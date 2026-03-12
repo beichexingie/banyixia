@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 import '../models/travel_post.dart';
 
 /// 旅行帖子状态管理
@@ -16,37 +16,34 @@ class PostProvider extends ChangeNotifier {
     notifyListeners();
 
     try {
-      final snapshot = await FirebaseFirestore.instance
-          .collection('posts')
-          .orderBy('createdAt', descending: true)
-          .get();
+      final response = await Supabase.instance.client
+          .from('posts')
+          .select()
+          .order('created_at', ascending: false);
 
-      if (snapshot.docs.isNotEmpty) {
-        _posts = snapshot.docs.map((doc) {
-          final data = doc.data();
+      if (response.isNotEmpty) {
+        _posts = response.map<TravelPost>((data) {
+          final contentStr = data['content']?.toString() ?? '分享动态';
           return TravelPost(
-            id: doc.id,
-            title: data['title'] ?? '',
-            subtitle: data['subtitle'],
-            content: data['content'],
-            coverImage: data['coverImage'] ?? '',
+            id: data['id'],
+            title: contentStr.length > 10 ? contentStr.substring(0, 10).split('\n').first : contentStr,
+            subtitle: contentStr.length > 20 ? '${contentStr.substring(0, 20)}...' : contentStr,
+            content: contentStr,
+            coverImage: (data['images'] != null && (data['images'] as List).isNotEmpty) ? (data['images'] as List).first : '',
             images: List<String>.from(data['images'] ?? []),
-            authorId: data['authorId'] ?? '',
-            authorName: data['authorName'] ?? '匿名用户',
-            authorAvatar: data['authorAvatar'] ?? '',
+            authorId: data['user_id'] ?? '',
+            authorName: data['author_name'] ?? '匿名用户',
+            authorAvatar: data['author_avatar'] ?? '',
             likes: data['likes'] ?? 0,
-            tag: data['tag'] ?? '',
-            createdAt: data['createdAt'] != null ? (data['createdAt'] as Timestamp).toDate() : DateTime.now(),
+            tag: data['location'] ?? '',
+            createdAt: data['created_at'] != null ? DateTime.parse(data['created_at']) : DateTime.now(),
           );
         }).toList();
-        
-        // 简单处理前端点赞状态（实际业务需用户关联的 likes 表记录）
-        // 这里只是为了避免覆盖列表原有点赞状态的复杂性做个简化
       } else {
         _loadMockPosts();
       }
     } catch (e) {
-      debugPrint('Firestore fetch posts error: $e');
+      debugPrint('Supabase fetch posts error: $e');
       _loadMockPosts();
     }
 
@@ -60,6 +57,7 @@ class PostProvider extends ChangeNotifier {
         id: '1',
         title: '云端暂无数据，这是本地占位 1',
         subtitle: '去发布第一篇帖子吧！',
+        content: '这是本地的一条Mock测试帖子',
         coverImage: 'https://picsum.photos/seed/chongqing/400/300',
         authorId: 'u1',
         authorName: '伴一下官方',
@@ -83,15 +81,16 @@ class PostProvider extends ChangeNotifier {
       notifyListeners();
 
       try {
-        await FirebaseFirestore.instance.collection('posts').doc(postId).update({
-          'likes': FieldValue.increment(newLikedState ? 1 : -1),
-        });
+        // Warning: if RLS policy prevents update of other's posts, this will fail silently and rollback UI
+        await Supabase.instance.client.from('posts').update({
+          'likes': _posts[index].likes,
+        }).eq('id', postId);
       } catch (e) {
         // 如果失败，回滚状态
         _posts[index].isLiked = !newLikedState;
         _posts[index].likes -= newLikedState ? 1 : -1;
         notifyListeners();
-        debugPrint('Firestore toggle like error: $e');
+        debugPrint('Supabase toggle like error: $e');
       }
     }
   }
@@ -110,23 +109,20 @@ class PostProvider extends ChangeNotifier {
     notifyListeners();
 
     try {
-      final docRef = await FirebaseFirestore.instance.collection('posts').add({
-        'title': title,
-        'subtitle': content.length > 20 ? '${content.substring(0, 20)}...' : content,
-        'content': content,
-        'coverImage': images.isNotEmpty ? images.first : '',
+      final newPostData = {
+        'user_id': authorId,
+        'author_name': authorName,
+        'author_avatar': authorAvatar,
+        'content': title + '\n' + content, // combined title and content
         'images': images,
-        'authorId': authorId,
-        'authorName': authorName,
-        'authorAvatar': authorAvatar,
-        'likes': 0,
-        'tag': tag,
-        'createdAt': FieldValue.serverTimestamp(),
-      });
+        'location': tag,
+      };
+
+      final response = await Supabase.instance.client.from('posts').insert(newPostData).select().single();
 
       // 成功后插入到本地首位并刷新 UI
       final newPost = TravelPost(
-        id: docRef.id,
+        id: response['id'],
         title: title,
         subtitle: content.length > 20 ? '${content.substring(0, 20)}...' : content,
         content: content,
@@ -137,13 +133,13 @@ class PostProvider extends ChangeNotifier {
         authorAvatar: authorAvatar,
         likes: 0,
         tag: tag,
-        createdAt: DateTime.now(),
+        createdAt: DateTime.parse(response['created_at']),
       );
       
       _posts.insert(0, newPost);
       
     } catch (e) {
-      debugPrint('Firestore add post error: $e');
+      debugPrint('Supabase add post error: $e');
       throw Exception('发布失败: $e');
     } finally {
       _isLoading = false;

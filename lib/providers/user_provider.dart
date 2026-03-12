@@ -1,14 +1,11 @@
 import 'package:flutter/material.dart';
-import 'package:flutter/foundation.dart' show kIsWeb;
-import 'package:firebase_auth/firebase_auth.dart' as firebase_auth;
-import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:supabase_flutter/supabase_flutter.dart' as supabase;
 import '../models/user.dart';
 
 class UserProvider extends ChangeNotifier {
   User _user = User.guest();
   bool _isLoading = false;
-  String? _verificationId;
-  firebase_auth.ConfirmationResult? _webConfirmationResult;
+  String? _pendingPhoneNumber;
 
   User get user => _user;
   bool get isLoading => _isLoading;
@@ -20,10 +17,11 @@ class UserProvider extends ChangeNotifier {
 
   void _initAuthListener() {
     try {
-      firebase_auth.FirebaseAuth.instance.authStateChanges().listen((firebaseUser) async {
-        if (firebaseUser != null) {
-          // User is signed in via Firebase Auth, now sync with Firestore
-          await _syncUserWithFirestore(firebaseUser);
+      supabase.Supabase.instance.client.auth.onAuthStateChange.listen((data) async {
+        final session = data.session;
+        if (session != null && session.user != null) {
+          // User is signed in via Supabase Auth, now sync with Supabase Database
+          await _syncUserWithDatabase(session.user!);
         } else {
           // User is signed out.
           _user = User.guest();
@@ -31,36 +29,39 @@ class UserProvider extends ChangeNotifier {
         }
       });
     } catch (e) {
-      debugPrint('FirebaseAuth Error: $e');
+      debugPrint('Supabase Auth Error: $e');
       _user = User.guest();
       notifyListeners();
     }
   }
 
-  Future<void> _syncUserWithFirestore(firebase_auth.User firebaseUser) async {
+  Future<void> _syncUserWithDatabase(supabase.User supaUser) async {
     try {
-      final docRef = FirebaseFirestore.instance.collection('users').doc(firebaseUser.uid);
-      final docSnap = await docRef.get();
+      final client = supabase.Supabase.instance.client;
+      final response = await client
+          .from('users')
+          .select()
+          .eq('id', supaUser.id)
+          .maybeSingle();
 
-      if (docSnap.exists) {
-        // User exists in Firestore, load their data
-        final data = docSnap.data()!;
+      if (response != null) {
+        // User exists in Database, load their data
         _user = User(
-          id: firebaseUser.uid,
-          nickname: data['nickname'] ?? firebaseUser.phoneNumber ?? '新用户',
-          avatar: data['avatar'] ?? 'https://picsum.photos/seed/user/100/100',
-          vipLevel: data['vipLevel'] ?? 1,
-          title: data['title'] ?? '初级旅行家',
-          balance: (data['balance'] ?? 0.0).toDouble(),
-          couponCount: data['couponCount'] ?? 0,
-          followCount: data['followCount'] ?? 0,
-          fansCount: data['fansCount'] ?? 0,
+          id: supaUser.id,
+          nickname: response['nickname'] ?? supaUser.phone ?? '新用户',
+          avatar: response['avatar'] ?? 'https://picsum.photos/seed/user/100/100',
+          vipLevel: response['vip_level'] ?? 1,
+          title: response['title'] ?? '初级旅行家',
+          balance: (response['balance'] ?? 0.0).toDouble(),
+          couponCount: response['coupon_count'] ?? 0,
+          followCount: response['follow_count'] ?? 0,
+          fansCount: response['fans_count'] ?? 0,
         );
       } else {
-        // New user, create a default profile in Firestore
+        // New user, create a default profile in Database
         _user = User(
-          id: firebaseUser.uid,
-          nickname: firebaseUser.phoneNumber ?? '新用户',
+          id: supaUser.id,
+          nickname: supaUser.phone ?? '新用户',
           avatar: 'https://picsum.photos/seed/user/100/100',
           vipLevel: 1,
           title: '初级旅行家',
@@ -70,26 +71,25 @@ class UserProvider extends ChangeNotifier {
           fansCount: 0,
         );
         
-        await docRef.set({
+        await client.from('users').insert({
           'id': _user.id,
           'nickname': _user.nickname,
           'avatar': _user.avatar,
-          'vipLevel': _user.vipLevel,
+          'vip_level': _user.vipLevel,
           'title': _user.title,
           'balance': _user.balance,
-          'couponCount': _user.couponCount,
-          'followCount': _user.followCount,
-          'fansCount': _user.fansCount,
-          'createdAt': FieldValue.serverTimestamp(),
+          'coupon_count': _user.couponCount,
+          'follow_count': _user.followCount,
+          'fans_count': _user.fansCount,
         });
       }
       notifyListeners();
     } catch (e) {
-      debugPrint('Firestore Sync Error: $e');
-      // Fallback to basic auth info if Firestore fails
+      debugPrint('Supabase Sync Error: $e');
+      // Fallback to basic auth info if Database fails
       _user = User(
-        id: firebaseUser.uid,
-        nickname: firebaseUser.phoneNumber ?? '新用户',
+        id: supaUser.id,
+        nickname: supaUser.phone ?? '新用户',
         avatar: 'https://picsum.photos/seed/user/100/100',
         vipLevel: 1,
         title: '初级旅行家',
@@ -107,65 +107,38 @@ class UserProvider extends ChangeNotifier {
     notifyListeners();
 
     try {
-      if (kIsWeb) {
-        // Web requires a slightly different flow with signInWithPhoneNumber which handles Recaptcha
-        _webConfirmationResult = await firebase_auth.FirebaseAuth.instance.signInWithPhoneNumber(
-          phoneNumber,
-        );
-        _isLoading = false;
-        notifyListeners();
-      } else {
-        // Android / iOS / Windows Flow
-        await firebase_auth.FirebaseAuth.instance.verifyPhoneNumber(
-          phoneNumber: phoneNumber,
-          verificationCompleted: (firebase_auth.PhoneAuthCredential credential) async {
-            await firebase_auth.FirebaseAuth.instance.signInWithCredential(credential);
-            _isLoading = false;
-            notifyListeners();
-          },
-          verificationFailed: (firebase_auth.FirebaseAuthException e) {
-            _isLoading = false;
-            notifyListeners();
-            throw Exception(e.message ?? '验证失败');
-          },
-          codeSent: (String verificationId, int? resendToken) {
-            _verificationId = verificationId;
-            _isLoading = false;
-            notifyListeners();
-          },
-          codeAutoRetrievalTimeout: (String verificationId) {
-            _verificationId = verificationId;
-          },
-        );
-      }
+      await supabase.Supabase.instance.client.auth.signInWithOtp(
+        phone: phoneNumber,
+      );
+      // Save the phone number so we can verify the OTP against it later
+      _pendingPhoneNumber = phoneNumber;
+      _isLoading = false;
+      notifyListeners();
     } catch (e) {
       _isLoading = false;
       notifyListeners();
       debugPrint("sendSmsCode error: $e");
+      if (e is supabase.AuthException) {
+        throw Exception('发送失败: ${e.message}');
+      }
       rethrow;
     }
   }
 
   Future<void> verifySmsCode(String smsCode) async {
+    if (_pendingPhoneNumber == null) {
+      throw Exception('请先获取验证码');
+    }
+    
     _isLoading = true;
     notifyListeners();
 
     try {
-      if (kIsWeb) {
-        if (_webConfirmationResult == null) {
-          throw Exception('验证码未发送或已过期');
-        }
-        await _webConfirmationResult!.confirm(smsCode);
-      } else {
-        if (_verificationId == null) {
-          throw Exception('验证码ID无效，请重新发送');
-        }
-        firebase_auth.PhoneAuthCredential credential = firebase_auth.PhoneAuthProvider.credential(
-          verificationId: _verificationId!,
-          smsCode: smsCode,
-        );
-        await firebase_auth.FirebaseAuth.instance.signInWithCredential(credential);
-      }
+      await supabase.Supabase.instance.client.auth.verifyOTP(
+        type: supabase.OtpType.sms,
+        phone: _pendingPhoneNumber,
+        token: smsCode,
+      );
       
       _isLoading = false;
       notifyListeners();
@@ -173,27 +146,30 @@ class UserProvider extends ChangeNotifier {
       _isLoading = false;
       notifyListeners();
       debugPrint("verifySmsCode error: $e");
-      throw Exception('验证码错误或已过期');
+      if (e is supabase.AuthException) {
+         throw Exception('验证码错误: ${e.message}');
+      }
+      throw Exception('验证失败');
     }
   }
 
   void logout() async {
-    await firebase_auth.FirebaseAuth.instance.signOut();
+    await supabase.Supabase.instance.client.auth.signOut();
   }
 
   Future<void> updateUser(User newUser) async {
     _user = newUser;
     notifyListeners();
     
-    // Also update in Firestore if logged in with Firebase
+    // Also update in Database if logged in with Supabase
     if (isLoggedIn && _user.id != 'mock_123') {
       try {
-        await FirebaseFirestore.instance.collection('users').doc(_user.id).update({
+        await supabase.Supabase.instance.client.from('users').update({
           'nickname': _user.nickname,
           'avatar': _user.avatar,
-        });
+        }).eq('id', _user.id);
       } catch (e) {
-        debugPrint('Error updating user in Firestore: $e');
+        debugPrint('Error updating user in Supabase: $e');
       }
     }
   }

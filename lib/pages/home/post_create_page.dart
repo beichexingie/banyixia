@@ -1,6 +1,9 @@
+import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:provider/provider.dart';
+import 'package:image_picker/image_picker.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 import '../../config/app_theme.dart';
 import '../../providers/post_provider.dart';
 import '../../providers/user_provider.dart';
@@ -15,14 +18,56 @@ class PostCreatePage extends StatefulWidget {
 class _PostCreatePageState extends State<PostCreatePage> {
   final _titleController = TextEditingController();
   final _contentController = TextEditingController();
-  final List<String> _images = [];
+  final List<File> _selectedImages = [];
   String _tag = '';
+  final ImagePicker _picker = ImagePicker();
+  bool _isUploading = false;
 
   @override
   void dispose() {
     _titleController.dispose();
     _contentController.dispose();
     super.dispose();
+  }
+
+  Future<void> _pickImage() async {
+    try {
+      final List<XFile> images = await _picker.pickMultiImage();
+      if (images.isNotEmpty) {
+        setState(() {
+          _selectedImages.addAll(images.map((img) => File(img.path)));
+        });
+      }
+    } catch (e) {
+      debugPrint('Error picking images: $e');
+    }
+  }
+
+  Future<List<String>> _uploadImages() async {
+    List<String> uploadedUrls = [];
+    final supabase = Supabase.instance.client;
+    
+    for (var file in _selectedImages) {
+      try {
+        final fileName = '${DateTime.now().millisecondsSinceEpoch}_${file.path.split('/').last}';
+        final filePath = 'uploads/$fileName';
+        
+        // Upload to 'post_images' bucket
+        await supabase.storage.from('post_images').upload(
+          filePath,
+          file,
+          fileOptions: const FileOptions(cacheControl: '3600', upsert: false),
+        );
+        
+        // Get public URL
+        final publicUrl = supabase.storage.from('post_images').getPublicUrl(filePath);
+        uploadedUrls.add(publicUrl);
+      } catch (e) {
+        debugPrint('Error uploading image: $e');
+        // Continue uploading others if one fails, or you could throw to abort
+      }
+    }
+    return uploadedUrls;
   }
 
   void _submitPost() async {
@@ -38,18 +83,36 @@ class _PostCreatePageState extends State<PostCreatePage> {
       return;
     }
     
-    // 模拟图片
-    if (_images.isEmpty) {
-      _images.add('https://picsum.photos/seed/${DateTime.now().millisecondsSinceEpoch}/400/300');
-    }
-
     final user = context.read<UserProvider>().user;
 
+    setState(() {
+      _isUploading = true;
+    });
+
     try {
+      List<String> imageUrls = [];
+      
+      // Real users upload images
+      if (user.id != '00000000-0000-0000-0000-000000000000') {
+        if (_selectedImages.isNotEmpty) {
+          imageUrls = await _uploadImages();
+        }
+      } else {
+        // Mock user just uses placeholders to bypass storage upload
+        if (_selectedImages.isEmpty) {
+          imageUrls.add('https://picsum.photos/seed/${DateTime.now().millisecondsSinceEpoch}/400/300');
+        } else {
+           // For mock user picking real image, just use placeholder as it won't be saved to DB anyway
+           imageUrls.add('https://picsum.photos/seed/${DateTime.now().millisecondsSinceEpoch}/400/300');
+        }
+      }
+
+      if (!mounted) return;
+
       await context.read<PostProvider>().addPost(
         title: _titleController.text,
         content: _contentController.text,
-        images: _images,
+        images: imageUrls,
         authorId: user.id,
         authorName: user.nickname,
         authorAvatar: user.avatar,
@@ -78,6 +141,12 @@ class _PostCreatePageState extends State<PostCreatePage> {
           ),
         );
       }
+    } finally {
+      if (mounted) {
+        setState(() {
+          _isUploading = false;
+        });
+      }
     }
   }
 
@@ -88,14 +157,14 @@ class _PostCreatePageState extends State<PostCreatePage> {
       appBar: AppBar(
         leading: IconButton(
           icon: const Icon(Icons.close),
-          onPressed: () => context.pop(),
+          onPressed: _isUploading ? null : () => context.pop(),
         ),
         title: const Text('发布新帖'),
         actions: [
           Padding(
             padding: const EdgeInsets.only(right: 12.0, top: 10.0, bottom: 10.0),
             child: ElevatedButton(
-              onPressed: _submitPost,
+              onPressed: _isUploading ? null : _submitPost,
               style: ElevatedButton.styleFrom(
                 backgroundColor: AppColors.primary,
                 foregroundColor: Colors.white,
@@ -103,53 +172,73 @@ class _PostCreatePageState extends State<PostCreatePage> {
                 padding: const EdgeInsets.symmetric(horizontal: 20),
                 elevation: 0,
               ),
-              child: const Text('发布', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14)),
+              child: _isUploading 
+                ? const SizedBox(width: 20, height: 20, child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2))
+                : const Text('发布', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14)),
             ),
           ),
         ],
       ),
-      body: SingleChildScrollView(
-        padding: const EdgeInsets.all(20),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            // 图片选择区
-            Wrap(
-              spacing: 12,
-              runSpacing: 12,
+      body: Stack(
+        children: [
+          SingleChildScrollView(
+            padding: const EdgeInsets.all(20),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                ..._images.map((img) => Container(
-                  width: 100, height: 100,
-                  decoration: BoxDecoration(
-                    borderRadius: BorderRadius.circular(12),
-                    image: DecorationImage(image: NetworkImage(img), fit: BoxFit.cover),
-                  ),
-                )),
-                GestureDetector(
-                  onTap: () {
-                    setState(() {
-                      _images.add('https://picsum.photos/seed/${DateTime.now().millisecondsSinceEpoch}/400/300');
-                    });
-                  },
-                  child: Container(
-                    width: 100, height: 100,
-                    decoration: BoxDecoration(
-                      color: AppColors.tagBackground,
-                      borderRadius: BorderRadius.circular(12),
-                      border: Border.all(color: AppColors.divider),
-                    ),
-                    child: const Column(
-                      mainAxisAlignment: MainAxisAlignment.center,
+                // 图片选择区
+                Wrap(
+                  spacing: 12,
+                  runSpacing: 12,
+                  children: [
+                    ..._selectedImages.map((file) => Stack(
                       children: [
-                        Icon(Icons.add_a_photo, color: AppColors.primary, size: 28),
-                        SizedBox(height: 4),
-                        Text('添加图片', style: TextStyle(color: AppColors.textSecondary, fontSize: 12)),
+                        Container(
+                          width: 100, height: 100,
+                          decoration: BoxDecoration(
+                            borderRadius: BorderRadius.circular(12),
+                            image: DecorationImage(image: FileImage(file), fit: BoxFit.cover),
+                          ),
+                        ),
+                        Positioned(
+                          right: 4, top: 4,
+                          child: GestureDetector(
+                            onTap: () {
+                              setState(() {
+                                _selectedImages.remove(file);
+                              });
+                            },
+                            child: Container(
+                              padding: const EdgeInsets.all(2),
+                              decoration: const BoxDecoration(color: Colors.black54, shape: BoxShape.circle),
+                              child: const Icon(Icons.close, color: Colors.white, size: 16),
+                            ),
+                          ),
+                        )
                       ],
-                    ),
-                  ),
+                    )),
+                    if (_selectedImages.length < 9)
+                      GestureDetector(
+                        onTap: _pickImage,
+                        child: Container(
+                          width: 100, height: 100,
+                          decoration: BoxDecoration(
+                            color: AppColors.tagBackground,
+                            borderRadius: BorderRadius.circular(12),
+                            border: Border.all(color: AppColors.divider),
+                          ),
+                          child: const Column(
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            children: [
+                              Icon(Icons.add_a_photo, color: AppColors.primary, size: 28),
+                              SizedBox(height: 4),
+                              Text('添加图片', style: TextStyle(color: AppColors.textSecondary, fontSize: 12)),
+                            ],
+                          ),
+                        ),
+                      ),
+                  ],
                 ),
-              ],
-            ),
             const SizedBox(height: 24),
             
             // 标题
@@ -248,6 +337,9 @@ class _PostCreatePageState extends State<PostCreatePage> {
           ],
         ),
       ),
+        ],
+      ),
     );
   }
 }
+

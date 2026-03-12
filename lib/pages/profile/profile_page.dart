@@ -1,8 +1,11 @@
+import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import 'package:image_picker/image_picker.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 import '../../config/app_theme.dart';
 import '../../models/order.dart';
-import '../../models/user.dart';
+import '../../models/user.dart' as app_model;
 import '../../providers/user_provider.dart';
 import '../../providers/order_provider.dart';
 import 'package:go_router/go_router.dart';
@@ -36,99 +39,13 @@ class ProfilePage extends StatelessWidget {
 
   // ==================== 编辑资料 ====================
   void _showEditProfile(BuildContext context) {
-    final userProvider = context.read<UserProvider>();
-    final user = userProvider.user;
-    final nicknameController = TextEditingController(text: user.nickname);
-
     showDialog(
       context: context,
-      builder: (ctx) {
-        return AlertDialog(
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-          title: const Text('编辑资料'),
-          content: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              // 头像
-              GestureDetector(
-                onTap: () {
-                  Navigator.pop(ctx);
-                  _showSnack(context, '请在此处接入图片选择与 Firebase Storage 上传');
-                },
-                child: Stack(
-                  children: [
-                    const CircleAvatar(
-                      radius: 40,
-                      backgroundColor: Color(0xFFE0E0E0),
-                      child: Icon(Icons.person, size: 40, color: Colors.white),
-                    ),
-                    Positioned(
-                      bottom: 0, right: 0,
-                      child: Container(
-                        width: 28, height: 28,
-                        decoration: BoxDecoration(
-                          color: AppColors.primary,
-                          shape: BoxShape.circle,
-                          border: Border.all(color: Colors.white, width: 2),
-                        ),
-                        child: const Icon(Icons.camera_alt, size: 14, color: Colors.white),
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-              const SizedBox(height: 20),
-              TextField(
-                controller: nicknameController,
-                decoration: InputDecoration(
-                  labelText: '昵称',
-                  border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
-                  focusedBorder: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(12),
-                    borderSide: const BorderSide(color: AppColors.primary),
-                  ),
-                ),
-              ),
-            ],
-          ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.pop(ctx),
-              child: const Text('取消', style: TextStyle(color: AppColors.textHint)),
-            ),
-            ElevatedButton(
-              onPressed: () {
-                final newName = nicknameController.text.trim();
-                if (newName.isNotEmpty) {
-                  userProvider.updateUser(
-                    User(
-                      id: user.id,
-                      nickname: newName,
-                      avatar: user.avatar,
-                      vipLevel: user.vipLevel,
-                      title: user.title,
-                      balance: user.balance,
-                      couponCount: user.couponCount,
-                      followCount: user.followCount,
-                      fansCount: user.fansCount,
-                    ),
-                  );
-                }
-                Navigator.pop(ctx);
-                _showSnack(context, '资料已更新');
-              },
-              style: ElevatedButton.styleFrom(
-                backgroundColor: AppColors.primary,
-                foregroundColor: Colors.white,
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-              ),
-              child: const Text('保存'),
-            ),
-          ],
-        );
-      },
+      builder: (ctx) => const _EditProfileDialog(),
     );
   }
+
+
 
   // ==================== 评头衔与福利 ====================
   void _showTitleModal(BuildContext context) {
@@ -316,9 +233,11 @@ class ProfilePage extends StatelessWidget {
                             border: Border.all(color: Colors.white, width: 3),
                             color: Colors.white.withValues(alpha: 0.3),
                           ),
-                          child: const CircleAvatar(
-                            radius: 31, backgroundColor: Color(0xFFE0E0E0),
-                            child: Icon(Icons.person, size: 36, color: Colors.white),
+                          child: CircleAvatar(
+                            radius: 31, 
+                            backgroundColor: const Color(0xFFE0E0E0),
+                            backgroundImage: user.avatar.isNotEmpty ? NetworkImage(user.avatar) : null,
+                            child: user.avatar.isEmpty ? const Icon(Icons.person, size: 36, color: Colors.white) : null,
                           ),
                         ),
                         const SizedBox(width: 16),
@@ -328,7 +247,13 @@ class ProfilePage extends StatelessWidget {
                             children: [
                               Row(
                                 children: [
-                                  Text(user.nickname, style: const TextStyle(fontSize: 20, fontWeight: FontWeight.bold, color: Colors.white)),
+                                  Flexible(
+                                    child: Text(
+                                      user.nickname, 
+                                      style: const TextStyle(fontSize: 20, fontWeight: FontWeight.bold, color: Colors.white),
+                                      overflow: TextOverflow.ellipsis,
+                                    ),
+                                  ),
                                   const SizedBox(width: 8),
                                   if (user.vipLabel.isNotEmpty)
                                     Container(
@@ -345,13 +270,23 @@ class ProfilePage extends StatelessWidget {
                               const SizedBox(height: 6),
                               Row(
                                 children: [
-                                  Text('ID: ${user.id}', style: TextStyle(fontSize: 13, color: Colors.white.withValues(alpha: 0.85))),
-                                  if (user.title.isNotEmpty) ...[
-                                    const SizedBox(width: 12),
-                                    Text('解锁【${user.title}】身份', style: TextStyle(fontSize: 12, color: Colors.white.withValues(alpha: 0.75))),
-                                  ],
+                                  Expanded(
+                                    child: Text(
+                                      'ID: ${user.id}', 
+                                      style: TextStyle(fontSize: 13, color: Colors.white.withValues(alpha: 0.85)),
+                                      overflow: TextOverflow.ellipsis,
+                                    ),
+                                  ),
                                 ],
                               ),
+                              if (user.title.isNotEmpty) ...[
+                                const SizedBox(height: 4),
+                                Text(
+                                  '解锁【${user.title}】身份', 
+                                  style: TextStyle(fontSize: 12, color: Colors.white.withValues(alpha: 0.75)),
+                                  overflow: TextOverflow.ellipsis,
+                                ),
+                              ],
                             ],
                           ),
                         ),
@@ -584,6 +519,205 @@ class ProfilePage extends StatelessWidget {
           const Text('暂无数据', style: TextStyle(fontSize: 14, color: AppColors.textHint)),
         ],
       ),
+    );
+  }
+}
+
+class _EditProfileDialog extends StatefulWidget {
+  const _EditProfileDialog();
+
+  @override
+  State<_EditProfileDialog> createState() => _EditProfileDialogState();
+}
+
+class _EditProfileDialogState extends State<_EditProfileDialog> {
+  late TextEditingController _nicknameController;
+  late UserProvider _userProvider;
+  File? _selectedAvatar;
+  bool _isUploading = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _userProvider = context.read<UserProvider>();
+    _nicknameController = TextEditingController(text: _userProvider.user.nickname);
+  }
+
+  @override
+  void dispose() {
+    _nicknameController.dispose();
+    super.dispose();
+  }
+
+  Future<void> _pickAndUploadAvatar() async {
+    final picker = ImagePicker();
+    try {
+      final XFile? image = await picker.pickImage(source: ImageSource.gallery);
+      if (image != null) {
+        setState(() {
+          _selectedAvatar = File(image.path);
+        });
+      }
+    } catch (e) {
+      debugPrint('Error picking avatar: $e');
+    }
+  }
+
+  Future<void> _saveProfile() async {
+    final newName = _nicknameController.text.trim();
+    if (newName.isEmpty) return;
+
+    final user = _userProvider.user;
+    String finalAvatarUrl = user.avatar;
+
+    setState(() {
+      _isUploading = true;
+    });
+
+    try {
+      // Mock user bypasses real upload
+      if (user.id != '00000000-0000-0000-0000-000000000000' && _selectedAvatar != null) {
+        final supabase = Supabase.instance.client;
+        final fileName = '${user.id}_${DateTime.now().millisecondsSinceEpoch}.jpg';
+        final filePath = 'uploads/$fileName';
+
+        await supabase.storage.from('avatars').upload(
+          filePath,
+          _selectedAvatar!,
+          fileOptions: const FileOptions(cacheControl: '3600', upsert: true),
+        );
+
+        finalAvatarUrl = supabase.storage.from('avatars').getPublicUrl(filePath);
+      } else if (_selectedAvatar != null) {
+        // Mock user local preview URL (won't persist across restarts but updates UI)
+         finalAvatarUrl = 'https://picsum.photos/seed/${DateTime.now().millisecondsSinceEpoch}/100/100';
+      }
+
+      await _userProvider.updateUser(
+        app_model.User(
+          id: user.id,
+          nickname: newName,
+          avatar: finalAvatarUrl,
+          vipLevel: user.vipLevel,
+          title: user.title,
+          balance: user.balance,
+          couponCount: user.couponCount,
+          followCount: user.followCount,
+          fansCount: user.fansCount,
+        ),
+      );
+
+      if (mounted) {
+        Navigator.pop(context);
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: const Text('资料已更新'),
+            backgroundColor: AppColors.primary,
+            behavior: SnackBarBehavior.floating,
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+          ),
+        );
+      }
+    } catch (e) {
+      debugPrint('Error saving profile: $e');
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('上传头像失败'), backgroundColor: Colors.red),
+        );
+      }
+    } finally {
+      if (mounted) {
+        setState(() {
+          _isUploading = false;
+        });
+      }
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final user = _userProvider.user;
+    
+    return AlertDialog(
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+      title: const Text('编辑资料'),
+      content: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          // 头像
+          GestureDetector(
+            onTap: _isUploading ? null : _pickAndUploadAvatar,
+            child: Stack(
+              children: [
+                CircleAvatar(
+                  radius: 40,
+                  backgroundColor: const Color(0xFFE0E0E0),
+                  backgroundImage: _selectedAvatar != null 
+                      ? FileImage(_selectedAvatar!) as ImageProvider
+                      : NetworkImage(user.avatar),
+                  child: _selectedAvatar == null && user.avatar.isEmpty
+                      ? const Icon(Icons.person, size: 40, color: Colors.white)
+                      : null,
+                ),
+                Positioned(
+                  bottom: 0, right: 0,
+                  child: Container(
+                    width: 28, height: 28,
+                    decoration: BoxDecoration(
+                      color: AppColors.primary,
+                      shape: BoxShape.circle,
+                      border: Border.all(color: Colors.white, width: 2),
+                    ),
+                    child: const Icon(Icons.camera_alt, size: 14, color: Colors.white),
+                  ),
+                ),
+                if (_isUploading)
+                  Positioned.fill(
+                    child: Container(
+                      decoration: const BoxDecoration(
+                        color: Colors.black45,
+                        shape: BoxShape.circle,
+                      ),
+                      child: const Center(
+                        child: CircularProgressIndicator(color: Colors.white),
+                      ),
+                    ),
+                  ),
+              ],
+            ),
+          ),
+          const SizedBox(height: 20),
+          TextField(
+            controller: _nicknameController,
+            enabled: !_isUploading,
+            decoration: InputDecoration(
+              labelText: '昵称',
+              border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+              focusedBorder: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(12),
+                borderSide: const BorderSide(color: AppColors.primary),
+              ),
+            ),
+          ),
+        ],
+      ),
+      actions: [
+        TextButton(
+          onPressed: _isUploading ? null : () => Navigator.pop(context),
+          child: const Text('取消', style: TextStyle(color: AppColors.textHint)),
+        ),
+        ElevatedButton(
+          onPressed: _isUploading ? null : _saveProfile,
+          style: ElevatedButton.styleFrom(
+            backgroundColor: AppColors.primary,
+            foregroundColor: Colors.white,
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+          ),
+          child: _isUploading 
+              ? const SizedBox(width: 16, height: 16, child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2))
+              : const Text('保存'),
+        ),
+      ],
     );
   }
 }

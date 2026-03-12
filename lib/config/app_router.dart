@@ -1,3 +1,4 @@
+import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import '../providers/user_provider.dart';
 import '../providers/post_provider.dart';
@@ -16,6 +17,8 @@ import '../pages/profile/help_feedback_page.dart';
 import '../pages/profile/coupons_page.dart';
 import '../pages/profile/balance_page.dart';
 import '../pages/profile/orders_page.dart';
+import '../pages/order/order_create_page.dart';
+import '../models/guide.dart';
 
 class AppRouter {
   final UserProvider userProvider;
@@ -108,6 +111,16 @@ class AppRouter {
       GoRoute(
         path: '/travel_plan/create',
         builder: (context, state) => const TravelPlanCreatePage(),
+      ),
+      GoRoute(
+        path: '/order_create',
+        builder: (context, state) {
+          final guide = state.extra as Guide?;
+          if (guide == null) {
+            return const Scaffold(body: Center(child: Text('Error: Guide data missing')));
+          }
+          return OrderCreatePage(guide: guide);
+        },
       ),
     ],
   );

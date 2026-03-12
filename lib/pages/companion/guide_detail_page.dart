@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:cached_network_image/cached_network_image.dart';
+import 'package:go_router/go_router.dart';
 import '../../models/guide.dart';
 import '../../config/app_theme.dart';
 
@@ -57,297 +58,364 @@ class _GuideDetailPageState extends State<GuideDetailPage> {
     );
   }
 
-  Widget _buildStat(String label, String value) {
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      backgroundColor: Colors.white,
+      body: DefaultTabController(
+        length: 2,
+        child: NestedScrollView(
+          headerSliverBuilder: (context, innerBoxIsScrolled) {
+            return [
+              SliverAppBar(
+                expandedHeight: 380, // 调整为合适的高度
+                pinned: true,
+                floating: false,
+                backgroundColor: Colors.white,
+                elevation: 0,
+                leading: IconButton(
+                  icon: Container(
+                    padding: const EdgeInsets.all(6),
+                    decoration: BoxDecoration(color: Colors.black.withValues(alpha: 0.3), shape: BoxShape.circle),
+                    child: const Icon(Icons.arrow_back_ios_new, color: Colors.white, size: 18),
+                  ),
+                  onPressed: () => context.pop(),
+                ),
+                actions: [
+                  IconButton(
+                    icon: Container(
+                      padding: const EdgeInsets.all(6),
+                      decoration: BoxDecoration(color: Colors.black.withValues(alpha: 0.3), shape: BoxShape.circle),
+                      child: const Icon(Icons.more_horiz, color: Colors.white, size: 18),
+                    ),
+                    onPressed: _showShareModal,
+                  ),
+                ],
+                flexibleSpace: FlexibleSpaceBar(
+                  collapseMode: CollapseMode.pin,
+                  background: _buildTopProfileArea(),
+                ),
+                bottom: PreferredSize(
+                  preferredSize: const Size.fromHeight(50),
+                  child: Container(
+                    decoration: const BoxDecoration(
+                      color: Colors.white,
+                      borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+                      boxShadow: [
+                        BoxShadow(color: Colors.black12, blurRadius: 4, offset: Offset(0, -2))
+                      ],
+                    ),
+                    child: const TabBar(
+                      labelColor: AppColors.textPrimary,
+                      unselectedLabelColor: AppColors.textHint,
+                      indicatorColor: AppColors.textPrimary,
+                      indicatorWeight: 3,
+                      indicatorSize: TabBarIndicatorSize.label,
+                      tabs: [
+                        Tab(text: '服务'),
+                        Tab(text: '笔记'),
+                      ],
+                    ),
+                  ),
+                ),
+              ),
+            ];
+          },
+          body: TabBarView(
+            children: [
+              _buildServiceTab(),
+              _buildNoteTab(),
+            ],
+          ),
+        ),
+      ),
+      bottomNavigationBar: _buildBottomBar(),
+    );
+  }
+
+  Widget _buildTopProfileArea() {
     return Column(
       children: [
-        Text(value, style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: AppColors.textPrimary)),
-        const SizedBox(height: 4),
-        Text(label, style: const TextStyle(fontSize: 12, color: AppColors.textSecondary)),
+        // 顶部背景
+        Stack(
+          clipBehavior: Clip.none,
+          children: [
+            Container(
+              height: 200,
+              color: Colors.grey[300], // 背景图占位
+              alignment: Alignment.center,
+              child: const Text('个人背景图', style: TextStyle(color: Colors.grey, fontSize: 18)),
+            ),
+            // 头像
+            Positioned(
+              left: 20,
+              bottom: -40,
+              child: Container(
+                width: 90, height: 90,
+                decoration: BoxDecoration(
+                  shape: BoxShape.circle, 
+                  border: Border.all(color: Colors.white, width: 4),
+                  boxShadow: [BoxShadow(color: Colors.black.withValues(alpha: 0.1), blurRadius: 8, offset: const Offset(0, 2))],
+                ),
+                child: ClipOval(
+                  child: CachedNetworkImage(
+                    imageUrl: widget.guide.avatar, fit: BoxFit.cover,
+                    placeholder: (context, url) => const ColoredBox(color: Colors.grey),
+                    errorWidget: (context, url, error) => const ColoredBox(color: AppColors.tagBackground, child: Icon(Icons.person, size: 40)),
+                  ),
+                ),
+              ),
+            ),
+          ],
+        ),
+        const SizedBox(height: 50), // 留出头像偏移的空间
+        // 个人信息
+        Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 20),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                children: [
+                  Text(widget.guide.name, style: const TextStyle(fontSize: 22, fontWeight: FontWeight.bold)),
+                  const SizedBox(width: 8),
+                  if (widget.guide.verified)
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                      decoration: BoxDecoration(color: const Color(0xFFFF9A3E).withValues(alpha: 0.1), borderRadius: BorderRadius.circular(4)),
+                      child: const Text('已认证', style: TextStyle(color: Color(0xFFFF9A3E), fontSize: 10, fontWeight: FontWeight.bold)),
+                    ),
+                ],
+              ),
+              const SizedBox(height: 6),
+              Text('ID: ${widget.guide.id.length > 8 ? widget.guide.id.substring(0,8) : widget.guide.id}', style: const TextStyle(color: AppColors.textHint, fontSize: 13)),
+              const SizedBox(height: 12),
+              // Tags
+              if (widget.guide.tags.isNotEmpty)
+                Wrap(
+                  spacing: 8, runSpacing: 6,
+                  children: widget.guide.tags.map((t) => Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                    decoration: BoxDecoration(color: Colors.grey[200], borderRadius: BorderRadius.circular(4)),
+                    child: Text(t, style: const TextStyle(fontSize: 12, color: AppColors.textSecondary)),
+                  )).toList(),
+                ),
+              const SizedBox(height: 16),
+              // 地区与接单统计
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  Row(
+                    children: [
+                      const Icon(Icons.location_on, size: 14, color: AppColors.textHint),
+                      const SizedBox(width: 4),
+                      Text('常驻: ${widget.guide.city}', style: const TextStyle(fontSize: 12, color: AppColors.textSecondary)),
+                    ],
+                  ),
+                  const Text('接单 23 · 好评率 100%', style: TextStyle(fontSize: 12, color: AppColors.textSecondary)),
+                ],
+              ),
+              const SizedBox(height: 20),
+            ],
+          ),
+        ),
       ],
     );
   }
 
-  @override
-  Widget build(BuildContext context) {
-    return Scaffold(
-      backgroundColor: AppColors.background,
-      body: CustomScrollView(
-        slivers: [
-          // 沉浸式头部
-          SliverAppBar(
-            expandedHeight: 240,
-            pinned: true,
-            stretch: true,
-            backgroundColor: AppColors.primary,
-            elevation: 0,
-            leading: IconButton(
-              icon: const Icon(Icons.arrow_back_ios_new, color: Colors.white, size: 20),
-              onPressed: () => Navigator.pop(context),
-            ),
-            actions: [
-              IconButton(
-                icon: const Icon(Icons.share_outlined, color: Colors.white),
-                onPressed: _showShareModal,
-              ),
-              IconButton(
-                icon: const Icon(Icons.more_horiz, color: Colors.white),
-                onPressed: () {},
-              ),
+  Widget _buildServiceTab() {
+    return ListView(
+      padding: const EdgeInsets.all(20),
+      children: [
+        // 八维属性图 (Mock)
+        Container(
+          padding: const EdgeInsets.symmetric(vertical: 20, horizontal: 10),
+          decoration: BoxDecoration(color: const Color(0xFFF9F9F9), borderRadius: BorderRadius.circular(12)),
+          child: const Row(
+            mainAxisAlignment: MainAxisAlignment.spaceAround,
+            children: [
+              _AttrStat('人品', '极好'), _AttrStat('靠谱', '极高'), _AttrStat('阅历', '丰富'), _AttrStat('品味', '较佳'),
             ],
-            flexibleSpace: FlexibleSpaceBar(
-              stretchModes: const [StretchMode.zoomBackground],
-              background: Stack(
-                fit: StackFit.expand,
-                children: [
-                  // 背景图
-                  CachedNetworkImage(
-                    imageUrl: 'https://images.unsplash.com/photo-1469474968028-56623f02e42e?auto=format&fit=crop&q=80&w=1000',
-                    fit: BoxFit.cover,
-                  ),
-                  // 渐变蒙层
-                  Container(
-                    decoration: BoxDecoration(
-                      gradient: LinearGradient(
-                        begin: Alignment.topCenter,
-                        end: Alignment.bottomCenter,
-                        colors: [
-                          Colors.black.withValues(alpha: 0.3),
-                          Colors.transparent,
-                          Colors.black.withValues(alpha: 0.5),
-                        ],
-                      ),
-                    ),
-                  ),
-                  // 底部内容
-                  Positioned(
-                    left: 20,
-                    right: 20,
-                    bottom: 20,
-                    child: Row(
-                      crossAxisAlignment: CrossAxisAlignment.end,
-                      children: [
-                        // 头像
-                        Container(
-                          decoration: BoxDecoration(
-                            shape: BoxShape.circle,
-                            border: Border.all(color: Colors.white, width: 3),
-                            boxShadow: [
-                              BoxShadow(color: Colors.black.withValues(alpha: 0.2), blurRadius: 10, offset: const Offset(0, 4))
-                            ],
-                          ),
-                          child: ClipOval(
-                            child: CachedNetworkImage(
-                              imageUrl: widget.guide.avatar, width: 80, height: 80, fit: BoxFit.cover,
-                              placeholder: (context, url) => Container(width: 80, height: 80, color: Colors.white24),
-                              errorWidget: (context, url, error) => const CircleAvatar(radius: 40, child: Icon(Icons.person)),
-                            ),
-                          ),
-                        ),
-                        const SizedBox(width: 16),
-                        Expanded(
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            mainAxisSize: MainAxisSize.min,
-                            children: [
-                              Row(
-                                children: [
-                                  Text(widget.guide.name, style: const TextStyle(fontSize: 24, fontWeight: FontWeight.bold, color: Colors.white)),
-                                  const SizedBox(width: 8),
-                                  if (widget.guide.verified)
-                                    const Icon(Icons.verified, size: 20, color: Color(0xFF4CAF50)),
-                                ],
-                              ),
-                              const SizedBox(height: 4),
-                              Row(
-                                children: [
-                                  const Icon(Icons.star, size: 14, color: AppColors.starColor),
-                                  const SizedBox(width: 4),
-                                  Text('${widget.guide.rating} · ${widget.guide.city}', style: const TextStyle(color: Colors.white, fontSize: 14)),
-                                ],
-                              ),
-                            ],
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                ],
-              ),
-            ),
           ),
-          
-          // 内容区域
-          SliverToBoxAdapter(
-            child: Column(
-              children: [
-                // 数据面板
-                Container(
-                  margin: const EdgeInsets.fromLTRB(16, 16, 16, 8),
-                  padding: const EdgeInsets.symmetric(vertical: 20, horizontal: 24),
-                  decoration: BoxDecoration(
-                    color: Colors.white,
-                    borderRadius: BorderRadius.circular(20),
-                    boxShadow: [
-                      BoxShadow(color: Colors.black.withValues(alpha: 0.03), blurRadius: 10, offset: const Offset(0, 4))
-                    ],
-                  ),
-                  child: Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                    children: [
-                      _buildStat('访问', '${widget.guide.views}'),
-                      _buildStat('获赞', '${widget.guide.likes}'),
-                      _buildStat('案例', '12'), // 示例数据
-                      _buildStat('粉丝', '${widget.guide.fans}'),
-                    ],
-                  ),
-                ),
+        ),
+        const SizedBox(height: 10),
+        Container(
+          padding: const EdgeInsets.symmetric(vertical: 20, horizontal: 10),
+          decoration: BoxDecoration(color: const Color(0xFFF9F9F9), borderRadius: BorderRadius.circular(12)),
+          child: const Row(
+            mainAxisAlignment: MainAxisAlignment.spaceAround,
+            children: [
+              _AttrStat('颜值', '出众'), _AttrStat('身材', '匀称'), _AttrStat('才艺', '多样'), _AttrStat('体能', '充沛'),
+            ],
+          ),
+        ),
+        const SizedBox(height: 24),
+        
+        const Text('个性介绍:', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
+        const SizedBox(height: 10),
+        Container(
+          width: double.infinity,
+          padding: const EdgeInsets.all(16),
+          decoration: BoxDecoration(
+            color: const Color(0xFFF9F9F9), 
+            borderRadius: BorderRadius.circular(12),
+            border: Border.all(color: AppColors.divider.withValues(alpha: 0.3)),
+          ),
+          child: Text(widget.guide.description, style: const TextStyle(color: AppColors.textPrimary, height: 1.6, fontSize: 14)),
+        ),
+        const SizedBox(height: 24),
 
-                // 详细信息卡片
-                Container(
-                  width: double.infinity,
-                  margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-                  padding: const EdgeInsets.all(24),
-                  decoration: BoxDecoration(
-                    color: Colors.white,
-                    borderRadius: BorderRadius.circular(20),
-                  ),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      // 标签
-                      if (widget.guide.tags.isNotEmpty) ...[
-                        const Text('个人标签', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
-                        const SizedBox(height: 16),
-                        Wrap(
-                          spacing: 12, runSpacing: 12,
-                          children: widget.guide.tags.map((tag) => _buildTag(tag)).toList(),
-                        ),
-                        const SizedBox(height: 32),
-                      ],
-                      // 简介
-                      const Text('向导简介', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
-                      const SizedBox(height: 12),
-                      Text(widget.guide.description, style: const TextStyle(fontSize: 15, color: AppColors.textSecondary, height: 1.8)),
-                      const SizedBox(height: 32),
-                      // 向导风采
-                      if (widget.guide.images.isNotEmpty) ...[
-                        const Text('服务展示', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
-                        const SizedBox(height: 16),
-                        SizedBox(
-                          height: 160,
-                          child: ListView.separated(
-                            scrollDirection: Axis.horizontal,
-                            itemCount: widget.guide.images.length,
-                            separatorBuilder: (context, index) => const SizedBox(width: 12),
-                            itemBuilder: (context, index) {
-                              return ClipRRect(
-                                borderRadius: BorderRadius.circular(16),
-                                child: CachedNetworkImage(
-                                  imageUrl: widget.guide.images[index], width: 220, height: 160, fit: BoxFit.cover,
-                                  placeholder: (context, url) => Container(width: 220, height: 160, color: AppColors.tagBackground),
-                                ),
-                              );
-                            },
-                          ),
-                        ),
-                      ],
-                    ],
-                  ),
-                ),
-                const SizedBox(height: 120), // 留出底部按钮的空间
+        const Text('服务类型说明:', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
+        const SizedBox(height: 10),
+        Container(
+          width: double.infinity,
+          padding: const EdgeInsets.all(16),
+          decoration: BoxDecoration(
+            color: const Color(0xFFF9F9F9), 
+            borderRadius: BorderRadius.circular(12),
+            border: Border.all(color: AppColors.divider.withValues(alpha: 0.3)),
+          ),
+          child: const Text('提供本地导游、代驾打卡、包车解说等多项旅行服务。', style: TextStyle(color: AppColors.textPrimary, height: 1.6, fontSize: 14)),
+        ),
+        const SizedBox(height: 24),
+
+        const Text('额外费用说明:', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
+        const SizedBox(height: 10),
+        Container(
+          width: double.infinity,
+          padding: const EdgeInsets.all(16),
+          decoration: BoxDecoration(
+            color: const Color(0xFFF9F9F9), 
+            borderRadius: BorderRadius.circular(12),
+            border: Border.all(color: AppColors.divider.withValues(alpha: 0.3)),
+          ),
+          child: const Text('餐饮门票需由雇主承担（协商）。', style: TextStyle(color: AppColors.textPrimary, height: 1.6, fontSize: 14)),
+        ),
+        const SizedBox(height: 24),
+
+        const Text('服务范围:', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
+        const SizedBox(height: 10),
+        Container(
+          width: double.infinity,
+          padding: const EdgeInsets.all(16),
+          decoration: BoxDecoration(
+            color: const Color(0xFFF9F9F9), 
+            borderRadius: BorderRadius.circular(12),
+            border: Border.all(color: AppColors.divider.withValues(alpha: 0.3)),
+          ),
+          child: Text(widget.guide.city, style: const TextStyle(color: AppColors.textPrimary, height: 1.6, fontSize: 14)),
+        ),
+        const SizedBox(height: 30),
+
+        // 用户评价
+        const Row(
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          crossAxisAlignment: CrossAxisAlignment.end,
+          children: [
+            Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text('用户评价(29)', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
+                SizedBox(height: 4),
+                Text('来自29位真实用户参与评分', style: TextStyle(fontSize: 12, color: AppColors.textHint)),
+              ],
+            ),
+            Text('5.0', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 32, color: Color(0xFFFF9A3E))),
+          ],
+        ),
+        const SizedBox(height: 80), 
+      ],
+    );
+  }
+
+  Widget _buildNoteTab() {
+    return ListView(
+      padding: const EdgeInsets.all(20),
+      children: [
+        if (widget.guide.images.isNotEmpty) ...[
+          const Text('服务案例与照片', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
+          const SizedBox(height: 16),
+          Wrap(
+            spacing: 10, runSpacing: 10,
+            children: widget.guide.images.map((img) => ClipRRect(
+              borderRadius: BorderRadius.circular(8),
+              child: CachedNetworkImage(
+                imageUrl: img, width: (MediaQuery.of(context).size.width - 60) / 3, height: (MediaQuery.of(context).size.width - 60) / 3, fit: BoxFit.cover, 
+                placeholder: (context, url) => Container(width: (MediaQuery.of(context).size.width - 60) / 3, height: (MediaQuery.of(context).size.width - 60) / 3, color: AppColors.tagBackground),
+                errorWidget: (context, url, err) => Container(width: (MediaQuery.of(context).size.width - 60) / 3, height: (MediaQuery.of(context).size.width - 60) / 3, color: AppColors.tagBackground),
+              ),
+            )).toList()
+          ),
+        ] else
+          const Center(child: Padding(
+            padding: EdgeInsets.only(top: 40.0),
+            child: Text('该向导很懒，还没有发布任何笔记照片哦～', style: TextStyle(color: AppColors.textHint, fontSize: 13)),
+          )),
+        const SizedBox(height: 80),
+      ],
+    );
+  }
+
+  Widget _buildBottomBar() {
+    return Container(
+      padding: EdgeInsets.fromLTRB(20, 10, 20, MediaQuery.of(context).padding.bottom + 10),
+      // 顶部加一条阴影或边框分隔
+      decoration: BoxDecoration(
+        color: Colors.white,
+        border: Border(top: BorderSide(color: AppColors.divider.withValues(alpha: 0.5))),
+      ),
+      child: Row(
+        children: [
+          GestureDetector(
+            onTap: () => setState(() => _isFollowing = !_isFollowing),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Icon(_isFollowing ? Icons.star : Icons.star_border, size: 26, color: _isFollowing ? const Color(0xFFFF9A3E) : AppColors.textHint),
+                const SizedBox(height: 2),
+                const Text('收藏', style: TextStyle(fontSize: 10, color: AppColors.textHint)),
               ],
             ),
           ),
-        ],
-      ),
-      // 底部操作栏
-      bottomSheet: Container(
-        height: 80,
-        padding: const EdgeInsets.fromLTRB(20, 10, 20, 20),
-        decoration: BoxDecoration(
-          color: Colors.white,
-          boxShadow: [
-            BoxShadow(color: Colors.black.withValues(alpha: 0.05), blurRadius: 10, offset: const Offset(0, -5))
-          ],
-        ),
-        child: Row(
-          children: [
-            _buildIconButton(
-              _isFollowing ? Icons.favorite : Icons.favorite_border,
-              _isFollowing ? '已关注' : '关注',
-              color: _isFollowing ? const Color(0xFFFF6B6B) : AppColors.textPrimary,
+          const SizedBox(width: 30),
+          Expanded(
+            child: GestureDetector(
               onTap: () {
-                setState(() => _isFollowing = !_isFollowing);
+                context.push('/order_create', extra: widget.guide);
               },
-            ),
-            const SizedBox(width: 20),
-            _buildIconButton(
-              Icons.chat_bubble_outline,
-              '私信',
-              onTap: () {
-                ScaffoldMessenger.of(context).showSnackBar(
-                  SnackBar(content: Text('正在准备与 ${widget.guide.name} 的聊天...'), behavior: SnackBarBehavior.floating),
-                );
-              },
-            ),
-            const SizedBox(width: 20),
-            Expanded(
               child: Container(
-                height: 50,
+                height: 48,
                 decoration: BoxDecoration(
-                  gradient: AppColors.primaryGradient,
-                  borderRadius: BorderRadius.circular(25),
+                  color: const Color(0xFFFF9A3E),
+                  borderRadius: BorderRadius.circular(24),
                   boxShadow: [
-                    BoxShadow(color: AppColors.primary.withValues(alpha: 0.3), blurRadius: 8, offset: const Offset(0, 4))
+                    BoxShadow(color: const Color(0xFFFF9A3E).withValues(alpha: 0.3), blurRadius: 8, offset: const Offset(0, 4))
                   ],
                 ),
-                child: ElevatedButton(
-                  onPressed: () {
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      SnackBar(content: Text('已成功向 ${widget.guide.name} 发送预约申请！')),
-                    );
-                  },
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: Colors.transparent,
-                    shadowColor: Colors.transparent,
-                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(25)),
-                  ),
-                  child: const Text('立即预约', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: Colors.white)),
-                ),
+                alignment: Alignment.center,
+                child: const Text('找TA下单', style: TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.bold)),
               ),
             ),
-          ],
-        ),
-      ),
-    );
-  }
-
-  Widget _buildTag(String text) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-      decoration: BoxDecoration(
-        color: AppColors.primary.withValues(alpha: 0.08),
-        borderRadius: BorderRadius.circular(10),
-      ),
-      child: Text(
-        text,
-        style: const TextStyle(color: AppColors.primary, fontSize: 13, fontWeight: FontWeight.w600),
-      ),
-    );
-  }
-
-  Widget _buildIconButton(IconData icon, String label, {Color color = AppColors.textPrimary, VoidCallback? onTap}) {
-    return GestureDetector(
-      onTap: onTap,
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          Icon(icon, color: color, size: 24),
-          const SizedBox(height: 4),
-          Text(label, style: const TextStyle(fontSize: 11, color: AppColors.textSecondary)),
+          ),
         ],
       ),
+    );
+  }
+}
+
+class _AttrStat extends StatelessWidget {
+  final String title;
+  final String value;
+  const _AttrStat(this.title, this.value);
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      children: [
+        Text(value, style: const TextStyle(fontSize: 14, fontWeight: FontWeight.bold, color: AppColors.textPrimary)),
+        const SizedBox(height: 4),
+        Text(title, style: const TextStyle(fontSize: 12, color: AppColors.textHint)),
+      ],
     );
   }
 }

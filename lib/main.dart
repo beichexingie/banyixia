@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
-import 'package:firebase_core/firebase_core.dart';
-import 'firebase_options.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 import 'config/app_theme.dart';
 import 'config/app_router.dart';
 import 'providers/user_provider.dart';
@@ -12,9 +11,12 @@ import 'providers/message_provider.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
-  await Firebase.initializeApp(
-    options: DefaultFirebaseOptions.currentPlatform,
+  
+  await Supabase.initialize(
+    url: 'https://npvqebjogjmvzkkgwtss.supabase.co',
+    anonKey: 'sb_publishable_S9-vRUc8U34sv5FhPHUElg_i67bEphP',
   );
+
   runApp(const MyApp());
 }
 

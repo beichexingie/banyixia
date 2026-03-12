@@ -39,66 +39,63 @@ class _CompanionPageState extends State<CompanionPage> {
   Widget _buildHeader() {
     return Container(
       color: Colors.white,
+      padding: const EdgeInsets.fromLTRB(16, 12, 16, 12),
       child: Column(
         children: [
+          // 搜索栏
           Container(
-            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-            decoration: const BoxDecoration(
-              gradient: LinearGradient(
-                colors: [Color(0xFFFFB347), Color(0xFFFF9A3E)],
-                begin: Alignment.centerLeft,
-                end: Alignment.centerRight,
-              ),
+            height: 40,
+            padding: const EdgeInsets.symmetric(horizontal: 16),
+            decoration: BoxDecoration(
+              border: Border.all(color: AppColors.primary.withValues(alpha: 0.5)),
+              borderRadius: BorderRadius.circular(20),
             ),
             child: const Row(
               children: [
                 Expanded(
-                  child: Center(
-                    child: Text(
-                      '大家都在逛 "国南搭子"',
-                      style: TextStyle(color: Colors.white, fontSize: 14, fontWeight: FontWeight.w500),
-                    ),
+                  child: Text(
+                    '大家都搜 "国风搭子"',
+                    style: TextStyle(color: AppColors.textHint, fontSize: 13),
                   ),
                 ),
+                Icon(Icons.search, size: 20, color: AppColors.textHint),
               ],
             ),
           ),
-          Padding(
-            padding: const EdgeInsets.symmetric(vertical: 12),
-            child: Row(
-              mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-              children: [
-                GestureDetector(onTap: () => setState(() => _activeTabIndex = 0), child: _buildTabItem('浅伴入驻', _activeTabIndex == 0)),
-                GestureDetector(onTap: () => setState(() => _activeTabIndex = 1), child: _buildTabItem('联系我们', _activeTabIndex == 1)),
-              ],
-            ),
+          const SizedBox(height: 16),
+          // 三个矩形按钮
+          Row(
+            children: [
+              _buildTopBlock('浅伴入驻', () {}),
+              const SizedBox(width: 8),
+              _buildTopBlock('联系我们', () => setState(() => _activeTabIndex = 1), isActive: _activeTabIndex == 1),
+              const SizedBox(width: 8),
+              _buildTopBlock('伴一下', () => setState(() => _activeTabIndex = 0), isActive: _activeTabIndex == 0),
+            ],
           ),
         ],
       ),
     );
   }
 
-  Widget _buildTabItem(String label, bool isActive) {
-    return Column(
-      children: [
-        Text(
-          label,
-          style: TextStyle(
-            fontSize: 16,
-            fontWeight: isActive ? FontWeight.bold : FontWeight.normal,
-            color: isActive ? AppColors.textPrimary : AppColors.textHint,
+  Widget _buildTopBlock(String title, VoidCallback onTap, {bool isActive = false}) {
+    return Expanded(
+      child: GestureDetector(
+        onTap: onTap,
+        child: Container(
+          height: 64,
+          padding: const EdgeInsets.all(10),
+          decoration: BoxDecoration(
+            color: isActive ? AppColors.primary : const Color(0xFFFF9A3E),
+            borderRadius: BorderRadius.circular(8),
+          ),
+          alignment: Alignment.topLeft,
+          child: Text(
+            title,
+            style: const TextStyle(color: Colors.white, fontSize: 15, fontWeight: FontWeight.bold),
           ),
         ),
-        const SizedBox(height: 4),
-        if (isActive)
-          Container(
-            width: 24, height: 3,
-            decoration: BoxDecoration(
-              color: AppColors.primary,
-              borderRadius: BorderRadius.circular(2),
-            ),
-          ),
-      ],
+      ),
     );
   }
 
