@@ -13,6 +13,7 @@ class TravelPost {
   final String tag;
   final DateTime createdAt;
   bool isLiked;
+  bool isFavorited;
 
   TravelPost({
     required this.id,
@@ -28,6 +29,7 @@ class TravelPost {
     this.tag = '',
     DateTime? createdAt,
     this.isLiked = false,
+    this.isFavorited = false,
   }) : createdAt = createdAt ?? DateTime.now();
 
   factory TravelPost.fromJson(Map<String, dynamic> json) {
@@ -47,6 +49,7 @@ class TravelPost {
           ? DateTime.tryParse(json['createdAt']) ?? DateTime.now()
           : DateTime.now(),
       isLiked: json['isLiked'] ?? false,
+      isFavorited: json['isFavorited'] ?? false,
     );
   }
 
@@ -65,6 +68,7 @@ class TravelPost {
       'tag': tag,
       'createdAt': createdAt.toIso8601String(),
       'isLiked': isLiked,
+      'isFavorited': isFavorited,
     };
   }
 }

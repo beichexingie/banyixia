@@ -10,6 +10,7 @@ import '../../providers/user_provider.dart';
 import '../../providers/order_provider.dart';
 import 'package:go_router/go_router.dart';
 import '../main_scaffold.dart';
+import 'favorite_posts_page.dart';
 
 class ProfilePage extends StatelessWidget {
   const ProfilePage({super.key});
@@ -481,14 +482,22 @@ class ProfilePage extends StatelessWidget {
         mainAxisAlignment: MainAxisAlignment.spaceEvenly,
         children: [
           GestureDetector(
-            onTap: () => _showListPage(context, '收藏', Icons.favorite_outline),
+            behavior: HitTestBehavior.opaque,
+            onTap: () {
+              Navigator.push(
+                context,
+                MaterialPageRoute(builder: (_) => const FavoritePostsPage()),
+              );
+            },
             child: _buildActionItem(Icons.favorite_outline, '收藏'),
           ),
           GestureDetector(
+            behavior: HitTestBehavior.opaque,
             onTap: () => _showListPage(context, '足迹', Icons.directions_walk),
             child: _buildActionItem(Icons.directions_walk, '足迹'),
           ),
           GestureDetector(
+            behavior: HitTestBehavior.opaque,
             onTap: () => _showListPage(context, '投诉', Icons.report_outlined),
             child: _buildActionItem(Icons.report_outlined, '投诉'),
           ),

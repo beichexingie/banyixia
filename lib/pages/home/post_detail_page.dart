@@ -16,7 +16,6 @@ class PostDetailPage extends StatefulWidget {
 
 class _PostDetailPageState extends State<PostDetailPage> {
   bool _isFollowing = false;
-  bool _isFavorited = false;
 
   void _showShareModal() {
     showModalBottomSheet(
@@ -230,32 +229,53 @@ class _PostDetailPageState extends State<PostDetailPage> {
               const SizedBox(width: 16),
               Consumer<PostProvider>(
                 builder: (context, provider, _) {
-                  final isLiked = widget.post.isLiked;
+                  // Find the post in the provider to get the latest state
+                  final latestPost = provider.posts.firstWhere(
+                    (p) => p.id == widget.post.id,
+                    orElse: () => widget.post,
+                  );
+                  final isLiked = latestPost.isLiked;
                   return GestureDetector(
-                    onTap: () => provider.toggleLike(widget.post.id),
+                    onTap: () => provider.toggleLike(latestPost),
                     child: Row(
                       mainAxisSize: MainAxisSize.min,
                       children: [
                         Icon(isLiked ? Icons.favorite : Icons.favorite_border,
                             color: isLiked ? const Color(0xFFFF6B6B) : AppColors.textSecondary, size: 24),
                         const SizedBox(width: 4),
-                        Text('${widget.post.likes}', style: const TextStyle(fontWeight: FontWeight.w600, color: AppColors.textSecondary)),
+                        Text('${latestPost.likes}', style: const TextStyle(fontWeight: FontWeight.w600, color: AppColors.textSecondary)),
                       ],
                     ),
                   );
                 },
               ),
               const SizedBox(width: 20),
-              GestureDetector(
-                onTap: () => setState(() => _isFavorited = !_isFavorited),
-                child: Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Icon(_isFavorited ? Icons.star : Icons.star_border, color: _isFavorited ? const Color(0xFFFFB300) : AppColors.textSecondary, size: 24),
-                    const SizedBox(width: 4),
-                    Text(_isFavorited ? '已收藏' : '收藏', style: TextStyle(fontWeight: FontWeight.w600, color: _isFavorited ? const Color(0xFFFFB300) : AppColors.textSecondary)),
-                  ],
-                ),
+              Consumer<PostProvider>(
+                builder: (context, provider, _) {
+                  // Find the post in the provider to get the latest state
+                  final latestPost = provider.posts.firstWhere(
+                    (p) => p.id == widget.post.id,
+                    orElse: () => widget.post,
+                  );
+                  final isFavorited = latestPost.isFavorited;
+                  return GestureDetector(
+                    behavior: HitTestBehavior.opaque,
+                    onTap: () {
+                      provider.toggleFavorite(latestPost);
+                    },
+                    child: Padding(
+                      padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 8),
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Icon(isFavorited ? Icons.star : Icons.star_border, color: isFavorited ? const Color(0xFFFFB300) : AppColors.textSecondary, size: 24),
+                          const SizedBox(width: 4),
+                          Text(isFavorited ? '已收藏' : '收藏', style: TextStyle(fontWeight: FontWeight.w600, color: isFavorited ? const Color(0xFFFFB300) : AppColors.textSecondary)),
+                        ],
+                      ),
+                    ),
+                  );
+                },
               ),
               const SizedBox(width: 16),
             ],

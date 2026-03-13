@@ -92,7 +92,7 @@ class TravelCard extends StatelessWidget {
                         // 点赞按钮 — 可点击
                         GestureDetector(
                           onTap: () {
-                            context.read<PostProvider>().toggleLike(post.id);
+                            context.read<PostProvider>().toggleLike(post);
                           },
                           child: Row(
                             mainAxisSize: MainAxisSize.min,
