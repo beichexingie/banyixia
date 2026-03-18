@@ -45,6 +45,12 @@ class UserProvider extends ChangeNotifier {
           .maybeSingle();
 
       if (response != null) {
+        // 实时统计关注数和粉丝数
+        final results = await Future.wait([
+          client.from('follows').count().eq('follower_id', supaUser.id),
+          client.from('follows').count().eq('followed_id', supaUser.id),
+        ]);
+        
         // User exists in Database, load their data
         _user = User(
           id: supaUser.id,
@@ -54,8 +60,8 @@ class UserProvider extends ChangeNotifier {
           title: response['title'] ?? '初级旅行家',
           balance: (response['balance'] ?? 0.0).toDouble(),
           couponCount: response['coupon_count'] ?? 0,
-          followCount: response['follow_count'] ?? 0,
-          fansCount: response['fans_count'] ?? 0,
+          followCount: results[0] as int? ?? 0,
+          fansCount: results[1] as int? ?? 0,
           isBanned: response['is_banned'] ?? false,
           cancelCount: response['cancel_count'] ?? 0,
         );
@@ -69,7 +75,7 @@ class UserProvider extends ChangeNotifier {
           title: '初级旅行家',
           balance: 0.0,
           couponCount: 3,
-          followCount: 5,
+          followCount: 0,
           fansCount: 0,
           isBanned: false,
           cancelCount: 0,
@@ -240,6 +246,70 @@ class UserProvider extends ChangeNotifier {
       return false;
     }
   }
+
+  /// 获取关注列表
+  Future<List<User>> getFollowingUsers() async {
+    if (!isLoggedIn) return [];
+    try {
+      final response = await supabase.Supabase.instance.client
+          .from('follows')
+          .select('*, users!follows_followed_id_fkey(*)')
+          .eq('follower_id', user.id);
+      
+      return (response as List).map((e) {
+        final userData = e['users'];
+        if (userData == null) return User.guest();
+        return User.fromJson(userData as Map<String, dynamic>);
+      }).where((u) => u.isLoggedIn).toList();
+    } catch (e) {
+      debugPrint('getFollowingUsers error: $e');
+      return [];
+    }
+  }
+
+  /// 获取任意用户的公开资料
+  Future<User?> fetchUserById(String userId) async {
+    try {
+      // 1. 获取基本资料
+      final response = await supabase.Supabase.instance.client
+          .from('users')
+          .select()
+          .eq('id', userId)
+          .maybeSingle();
+      if (response == null) return null;
+
+      // 2. 实时统计关注数和粉丝数 (避免 reads stale counts in 'users' table)
+      final results = await Future.wait([
+        supabase.Supabase.instance.client
+            .from('follows')
+            .count()
+            .eq('follower_id', userId),
+        supabase.Supabase.instance.client
+            .from('follows')
+            .count()
+            .eq('followed_id', userId),
+      ]);
+
+      final followCount = results[0] as int? ?? 0;
+      final fansCount = results[1] as int? ?? 0;
+
+      return User(
+        id: userId,
+        nickname: response['nickname'] ?? '用户',
+        avatar: response['avatar'] ?? '',
+        vipLevel: response['vip_level'] ?? 0,
+        title: response['title'] ?? '',
+        balance: (response['balance'] ?? 0.0).toDouble(),
+        couponCount: response['coupon_count'] ?? 0,
+        followCount: followCount,
+        fansCount: fansCount,
+      );
+    } catch (e) {
+      debugPrint('fetchUserById error: $e');
+      return null;
+    }
+  }
+
 
   void mockLogin() {
     _isLoading = true;

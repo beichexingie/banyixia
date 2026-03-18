@@ -20,6 +20,7 @@ import '../pages/profile/coupons_page.dart';
 import '../pages/profile/balance_page.dart';
 import '../pages/profile/orders_page.dart';
 import '../pages/order/order_create_page.dart';
+import '../pages/profile/user_profile_page.dart';
 import '../models/guide.dart';
 
 class AppRouter {
@@ -123,6 +124,13 @@ class AppRouter {
       GoRoute(
         path: '/apply/guide',
         builder: (context, state) => const ApplyGuidePage(),
+      ),
+      GoRoute(
+        path: '/user/:id',
+        builder: (context, state) {
+          final id = state.pathParameters['id']!;
+          return UserProfilePage(userId: id);
+        },
       ),
       GoRoute(
         path: '/wallet',

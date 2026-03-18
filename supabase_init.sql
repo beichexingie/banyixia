@@ -87,6 +87,18 @@ CREATE TABLE public.users (
   CONSTRAINT users_id_fkey FOREIGN KEY (id) REFERENCES auth.users(id)
 );
 
+DROP TABLE IF EXISTS public.follows CASCADE;
+CREATE TABLE public.follows (
+  id uuid NOT NULL DEFAULT gen_random_uuid(),
+  follower_id uuid NOT NULL,
+  followed_id uuid NOT NULL,
+  created_at timestamp with time zone DEFAULT now(),
+  CONSTRAINT follows_pkey PRIMARY KEY (id),
+  CONSTRAINT follows_follower_id_fkey FOREIGN KEY (follower_id) REFERENCES public.users(id) ON DELETE CASCADE,
+  CONSTRAINT follows_followed_id_fkey FOREIGN KEY (followed_id) REFERENCES public.users(id) ON DELETE CASCADE,
+  UNIQUE(follower_id, followed_id)
+);
+
 -- DROP TABLE IF EXISTS public.post_favorites CASCADE; is already at the top to avoid relation constraint failures
 CREATE TABLE public.post_favorites (
   id uuid NOT NULL DEFAULT gen_random_uuid(),

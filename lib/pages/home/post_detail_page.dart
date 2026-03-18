@@ -288,9 +288,7 @@ class _PostDetailPageState extends State<PostDetailPage> {
                       if (isGuide) {
                         context.push('/guide/${widget.post.authorId}');
                       } else {
-                        ScaffoldMessenger.of(context).showSnackBar(
-                          const SnackBar(content: Text('该作者暂未开通个人主页'), behavior: SnackBarBehavior.floating),
-                        );
+                        context.push('/user/${widget.post.authorId}');
                       }
                     },
                     child: Row(

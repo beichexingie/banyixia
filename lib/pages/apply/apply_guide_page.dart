@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:go_router/go_router.dart';
 import '../../config/app_theme.dart';
+import '../../models/guide_application.dart';
 import '../../providers/application_provider.dart';
 
 class ApplyGuidePage extends StatefulWidget {
@@ -25,6 +26,8 @@ class _ApplyGuidePageState extends State<ApplyGuidePage> {
   bool _isContractRead = false;
   bool _isContractSigned = false;
   bool _isSubmitting = false;
+  bool _isCheckingStatus = true;
+  GuideApplication? _existingApplication;
 
   final List<String> _availableTags = ['本地通', '摄影达人', '美食家', '双语服务', '自驾游', '深夜食堂'];
 
@@ -36,6 +39,21 @@ class _ApplyGuidePageState extends State<ApplyGuidePage> {
         if (!_isContractRead) setState(() => _isContractRead = true);
       }
     });
+    _checkExistingApplication();
+  }
+
+  Future<void> _checkExistingApplication() async {
+    try {
+      final app = await context.read<ApplicationProvider>().getMyApplication();
+      if (mounted) {
+        setState(() {
+          _existingApplication = app;
+          _isCheckingStatus = false;
+        });
+      }
+    } catch (e) {
+      if (mounted) setState(() => _isCheckingStatus = false);
+    }
   }
 
   @override
@@ -95,6 +113,23 @@ class _ApplyGuidePageState extends State<ApplyGuidePage> {
 
   @override
   Widget build(BuildContext context) {
+    if (_isCheckingStatus) {
+      return Scaffold(
+        appBar: AppBar(
+          title: const Text('申请成为地陪', style: TextStyle(fontWeight: FontWeight.bold)),
+          backgroundColor: Colors.white,
+          foregroundColor: AppColors.textPrimary,
+          elevation: 0,
+        ),
+        body: const Center(child: CircularProgressIndicator(color: AppColors.primary)),
+      );
+    }
+
+    // Already has an active (pending or approved) application
+    if (_existingApplication != null && _existingApplication!.status != 'rejected') {
+      return _buildStatusPage(_existingApplication!);
+    }
+
     return Scaffold(
       appBar: AppBar(
         title: const Text('申请成为地陪', style: TextStyle(fontWeight: FontWeight.bold)),
@@ -127,6 +162,86 @@ class _ApplyGuidePageState extends State<ApplyGuidePage> {
           ),
           _buildBottomBar(),
         ],
+      ),
+    );
+  }
+
+  /// 状态展示页（已提交申请时显示）
+  Widget _buildStatusPage(GuideApplication app) {
+    final isPending = app.status == 'pending';
+    final isApproved = app.status == 'approved';
+
+    final Color statusColor = isApproved ? Colors.green : AppColors.primary;
+    final IconData statusIcon = isApproved ? Icons.verified_user_outlined : Icons.hourglass_top_outlined;
+    final String statusTitle = isApproved ? '🎉 您已是认证地陪' : '申请审核中';
+    final String statusDesc = isApproved
+        ? '恭喜您！您的地陪申请已通过审核，可以开始接单啦。'
+        : '您的申请已提交，我们会在 1-2 个工作日内完成审核，请耐心等待。';
+
+    return Scaffold(
+      appBar: AppBar(
+        title: const Text('申请成为地陪', style: TextStyle(fontWeight: FontWeight.bold)),
+        backgroundColor: Colors.white,
+        foregroundColor: AppColors.textPrimary,
+        elevation: 0,
+        leading: IconButton(
+          icon: const Icon(Icons.arrow_back),
+          onPressed: () => context.pop(),
+        ),
+      ),
+      body: Center(
+        child: Padding(
+          padding: const EdgeInsets.all(32),
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Container(
+                width: 90,
+                height: 90,
+                decoration: BoxDecoration(
+                  color: statusColor.withValues(alpha: 0.1),
+                  shape: BoxShape.circle,
+                ),
+                child: Icon(statusIcon, size: 48, color: statusColor),
+              ),
+              const SizedBox(height: 24),
+              Text(statusTitle, style: const TextStyle(fontSize: 22, fontWeight: FontWeight.bold, color: AppColors.textPrimary)),
+              const SizedBox(height: 12),
+              Text(statusDesc, textAlign: TextAlign.center, style: const TextStyle(fontSize: 14, color: AppColors.textSecondary, height: 1.6)),
+              const SizedBox(height: 32),
+              if (isPending)
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                  decoration: BoxDecoration(
+                    color: AppColors.tagBackground,
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  child: const Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Icon(Icons.info_outline, size: 16, color: AppColors.textHint),
+                      SizedBox(width: 8),
+                      Text('审核状态变更后将通过消息通知您', style: TextStyle(fontSize: 12, color: AppColors.textHint)),
+                    ],
+                  ),
+                ),
+              const SizedBox(height: 40),
+              SizedBox(
+                width: double.infinity,
+                child: ElevatedButton(
+                  onPressed: () => context.pop(),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: AppColors.primary,
+                    foregroundColor: Colors.white,
+                    padding: const EdgeInsets.symmetric(vertical: 16),
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                  ),
+                  child: const Text('返回', style: TextStyle(fontSize: 16)),
+                ),
+              ),
+            ],
+          ),
+        ),
       ),
     );
   }
@@ -278,7 +393,7 @@ class _ApplyGuidePageState extends State<ApplyGuidePage> {
               children: [
                 const Center(child: Text('伴一下地陪服务电子合同', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold))),
                 const SizedBox(height: 20),
-                Text('甲方：伴一下平台（以下简称“平台”）\n乙方：注册地陪人员（以下简称“地陪”）\n\n1. 服务规范：乙方应提供真实、合法、安全的伴玩服务；\n2. 资金结算：平台支持三方托管，乙方需遵守平台分成规则。月流水小于5000，平台保留50%技术服务费；超出5000部分，地陪分成比例提升至60%；\n3. 风控规定：禁止引导私下交易。如发现用户三次无故取消，平台有权封禁账号；\n4. 违约责任：如因乙方原因导致行程中断，需承担用户损失；\n\n...（此处省略完整法律条款）\n\n签署日期：${DateTime.now().year}年${DateTime.now().month}月${DateTime.now().day}日', style: const TextStyle(fontSize: 13, height: 1.6)),
+                Text('甲方：伴一下平台（以下简称"平台"）\n乙方：注册地陪人员（以下简称"地陪"）\n\n1. 服务规范：乙方应提供真实、合法、安全的伴玩服务；\n2. 资金结算：平台支持三方托管，乙方需遵守平台分成规则。月流水小于5000，平台保留50%技术服务费；超出5000部分，地陪分成比例提升至60%；\n3. 风控规定：禁止引导私下交易。如发现用户三次无故取消，平台有权封禁账号；\n4. 违约责任：如因乙方原因导致行程中断，需承担用户损失；\n\n...（此处省略完整法律条款）\n\n签署日期：${DateTime.now().year}年${DateTime.now().month}月${DateTime.now().day}日', style: const TextStyle(fontSize: 13, height: 1.6)),
               ],
             ),
           ),
@@ -363,3 +478,4 @@ class _ApplyGuidePageState extends State<ApplyGuidePage> {
     );
   }
 }
+

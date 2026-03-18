@@ -13,6 +13,7 @@ import 'package:go_router/go_router.dart';
 import '../main_scaffold.dart';
 import 'favorite_posts_page.dart';
 import 'footprint_posts_page.dart';
+import 'following_page.dart';
 
 class ProfilePage extends StatelessWidget {
   const ProfilePage({super.key});
@@ -499,6 +500,16 @@ class ProfilePage extends StatelessWidget {
       child: Row(
         mainAxisAlignment: MainAxisAlignment.spaceEvenly,
         children: [
+          GestureDetector(
+            behavior: HitTestBehavior.opaque,
+            onTap: () {
+              Navigator.push(
+                context,
+                MaterialPageRoute(builder: (_) => const FollowingPage()),
+              );
+            },
+            child: _buildActionItem(Icons.people_outline, '关注'),
+          ),
           GestureDetector(
             behavior: HitTestBehavior.opaque,
             onTap: () {

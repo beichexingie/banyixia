@@ -179,6 +179,56 @@ class PostProvider extends ChangeNotifier {
     }
   }
 
+  /// 获取某用户发布的所有帖子
+  Future<List<TravelPost>> fetchPostsByUser(String userId) async {
+    try {
+      final response = await Supabase.instance.client
+          .from('posts')
+          .select()
+          .eq('user_id', userId)
+          .order('created_at', ascending: false);
+
+      final authorIds = (response as List).map((data) => data['user_id']?.toString());
+      final usersMap = await _fetchAuthorProfiles(authorIds);
+
+      return (response as List).map<TravelPost>((data) {
+        final contentStr = data['content']?.toString() ?? '分享动态';
+        final postId = data['id'].toString();
+        final lines = contentStr.split('\n');
+        final parsedTitle = lines.isNotEmpty ? lines.first : '分享动态';
+        final parsedContent = lines.length > 1 ? lines.sublist(1).join('\n') : contentStr;
+
+        final authorId = data['user_id']?.toString() ?? '';
+        final userData = usersMap[authorId];
+        final authorName = userData?['nickname'] ?? data['author_name'] ?? '匿名用户';
+        final authorAvatar = userData?['avatar'] ?? data['author_avatar'] ?? '';
+
+        final images = List<String>.from(data['images'] ?? []);
+        final defaultBg = 'https://images.unsplash.com/photo-1476514525535-07fb3b4ae5f1?auto=format&fit=crop&q=80&w=800&h=600';
+
+        return TravelPost(
+          id: postId,
+          title: parsedTitle,
+          subtitle: parsedContent.length > 20 ? '${parsedContent.substring(0, 20)}...' : parsedContent,
+          content: parsedContent,
+          coverImage: images.isNotEmpty ? images.first : defaultBg,
+          images: images,
+          authorId: authorId,
+          authorName: authorName,
+          authorAvatar: authorAvatar,
+          likes: data['likes'] ?? 0,
+          tag: data['location'] ?? '',
+          createdAt: data['created_at'] != null ? DateTime.parse(data['created_at']) : DateTime.now(),
+        );
+      }).toList();
+    } catch (e) {
+      debugPrint('fetchPostsByUser error: $e');
+      return [];
+    }
+  }
+
+
+
   void _loadMockPosts() {
     _posts = [
       TravelPost(
