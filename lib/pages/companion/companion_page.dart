@@ -3,6 +3,8 @@ import 'package:provider/provider.dart';
 import 'package:go_router/go_router.dart';
 import '../../config/app_theme.dart';
 import '../../providers/guide_provider.dart';
+import '../../providers/application_provider.dart';
+import '../../models/guide_application.dart';
 import '../../widgets/guide_card.dart';
 
 class CompanionPage extends StatefulWidget {
@@ -14,6 +16,37 @@ class CompanionPage extends StatefulWidget {
 
 class _CompanionPageState extends State<CompanionPage> {
   int _activeTabIndex = 0; // 0 for Guide list, 1 for Contact Us
+  GuideApplication? _myApp;
+  bool _isCheckingStatus = false;
+  late TextEditingController _searchController;
+
+  @override
+  void initState() {
+    super.initState();
+    _searchController = TextEditingController();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      context.read<GuideProvider>().loadGuides();
+      _loadApplicationStatus();
+    });
+  }
+
+  @override
+  void dispose() {
+    _searchController.dispose();
+    super.dispose();
+  }
+
+  Future<void> _loadApplicationStatus() async {
+    setState(() => _isCheckingStatus = true);
+    try {
+      final app = await context.read<ApplicationProvider>().getMyApplication();
+      setState(() => _myApp = app);
+    } catch (e) {
+      debugPrint('Error loading app status: $e');
+    } finally {
+      setState(() => _isCheckingStatus = false);
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -47,18 +80,35 @@ class _CompanionPageState extends State<CompanionPage> {
             height: 40,
             padding: const EdgeInsets.symmetric(horizontal: 16),
             decoration: BoxDecoration(
-              border: Border.all(color: AppColors.primary.withValues(alpha: 0.5)),
+              color: AppColors.tagBackground,
               borderRadius: BorderRadius.circular(20),
             ),
-            child: const Row(
+            child: Row(
               children: [
+                const Icon(Icons.search, size: 20, color: AppColors.textHint),
+                const SizedBox(width: 8),
                 Expanded(
-                  child: Text(
-                    '大家都搜 "国风搭子"',
-                    style: TextStyle(color: AppColors.textHint, fontSize: 13),
+                  child: TextField(
+                    controller: _searchController,
+                    onChanged: (value) {
+                      context.read<GuideProvider>().setSearchQuery(value);
+                    },
+                    decoration: const InputDecoration(
+                      hintText: '搜索地陪姓名/城市/介绍',
+                      hintStyle: TextStyle(color: AppColors.textHint, fontSize: 13),
+                      border: InputBorder.none,
+                      isDense: true,
+                    ),
                   ),
                 ),
-                Icon(Icons.search, size: 20, color: AppColors.textHint),
+                if (_searchController.text.isNotEmpty)
+                  GestureDetector(
+                    onTap: () {
+                      _searchController.clear();
+                      context.read<GuideProvider>().setSearchQuery('');
+                    },
+                    child: const Icon(Icons.clear, size: 18, color: AppColors.textHint),
+                  ),
               ],
             ),
           ),
@@ -66,7 +116,25 @@ class _CompanionPageState extends State<CompanionPage> {
           // 三个矩形按钮
           Row(
             children: [
-              _buildTopBlock('浅伴入驻', () {}),
+              _buildTopBlock(
+                _isCheckingStatus 
+                    ? '检查中...' 
+                    : (_myApp == null 
+                        ? '浅伴入驻' 
+                        : (_myApp!.status == 'pending' 
+                            ? '审核中' 
+                            : (_myApp!.status == 'approved' ? '已入驻' : '重新入驻'))), 
+                () {
+                  if (_myApp == null || _myApp!.status == 'rejected') {
+                    context.push('/apply/guide');
+                  } else if (_myApp!.status == 'pending') {
+                    ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('申请正在审核中，请耐心等待')));
+                  } else if (_myApp!.status == 'approved') {
+                    context.push('/guide/${_myApp!.userId}');
+                  }
+                },
+                isActive: _myApp?.status == 'approved',
+              ),
               const SizedBox(width: 8),
               _buildTopBlock('联系我们', () => setState(() => _activeTabIndex = 1), isActive: _activeTabIndex == 1),
               const SizedBox(width: 8),
@@ -203,73 +271,108 @@ class _CompanionPageState extends State<CompanionPage> {
   }
 
   void _showFilterModal(BuildContext context) {
+    final provider = context.read<GuideProvider>();
+    
     showModalBottomSheet(
       context: context,
       shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(16))),
       builder: (ctx) {
-        return Container(
-          padding: const EdgeInsets.all(20),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              const Text('筛选条件 (Demo)', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
-              const SizedBox(height: 20),
-              const Text('性别要求', style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold)),
-              const SizedBox(height: 10),
-              Row(
+        return StatefulBuilder(
+          builder: (context, setModalState) {
+            return Container(
+              padding: const EdgeInsets.all(20),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  _buildFilterChip('不限', true),
-                  const SizedBox(width: 10),
-                  _buildFilterChip('只看女生', false),
-                  const SizedBox(width: 10),
-                  _buildFilterChip('只看男生', false),
-                ],
-              ),
-              const SizedBox(height: 20),
-              const Text('认证状态', style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold)),
-              const SizedBox(height: 10),
-              Row(
-                children: [
-                  _buildFilterChip('不限', true),
-                  const SizedBox(width: 10),
-                  _buildFilterChip('已实名', false),
-                ],
-              ),
-              const SizedBox(height: 30),
-              SizedBox(
-                width: double.infinity,
-                child: ElevatedButton(
-                  onPressed: () => Navigator.pop(ctx),
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: AppColors.primary,
-                    foregroundColor: Colors.white,
-                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                    padding: const EdgeInsets.symmetric(vertical: 12),
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      const Text('筛选条件', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+                      TextButton(
+                        onPressed: () {
+                          provider.clearFilters();
+                          setModalState(() {});
+                        },
+                        child: const Text('重置', style: TextStyle(color: AppColors.textSecondary)),
+                      ),
+                    ],
                   ),
-                  child: const Text('确定'),
-                ),
+                  const SizedBox(height: 20),
+                  const Text('性别要求', style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold)),
+                  const SizedBox(height: 10),
+                  Row(
+                    children: [
+                      _buildFilterChip('不限', provider.filterGender == null, () {
+                        setModalState(() => provider.setGenderFilter(null));
+                      }),
+                      const SizedBox(width: 10),
+                      _buildFilterChip('只看女生', provider.filterGender == '女', () {
+                        setModalState(() => provider.setGenderFilter('女'));
+                      }),
+                      const SizedBox(width: 10),
+                      _buildFilterChip('只看男生', provider.filterGender == '男', () {
+                        setModalState(() => provider.setGenderFilter('男'));
+                      }),
+                    ],
+                  ),
+                  const SizedBox(height: 20),
+                  const Text('特色标签', style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold)),
+                  const SizedBox(height: 10),
+                  Wrap(
+                    spacing: 10,
+                    runSpacing: 10,
+                    children: [
+                      _buildFilterChip('今天来过', provider.filterTag == '今天来过', () {
+                        setModalState(() => provider.setTagFilter(provider.filterTag == '今天来过' ? null : '今天来过'));
+                      }),
+                      _buildFilterChip('本地通', provider.filterTag == '本地通', () {
+                        setModalState(() => provider.setTagFilter(provider.filterTag == '本地通' ? null : '本地通'));
+                      }),
+                      _buildFilterChip('摄影达人', provider.filterTag == '摄影达人', () {
+                        setModalState(() => provider.setTagFilter(provider.filterTag == '摄影达人' ? null : '摄影达人'));
+                      }),
+                    ],
+                  ),
+                  const SizedBox(height: 30),
+                  SizedBox(
+                    width: double.infinity,
+                    child: ElevatedButton(
+                      onPressed: () => Navigator.pop(ctx),
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: AppColors.primary,
+                        foregroundColor: Colors.white,
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                        padding: const EdgeInsets.symmetric(vertical: 12),
+                      ),
+                      child: const Text('显示结果'),
+                    ),
+                  ),
+                ],
               ),
-            ],
-          ),
+            );
+          }
         );
       },
     );
   }
 
-  Widget _buildFilterChip(String label, bool isSelected) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-      decoration: BoxDecoration(
-        color: isSelected ? AppColors.primary : AppColors.tagBackground,
-        borderRadius: BorderRadius.circular(20),
-      ),
-      child: Text(
-        label,
-        style: TextStyle(
-          color: isSelected ? Colors.white : AppColors.textPrimary,
-          fontSize: 13,
-          fontWeight: isSelected ? FontWeight.w600 : FontWeight.normal,
+  Widget _buildFilterChip(String label, bool isSelected, VoidCallback onTap) {
+    return GestureDetector(
+      onTap: onTap,
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+        decoration: BoxDecoration(
+          color: isSelected ? AppColors.primary : AppColors.tagBackground,
+          borderRadius: BorderRadius.circular(20),
+        ),
+        child: Text(
+          label,
+          style: TextStyle(
+            color: isSelected ? Colors.white : AppColors.textPrimary,
+            fontSize: 13,
+            fontWeight: isSelected ? FontWeight.w600 : FontWeight.normal,
+          ),
         ),
       ),
     );

@@ -3,6 +3,9 @@ import 'package:cached_network_image/cached_network_image.dart';
 import 'package:go_router/go_router.dart';
 import '../../models/guide.dart';
 import '../../config/app_theme.dart';
+import '../../providers/guide_provider.dart';
+import '../../providers/user_provider.dart';
+import 'package:provider/provider.dart';
 
 class GuideDetailPage extends StatefulWidget {
   final Guide guide;
@@ -15,6 +18,47 @@ class GuideDetailPage extends StatefulWidget {
 
 class _GuideDetailPageState extends State<GuideDetailPage> {
   bool _isFollowing = false;
+  bool _isFollowLoading = false;
+
+
+  @override
+  void initState() {
+    super.initState();
+    _checkFollowStatus();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      context.read<GuideProvider>().recordFootprint(widget.guide.id);
+    });
+  }
+
+  Future<void> _checkFollowStatus() async {
+    final following = await context.read<UserProvider>().isFollowing(widget.guide.id);
+    if (mounted) {
+      setState(() => _isFollowing = following);
+    }
+  }
+
+  Future<void> _toggleFollow() async {
+    if (_isFollowLoading) return;
+    setState(() => _isFollowLoading = true);
+    try {
+      final userProvider = context.read<UserProvider>();
+      if (_isFollowing) {
+        await userProvider.unfollowUser(widget.guide.id);
+      } else {
+        await userProvider.followUser(widget.guide.id);
+      }
+      await _checkFollowStatus();
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(e.toString())));
+      }
+    } finally {
+      if (mounted) {
+        setState(() => _isFollowLoading = false);
+      }
+    }
+  }
+
 
   void _showShareModal() {
     showModalBottomSheet(
@@ -185,6 +229,20 @@ class _GuideDetailPageState extends State<GuideDetailPage> {
                       decoration: BoxDecoration(color: const Color(0xFFFF9A3E).withValues(alpha: 0.1), borderRadius: BorderRadius.circular(4)),
                       child: const Text('已认证', style: TextStyle(color: Color(0xFFFF9A3E), fontSize: 10, fontWeight: FontWeight.bold)),
                     ),
+                  const Spacer(),
+                  OutlinedButton(
+                    onPressed: _toggleFollow,
+                    style: OutlinedButton.styleFrom(
+                      foregroundColor: _isFollowing ? AppColors.textSecondary : AppColors.primary,
+                      side: BorderSide(color: _isFollowing ? AppColors.divider : AppColors.primary),
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+                      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 0),
+                      minimumSize: const Size(0, 32),
+                    ),
+                    child: _isFollowLoading 
+                      ? const SizedBox(width: 14, height: 14, child: CircularProgressIndicator(strokeWidth: 2, color: AppColors.primary))
+                      : Text(_isFollowing ? '已关注' : '关注', style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold)),
+                  ),
                 ],
               ),
               const SizedBox(height: 6),
@@ -357,48 +415,57 @@ class _GuideDetailPageState extends State<GuideDetailPage> {
   }
 
   Widget _buildBottomBar() {
-    return Container(
-      padding: EdgeInsets.fromLTRB(20, 10, 20, MediaQuery.of(context).padding.bottom + 10),
-      // 顶部加一条阴影或边框分隔
-      decoration: BoxDecoration(
-        color: Colors.white,
-        border: Border(top: BorderSide(color: AppColors.divider.withValues(alpha: 0.5))),
-      ),
-      child: Row(
-        children: [
-          GestureDetector(
-            onTap: () => setState(() => _isFollowing = !_isFollowing),
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Icon(_isFollowing ? Icons.star : Icons.star_border, size: 26, color: _isFollowing ? const Color(0xFFFF9A3E) : AppColors.textHint),
-                const SizedBox(height: 2),
-                const Text('收藏', style: TextStyle(fontSize: 10, color: AppColors.textHint)),
-              ],
-            ),
+    return Consumer<GuideProvider>(
+      builder: (context, provider, child) {
+        final isFavorited = provider.favoriteIds.contains(widget.guide.id);
+        
+        return Container(
+          padding: EdgeInsets.fromLTRB(20, 10, 20, MediaQuery.of(context).padding.bottom + 10),
+          decoration: BoxDecoration(
+            color: Colors.white,
+            border: Border(top: BorderSide(color: AppColors.divider.withValues(alpha: 0.5))),
           ),
-          const SizedBox(width: 30),
-          Expanded(
-            child: GestureDetector(
-              onTap: () {
-                context.push('/order_create', extra: widget.guide);
-              },
-              child: Container(
-                height: 48,
-                decoration: BoxDecoration(
-                  color: const Color(0xFFFF9A3E),
-                  borderRadius: BorderRadius.circular(24),
-                  boxShadow: [
-                    BoxShadow(color: const Color(0xFFFF9A3E).withValues(alpha: 0.3), blurRadius: 8, offset: const Offset(0, 4))
+          child: Row(
+            children: [
+              GestureDetector(
+                onTap: () => provider.toggleFavorite(widget.guide.id),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Icon(
+                      isFavorited ? Icons.star : Icons.star_border, 
+                      size: 26, 
+                      color: isFavorited ? const Color(0xFFFF9A3E) : AppColors.textHint
+                    ),
+                    const SizedBox(height: 2),
+                    const Text('收藏', style: TextStyle(fontSize: 10, color: AppColors.textHint)),
                   ],
                 ),
-                alignment: Alignment.center,
-                child: const Text('找TA下单', style: TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.bold)),
               ),
-            ),
+              const SizedBox(width: 30),
+              Expanded(
+                child: GestureDetector(
+                  onTap: () {
+                    context.push('/order_create', extra: widget.guide);
+                  },
+                  child: Container(
+                    height: 48,
+                    decoration: BoxDecoration(
+                      color: const Color(0xFFFF9A3E),
+                      borderRadius: BorderRadius.circular(24),
+                      boxShadow: [
+                        BoxShadow(color: const Color(0xFFFF9A3E).withValues(alpha: 0.3), blurRadius: 8, offset: const Offset(0, 4))
+                      ],
+                    ),
+                    alignment: Alignment.center,
+                    child: const Text('找TA下单', style: TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.bold)),
+                  ),
+                ),
+              ),
+            ],
           ),
-        ],
-      ),
+        );
+      },
     );
   }
 }

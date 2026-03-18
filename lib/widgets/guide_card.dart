@@ -3,6 +3,8 @@ import 'package:cached_network_image/cached_network_image.dart';
 import 'package:go_router/go_router.dart';
 import '../../config/app_theme.dart';
 import '../../models/guide.dart';
+import '../../providers/guide_provider.dart';
+import 'package:provider/provider.dart';
 
 class GuideCard extends StatelessWidget {
   final Guide guide;
@@ -115,41 +117,73 @@ class GuideCard extends StatelessWidget {
                     ),
                     const Spacer(), // 占据剩余空间
                     // 底部互动数据 & 去下单
-                    Row(
-                      children: [
-                        // 互动数据区域，使用 Expanded 确保它只占据剩余空间，且内部 Row 不会溢出
-                        Expanded(
-                          child: SingleChildScrollView(
-                            scrollDirection: Axis.horizontal,
-                            physics: const NeverScrollableScrollPhysics(),
-                            child: Row(
-                              mainAxisSize: MainAxisSize.min,
-                              children: [
-                                const Icon(Icons.favorite_border, size: 12, color: AppColors.textHint),
-                                const SizedBox(width: 2),
-                                Text('${guide.likes}', style: const TextStyle(fontSize: 10, color: AppColors.textHint)),
-                                const SizedBox(width: 6),
-                                const Icon(Icons.chat_bubble_outline, size: 12, color: AppColors.textHint),
-                                const SizedBox(width: 2),
-                                const Text('11', style: TextStyle(fontSize: 10, color: AppColors.textHint)),
-                                const SizedBox(width: 6),
-                                const Icon(Icons.star_border, size: 12, color: AppColors.textHint),
-                                const SizedBox(width: 2),
-                                Text('${guide.fans}', style: const TextStyle(fontSize: 10, color: AppColors.textHint)),
-                              ],
+                    Consumer<GuideProvider>(
+                      builder: (context, provider, child) {
+                        final isLiked = provider.likedIds.contains(guide.id);
+                        final isFavorited = provider.favoriteIds.contains(guide.id);
+                        
+                        return Row(
+                          children: [
+                            // 互动数据区域
+                            Expanded(
+                              child: SingleChildScrollView(
+                                scrollDirection: Axis.horizontal,
+                                physics: const NeverScrollableScrollPhysics(),
+                                child: Row(
+                                  mainAxisSize: MainAxisSize.min,
+                                  children: [
+                                    GestureDetector(
+                                      onTap: () => provider.toggleLike(guide.id),
+                                      child: Row(
+                                        children: [
+                                          Icon(
+                                            isLiked ? Icons.favorite : Icons.favorite_border, 
+                                            size: 14, 
+                                            color: isLiked ? Colors.red : AppColors.textHint
+                                          ),
+                                          const SizedBox(width: 2),
+                                          Text('${guide.likes + (isLiked ? 1 : 0)}', style: const TextStyle(fontSize: 10, color: AppColors.textHint)),
+                                        ],
+                                      ),
+                                    ),
+                                    const SizedBox(width: 8),
+                                    const Icon(Icons.chat_bubble_outline, size: 14, color: AppColors.textHint),
+                                    const SizedBox(width: 2),
+                                    const Text('11', style: TextStyle(fontSize: 10, color: AppColors.textHint)),
+                                    const SizedBox(width: 8),
+                                    GestureDetector(
+                                      onTap: () => provider.toggleFavorite(guide.id),
+                                      child: Row(
+                                        children: [
+                                          Icon(
+                                            isFavorited ? Icons.star : Icons.star_border, 
+                                            size: 14, 
+                                            color: isFavorited ? Colors.amber : AppColors.textHint
+                                          ),
+                                          const SizedBox(width: 2),
+                                          Text('${guide.fans + (isFavorited ? 1 : 0)}', style: const TextStyle(fontSize: 10, color: AppColors.textHint)),
+                                        ],
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ),
                             ),
-                          ),
-                        ),
-                        const SizedBox(width: 8),
-                        Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-                          decoration: BoxDecoration(
-                            color: const Color(0xFFFF9A3E),
-                            borderRadius: BorderRadius.circular(16),
-                          ),
-                          child: const Text('去下单', style: TextStyle(color: Colors.white, fontSize: 12, fontWeight: FontWeight.bold)),
-                        ),
-                      ],
+                            const SizedBox(width: 8),
+                            GestureDetector(
+                              onTap: () => context.push('/order_create', extra: guide),
+                              child: Container(
+                                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                                decoration: BoxDecoration(
+                                  color: const Color(0xFFFF9A3E),
+                                  borderRadius: BorderRadius.circular(16),
+                                ),
+                                child: const Text('去下单', style: TextStyle(color: Colors.white, fontSize: 12, fontWeight: FontWeight.bold)),
+                              ),
+                            ),
+                          ],
+                        );
+                      },
                     ),
                   ],
                 ),

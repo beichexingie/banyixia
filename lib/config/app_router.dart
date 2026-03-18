@@ -7,12 +7,14 @@ import '../pages/main_scaffold.dart';
 import '../pages/auth/login_page.dart';
 import '../pages/home/post_detail_page.dart';
 import '../pages/home/post_create_page.dart';
+import '../pages/apply/apply_guide_page.dart';
+import '../pages/admin/admin_audit_page.dart';
 import '../pages/companion/guide_detail_page.dart';
 import '../pages/profile/settings_page.dart';
 import '../pages/travel_plan/travel_plan_create_page.dart';
-import '../pages/guide/guide_apply_page.dart';
 import '../pages/profile/notification_settings_page.dart';
 import '../pages/profile/security_settings_page.dart';
+import '../pages/profile/wallet_page.dart';
 import '../pages/profile/help_feedback_page.dart';
 import '../pages/profile/coupons_page.dart';
 import '../pages/profile/balance_page.dart';
@@ -66,10 +68,6 @@ class AppRouter {
         },
       ),
       GoRoute(
-        path: '/apply/guide',
-        builder: (context, state) => const GuideApplyPage(),
-      ),
-      GoRoute(
         path: '/guide/:id',
         builder: (context, state) {
           final id = state.pathParameters['id'];
@@ -121,6 +119,18 @@ class AppRouter {
           }
           return OrderCreatePage(guide: guide);
         },
+      ),
+      GoRoute(
+        path: '/apply/guide',
+        builder: (context, state) => const ApplyGuidePage(),
+      ),
+      GoRoute(
+        path: '/wallet',
+        builder: (context, state) => const WalletPage(),
+      ),
+      GoRoute(
+        path: '/admin/audit',
+        builder: (context, state) => const AdminAuditPage(),
       ),
     ],
   );

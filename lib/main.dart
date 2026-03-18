@@ -8,6 +8,7 @@ import 'providers/post_provider.dart';
 import 'providers/guide_provider.dart';
 import 'providers/order_provider.dart';
 import 'providers/message_provider.dart';
+import 'providers/application_provider.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -32,6 +33,7 @@ class MyApp extends StatelessWidget {
         ChangeNotifierProvider(create: (_) => GuideProvider()..loadGuides()),
         ChangeNotifierProvider(create: (_) => OrderProvider()..loadOrders()),
         ChangeNotifierProvider(create: (_) => MessageProvider()..loadMessages()),
+        ChangeNotifierProvider(create: (_) => ApplicationProvider()),
       ],
       child: Builder(
         builder: (context) {

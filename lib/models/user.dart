@@ -9,6 +9,8 @@ class User {
   final int couponCount;
   final int followCount;
   final int fansCount;
+  final bool isBanned;
+  final int cancelCount;
 
   User({
     required this.id,
@@ -20,6 +22,8 @@ class User {
     this.couponCount = 0,
     this.followCount = 0,
     this.fansCount = 0,
+    this.isBanned = false,
+    this.cancelCount = 0,
   });
 
   /// 默认未登录用户
@@ -42,6 +46,8 @@ class User {
       couponCount: json['couponCount'] ?? 0,
       followCount: json['followCount'] ?? 0,
       fansCount: json['fansCount'] ?? 0,
+      isBanned: json['is_banned'] ?? false,
+      cancelCount: json['cancel_count'] ?? 0,
     );
   }
 
@@ -56,6 +62,8 @@ class User {
       'couponCount': couponCount,
       'followCount': followCount,
       'fansCount': fansCount,
+      'is_banned': isBanned,
+      'cancel_count': cancelCount,
     };
   }
 

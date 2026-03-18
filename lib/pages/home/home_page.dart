@@ -3,6 +3,7 @@ import 'package:provider/provider.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:go_router/go_router.dart';
 import '../../config/app_theme.dart';
+import '../../models/travel_post.dart';
 import '../../providers/post_provider.dart';
 import '../../widgets/travel_card.dart';
 import '../main_scaffold.dart';
@@ -16,6 +17,7 @@ class HomePage extends StatefulWidget {
 
 class _HomePageState extends State<HomePage> with SingleTickerProviderStateMixin {
   late TabController _tabController;
+  late TextEditingController _searchController;
   String _selectedCity = '苏州';
   bool _hasSignedIn = false;
 
@@ -23,11 +25,13 @@ class _HomePageState extends State<HomePage> with SingleTickerProviderStateMixin
   void initState() {
     super.initState();
     _tabController = TabController(length: 3, vsync: this);
+    _searchController = TextEditingController();
   }
 
   @override
   void dispose() {
     _tabController.dispose();
+    _searchController.dispose();
     super.dispose();
   }
 
@@ -174,7 +178,7 @@ class _HomePageState extends State<HomePage> with SingleTickerProviderStateMixin
             children: [
               _buildContentGrid(),
               _buildContentGrid(),
-              _buildEmptyFollow(),
+              _buildFollowingContent(),
             ],
           ),
         ),
@@ -191,51 +195,93 @@ class _HomePageState extends State<HomePage> with SingleTickerProviderStateMixin
     return Container(
       color: Colors.white,
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
-      child: Row(
+      child: Column(
         children: [
-          Container(
-            width: 32, height: 32,
-            decoration: BoxDecoration(gradient: AppColors.primaryGradient, borderRadius: BorderRadius.circular(8)),
-            child: const Icon(Icons.diamond_outlined, color: Colors.white, size: 18),
-          ),
-          const SizedBox(width: 8),
-          const Text('伴一下', style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold, color: AppColors.primary)),
-          const Spacer(),
-          // 签到按钮 — 可点击
-          GestureDetector(
-            onTap: _showSignInDialog,
-            child: Container(
-              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-              decoration: BoxDecoration(
-                color: _hasSignedIn ? AppColors.divider : AppColors.tagBackground,
-                borderRadius: BorderRadius.circular(16),
+          Row(
+            children: [
+              Container(
+                width: 32, height: 32,
+                decoration: BoxDecoration(gradient: AppColors.primaryGradient, borderRadius: BorderRadius.circular(8)),
+                child: const Icon(Icons.diamond_outlined, color: Colors.white, size: 18),
               ),
-              child: Row(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Icon(Icons.calendar_today, size: 14, color: _hasSignedIn ? AppColors.textHint : AppColors.primary),
-                  const SizedBox(width: 4),
-                  Text(
-                    _hasSignedIn ? '已签到' : '签到',
-                    style: TextStyle(
-                      fontSize: 12,
-                      fontWeight: FontWeight.w500,
-                      color: _hasSignedIn ? AppColors.textHint : AppColors.primary,
+              const SizedBox(width: 8),
+              const Text('伴一下', style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold, color: AppColors.primary)),
+              const Spacer(),
+              // 签到按钮
+              GestureDetector(
+                onTap: _showSignInDialog,
+                child: Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                  decoration: BoxDecoration(
+                    color: _hasSignedIn ? AppColors.divider : AppColors.tagBackground,
+                    borderRadius: BorderRadius.circular(16),
+                  ),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Icon(Icons.calendar_today, size: 14, color: _hasSignedIn ? AppColors.textHint : AppColors.primary),
+                      const SizedBox(width: 4),
+                      Text(
+                        _hasSignedIn ? '已签到' : '签到',
+                        style: TextStyle(
+                          fontSize: 12,
+                          fontWeight: FontWeight.w500,
+                          color: _hasSignedIn ? AppColors.textHint : AppColors.primary,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+              const SizedBox(width: 12),
+              // 城市选择
+              GestureDetector(
+                onTap: _showCityPicker,
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Text(_selectedCity, style: AppTextStyles.subtitle),
+                    const Icon(Icons.arrow_drop_down, size: 20, color: AppColors.textSecondary),
+                  ],
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 12),
+          // 搜索栏
+          Container(
+            height: 38,
+            padding: const EdgeInsets.symmetric(horizontal: 16),
+            decoration: BoxDecoration(
+              color: AppColors.tagBackground,
+              borderRadius: BorderRadius.circular(19),
+            ),
+            child: Row(
+              children: [
+                const Icon(Icons.search, size: 18, color: AppColors.textHint),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: TextField(
+                    controller: _searchController,
+                    onSubmitted: (value) {
+                      context.read<PostProvider>().loadPosts(query: value);
+                    },
+                    decoration: const InputDecoration(
+                      hintText: '搜你感兴趣的目的地、景点、玩法',
+                      hintStyle: TextStyle(color: AppColors.textHint, fontSize: 13),
+                      border: InputBorder.none,
+                      isDense: true,
                     ),
                   ),
-                ],
-              ),
-            ),
-          ),
-          const SizedBox(width: 12),
-          // 城市选择 — 可点击
-          GestureDetector(
-            onTap: _showCityPicker,
-            child: Row(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Text(_selectedCity, style: AppTextStyles.subtitle),
-                const Icon(Icons.arrow_drop_down, size: 20, color: AppColors.textSecondary),
+                ),
+                if (_searchController.text.isNotEmpty)
+                  GestureDetector(
+                    onTap: () {
+                      _searchController.clear();
+                      context.read<PostProvider>().loadPosts(query: '');
+                    },
+                    child: const Icon(Icons.clear, size: 16, color: AppColors.textHint),
+                  ),
               ],
             ),
           ),
@@ -426,18 +472,60 @@ class _HomePageState extends State<HomePage> with SingleTickerProviderStateMixin
     );
   }
 
-  Widget _buildEmptyFollow() {
-    return Center(
-      child: Column(
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          Icon(Icons.people_outline, size: 64, color: AppColors.textHint.withValues(alpha: 0.5)),
-          const SizedBox(height: 16),
-          const Text('暂无关注内容', style: AppTextStyles.subtitle),
-          const SizedBox(height: 8),
-          Text('去发现感兴趣的人吧', style: AppTextStyles.caption),
-        ],
-      ),
+  Widget _buildFollowingContent() {
+    return Consumer<PostProvider>(
+      builder: (context, postProvider, child) {
+        return FutureBuilder<List<TravelPost>>(
+          future: postProvider.fetchFollowingPosts(),
+          builder: (context, snapshot) {
+            if (snapshot.connectionState == ConnectionState.waiting) {
+              return const Center(child: CircularProgressIndicator(color: AppColors.primary));
+            }
+            final posts = snapshot.data ?? [];
+            if (posts.isEmpty) {
+              return Center(
+                child: Column(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    Icon(Icons.people_outline, size: 64, color: AppColors.textHint.withValues(alpha: 0.5)),
+                    const SizedBox(height: 16),
+                    const Text('暂无关注内容', style: AppTextStyles.subtitle),
+                    const SizedBox(height: 8),
+                    Text('去发现感兴趣的人吧', style: AppTextStyles.caption),
+                    const SizedBox(height: 24),
+                    ElevatedButton(
+                      onPressed: () => MainScaffold.switchTo(1), // 跳转搭子页
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: AppColors.primary,
+                        foregroundColor: Colors.white,
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+                      ),
+                      child: const Text('去看看'),
+                    ),
+                  ],
+                ),
+              );
+            }
+            return RefreshIndicator(
+              color: AppColors.primary,
+              onRefresh: () async {
+                setState(() {}); // 触发重绘以重新调用 fetchFollowingPosts
+              },
+              child: Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 12),
+                child: GridView.builder(
+                  padding: const EdgeInsets.only(top: 8),
+                  gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+                    crossAxisCount: 2, mainAxisSpacing: 10, crossAxisSpacing: 10, childAspectRatio: 0.7,
+                  ),
+                  itemCount: posts.length,
+                  itemBuilder: (context, index) => TravelCard(post: posts[index]),
+                ),
+              ),
+            );
+          },
+        );
+      },
     );
   }
 }

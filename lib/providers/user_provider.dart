@@ -56,6 +56,8 @@ class UserProvider extends ChangeNotifier {
           couponCount: response['coupon_count'] ?? 0,
           followCount: response['follow_count'] ?? 0,
           fansCount: response['fans_count'] ?? 0,
+          isBanned: response['is_banned'] ?? false,
+          cancelCount: response['cancel_count'] ?? 0,
         );
       } else {
         // New user, create a default profile in Database
@@ -69,9 +71,11 @@ class UserProvider extends ChangeNotifier {
           couponCount: 3,
           followCount: 5,
           fansCount: 0,
+          isBanned: false,
+          cancelCount: 0,
         );
         
-        await client.from('users').insert({
+        await client.from('users').upsert({
           'id': _user.id,
           'nickname': _user.nickname,
           'avatar': _user.avatar,
@@ -157,20 +161,83 @@ class UserProvider extends ChangeNotifier {
     await supabase.Supabase.instance.client.auth.signOut();
   }
 
+  /// 更新用户信息
   Future<void> updateUser(User newUser) async {
+    final oldUser = _user;
     _user = newUser;
     notifyListeners();
     
-    // Also update in Database if logged in with Supabase
-    if (isLoggedIn && _user.id != 'mock_123') {
+    if (isLoggedIn && !_user.id.startsWith('mock')) {
       try {
         await supabase.Supabase.instance.client.from('users').update({
           'nickname': _user.nickname,
           'avatar': _user.avatar,
         }).eq('id', _user.id);
       } catch (e) {
+        _user = oldUser; // 还原状态
+        notifyListeners();
         debugPrint('Error updating user in Supabase: $e');
+        throw Exception('$e');
       }
+    }
+  }
+
+  /// 关注用户
+  Future<void> followUser(String targetId) async {
+    if (!isLoggedIn) throw Exception('请先登录');
+    if (user.id == targetId) throw Exception('不能关注自己哦');
+    
+    // 对于本地死数据的 mock 帖子，避免调用真实 API 报错
+    if (targetId.isEmpty || targetId.startsWith('mock_')) {
+      return; 
+    }
+
+    try {
+      await supabase.Supabase.instance.client.from('follows').insert({
+        'follower_id': user.id,
+        'followed_id': targetId,
+      });
+      // 这里的用户统计建议通过数据库 Trigger 自动更新，
+      // 但为了 UI 实时性，我们可以重新加载一下当前用户信息
+      await _syncUserWithDatabase(supabase.Supabase.instance.client.auth.currentUser!);
+    } catch (e) {
+      debugPrint('Follow error: $e');
+      throw Exception('关注失败: 可能未开通此服务或网络异常');
+    }
+  }
+
+  /// 取消关注
+  Future<void> unfollowUser(String targetId) async {
+    if (!isLoggedIn) throw Exception('请先登录');
+    
+    if (targetId.isEmpty || targetId.startsWith('mock_')) {
+      return; 
+    }
+
+    try {
+      await supabase.Supabase.instance.client.from('follows').delete().match({
+        'follower_id': user.id,
+        'followed_id': targetId,
+      });
+      await _syncUserWithDatabase(supabase.Supabase.instance.client.auth.currentUser!);
+    } catch (e) {
+      debugPrint('Unfollow error: $e');
+      throw Exception('取消关注失败');
+    }
+  }
+
+  /// 检查是否已关注
+  Future<bool> isFollowing(String targetId) async {
+    if (!isLoggedIn) return false;
+    try {
+      final response = await supabase.Supabase.instance.client
+          .from('follows')
+          .select()
+          .match({'follower_id': user.id, 'followed_id': targetId})
+          .maybeSingle();
+      return response != null;
+    } catch (e) {
+      return false;
     }
   }
 

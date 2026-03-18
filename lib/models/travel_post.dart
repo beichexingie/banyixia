@@ -10,6 +10,7 @@ class TravelPost {
   final String authorName;
   final String authorAvatar;
   int likes;
+  int commentCount;
   final String tag;
   final DateTime createdAt;
   bool isLiked;
@@ -26,6 +27,7 @@ class TravelPost {
     required this.authorName,
     required this.authorAvatar,
     this.likes = 0,
+    this.commentCount = 0,
     this.tag = '',
     DateTime? createdAt,
     this.isLiked = false,
@@ -44,6 +46,7 @@ class TravelPost {
       authorName: json['authorName'] ?? json['author'] ?? '',
       authorAvatar: json['authorAvatar'] ?? json['avatar'] ?? '',
       likes: json['likes'] ?? 0,
+      commentCount: json['comments'] ?? 0,
       tag: json['tag'] ?? '',
       createdAt: json['createdAt'] != null
           ? DateTime.tryParse(json['createdAt']) ?? DateTime.now()

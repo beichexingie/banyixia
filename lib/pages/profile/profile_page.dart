@@ -1,4 +1,5 @@
 import 'dart:io';
+import 'dart:typed_data';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:image_picker/image_picker.dart';
@@ -11,6 +12,7 @@ import '../../providers/order_provider.dart';
 import 'package:go_router/go_router.dart';
 import '../main_scaffold.dart';
 import 'favorite_posts_page.dart';
+import 'footprint_posts_page.dart';
 
 class ProfilePage extends StatelessWidget {
   const ProfilePage({super.key});
@@ -208,20 +210,34 @@ class ProfilePage extends StatelessWidget {
               padding: const EdgeInsets.fromLTRB(20, 16, 20, 24),
               child: Column(
                 children: [
-                  Align(
-                    alignment: Alignment.topRight,
-                    child: GestureDetector(
-                      onTap: () => context.push('/settings'),
-                      child: const Row(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          Icon(Icons.settings_outlined, size: 20, color: Colors.white),
-                          SizedBox(width: 4),
-                          Text('设置', style: TextStyle(color: Colors.white, fontSize: 13)),
-                        ],
-                      ),
+                   Row(
+                      mainAxisAlignment: MainAxisAlignment.end,
+                      children: [
+                        GestureDetector(
+                          onTap: () => context.push('/admin/audit'),
+                          child: const Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Icon(Icons.admin_panel_settings_outlined, size: 20, color: Colors.white),
+                              SizedBox(width: 4),
+                              Text('管理', style: TextStyle(color: Colors.white, fontSize: 13)),
+                            ],
+                          ),
+                        ),
+                        const SizedBox(width: 16),
+                        GestureDetector(
+                          onTap: () => context.push('/settings'),
+                          child: const Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Icon(Icons.settings_outlined, size: 20, color: Colors.white),
+                              SizedBox(width: 4),
+                              Text('设置', style: TextStyle(color: Colors.white, fontSize: 13)),
+                            ],
+                          ),
+                        ),
+                      ],
                     ),
-                  ),
                   const SizedBox(height: 12),
                   GestureDetector(
                     onTap: () => _showEditProfile(context),
@@ -321,8 +337,10 @@ class ProfilePage extends StatelessWidget {
           padding: const EdgeInsets.symmetric(vertical: 16),
           decoration: BoxDecoration(
             color: Colors.white, borderRadius: BorderRadius.circular(14),
-            boxShadow: [BoxShadow(color: Colors.black.withValues(alpha: 0.06), blurRadius: 12, offset: const Offset(0, 4))],
-          ),
+            boxShadow: [
+            BoxShadow(color: Colors.black.withValues(alpha: 0.05), blurRadius: 10, offset: const Offset(0, 4)),
+          ],
+        ),
           child: Row(
             mainAxisAlignment: MainAxisAlignment.spaceEvenly,
             children: items.map((item) {
@@ -411,7 +429,7 @@ class ProfilePage extends StatelessWidget {
                   top: -4, right: -4,
                   child: Container(
                     padding: const EdgeInsets.all(4),
-                    decoration: const BoxDecoration(color: Colors.red, shape: BoxShape.circle),
+                    decoration: BoxDecoration(color: AppColors.primary.withValues(alpha: 0.1), shape: BoxShape.circle),
                     constraints: const BoxConstraints(minWidth: 18, minHeight: 18),
                     child: Text('$count', textAlign: TextAlign.center,
                       style: const TextStyle(color: Colors.white, fontSize: 10, fontWeight: FontWeight.bold)),
@@ -493,7 +511,12 @@ class ProfilePage extends StatelessWidget {
           ),
           GestureDetector(
             behavior: HitTestBehavior.opaque,
-            onTap: () => _showListPage(context, '足迹', Icons.directions_walk),
+            onTap: () {
+              Navigator.push(
+                context,
+                MaterialPageRoute(builder: (_) => const FootprintPostsPage()),
+              );
+            },
             child: _buildActionItem(Icons.directions_walk, '足迹'),
           ),
           GestureDetector(
@@ -542,7 +565,8 @@ class _EditProfileDialog extends StatefulWidget {
 class _EditProfileDialogState extends State<_EditProfileDialog> {
   late TextEditingController _nicknameController;
   late UserProvider _userProvider;
-  File? _selectedAvatar;
+  Uint8List? _avatarBytes;
+  String? _avatarMimeType;
   bool _isUploading = false;
 
   @override
@@ -563,8 +587,10 @@ class _EditProfileDialogState extends State<_EditProfileDialog> {
     try {
       final XFile? image = await picker.pickImage(source: ImageSource.gallery);
       if (image != null) {
+        final bytes = await image.readAsBytes();
         setState(() {
-          _selectedAvatar = File(image.path);
+          _avatarBytes = bytes;
+          _avatarMimeType = image.mimeType ?? 'image/jpeg';
         });
       }
     } catch (e) {
@@ -585,19 +611,19 @@ class _EditProfileDialogState extends State<_EditProfileDialog> {
 
     try {
       // Mock user bypasses real upload
-      if (user.id != '00000000-0000-0000-0000-000000000000' && _selectedAvatar != null) {
+      if (user.id != '00000000-0000-0000-0000-000000000000' && _avatarBytes != null) {
         final supabase = Supabase.instance.client;
         final fileName = '${user.id}_${DateTime.now().millisecondsSinceEpoch}.jpg';
         final filePath = 'uploads/$fileName';
 
-        await supabase.storage.from('avatars').upload(
+        await supabase.storage.from('avatars').uploadBinary(
           filePath,
-          _selectedAvatar!,
-          fileOptions: const FileOptions(cacheControl: '3600', upsert: true),
+          _avatarBytes!,
+          fileOptions: FileOptions(cacheControl: '3600', upsert: true, contentType: _avatarMimeType ?? 'image/jpeg'),
         );
 
         finalAvatarUrl = supabase.storage.from('avatars').getPublicUrl(filePath);
-      } else if (_selectedAvatar != null) {
+      } else if (_avatarBytes != null) {
         // Mock user local preview URL (won't persist across restarts but updates UI)
          finalAvatarUrl = 'https://picsum.photos/seed/${DateTime.now().millisecondsSinceEpoch}/100/100';
       }
@@ -630,8 +656,13 @@ class _EditProfileDialogState extends State<_EditProfileDialog> {
     } catch (e) {
       debugPrint('Error saving profile: $e');
       if (mounted) {
+        // Extract inner exception message if available
+        String errorMsg = '保存失败';
+        if (e is Exception) {
+          errorMsg = e.toString().replaceAll('Exception: ', '');
+        }
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('上传头像失败'), backgroundColor: Colors.red),
+          SnackBar(content: Text(errorMsg), backgroundColor: Colors.red),
         );
       }
     } finally {
@@ -661,10 +692,10 @@ class _EditProfileDialogState extends State<_EditProfileDialog> {
                 CircleAvatar(
                   radius: 40,
                   backgroundColor: const Color(0xFFE0E0E0),
-                  backgroundImage: _selectedAvatar != null 
-                      ? FileImage(_selectedAvatar!) as ImageProvider
+                  backgroundImage: _avatarBytes != null 
+                      ? MemoryImage(_avatarBytes!) as ImageProvider
                       : NetworkImage(user.avatar),
-                  child: _selectedAvatar == null && user.avatar.isEmpty
+                  child: _avatarBytes == null && user.avatar.isEmpty
                       ? const Icon(Icons.person, size: 40, color: Colors.white)
                       : null,
                 ),

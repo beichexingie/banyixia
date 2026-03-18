@@ -1,4 +1,3 @@
-import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:provider/provider.dart';
@@ -18,7 +17,7 @@ class PostCreatePage extends StatefulWidget {
 class _PostCreatePageState extends State<PostCreatePage> {
   final _titleController = TextEditingController();
   final _contentController = TextEditingController();
-  final List<File> _selectedImages = [];
+  final List<XFile> _selectedImages = [];
   String _tag = '';
   final ImagePicker _picker = ImagePicker();
   bool _isUploading = false;
@@ -35,7 +34,7 @@ class _PostCreatePageState extends State<PostCreatePage> {
       final List<XFile> images = await _picker.pickMultiImage();
       if (images.isNotEmpty) {
         setState(() {
-          _selectedImages.addAll(images.map((img) => File(img.path)));
+          _selectedImages.addAll(images);
         });
       }
     } catch (e) {
@@ -52,10 +51,11 @@ class _PostCreatePageState extends State<PostCreatePage> {
         final fileName = '${DateTime.now().millisecondsSinceEpoch}_${file.path.split('/').last}';
         final filePath = 'uploads/$fileName';
         
-        // Upload to 'post_images' bucket
-        await supabase.storage.from('post_images').upload(
+        // Upload binary data directly to be web-compatible
+        final bytes = await file.readAsBytes();
+        await supabase.storage.from('post_images').uploadBinary(
           filePath,
-          file,
+          bytes,
           fileOptions: const FileOptions(cacheControl: '3600', upsert: false),
         );
         
@@ -193,13 +193,14 @@ class _PostCreatePageState extends State<PostCreatePage> {
                   children: [
                     ..._selectedImages.map((file) => Stack(
                       children: [
-                        Container(
-                          width: 100, height: 100,
-                          decoration: BoxDecoration(
-                            borderRadius: BorderRadius.circular(12),
-                            image: DecorationImage(image: FileImage(file), fit: BoxFit.cover),
+                          Container(
+                            width: 100, height: 100,
+                            decoration: BoxDecoration(
+                              borderRadius: BorderRadius.circular(12),
+                            ),
+                            clipBehavior: Clip.antiAlias,
+                            child: Image.network(file.path, fit: BoxFit.cover),
                           ),
-                        ),
                         Positioned(
                           right: 4, top: 4,
                           child: GestureDetector(
