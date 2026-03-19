@@ -9,6 +9,7 @@ import '../pages/home/post_detail_page.dart';
 import '../pages/home/post_create_page.dart';
 import '../pages/apply/apply_guide_page.dart';
 import '../pages/admin/admin_audit_page.dart';
+import '../pages/messages/chat_room_page.dart';
 import '../pages/companion/guide_detail_page.dart';
 import '../pages/profile/settings_page.dart';
 import '../pages/travel_plan/travel_plan_create_page.dart';
@@ -135,6 +136,15 @@ class AppRouter {
       GoRoute(
         path: '/wallet',
         builder: (context, state) => const WalletPage(),
+      ),
+      GoRoute(
+        path: '/chat/:roomId',
+        builder: (context, state) {
+          final roomId = state.pathParameters['roomId']!;
+          final name = state.uri.queryParameters['name'] ?? '用户';
+          final avatar = state.uri.queryParameters['avatar'] ?? '';
+          return ChatRoomPage(roomId: roomId, otherUserName: name, otherUserAvatar: avatar);
+        },
       ),
       GoRoute(
         path: '/admin/audit',

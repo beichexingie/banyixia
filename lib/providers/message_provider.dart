@@ -1,77 +1,190 @@
 import 'package:flutter/material.dart';
+import 'package:supabase_flutter/supabase_flutter.dart' as supabase;
 import '../models/message.dart';
+import '../models/chat_room.dart';
 
-/// 消息状态管理
 class MessageProvider extends ChangeNotifier {
-  List<Message> _messages = [];
+  final _client = supabase.Supabase.instance.client;
+  
+  List<ChatRoom> _rooms = [];
+  List<Message> _currentRoomMessages = [];
   bool _isLoading = false;
+  
+  supabase.RealtimeChannel? _messageSubscription;
 
-  List<Message> get messages => _messages;
+  List<ChatRoom> get rooms => _rooms;
+  List<Message> get currentRoomMessages => _currentRoomMessages;
   bool get isLoading => _isLoading;
 
-  /// 总未读数
-  int get totalUnread =>
-      _messages.fold(0, (sum, msg) => sum + msg.unreadCount);
+  int get totalUnread => _rooms.fold(0, (sum, room) => sum + room.unreadCount);
 
-  /// 加载消息列表（后续替换为 API 调用）
-  Future<void> loadMessages() async {
+  /// 加载会话列表
+  Future<void> loadRooms() async {
+    final userId = _client.auth.currentUser?.id;
+    if (userId == null) return;
+
     _isLoading = true;
     notifyListeners();
 
-    // TODO: 替换为真实 API 调用
-    await Future.delayed(const Duration(milliseconds: 300));
+    try {
+      final response = await _client
+          .from('chat_rooms')
+          .select()
+          .contains('participant_ids', [userId])
+          .order('last_message_time', ascending: false);
 
-    _messages = [
-      Message(
-        id: 'm1',
-        senderId: 'system',
-        senderName: '系统通知',
-        senderAvatar: 'https://picsum.photos/seed/sys1/100/100',
-        content: '欢迎加入伴一下！开启您的旅行社交之旅',
-        time: DateTime.now(),
-        unreadCount: 1,
-        type: MessageType.system,
-      ),
-      Message(
-        id: 'm2',
-        senderId: 'helper',
-        senderName: '小助手',
-        senderAvatar: 'https://picsum.photos/seed/helper/100/100',
-        content: '您好，有什么可以帮您的吗？',
-        time: DateTime.now().subtract(const Duration(hours: 2)),
-        unreadCount: 0,
-      ),
-      Message(
-        id: 'm3',
-        senderId: 'u3',
-        senderName: '旅行达人',
-        senderAvatar: 'https://picsum.photos/seed/traveler/100/100',
-        content: '明天的行程已经为您安排好了！',
-        time: DateTime.now().subtract(const Duration(days: 1)),
-        unreadCount: 3,
-      ),
-    ];
-
-    _isLoading = false;
-    notifyListeners();
-  }
-
-  /// 标记消息已读
-  void markAsRead(String messageId) {
-    final index = _messages.indexWhere((m) => m.id == messageId);
-    if (index != -1) {
-      _messages[index] = Message(
-        id: _messages[index].id,
-        senderId: _messages[index].senderId,
-        senderName: _messages[index].senderName,
-        senderAvatar: _messages[index].senderAvatar,
-        content: _messages[index].content,
-        time: _messages[index].time,
-        unreadCount: 0,
-        type: _messages[index].type,
-      );
-      // TODO: 调用 API 同步已读状态
+      final List<ChatRoom> loadedRooms = [];
+      for (var roomData in response) {
+        var room = ChatRoom.fromJson(roomData);
+        
+        // 获取对方信息 (由于暂无复杂的关联查询，简单获取一次)
+        final otherId = room.participantIds.firstWhere((id) => id != userId);
+        final otherUser = await _client.from('users').select('nickname, avatar').eq('id', otherId).maybeSingle();
+        
+        // 计算未读数
+        final unreadCount = await _client
+            .from('messages')
+            .count()
+            .eq('room_id', room.id)
+            .eq('is_read', false)
+            .neq('sender_id', userId);
+        
+        loadedRooms.add(room.copyWith(
+          otherParticipantName: otherUser?['nickname'] ?? '神秘用户',
+          otherParticipantAvatar: otherUser?['avatar'] ?? 'https://picsum.photos/seed/user/100/100',
+          unreadCount: unreadCount,
+        ));
+      }
+      _rooms = loadedRooms;
+    } catch (e) {
+      debugPrint('Load rooms error: $e');
+    } finally {
+      _isLoading = false;
       notifyListeners();
     }
+  }
+
+  /// 进入聊天室并开启实时监听
+  Future<void> enterRoom(String roomId) async {
+    _currentRoomMessages = [];
+    notifyListeners();
+
+    // 1. 加载历史消息
+    try {
+      final response = await _client
+          .from('messages')
+          .select()
+          .eq('room_id', roomId)
+          .order('created_at', ascending: true);
+      
+      _currentRoomMessages = (response as List).map((m) => Message.fromJson(m)).toList();
+      notifyListeners();
+      
+      // 2. 停止旧监听
+      await _messageSubscription?.unsubscribe();
+
+      // 3. 开启实时监听新消息
+      _messageSubscription = _client
+          .channel('room_$roomId')
+          .onPostgresChanges(
+            event: supabase.PostgresChangeEvent.insert,
+            schema: 'public',
+            table: 'messages',
+            filter: supabase.PostgresChangeFilter(
+              type: supabase.PostgresChangeFilterType.eq, 
+              column: 'room_id', 
+              value: roomId
+            ),
+            callback: (payload) {
+              debugPrint('Realtime message received: ${payload.newRecord}');
+              try {
+                final newMessage = Message.fromJson(payload.newRecord);
+                // 避免重复
+                if (!_currentRoomMessages.any((m) => m.id == newMessage.id)) {
+                  _currentRoomMessages.add(newMessage);
+                  notifyListeners();
+                }
+              } catch (e) {
+                debugPrint('Error parsing realtime message: $e');
+              }
+            },
+          )
+          .subscribe((status, [error]) {
+            debugPrint('Realtime status for room $roomId: $status');
+            if (error != null) {
+              debugPrint('Realtime subscription error: $error');
+            }
+          });
+
+      // 4. 清除未读状态
+      _markRoomAsRead(roomId);
+    } catch (e) {
+      debugPrint('Enter room error: $e');
+    }
+  }
+
+  /// 发送消息
+  Future<void> sendMessage(String roomId, String content, {String type = 'text'}) async {
+    final userId = _client.auth.currentUser?.id;
+    if (userId == null) return;
+
+    try {
+      await _client.from('messages').insert({
+        'room_id': roomId,
+        'sender_id': userId,
+        'content': content,
+        'type': type,
+      });
+      // 消息会通过实时监听自动回来，或者在这里手动 load 一下
+    } catch (e) {
+      debugPrint('Send message error: $e');
+      throw Exception('发送失败');
+    }
+  }
+
+  /// 获取或创建会话
+  Future<String> getOrCreateRoom(String otherUserId) async {
+    final userId = _client.auth.currentUser?.id;
+    if (userId == null) throw Exception('未登录');
+
+    // 1. 查找是否存在两人的会话
+    final response = await _client
+        .from('chat_rooms')
+        .select('id')
+        .contains('participant_ids', [userId, otherUserId])
+        .maybeSingle();
+
+    if (response != null) return response['id'];
+
+    // 2. 如果不存在，创建新会话
+    final newRoom = await _client.from('chat_rooms').insert({
+      'participant_ids': [userId, otherUserId],
+    }).select('id').single();
+
+    return newRoom['id'];
+  }
+
+  Future<void> _markRoomAsRead(String roomId) async {
+    final userId = _client.auth.currentUser?.id;
+    if (userId == null) return;
+
+    await _client
+        .from('messages')
+        .update({'is_read': true})
+        .eq('room_id', roomId)
+        .neq('sender_id', userId);
+    
+    // 更新本地未读数
+    final idx = _rooms.indexWhere((r) => r.id == roomId);
+    if (idx != -1) {
+      _rooms[idx] = _rooms[idx].copyWith(unreadCount: 0);
+      notifyListeners();
+    }
+  }
+
+  @override
+  void dispose() {
+    _messageSubscription?.unsubscribe();
+    super.dispose();
   }
 }

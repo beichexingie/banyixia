@@ -6,6 +6,7 @@ import '../../config/app_theme.dart';
 import '../../providers/guide_provider.dart';
 import '../../providers/user_provider.dart';
 import 'package:provider/provider.dart';
+import '../../providers/message_provider.dart';
 
 class GuideDetailPage extends StatefulWidget {
   final Guide guide;
@@ -428,6 +429,28 @@ class _GuideDetailPageState extends State<GuideDetailPage> {
           child: Row(
             children: [
               GestureDetector(
+                onTap: () async {
+                  final msgProvider = context.read<MessageProvider>();
+                  try {
+                    final roomId = await msgProvider.getOrCreateRoom(widget.guide.id);
+                    if (mounted) {
+                      context.push('/chat/$roomId?name=${Uri.encodeComponent(widget.guide.name)}&avatar=${Uri.encodeComponent(widget.guide.avatar)}');
+                    }
+                  } catch (e) {
+                    ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(e.toString())));
+                  }
+                },
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    const Icon(Icons.chat_bubble_outline, size: 26, color: AppColors.textHint),
+                    const SizedBox(height: 2),
+                    const Text('咨询', style: TextStyle(fontSize: 10, color: AppColors.textHint)),
+                  ],
+                ),
+              ),
+              const SizedBox(width: 24),
+              GestureDetector(
                 onTap: () => provider.toggleFavorite(widget.guide.id),
                 child: Column(
                   mainAxisSize: MainAxisSize.min,
@@ -442,7 +465,7 @@ class _GuideDetailPageState extends State<GuideDetailPage> {
                   ],
                 ),
               ),
-              const SizedBox(width: 30),
+              const SizedBox(width: 24),
               Expanded(
                 child: GestureDetector(
                   onTap: () {
@@ -458,7 +481,7 @@ class _GuideDetailPageState extends State<GuideDetailPage> {
                       ],
                     ),
                     alignment: Alignment.center,
-                    child: const Text('找TA下单', style: TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.bold)),
+                    child: const Text('立即预约', style: TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.bold)),
                   ),
                 ),
               ),

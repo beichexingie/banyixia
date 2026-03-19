@@ -32,7 +32,7 @@ class MyApp extends StatelessWidget {
         ChangeNotifierProvider(create: (_) => PostProvider()..loadPosts()),
         ChangeNotifierProvider(create: (_) => GuideProvider()..loadGuides()),
         ChangeNotifierProvider(create: (_) => OrderProvider()..loadOrders()),
-        ChangeNotifierProvider(create: (_) => MessageProvider()..loadMessages()),
+        ChangeNotifierProvider(create: (_) => MessageProvider()..loadRooms()),
         ChangeNotifierProvider(create: (_) => ApplicationProvider()),
       ],
       child: Builder(

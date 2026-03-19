@@ -5,6 +5,8 @@ import 'companion/companion_page.dart';
 import 'messages/messages_page.dart';
 import 'profile/profile_page.dart';
 import 'package:go_router/go_router.dart';
+import 'package:provider/provider.dart';
+import '../providers/message_provider.dart';
 
 class MainScaffold extends StatefulWidget {
   const MainScaffold({super.key});
@@ -146,7 +148,11 @@ class _MainScaffoldState extends State<MainScaffold> {
                 _buildNavItem(0, Icons.home_outlined, Icons.home, '首页'),
                 _buildNavItem(1, Icons.people_outline, Icons.people, '搭子'),
                 _buildCenterButton(),
-                _buildNavItem(3, Icons.chat_bubble_outline, Icons.chat_bubble, '消息'),
+                Consumer<MessageProvider>(
+                  builder: (context, msgProvider, _) {
+                    return _buildNavItem(3, Icons.chat_bubble_outline, Icons.chat_bubble, '消息', badge: msgProvider.totalUnread);
+                  },
+                ),
                 _buildNavItem(4, Icons.person_outline, Icons.person, '我的'),
               ],
             ),
@@ -156,7 +162,7 @@ class _MainScaffoldState extends State<MainScaffold> {
     );
   }
 
-  Widget _buildNavItem(int index, IconData icon, IconData activeIcon, String label) {
+  Widget _buildNavItem(int index, IconData icon, IconData activeIcon, String label, {int badge = 0}) {
     final isActive = _currentIndex == index;
     return GestureDetector(
       onTap: () => _onTabTapped(index),
@@ -166,10 +172,26 @@ class _MainScaffoldState extends State<MainScaffold> {
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            Icon(
-              isActive ? activeIcon : icon,
-              color: isActive ? AppColors.primary : AppColors.textHint,
-              size: 24,
+            Stack(
+              clipBehavior: Clip.none,
+              children: [
+                Icon(
+                  isActive ? activeIcon : icon,
+                  color: isActive ? AppColors.primary : AppColors.textHint,
+                  size: 24,
+                ),
+                if (badge > 0)
+                  Positioned(
+                    top: -2, right: -6,
+                    child: Container(
+                      padding: const EdgeInsets.all(2),
+                      decoration: const BoxDecoration(color: Colors.red, shape: BoxShape.circle),
+                      constraints: const BoxConstraints(minWidth: 16, minHeight: 16),
+                      alignment: Alignment.center,
+                      child: Text(badge > 99 ? '..' : '$badge', style: const TextStyle(color: Colors.white, fontSize: 9, fontWeight: FontWeight.bold)),
+                    ),
+                  ),
+              ],
             ),
             const SizedBox(height: 2),
             Text(

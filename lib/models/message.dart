@@ -1,64 +1,53 @@
 /// 消息模型
 class Message {
   final String id;
+  final String roomId;
   final String senderId;
-  final String senderName;
-  final String senderAvatar;
   final String content;
-  final DateTime time;
-  final int unreadCount;
-  final MessageType type;
+  final String type; // text, image, order_card
+  final bool isRead;
+  final DateTime createdAt;
 
   Message({
     required this.id,
+    required this.roomId,
     required this.senderId,
-    required this.senderName,
-    this.senderAvatar = '',
     required this.content,
-    DateTime? time,
-    this.unreadCount = 0,
-    this.type = MessageType.text,
-  }) : time = time ?? DateTime.now();
+    this.type = 'text',
+    this.isRead = false,
+    required this.createdAt,
+  });
 
   factory Message.fromJson(Map<String, dynamic> json) {
     return Message(
-      id: json['id']?.toString() ?? '',
-      senderId: json['senderId']?.toString() ?? '',
-      senderName: json['senderName'] ?? json['name'] ?? '',
-      senderAvatar: json['senderAvatar'] ?? json['avatar'] ?? '',
-      content: json['content'] ?? json['lastMessage'] ?? '',
-      time: json['time'] is String
-          ? DateTime.tryParse(json['time']) ?? DateTime.now()
-          : DateTime.now(),
-      unreadCount: json['unreadCount'] ?? json['unread'] ?? 0,
-      type: MessageType.values[json['type'] ?? 0],
+      id: json['id'],
+      roomId: json['room_id'],
+      senderId: json['sender_id'],
+      content: json['content'],
+      type: json['type'] ?? 'text',
+      isRead: json['is_read'] ?? false,
+      createdAt: DateTime.parse(json['created_at']),
     );
   }
 
   Map<String, dynamic> toJson() {
     return {
-      'id': id,
-      'senderId': senderId,
-      'senderName': senderName,
-      'senderAvatar': senderAvatar,
+      'room_id': roomId,
+      'sender_id': senderId,
       'content': content,
-      'time': time.toIso8601String(),
-      'unreadCount': unreadCount,
-      'type': type.index,
+      'type': type,
     };
   }
 
-  /// 格式化时间显示
+  bool get isSystem => senderId == 'system';
+  
   String get timeLabel {
     final now = DateTime.now();
-    final diff = now.difference(time);
-
+    final diff = now.difference(createdAt);
     if (diff.inMinutes < 1) return '刚刚';
     if (diff.inHours < 1) return '${diff.inMinutes}分钟前';
-    if (diff.inDays < 1) return '${diff.inHours}小时前';
-    if (diff.inDays < 2) return '昨天';
-    if (diff.inDays < 7) return '${diff.inDays}天前';
-    return '${time.month}/${time.day}';
+    if (diff.inDays < 1) return '${createdAt.hour}:${createdAt.minute.toString().padLeft(2, "0")}';
+    return '${createdAt.month}/${createdAt.day}';
   }
 }
 
