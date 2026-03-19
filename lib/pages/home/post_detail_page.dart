@@ -224,7 +224,7 @@ class _PostDetailPageState extends State<PostDetailPage> {
                         mainAxisAlignment: MainAxisAlignment.spaceBetween,
                         children: [
                           Text(comment.userName, style: const TextStyle(fontSize: 13, fontWeight: FontWeight.bold, color: AppColors.textPrimary)),
-                          Text('${comment.createdAt.month}-${comment.createdAt.day} ${comment.createdAt.hour}:${comment.createdAt.minute}', style: AppTextStyles.caption),
+                          Text(comment.timeLabel, style: AppTextStyles.caption),
                         ],
                       ),
                       const SizedBox(height: 4),
@@ -306,7 +306,7 @@ class _PostDetailPageState extends State<PostDetailPage> {
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
                             Text(widget.post.authorName, style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w600)),
-                            Text('发布于 ${widget.post.createdAt.year}/${widget.post.createdAt.month}/${widget.post.createdAt.day}', style: AppTextStyles.caption),
+                            Text(widget.post.timeLabel, style: AppTextStyles.caption),
                           ],
                         ),
                         const Spacer(),

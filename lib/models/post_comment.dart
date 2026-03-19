@@ -1,3 +1,5 @@
+import '../utils/time_utils.dart';
+
 /// 帖子评论模型
 class PostComment {
   final String id;
@@ -41,4 +43,5 @@ class PostComment {
       'created_at': createdAt.toIso8601String(),
     };
   }
+  String get timeLabel => TimeUtils.format(createdAt);
 }

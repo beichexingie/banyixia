@@ -98,7 +98,7 @@ class _MessagesPageState extends State<MessagesPage> {
           child: Text(room.lastMessage ?? '快开始聊天吧', maxLines: 1, overflow: TextOverflow.ellipsis, style: AppTextStyles.caption),
         ),
         trailing: Text(
-          room.lastMessageTime != null ? room.lastMessageTime!.hour.toString() + ":" + room.lastMessageTime!.minute.toString().padLeft(2, '0') : '',
+          room.timeLabel,
           style: const TextStyle(fontSize: 12, color: AppColors.textHint)
         ),
         onTap: () {

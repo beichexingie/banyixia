@@ -88,7 +88,16 @@ class TravelCard extends StatelessWidget {
                           ),
                         ),
                         const SizedBox(width: 6),
-                        Expanded(child: Text(post.authorName, overflow: TextOverflow.ellipsis, style: AppTextStyles.caption)),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Text(post.authorName, overflow: TextOverflow.ellipsis, style: AppTextStyles.caption),
+                              Text(post.timeLabel, style: const TextStyle(fontSize: 8, color: AppColors.textHint)),
+                            ],
+                          ),
+                        ),
                         // 点赞按钮 — 可点击
                         GestureDetector(
                           onTap: () {

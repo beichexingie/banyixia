@@ -242,6 +242,7 @@ class PostProvider extends ChangeNotifier {
         authorAvatar: 'https://picsum.photos/seed/avatar1/100/100',
         likes: 16,
         tag: '官方',
+        createdAt: DateTime.now().subtract(const Duration(days: 2)),
       ),
     ];
   }

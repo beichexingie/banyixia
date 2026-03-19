@@ -1,4 +1,5 @@
 import 'message.dart';
+import '../utils/time_utils.dart';
 
 /// 聊天会话模型
 class ChatRoom {
@@ -57,4 +58,6 @@ class ChatRoom {
       unreadCount: unreadCount ?? this.unreadCount,
     );
   }
+
+  String get timeLabel => TimeUtils.formatChat(lastMessageTime ?? createdAt);
 }

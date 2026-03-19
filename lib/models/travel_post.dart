@@ -1,3 +1,5 @@
+import '../utils/time_utils.dart';
+
 /// 旅行帖子模型
 class TravelPost {
   final String id;
@@ -74,4 +76,6 @@ class TravelPost {
       'isFavorited': isFavorited,
     };
   }
+
+  String get timeLabel => TimeUtils.format(createdAt);
 }
