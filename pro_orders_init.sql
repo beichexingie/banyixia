@@ -43,3 +43,13 @@ DROP TRIGGER IF EXISTS tr_user_ban_check ON public.users;
 CREATE TRIGGER tr_user_ban_check
   BEFORE UPDATE OF cancel_count ON public.users
   FOR EACH ROW EXECUTE FUNCTION public.check_user_ban();
+
+-- 5. 增加取消次数 RPC
+CREATE OR REPLACE FUNCTION public.increment_cancel_count(target_user_id UUID)
+RETURNS VOID AS $$
+BEGIN
+  UPDATE public.users 
+  SET cancel_count = cancel_count + 1
+  WHERE id = target_user_id;
+END;
+$$ LANGUAGE plpgsql SECURITY DEFINER;

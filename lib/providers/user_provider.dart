@@ -64,6 +64,7 @@ class UserProvider extends ChangeNotifier {
           fansCount: results[1] as int? ?? 0,
           isBanned: response['is_banned'] ?? false,
           cancelCount: response['cancel_count'] ?? 0,
+          isAdmin: response['is_admin'] ?? false,
         );
       } else {
         // New user, create a default profile in Database
@@ -79,6 +80,7 @@ class UserProvider extends ChangeNotifier {
           fansCount: 0,
           isBanned: false,
           cancelCount: 0,
+          isAdmin: false, // 新用户默认非管理员
         );
         
         await client.from('users').upsert({
@@ -190,12 +192,10 @@ class UserProvider extends ChangeNotifier {
 
   /// 关注用户
   Future<void> followUser(String targetId) async {
-    if (!isLoggedIn) throw Exception('请先登录');
-    if (user.id == targetId) throw Exception('不能关注自己哦');
+    if (!isLoggedIn) throw Exception('请先登录后操作');
     
-    // 对于本地死数据的 mock 帖子，避免调用真实 API 报错
     if (targetId.isEmpty || targetId.startsWith('mock_')) {
-      return; 
+      return; // mock data, do nothing
     }
 
     try {
@@ -325,9 +325,57 @@ class UserProvider extends ChangeNotifier {
         couponCount: 1,
         followCount: 10,
         fansCount: 5,
+        isAdmin: true, // 设置为管理员以便进入审核页面
       );
       _isLoading = false;
       notifyListeners();
     });
+  }
+
+  // --- 管理员审核相关 (Admin Audit) ---
+
+  /// 获取所有待审核请求
+  Future<List<Map<String, dynamic>>> fetchPendingApplications() async {
+    try {
+      final response = await supabase.Supabase.instance.client
+          .from('guide_applications')
+          .select()
+          .eq('status', 'pending')
+          .order('created_at', ascending: false);
+      return List<Map<String, dynamic>>.from(response);
+    } catch (e) {
+      debugPrint('fetchPendingApplications error: $e');
+      return [];
+    }
+  }
+
+  /// 审核通过
+  Future<void> approveApplication(String id) async {
+    try {
+      await supabase.Supabase.instance.client
+          .from('guide_applications')
+          .update({'status': 'approved'})
+          .eq('id', id);
+      // RPC 触发钱包创建已在 SQL 层实现
+    } catch (e) {
+      debugPrint('approveApplication error: $e');
+      throw Exception('审批通过失败: $e');
+    }
+  }
+
+  /// 审核驳回
+  Future<void> rejectApplication(String id, String reason) async {
+    try {
+      await supabase.Supabase.instance.client
+          .from('guide_applications')
+          .update({
+            'status': 'rejected',
+            'reject_reason': reason,
+          })
+          .eq('id', id);
+    } catch (e) {
+      debugPrint('rejectApplication error: $e');
+      throw Exception('驳回失败: $e');
+    }
   }
 }

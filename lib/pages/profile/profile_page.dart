@@ -1,4 +1,3 @@
-import 'dart:io';
 import 'dart:typed_data';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
@@ -9,28 +8,33 @@ import '../../models/order.dart';
 import '../../models/user.dart' as app_model;
 import '../../providers/user_provider.dart';
 import '../../providers/order_provider.dart';
+import '../../providers/guide_provider.dart';
 import 'package:go_router/go_router.dart';
 import '../main_scaffold.dart';
 import 'favorite_posts_page.dart';
 import 'footprint_posts_page.dart';
 import 'following_page.dart';
+import '../admin/audit_list_page.dart';
 
 class ProfilePage extends StatelessWidget {
   const ProfilePage({super.key});
 
   @override
   Widget build(BuildContext context) {
+    final user = context.watch<UserProvider>().user;
+    final isGuide = context.watch<GuideProvider>().guides.any((g) => g.id == user.id);
+
     return Scaffold(
       backgroundColor: AppColors.background,
       body: SingleChildScrollView(
         child: Column(
           children: [
-            _buildHeader(context),
+            _buildHeader(context, isGuide),
             _buildFunctionGrid(context),
             _buildOrderSection(context),
             _buildEmptyOrderTip(context),
             _buildBottomActions(context),
-            _buildEmptyContent(),
+            _buildGuidePanel(context, isGuide),
             const SizedBox(height: 20),
           ],
         ),
@@ -194,10 +198,11 @@ class ProfilePage extends StatelessWidget {
   }
 
   // ==================== 构建界面 ====================
-  Widget _buildHeader(BuildContext context) {
+  Widget _buildHeader(BuildContext context, bool isGuide) {
     return Consumer<UserProvider>(
       builder: (context, userProvider, child) {
         final user = userProvider.user;
+        
         return Container(
           decoration: const BoxDecoration(
             gradient: LinearGradient(
@@ -211,11 +216,12 @@ class ProfilePage extends StatelessWidget {
               padding: const EdgeInsets.fromLTRB(20, 16, 20, 24),
               child: Column(
                 children: [
-                   Row(
-                      mainAxisAlignment: MainAxisAlignment.end,
-                      children: [
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.end,
+                    children: [
+                      if (user.isAdmin)
                         GestureDetector(
-                          onTap: () => context.push('/admin/audit'),
+                          onTap: () => Navigator.push(context, MaterialPageRoute(builder: (context) => const AuditListPage())),
                           child: const Row(
                             mainAxisSize: MainAxisSize.min,
                             children: [
@@ -225,20 +231,20 @@ class ProfilePage extends StatelessWidget {
                             ],
                           ),
                         ),
-                        const SizedBox(width: 16),
-                        GestureDetector(
-                          onTap: () => context.push('/settings'),
-                          child: const Row(
-                            mainAxisSize: MainAxisSize.min,
-                            children: [
-                              Icon(Icons.settings_outlined, size: 20, color: Colors.white),
-                              SizedBox(width: 4),
-                              Text('设置', style: TextStyle(color: Colors.white, fontSize: 13)),
-                            ],
-                          ),
+                      if (user.isAdmin) const SizedBox(width: 16),
+                      GestureDetector(
+                        onTap: () => context.push('/settings'),
+                        child: const Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Icon(Icons.settings_outlined, size: 20, color: Colors.white),
+                            SizedBox(width: 4),
+                            Text('设置', style: TextStyle(color: Colors.white, fontSize: 13)),
+                          ],
                         ),
-                      ],
-                    ),
+                      ),
+                    ],
+                  ),
                   const SizedBox(height: 12),
                   GestureDetector(
                     onTap: () => _showEditProfile(context),
@@ -283,7 +289,34 @@ class ProfilePage extends StatelessWidget {
                                       ),
                                       child: Text(user.vipLabel, style: const TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: Colors.white)),
                                     ),
+                                  if (isGuide) ...[
+                                    const SizedBox(width: 8),
+                                    Container(
+                                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 3),
+                                      decoration: BoxDecoration(
+                                        gradient: const LinearGradient(
+                                          colors: [Color(0xFFFF6B6B), Color(0xFFFF8E53)],
+                                        ),
+                                        borderRadius: BorderRadius.circular(20),
+                                        boxShadow: [
+                                          BoxShadow(
+                                            color: Colors.black.withValues(alpha: 0.1),
+                                            blurRadius: 4, offset: const Offset(0, 2),
+                                          )
+                                        ],
+                                      ),
+                                      child: Row(
+                                        mainAxisSize: MainAxisSize.min,
+                                        children: [
+                                          const Icon(Icons.verified, size: 10, color: Colors.white),
+                                          const SizedBox(width: 4),
+                                          const Text('认证地陪', style: TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: Colors.white)),
+                                        ],
+                                      ),
+                                    ),
+                                  ],
                                 ],
+
                               ),
                               const SizedBox(height: 6),
                               Row(
@@ -537,6 +570,71 @@ class ProfilePage extends StatelessWidget {
           ),
         ],
       ),
+    );
+  }
+
+  Widget _buildGuidePanel(BuildContext context, bool isGuide) {
+    if (!isGuide) return const SizedBox.shrink();
+    return Container(
+      margin: const EdgeInsets.fromLTRB(16, 16, 16, 0),
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(16),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.03),
+            blurRadius: 10,
+            offset: const Offset(0, 4),
+          ),
+        ],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+               Container(
+                width: 32, height: 32,
+                decoration: BoxDecoration(
+                  color: Colors.orange.withValues(alpha: 0.1),
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: const Icon(Icons.stars, color: Colors.orange, size: 18),
+              ),
+              const SizedBox(width: 12),
+              const Text('地陪专属权益', style: TextStyle(fontSize: 15, fontWeight: FontWeight.bold, color: AppColors.textPrimary)),
+              const Spacer(),
+              TextButton(
+                onPressed: () {
+                  final userId = context.read<UserProvider>().user.id;
+                  context.push('/guide/$userId');
+                },
+                child: const Text('查看主页 >', style: TextStyle(fontSize: 13, color: AppColors.primary)),
+              ),
+            ],
+          ),
+          const SizedBox(height: 12),
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceAround,
+            children: [
+              _buildGuideStatItem('4.9', '综合评分'),
+              _buildGuideStatItem('12', '服务人次'),
+              _buildGuideStatItem('98%', '好评率'),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildGuideStatItem(String value, String label) {
+    return Column(
+      children: [
+        Text(value, style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: AppColors.textPrimary)),
+        const SizedBox(height: 4),
+        Text(label, style: const TextStyle(fontSize: 11, color: AppColors.textHint)),
+      ],
     );
   }
 

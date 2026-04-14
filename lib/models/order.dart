@@ -36,35 +36,40 @@ class Order {
   factory Order.fromJson(Map<String, dynamic> json) {
     return Order(
       id: json['id']?.toString() ?? '',
-      userId: json['userId']?.toString() ?? '',
-      guideId: json['guideId']?.toString() ?? '',
-      guideName: json['guideName'] ?? '',
-      guideAvatar: json['guideAvatar'] ?? '',
+      userId: json['user_id']?.toString() ?? '',
+      guideId: json['guide_id']?.toString() ?? '',
+      guideName: json['guide_name'] ?? '',
+      guideAvatar: json['guide_avatar'] ?? '',
       status: OrderStatus.values[json['status'] ?? 0],
       amount: (json['amount'] ?? 0).toDouble(),
-      serviceName: json['serviceName'] ?? '',
-      createdAt: json['createdAt'] != null
-          ? DateTime.tryParse(json['createdAt']) ?? DateTime.now()
+      serviceName: json['service_name'] ?? '',
+      createdAt: json['created_at'] != null
+          ? DateTime.tryParse(json['created_at']) ?? DateTime.now()
           : DateTime.now(),
-      serviceDate: json['serviceDate'] != null
-          ? DateTime.tryParse(json['serviceDate'])
+      serviceDate: json['service_date'] != null
+          ? DateTime.tryParse(json['service_date'])
           : null,
     );
   }
 
   Map<String, dynamic> toJson() {
-    return {
-      'id': id,
-      'userId': userId,
-      'guideId': guideId,
-      'guideName': guideName,
-      'guideAvatar': guideAvatar,
+    final map = <String, dynamic>{
+      'user_id': userId,
+      'guide_id': guideId,
+      'guide_name': guideName,
+      'guide_avatar': guideAvatar,
       'status': status.index,
       'amount': amount,
-      'serviceName': serviceName,
-      'createdAt': createdAt.toIso8601String(),
-      'serviceDate': serviceDate?.toIso8601String(),
+      'service_name': serviceName,
+      'created_at': createdAt.toIso8601String(),
     };
+    if (id.isNotEmpty) {
+      map['id'] = id;
+    }
+    if (serviceDate != null) {
+      map['service_date'] = serviceDate!.toIso8601String();
+    }
+    return map;
   }
 
   String get statusLabel {

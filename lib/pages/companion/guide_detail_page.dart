@@ -6,18 +6,22 @@ import '../../config/app_theme.dart';
 import '../../providers/guide_provider.dart';
 import '../../providers/user_provider.dart';
 import 'package:provider/provider.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 import '../../providers/message_provider.dart';
 
 class GuideDetailPage extends StatefulWidget {
-  final Guide guide;
+  final Guide? guide;
+  final String? guideId;
 
-  const GuideDetailPage({super.key, required this.guide});
+  const GuideDetailPage({super.key, this.guide, this.guideId});
 
   @override
   State<GuideDetailPage> createState() => _GuideDetailPageState();
 }
 
 class _GuideDetailPageState extends State<GuideDetailPage> {
+  Guide? _guide;
+  bool _isLoading = false;
   bool _isFollowing = false;
   bool _isFollowLoading = false;
 
@@ -25,14 +29,52 @@ class _GuideDetailPageState extends State<GuideDetailPage> {
   @override
   void initState() {
     super.initState();
+    if (widget.guide != null) {
+      _guide = widget.guide;
+      _initData();
+    } else if (widget.guideId != null) {
+      _fetchGuide();
+    }
+  }
+
+  void _initData() {
     _checkFollowStatus();
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      context.read<GuideProvider>().recordFootprint(widget.guide.id);
+      if (_guide != null) {
+        context.read<GuideProvider>().recordFootprint(_guide!.id);
+      }
     });
   }
 
+  Future<void> _fetchGuide() async {
+    setState(() => _isLoading = true);
+    try {
+      final data = await Supabase.instance.client
+          .from('guides')
+          .select()
+          .eq('id', widget.guideId!)
+          .maybeSingle();
+      
+      if (data != null && mounted) {
+        setState(() {
+          _guide = Guide.fromJson(data);
+          _isLoading = false;
+        });
+        _initData();
+      } else {
+        throw Exception('未找到该地陪信息');
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(e.toString())));
+        context.pop();
+      }
+    }
+  }
+
   Future<void> _checkFollowStatus() async {
-    final following = await context.read<UserProvider>().isFollowing(widget.guide.id);
+    if (_guide == null) return;
+    final following = await context.read<UserProvider>().isFollowing(_guide!.id);
     if (mounted) {
       setState(() => _isFollowing = following);
     }
@@ -43,10 +85,11 @@ class _GuideDetailPageState extends State<GuideDetailPage> {
     setState(() => _isFollowLoading = true);
     try {
       final userProvider = context.read<UserProvider>();
+      if (_guide == null) return;
       if (_isFollowing) {
-        await userProvider.unfollowUser(widget.guide.id);
+        await userProvider.unfollowUser(_guide!.id);
       } else {
-        await userProvider.followUser(widget.guide.id);
+        await userProvider.followUser(_guide!.id);
       }
       await _checkFollowStatus();
     } catch (e) {
@@ -105,6 +148,12 @@ class _GuideDetailPageState extends State<GuideDetailPage> {
 
   @override
   Widget build(BuildContext context) {
+    if (_isLoading || _guide == null) {
+      return const Scaffold(
+        body: Center(child: CircularProgressIndicator(color: AppColors.primary)),
+      );
+    }
+
     return Scaffold(
       backgroundColor: Colors.white,
       body: DefaultTabController(
@@ -204,7 +253,7 @@ class _GuideDetailPageState extends State<GuideDetailPage> {
                 ),
                 child: ClipOval(
                   child: CachedNetworkImage(
-                    imageUrl: widget.guide.avatar, fit: BoxFit.cover,
+                    imageUrl: _guide!.avatar, fit: BoxFit.cover,
                     placeholder: (context, url) => const ColoredBox(color: Colors.grey),
                     errorWidget: (context, url, error) => const ColoredBox(color: AppColors.tagBackground, child: Icon(Icons.person, size: 40)),
                   ),
@@ -222,9 +271,9 @@ class _GuideDetailPageState extends State<GuideDetailPage> {
             children: [
               Row(
                 children: [
-                  Text(widget.guide.name, style: const TextStyle(fontSize: 22, fontWeight: FontWeight.bold)),
+                  Text(_guide!.name, style: const TextStyle(fontSize: 22, fontWeight: FontWeight.bold)),
                   const SizedBox(width: 8),
-                  if (widget.guide.verified)
+                  if (_guide!.verified)
                     Container(
                       padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
                       decoration: BoxDecoration(color: const Color(0xFFFF9A3E).withValues(alpha: 0.1), borderRadius: BorderRadius.circular(4)),
@@ -247,13 +296,13 @@ class _GuideDetailPageState extends State<GuideDetailPage> {
                 ],
               ),
               const SizedBox(height: 6),
-              Text('ID: ${widget.guide.id.length > 8 ? widget.guide.id.substring(0,8) : widget.guide.id}', style: const TextStyle(color: AppColors.textHint, fontSize: 13)),
+              Text('ID: ${_guide!.id.length > 8 ? _guide!.id.substring(0,8) : _guide!.id}', style: const TextStyle(color: AppColors.textHint, fontSize: 13)),
               const SizedBox(height: 12),
               // Tags
-              if (widget.guide.tags.isNotEmpty)
+              if (_guide!.tags.isNotEmpty)
                 Wrap(
                   spacing: 8, runSpacing: 6,
-                  children: widget.guide.tags.map((t) => Container(
+                  children: _guide!.tags.map((t) => Container(
                     padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
                     decoration: BoxDecoration(color: Colors.grey[200], borderRadius: BorderRadius.circular(4)),
                     child: Text(t, style: const TextStyle(fontSize: 12, color: AppColors.textSecondary)),
@@ -268,7 +317,7 @@ class _GuideDetailPageState extends State<GuideDetailPage> {
                     children: [
                       const Icon(Icons.location_on, size: 14, color: AppColors.textHint),
                       const SizedBox(width: 4),
-                      Text('常驻: ${widget.guide.city}', style: const TextStyle(fontSize: 12, color: AppColors.textSecondary)),
+                      Text('常驻: ${_guide!.city}', style: const TextStyle(fontSize: 12, color: AppColors.textSecondary)),
                     ],
                   ),
                   const Text('接单 23 · 好评率 100%', style: TextStyle(fontSize: 12, color: AppColors.textSecondary)),
@@ -320,7 +369,7 @@ class _GuideDetailPageState extends State<GuideDetailPage> {
             borderRadius: BorderRadius.circular(12),
             border: Border.all(color: AppColors.divider.withValues(alpha: 0.3)),
           ),
-          child: Text(widget.guide.description, style: const TextStyle(color: AppColors.textPrimary, height: 1.6, fontSize: 14)),
+          child: Text(_guide!.description, style: const TextStyle(color: AppColors.textPrimary, height: 1.6, fontSize: 14)),
         ),
         const SizedBox(height: 24),
 
@@ -362,7 +411,7 @@ class _GuideDetailPageState extends State<GuideDetailPage> {
             borderRadius: BorderRadius.circular(12),
             border: Border.all(color: AppColors.divider.withValues(alpha: 0.3)),
           ),
-          child: Text(widget.guide.city, style: const TextStyle(color: AppColors.textPrimary, height: 1.6, fontSize: 14)),
+          child: Text(_guide!.city, style: const TextStyle(color: AppColors.textPrimary, height: 1.6, fontSize: 14)),
         ),
         const SizedBox(height: 30),
 
@@ -391,12 +440,12 @@ class _GuideDetailPageState extends State<GuideDetailPage> {
     return ListView(
       padding: const EdgeInsets.all(20),
       children: [
-        if (widget.guide.images.isNotEmpty) ...[
+        if (_guide!.images.isNotEmpty) ...[
           const Text('服务案例与照片', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
           const SizedBox(height: 16),
           Wrap(
             spacing: 10, runSpacing: 10,
-            children: widget.guide.images.map((img) => ClipRRect(
+            children: _guide!.images.map((img) => ClipRRect(
               borderRadius: BorderRadius.circular(8),
               child: CachedNetworkImage(
                 imageUrl: img, width: (MediaQuery.of(context).size.width - 60) / 3, height: (MediaQuery.of(context).size.width - 60) / 3, fit: BoxFit.cover, 
@@ -418,7 +467,7 @@ class _GuideDetailPageState extends State<GuideDetailPage> {
   Widget _buildBottomBar() {
     return Consumer<GuideProvider>(
       builder: (context, provider, child) {
-        final isFavorited = provider.favoriteIds.contains(widget.guide.id);
+        final isFavorited = provider.favoriteIds.contains(_guide!.id);
         
         return Container(
           padding: EdgeInsets.fromLTRB(20, 10, 20, MediaQuery.of(context).padding.bottom + 10),
@@ -432,10 +481,9 @@ class _GuideDetailPageState extends State<GuideDetailPage> {
                 onTap: () async {
                   final msgProvider = context.read<MessageProvider>();
                   try {
-                    final roomId = await msgProvider.getOrCreateRoom(widget.guide.id);
-                    if (mounted) {
-                      context.push('/chat/$roomId?name=${Uri.encodeComponent(widget.guide.name)}&avatar=${Uri.encodeComponent(widget.guide.avatar)}');
-                    }
+                    final roomId = await msgProvider.getOrCreateRoom(_guide!.id);
+                    if (!mounted) return;
+                    context.push('/chat/$roomId?name=${Uri.encodeComponent(_guide!.name)}&avatar=${Uri.encodeComponent(_guide!.avatar)}');
                   } catch (e) {
                     ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(e.toString())));
                   }
@@ -451,7 +499,7 @@ class _GuideDetailPageState extends State<GuideDetailPage> {
               ),
               const SizedBox(width: 24),
               GestureDetector(
-                onTap: () => provider.toggleFavorite(widget.guide.id),
+                onTap: () => provider.toggleFavorite(_guide!.id),
                 child: Column(
                   mainAxisSize: MainAxisSize.min,
                   children: [
@@ -469,7 +517,8 @@ class _GuideDetailPageState extends State<GuideDetailPage> {
               Expanded(
                 child: GestureDetector(
                   onTap: () {
-                    context.push('/order_create', extra: widget.guide);
+                    if (!mounted) return;
+                    context.push('/order/create?guideId=${_guide!.id}&name=${Uri.encodeComponent(_guide!.name)}&avatar=${Uri.encodeComponent(_guide!.avatar)}');
                   },
                   child: Container(
                     height: 48,

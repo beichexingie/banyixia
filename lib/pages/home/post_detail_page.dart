@@ -376,30 +376,45 @@ class _PostDetailPageState extends State<PostDetailPage> {
                         ),
                         child: Column(
                           children: [
-                             Row(
-                               children: [
-                                 const Text('想和作者一起出发？', style: TextStyle(fontSize: 15, fontWeight: FontWeight.bold)),
-                                 const Spacer(),
-                                 GestureDetector(
-                                   onTap: () async {
-                                     final msgProvider = context.read<MessageProvider>();
-                                     try {
-                                       final roomId = await msgProvider.getOrCreateRoom(widget.post.authorId);
-                                       if (mounted) {
-                                         context.push('/chat/$roomId?name=${Uri.encodeComponent(widget.post.authorName)}&avatar=${Uri.encodeComponent(widget.post.authorAvatar)}');
-                                       }
-                                     } catch (e) {
-                                       ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(e.toString())));
-                                     }
-                                   },
-                                   child: Container(
-                                     padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-                                     decoration: BoxDecoration(color: AppColors.primary, borderRadius: BorderRadius.circular(20)),
-                                     child: const Text('立即咨询', style: TextStyle(color: Colors.white, fontSize: 12, fontWeight: FontWeight.bold)),
-                                   ),
-                                 ),
-                               ],
-                             ),
+                          Row(
+                            children: [
+                              const Text('想和作者一起出发？', style: TextStyle(fontSize: 15, fontWeight: FontWeight.bold)),
+                              const Spacer(),
+                              OutlinedButton(
+                                onPressed: () {
+                                  context.push('/order/create?guideId=${widget.post.authorId}&name=${Uri.encodeComponent(widget.post.authorName)}&avatar=${Uri.encodeComponent(widget.post.authorAvatar)}');
+                                },
+                                style: OutlinedButton.styleFrom(
+                                  foregroundColor: AppColors.primary,
+                                  side: const BorderSide(color: AppColors.primary),
+                                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+                                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 0),
+                                ),
+                                child: const Text('立即下单', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold)),
+                              ),
+                              const SizedBox(width: 8),
+                              ElevatedButton(
+                                onPressed: () async {
+                                  final msgProvider = context.read<MessageProvider>();
+                                  try {
+                                    final roomId = await msgProvider.getOrCreateRoom(widget.post.authorId);
+                                    if (mounted) {
+                                      context.push('/chat/$roomId?name=${Uri.encodeComponent(widget.post.authorName)}&avatar=${Uri.encodeComponent(widget.post.authorAvatar)}');
+                                    }
+                                  } catch (e) {
+                                    ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(e.toString())));
+                                  }
+                                },
+                                style: ElevatedButton.styleFrom(
+                                  backgroundColor: AppColors.primary,
+                                  foregroundColor: Colors.white,
+                                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+                                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 0),
+                                ),
+                                child: const Text('立即咨询', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold)),
+                              ),
+                            ],
+                          ),
                              const SizedBox(height: 12),
                              const Text('该作者同时也是平台认证地陪，点击咨询可预订其陪游服务。', style: TextStyle(fontSize: 13, color: AppColors.textSecondary)),
                            ],

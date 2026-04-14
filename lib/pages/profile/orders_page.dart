@@ -4,6 +4,7 @@ import 'package:cached_network_image/cached_network_image.dart';
 import '../../config/app_theme.dart';
 import '../../models/order.dart';
 import '../../providers/order_provider.dart';
+import '../../widgets/safety_control_panel.dart';
 
 class OrdersPage extends StatefulWidget {
   const OrdersPage({super.key});
@@ -143,6 +144,10 @@ class _OrdersPageState extends State<OrdersPage> with SingleTickerProviderStateM
               Text(statusText, style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold, color: statusColor)),
             ],
           ),
+          if (order.status == OrderStatus.inProgress) ...[
+            const SizedBox(height: 12),
+            SafetyControlPanel(orderId: order.id),
+          ],
           const Divider(height: 24),
           Row(
             crossAxisAlignment: CrossAxisAlignment.start,
@@ -176,6 +181,54 @@ class _OrdersPageState extends State<OrdersPage> with SingleTickerProviderStateM
               const Text('总价', style: TextStyle(fontSize: 14, color: AppColors.textSecondary)),
               Text('¥${order.amount.toStringAsFixed(2)}', style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: AppColors.textPrimary)),
             ],
+          ),
+          if (order.status == OrderStatus.pendingPayment || order.status == OrderStatus.inProgress) ...[
+            const SizedBox(height: 16),
+            Row(
+              mainAxisAlignment: MainAxisAlignment.end,
+              children: [
+                if (order.status == OrderStatus.pendingPayment)
+                  ElevatedButton(
+                    onPressed: () => context.read<OrderProvider>().payOrder(order.id),
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: AppColors.primary,
+                      foregroundColor: Colors.white,
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                    ),
+                    child: const Text('立即支付'),
+                  ),
+                if (order.status == OrderStatus.inProgress)
+                  ElevatedButton(
+                    onPressed: () => _showConfirmComplete(context, order),
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: Colors.green,
+                      foregroundColor: Colors.white,
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                    ),
+                    child: const Text('确认完成'),
+                  ),
+              ],
+            ),
+          ],
+        ],
+      ),
+    );
+  }
+
+  void _showConfirmComplete(BuildContext context, Order order) {
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('确认完成服务？'),
+        content: const Text('确认后资金将结算给地陪，无法退款。'),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(context), child: const Text('取消')),
+          ElevatedButton(
+            onPressed: () async {
+              Navigator.pop(context);
+              await context.read<OrderProvider>().completeOrder(order.id);
+            },
+            child: const Text('确认确认'),
           ),
         ],
       ),

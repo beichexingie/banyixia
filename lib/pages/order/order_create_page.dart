@@ -1,6 +1,11 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
+import 'package:provider/provider.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 import '../../models/guide.dart';
+import '../../models/order.dart';
+import '../../providers/order_provider.dart';
+import '../../providers/user_provider.dart';
 import '../../config/app_theme.dart';
 
 class OrderCreatePage extends StatefulWidget {
@@ -112,16 +117,46 @@ class _OrderCreatePageState extends State<OrderCreatePage> {
     super.dispose();
   }
 
-  void _submitOrder() {
+  Future<void> _submitOrder() async {
     // 隐藏键盘
     FocusScope.of(context).unfocus();
-    // 模拟提交成功
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(content: Text('订单提交成功，即将前往支付')),
-    );
-    Future.delayed(const Duration(seconds: 1), () {
-      if (mounted) context.pop(); // 返回上一页
-    });
+
+    final userId = Supabase.instance.client.auth.currentUser?.id;
+    if (userId == null) {
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('请先登录')));
+      return;
+    }
+
+    try {
+      final newOrder = Order(
+        id: '', // Supabase 自动生成或保持为空
+        userId: userId,
+        guideId: widget.guide.id,
+        guideName: widget.guide.name,
+        guideAvatar: widget.guide.avatar,
+        status: OrderStatus.pendingPayment,
+        amount: 200.0, // 根据页面选项计算
+        serviceName: _selectedItineraries.join(', '),
+        serviceDate: DateTime.now(), // 实际应解析 _selectedTime
+        createdAt: DateTime.now(),
+      );
+
+      await context.read<OrderProvider>().createOrder(newOrder);
+
+      if (mounted) {
+        // 模拟提交成功
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('订单提交成功，请在"我的订单"中完成支付')),
+        );
+        Future.delayed(const Duration(seconds: 1), () {
+          if (mounted) context.pop(); // 返回上一页
+        });
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('创建订单失败: $e', style: const TextStyle(color: Colors.white)), backgroundColor: Colors.red));
+      }
+    }
   }
 
   @override

@@ -11,6 +11,7 @@ class User {
   final int fansCount;
   final bool isBanned;
   final int cancelCount;
+  final bool isAdmin;
 
   User({
     required this.id,
@@ -24,6 +25,7 @@ class User {
     this.fansCount = 0,
     this.isBanned = false,
     this.cancelCount = 0,
+    this.isAdmin = false,
   });
 
   /// 默认未登录用户
@@ -48,6 +50,7 @@ class User {
       fansCount: json['fansCount'] ?? 0,
       isBanned: json['is_banned'] ?? false,
       cancelCount: json['cancel_count'] ?? 0,
+      isAdmin: json['is_admin'] ?? false,
     );
   }
 
@@ -64,6 +67,7 @@ class User {
       'fansCount': fansCount,
       'is_banned': isBanned,
       'cancel_count': cancelCount,
+      'is_admin': isAdmin,
     };
   }
 

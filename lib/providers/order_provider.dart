@@ -137,10 +137,19 @@ class OrderProvider extends ChangeNotifier {
   /// 取消订单
   Future<void> cancelOrder(String orderId) async {
     try {
+      final userId = Supabase.instance.client.auth.currentUser?.id;
+      if (userId == null) return;
+
+      // 1. 更新订单状态
       await Supabase.instance.client
           .from('orders')
           .update({'status': OrderStatus.cancelled.index})
           .eq('id', orderId);
+
+      // 2. 增加用户取消次数 (触发自动封禁逻辑)
+      await Supabase.instance.client.rpc('increment_cancel_count', params: {
+        'target_user_id': userId,
+      });
       
       await loadOrders();
     } catch (e) {

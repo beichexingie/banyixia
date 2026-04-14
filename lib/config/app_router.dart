@@ -1,4 +1,3 @@
-import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import '../providers/user_provider.dart';
 import '../providers/post_provider.dart';
@@ -8,7 +7,6 @@ import '../pages/auth/login_page.dart';
 import '../pages/home/post_detail_page.dart';
 import '../pages/home/post_create_page.dart';
 import '../pages/apply/apply_guide_page.dart';
-import '../pages/admin/admin_audit_page.dart';
 import '../pages/messages/chat_room_page.dart';
 import '../pages/companion/guide_detail_page.dart';
 import '../pages/profile/settings_page.dart';
@@ -21,6 +19,7 @@ import '../pages/profile/coupons_page.dart';
 import '../pages/profile/balance_page.dart';
 import '../pages/profile/orders_page.dart';
 import '../pages/order/order_create_page.dart';
+import '../pages/admin/audit_list_page.dart';
 import '../pages/profile/user_profile_page.dart';
 import '../models/guide.dart';
 
@@ -73,11 +72,8 @@ class AppRouter {
         path: '/guide/:id',
         builder: (context, state) {
           final id = state.pathParameters['id'];
-          final guide = guideProvider.guides.firstWhere(
-            (g) => g.id == id,
-            orElse: () => guideProvider.guides.first,
-          );
-          return GuideDetailPage(guide: guide);
+          // Use guideId to allow the page to fetch its own data if needed
+          return GuideDetailPage(guideId: id);
         },
       ),
       GoRoute(
@@ -113,12 +109,28 @@ class AppRouter {
         builder: (context, state) => const TravelPlanCreatePage(),
       ),
       GoRoute(
-        path: '/order_create',
+        path: '/order/create',
         builder: (context, state) {
-          final guide = state.extra as Guide?;
-          if (guide == null) {
-            return const Scaffold(body: Center(child: Text('Error: Guide data missing')));
-          }
+          final guideId = state.uri.queryParameters['guideId'];
+          final name = state.uri.queryParameters['name'] ?? '';
+          final avatar = state.uri.queryParameters['avatar'] ?? '';
+          
+          // Reconstruct a partial Guide object for the page
+          // (In a real app, you'd fetch the full guide or pass it via extra)
+          final guide = guideProvider.guides.firstWhere(
+            (g) => g.id == guideId,
+            orElse: () => Guide(
+              id: guideId ?? '0',
+              name: name,
+              avatar: avatar,
+              description: '为您提供贴心的陪游服务',
+              city: '北京',
+              rating: 5.0,
+              tags: ['专业导游'],
+              images: [avatar],
+              verified: true,
+            ),
+          );
           return OrderCreatePage(guide: guide);
         },
       ),
@@ -148,7 +160,7 @@ class AppRouter {
       ),
       GoRoute(
         path: '/admin/audit',
-        builder: (context, state) => const AdminAuditPage(),
+        builder: (context, state) => const AuditListPage(),
       ),
     ],
   );

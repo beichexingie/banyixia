@@ -3,7 +3,7 @@ import 'package:provider/provider.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:go_router/go_router.dart';
 import '../../config/app_theme.dart';
-import '../../models/message.dart';
+
 import '../../providers/message_provider.dart';
 
 import '../../models/chat_room.dart';

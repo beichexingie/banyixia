@@ -12,6 +12,10 @@ class GuideApplication {
   final List<String> images;
   final String status; // 'pending', 'approved', 'rejected'
   final String? rejectReason;
+  final String? idCardFront;
+  final String? idCardBack;
+  final DateTime? contractSignedAt;
+  final String? contractIp;
   final DateTime createdAt;
 
   GuideApplication({
@@ -27,6 +31,10 @@ class GuideApplication {
     this.images = const [],
     this.status = 'pending',
     this.rejectReason,
+    this.idCardFront,
+    this.idCardBack,
+    this.contractSignedAt,
+    this.contractIp,
     required this.createdAt,
   });
 
@@ -44,6 +52,10 @@ class GuideApplication {
       images: List<String>.from(json['images'] ?? []),
       status: json['status'] ?? 'pending',
       rejectReason: json['reject_reason'],
+      idCardFront: json['id_card_front'],
+      idCardBack: json['id_card_back'],
+      contractSignedAt: json['contract_signed_at'] != null ? DateTime.parse(json['contract_signed_at']) : null,
+      contractIp: json['contract_ip'],
       createdAt: json['created_at'] != null
           ? DateTime.tryParse(json['created_at']) ?? DateTime.now()
           : DateTime.now(),
@@ -61,6 +73,11 @@ class GuideApplication {
       'service_tags': serviceTags,
       'images': images,
       'status': status,
+      'reject_reason': rejectReason,
+      'id_card_front': idCardFront,
+      'id_card_back': idCardBack,
+      'contract_signed_at': contractSignedAt?.toIso8601String(),
+      'contract_ip': contractIp,
     };
   }
 }

@@ -8,18 +8,15 @@ import 'package:go_router/go_router.dart';
 import 'package:provider/provider.dart';
 import '../providers/message_provider.dart';
 
+/// 全局状态控制器用于安全的跨页面 Tab 切换
+final ValueNotifier<int> appTabNotifier = ValueNotifier<int>(0);
+
 class MainScaffold extends StatefulWidget {
   const MainScaffold({super.key});
 
-  /// 全局 key，用于从其他页面切换 Tab
-  static final GlobalKey<State<MainScaffold>> mainKey = GlobalKey<State<MainScaffold>>();
-
   /// 从外部切换到指定 Tab
   static void switchTo(int index) {
-    final state = mainKey.currentState;
-    if (state is _MainScaffoldState) {
-      state.switchToTab(index);
-    }
+    appTabNotifier.value = index;
   }
 
   @override
@@ -29,11 +26,30 @@ class MainScaffold extends StatefulWidget {
 class _MainScaffoldState extends State<MainScaffold> {
   int _currentIndex = 0;
 
+  @override
+  void initState() {
+    super.initState();
+    appTabNotifier.addListener(_onTabNotifierChanged);
+  }
+
+  @override
+  void dispose() {
+    appTabNotifier.removeListener(_onTabNotifierChanged);
+    super.dispose();
+  }
+
+  void _onTabNotifierChanged() {
+    if (appTabNotifier.value == 2) return;
+    if (_currentIndex != appTabNotifier.value) {
+      setState(() {
+        _currentIndex = appTabNotifier.value;
+      });
+    }
+  }
+
   void switchToTab(int index) {
     if (index == 2) return; // + 号不是真正的 tab
-    setState(() {
-      _currentIndex = index;
-    });
+    appTabNotifier.value = index;
   }
 
   final List<Widget> _pages = const [
@@ -49,9 +65,7 @@ class _MainScaffoldState extends State<MainScaffold> {
       _showPublishSheet();
       return;
     }
-    setState(() {
-      _currentIndex = index;
-    });
+    appTabNotifier.value = index;
   }
 
   void _showPublishSheet() {
@@ -118,7 +132,6 @@ class _MainScaffoldState extends State<MainScaffold> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      key: MainScaffold.mainKey,
       body: IndexedStack(
         index: _currentIndex > 2 ? _currentIndex - 1 : _currentIndex,
         children: [

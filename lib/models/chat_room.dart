@@ -1,4 +1,3 @@
-import 'message.dart';
 import '../utils/time_utils.dart';
 
 /// 聊天会话模型

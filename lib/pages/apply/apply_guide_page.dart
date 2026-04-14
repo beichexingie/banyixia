@@ -4,6 +4,8 @@ import 'package:go_router/go_router.dart';
 import '../../config/app_theme.dart';
 import '../../models/guide_application.dart';
 import '../../providers/application_provider.dart';
+import '../../providers/user_provider.dart';
+import '../../providers/guide_provider.dart';
 
 class ApplyGuidePage extends StatefulWidget {
   const ApplyGuidePage({super.key});
@@ -20,7 +22,7 @@ class _ApplyGuidePageState extends State<ApplyGuidePage> {
   final ScrollController _contractScrollController = ScrollController();
   
   int _currentStep = 0; // 0: 实名, 1: 资料, 2: 合同
-  String _gender = '女';
+  final String _gender = '女';
   final List<String> _selectedTags = [];
   bool _isIdVerified = false;
   bool _isContractRead = false;
@@ -125,6 +127,23 @@ class _ApplyGuidePageState extends State<ApplyGuidePage> {
       );
     }
 
+    final currentUser = context.watch<UserProvider>().user;
+    final isGuide = context.watch<GuideProvider>().guides.any((g) => g.id == currentUser.id);
+
+    if (isGuide) {
+      return _buildStatusPage(GuideApplication(
+        id: 'mock_guide_app',
+        userId: currentUser.id,
+        fullName: currentUser.nickname,
+        gender: '保密',
+        city: '系统推荐',
+        bio: '系统认证地陪',
+        avatar: currentUser.avatar,
+        status: 'approved',
+        createdAt: DateTime.now(),
+      ));
+    }
+    
     // Already has an active (pending or approved) application
     if (_existingApplication != null && _existingApplication!.status != 'rejected') {
       return _buildStatusPage(_existingApplication!);
