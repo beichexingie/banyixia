@@ -2,20 +2,20 @@ import 'package:flutter/material.dart';
 
 /// 应用颜色常量
 class AppColors {
-  static const Color primary = Color(0xFFFF8C00);
-  static const Color primaryLight = Color(0xFFFFA500);
-  static const Color primaryDark = Color(0xFFE67E00);
-  static const Color accent = Color(0xFFFFB347);
-  static const Color gradientStart = Color(0xFFFF8C00);
-  static const Color gradientEnd = Color(0xFFFFA500);
+  static const Color primary = Color(0xFF3D6CF5);
+  static const Color primaryLight = Color(0xFF6C8EFF);
+  static const Color primaryDark = Color(0xFF2C56D6);
+  static const Color accent = Color(0xFF86A8FF);
+  static const Color gradientStart = Color(0xFF3D6CF5);
+  static const Color gradientEnd = Color(0xFF6C8EFF);
   static const Color background = Color(0xFFF5F5F5);
   static const Color cardBackground = Colors.white;
   static const Color textPrimary = Color(0xFF333333);
   static const Color textSecondary = Color(0xFF666666);
   static const Color textHint = Color(0xFF999999);
   static const Color divider = Color(0xFFEEEEEE);
-  static const Color tagBackground = Color(0xFFFFF3E0);
-  static const Color tagText = Color(0xFFFF8C00);
+  static const Color tagBackground = Color(0xFFEAF1FF);
+  static const Color tagText = Color(0xFF3D6CF5);
   static const Color starColor = Color(0xFFFFD700);
   static const Color vipGold = Color(0xFFDAA520);
 
@@ -26,7 +26,7 @@ class AppColors {
   );
 
   static const LinearGradient headerGradient = LinearGradient(
-    colors: [Color(0xFFFF9A3E), Color(0xFFFFC078)],
+    colors: [Color(0xFF3D6CF5), Color(0xFF6C8EFF)],
     begin: Alignment.topCenter,
     end: Alignment.bottomCenter,
   );

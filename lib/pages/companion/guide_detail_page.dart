@@ -119,7 +119,7 @@ class _GuideDetailPageState extends State<GuideDetailPage> {
               Row(
                 mainAxisAlignment: MainAxisAlignment.spaceEvenly,
                 children: [
-                  _shareIcon(Icons.wechat, '微信好友', Colors.green),
+                  _shareIcon(Icons.chat_bubble_outline, '微信好友', Colors.green),
                   _shareIcon(Icons.camera, '朋友圈', Colors.greenAccent),
                   _shareIcon(Icons.link, '复制主页链接', Colors.blue),
                 ],
@@ -205,10 +205,10 @@ class _GuideDetailPageState extends State<GuideDetailPage> {
                       indicatorColor: AppColors.textPrimary,
                       indicatorWeight: 3,
                       indicatorSize: TabBarIndicatorSize.label,
-                      tabs: [
-                        Tab(text: '服务'),
-                        Tab(text: '笔记'),
-                      ],
+                        tabs: [
+                          Tab(text: '服务'),
+                          Tab(text: '动态'),
+                        ],
                     ),
                   ),
                 ),
@@ -276,8 +276,8 @@ class _GuideDetailPageState extends State<GuideDetailPage> {
                   if (_guide!.verified)
                     Container(
                       padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                      decoration: BoxDecoration(color: const Color(0xFFFF9A3E).withValues(alpha: 0.1), borderRadius: BorderRadius.circular(4)),
-                      child: const Text('已认证', style: TextStyle(color: Color(0xFFFF9A3E), fontSize: 10, fontWeight: FontWeight.bold)),
+                      decoration: BoxDecoration(color: AppColors.primary.withValues(alpha: 0.1), borderRadius: BorderRadius.circular(4)),
+                      child: const Text('已认证', style: TextStyle(color: AppColors.primary, fontSize: 10, fontWeight: FontWeight.bold)),
                     ),
                   const Spacer(),
                   OutlinedButton(
@@ -428,7 +428,7 @@ class _GuideDetailPageState extends State<GuideDetailPage> {
                 Text('来自29位真实用户参与评分', style: TextStyle(fontSize: 12, color: AppColors.textHint)),
               ],
             ),
-            Text('5.0', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 32, color: Color(0xFFFF9A3E))),
+            Text('5.0', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 32, color: AppColors.primary)),
           ],
         ),
         const SizedBox(height: 80), 
@@ -506,7 +506,7 @@ class _GuideDetailPageState extends State<GuideDetailPage> {
                     Icon(
                       isFavorited ? Icons.star : Icons.star_border, 
                       size: 26, 
-                      color: isFavorited ? const Color(0xFFFF9A3E) : AppColors.textHint
+                      color: isFavorited ? AppColors.primary : AppColors.textHint
                     ),
                     const SizedBox(height: 2),
                     const Text('收藏', style: TextStyle(fontSize: 10, color: AppColors.textHint)),
@@ -523,17 +523,17 @@ class _GuideDetailPageState extends State<GuideDetailPage> {
                   child: Container(
                     height: 48,
                     decoration: BoxDecoration(
-                      color: const Color(0xFFFF9A3E),
+                      color: AppColors.primary,
                       borderRadius: BorderRadius.circular(24),
                       boxShadow: [
-                        BoxShadow(color: const Color(0xFFFF9A3E).withValues(alpha: 0.3), blurRadius: 8, offset: const Offset(0, 4))
+                        BoxShadow(color: AppColors.primary.withValues(alpha: 0.3), blurRadius: 8, offset: const Offset(0, 4))
                       ],
                     ),
                     alignment: Alignment.center,
-                    child: const Text('立即预约', style: TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.bold)),
+                        child: const Text('找TA下单', style: TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.bold)),
+                      ),
+                    ),
                   ),
-                ),
-              ),
             ],
           ),
         );

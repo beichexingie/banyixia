@@ -203,10 +203,12 @@ class ProfilePage extends StatelessWidget {
       builder: (context, userProvider, child) {
         final user = userProvider.user;
         
+        final cityLabel = context.watch<GuideProvider>().selectedCity;
+
         return Container(
           decoration: const BoxDecoration(
             gradient: LinearGradient(
-              colors: [Color(0xFFFF9A3E), Color(0xFFFFC078)],
+              colors: [Color(0xFF3D6CF5), Color(0xFF6C8EFF)],
               begin: Alignment.topLeft, end: Alignment.bottomRight,
             ),
           ),
@@ -219,6 +221,18 @@ class ProfilePage extends StatelessWidget {
                   Row(
                     mainAxisAlignment: MainAxisAlignment.end,
                     children: [
+                      GestureDetector(
+                        onTap: () => _showSnack(context, '客服入口已保留，后续可接入在线客服 API'),
+                        child: const Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Icon(Icons.support_agent_outlined, size: 20, color: Colors.white),
+                            SizedBox(width: 4),
+                            Text('客服', style: TextStyle(color: Colors.white, fontSize: 13)),
+                          ],
+                        ),
+                      ),
+                      const SizedBox(width: 16),
                       if (user.isAdmin)
                         GestureDetector(
                           onTap: () => Navigator.push(context, MaterialPageRoute(builder: (context) => const AuditListPage())),
@@ -330,6 +344,11 @@ class ProfilePage extends StatelessWidget {
                                   ),
                                 ],
                               ),
+                              const SizedBox(height: 2),
+                              Text(
+                                'IP: $cityLabel',
+                                style: TextStyle(fontSize: 12, color: Colors.white.withValues(alpha: 0.85)),
+                              ),
                               if (user.title.isNotEmpty) ...[
                                 const SizedBox(height: 4),
                                 Text(
@@ -359,10 +378,10 @@ class ProfilePage extends StatelessWidget {
       builder: (context, userProvider, child) {
         final user = userProvider.user;
         final items = [
-          {'icon': Icons.emoji_events_outlined, 'title': '玩家头衔', 'subtitle': '评个搭子称号', 'action': () => _showTitleModal(context)},
-          {'icon': Icons.card_giftcard_outlined, 'title': '进阶福利', 'subtitle': '得个搭子称号', 'action': () => _showBenefitsModal(context)},
+          {'icon': Icons.emoji_events_outlined, 'title': '会员中心', 'subtitle': '查看会员权益', 'action': () => _showBenefitsModal(context)},
           {'icon': Icons.local_offer_outlined, 'title': '优惠券', 'subtitle': '${user.couponCount}张可用', 'action': () => context.push('/profile/coupons')},
           {'icon': Icons.account_balance_wallet_outlined, 'title': '账户余额', 'subtitle': '¥${user.balance.toStringAsFixed(1)}', 'action': () => context.push('/profile/balance')},
+          {'icon': Icons.directions_walk, 'title': '足迹', 'subtitle': '看过的地陪', 'action': () => Navigator.push(context, MaterialPageRoute(builder: (_) => const FootprintPostsPage()))},
         ];
 
         return Container(

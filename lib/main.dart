@@ -6,13 +6,14 @@ import 'config/app_router.dart';
 import 'providers/user_provider.dart';
 import 'providers/post_provider.dart';
 import 'providers/guide_provider.dart';
+import 'providers/demand_provider.dart';
 import 'providers/order_provider.dart';
 import 'providers/message_provider.dart';
 import 'providers/application_provider.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
-  
+
   await Supabase.initialize(
     url: 'https://npvqebjogjmvzkkgwtss.supabase.co',
     anonKey: 'sb_publishable_S9-vRUc8U34sv5FhPHUElg_i67bEphP',
@@ -31,6 +32,7 @@ class MyApp extends StatelessWidget {
         ChangeNotifierProvider(create: (_) => UserProvider()),
         ChangeNotifierProvider(create: (_) => PostProvider()..loadPosts()),
         ChangeNotifierProvider(create: (_) => GuideProvider()..loadGuides()),
+        ChangeNotifierProvider(create: (_) => DemandProvider()..loadDemands()),
         ChangeNotifierProvider(create: (_) => OrderProvider()..loadOrders()),
         ChangeNotifierProvider(create: (_) => MessageProvider()..loadRooms()),
         ChangeNotifierProvider(create: (_) => ApplicationProvider()),

@@ -14,7 +14,8 @@ class _LoginPageState extends State<LoginPage> {
   final TextEditingController _phoneController = TextEditingController();
   final TextEditingController _smsController = TextEditingController();
   bool _isCodeSent = false;
-  
+  bool _agreed = true;
+
   @override
   void dispose() {
     _phoneController.dispose();
@@ -22,59 +23,43 @@ class _LoginPageState extends State<LoginPage> {
     super.dispose();
   }
 
-  void _sendCode() async {
+  Future<void> _sendCode() async {
+    if (!_agreed) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('请先勾选协议')),
+      );
+      return;
+    }
+
     final phone = _phoneController.text.trim();
     if (phone.isEmpty || phone.length < 11) {
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: const Text('请输入有效的手机号'),
-          backgroundColor: Colors.red,
-          behavior: SnackBarBehavior.floating,
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-        ),
+        const SnackBar(content: Text('请输入有效的手机号')),
       );
       return;
     }
 
     try {
       await context.read<UserProvider>().sendSmsCode('+86$phone');
-      setState(() {
-        _isCodeSent = true;
-      });
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: const Text('验证码已发送'),
-            backgroundColor: AppColors.primary,
-            behavior: SnackBarBehavior.floating,
-            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-          ),
-        );
-      }
+      if (!mounted) return;
+      setState(() => _isCodeSent = true);
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('验证码已发送')),
+      );
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('发送失败: $e'),
-            backgroundColor: Colors.red,
-            behavior: SnackBarBehavior.floating,
-            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-          ),
+          SnackBar(content: Text('发送失败: $e'), backgroundColor: Colors.red),
         );
       }
     }
   }
 
-  void _verifyAndLogin() async {
+  Future<void> _verifyAndLogin() async {
     final smsCode = _smsController.text.trim();
     if (smsCode.isEmpty || smsCode.length < 6) {
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: const Text('请输入有效的验证码'),
-          backgroundColor: Colors.red,
-          behavior: SnackBarBehavior.floating,
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-        ),
+        const SnackBar(content: Text('请输入有效的验证码')),
       );
       return;
     }
@@ -84,12 +69,7 @@ class _LoginPageState extends State<LoginPage> {
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('登录失败: $e'),
-            backgroundColor: Colors.red,
-            behavior: SnackBarBehavior.floating,
-            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-          ),
+          SnackBar(content: Text('登录失败: $e'), backgroundColor: Colors.red),
         );
       }
     }
@@ -98,125 +78,201 @@ class _LoginPageState extends State<LoginPage> {
   @override
   Widget build(BuildContext context) {
     final userProvider = context.watch<UserProvider>();
-    
+
     return Scaffold(
-      backgroundColor: Colors.white,
-      appBar: AppBar(
-        backgroundColor: Colors.white,
-        elevation: 0,
-        leading: IconButton(
-          icon: const Icon(Icons.close, color: AppColors.textPrimary),
-          onPressed: () {
-            // Cancel login and enter as guest if possible, 
-            // but for now let's just do nothing or pop if there is a back route
-          },
+      backgroundColor: const Color(0xFFF4F6FB),
+      body: SafeArea(
+        child: Stack(
+          children: [
+            Positioned.fill(
+              child: Container(
+                decoration: const BoxDecoration(
+                  gradient: LinearGradient(
+                    colors: [Color(0xFFF8FAFF), Color(0xFFF4F6FB)],
+                    begin: Alignment.topCenter,
+                    end: Alignment.bottomCenter,
+                  ),
+                ),
+              ),
+            ),
+            SingleChildScrollView(
+              child: Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 20),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.end,
+                      children: [
+                        IconButton(
+                          onPressed: () => Navigator.of(context).maybePop(),
+                          icon: const Icon(Icons.close, color: AppColors.textPrimary),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 16),
+                    const Text(
+                      '手机号登录',
+                      style: TextStyle(fontSize: 32, fontWeight: FontWeight.bold, color: AppColors.textPrimary),
+                    ),
+                    const SizedBox(height: 8),
+                    const Text(
+                      '未注册手机号验证后将自动登录',
+                      style: TextStyle(color: AppColors.textHint, fontSize: 14),
+                    ),
+                    const SizedBox(height: 40),
+                    _buildPhoneField(),
+                    const SizedBox(height: 16),
+                    if (_isCodeSent) _buildSmsField(),
+                    if (_isCodeSent) const SizedBox(height: 8),
+                    if (_isCodeSent)
+                      Align(
+                        alignment: Alignment.centerRight,
+                        child: TextButton(
+                          onPressed: () {},
+                          child: const Text('收不到验证码？', style: TextStyle(color: AppColors.textHint)),
+                        ),
+                      ),
+                    const SizedBox(height: 8),
+                    Row(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Checkbox(
+                          value: _agreed,
+                          onChanged: (value) => setState(() => _agreed = value ?? false),
+                          activeColor: const Color(0xFF3D6CF5),
+                        ),
+                        const Expanded(
+                          child: Padding(
+                            padding: EdgeInsets.only(top: 11),
+                            child: Text(
+                              '我已阅读并同意《用户协议》和《隐私政策》',
+                              style: TextStyle(fontSize: 12, color: AppColors.textSecondary),
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 20),
+                    SizedBox(
+                      width: double.infinity,
+                      height: 52,
+                      child: ElevatedButton(
+                        onPressed: userProvider.isLoading
+                            ? null
+                            : (_isCodeSent ? _verifyAndLogin : _sendCode),
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: const Color(0xFF3D6CF5),
+                          foregroundColor: Colors.white,
+                          disabledBackgroundColor: AppColors.divider,
+                          disabledForegroundColor: AppColors.textHint,
+                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+                        ),
+                        child: userProvider.isLoading
+                            ? const SizedBox(
+                                width: 18,
+                                height: 18,
+                                child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2),
+                              )
+                            : Text(_isCodeSent ? '登录' : '获取验证码', style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
+                      ),
+                    ),
+                    const SizedBox(height: 16),
+                    Center(
+                      child: TextButton(
+                        onPressed: () => context.read<UserProvider>().mockLogin(),
+                        child: const Text(
+                          '免验证码快速体验',
+                          style: TextStyle(color: AppColors.textHint, decoration: TextDecoration.underline),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(height: 40),
+                    Center(
+                      child: Text(
+                        '伴一下',
+                        style: TextStyle(
+                          color: AppColors.primary.withValues(alpha: 0.8),
+                          fontWeight: FontWeight.w600,
+                          letterSpacing: 2,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ],
         ),
       ),
-      body: SafeArea(
-        child: SingleChildScrollView(
-          child: Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 24),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                const SizedBox(height: 32),
-                const Text(
-                  '手机号登录/注册',
-                  style: TextStyle(
-                    fontSize: 28,
-                    fontWeight: FontWeight.bold,
-                    color: AppColors.textPrimary,
-                  ),
-                ),
-                const SizedBox(height: 8),
-                const Text(
-                  '未注册手机号验证后自动创建账号',
-                  style: TextStyle(color: AppColors.textHint, fontSize: 14),
-                ),
-                const SizedBox(height: 48),
-                
-                // 手机号输入框
-                Container(
-                  decoration: BoxDecoration(
-                    color: AppColors.tagBackground,
-                    borderRadius: BorderRadius.circular(12),
-                  ),
-                  child: TextField(
-                    controller: _phoneController,
-                    keyboardType: TextInputType.phone,
-                    style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w500),
-                    decoration: InputDecoration(
-                      hintText: '请输入手机号',
-                      hintStyle: const TextStyle(color: AppColors.textHint),
-                      prefixIcon: Padding(
-                        padding: const EdgeInsets.all(14),
-                        child: Text('+86', style: TextStyle(fontSize: 16, color: AppColors.textPrimary, fontWeight: FontWeight.bold)),
-                      ),
-                      border: InputBorder.none,
-                      contentPadding: const EdgeInsets.symmetric(vertical: 16),
-                    ),
-                  ),
-                ),
-                
-                const SizedBox(height: 20),
-                
-                // 验证码输入框 (如果已经发送了验证码)
-                if (_isCodeSent)
-                  Container(
-                    decoration: BoxDecoration(
-                      color: AppColors.tagBackground,
-                      borderRadius: BorderRadius.circular(12),
-                    ),
-                    child: TextField(
-                      controller: _smsController,
-                      keyboardType: TextInputType.number,
-                      style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w500),
-                      decoration: const InputDecoration(
-                        hintText: '请输入6位验证码',
-                        hintStyle: TextStyle(color: AppColors.textHint),
-                        prefixIcon: Icon(Icons.security, color: AppColors.textHint),
-                        border: InputBorder.none,
-                        contentPadding: EdgeInsets.symmetric(vertical: 16),
-                      ),
-                    ),
-                  ),
-                  
-                const SizedBox(height: 48),
-                
-                // 登录/获取验证码按钮
-                SizedBox(
-                  width: double.infinity,
-                  child: ElevatedButton(
-                    onPressed: userProvider.isLoading ? null : (_isCodeSent ? _verifyAndLogin : _sendCode),
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: AppColors.primary,
-                      foregroundColor: Colors.white,
-                      disabledBackgroundColor: AppColors.divider,
-                      disabledForegroundColor: AppColors.textHint,
-                      padding: const EdgeInsets.symmetric(vertical: 16),
-                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                    ),
-                    child: userProvider.isLoading 
-                      ? const SizedBox(width: 20, height: 20, child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2))
-                      : Text(_isCodeSent ? '登录' : '获取验证码', style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
-                  ),
-                ),
-                const SizedBox(height: 16),
-                Center(
-                  child: TextButton(
-                    onPressed: () {
-                      context.read<UserProvider>().mockLogin();
-                    },
-                    child: const Text(
-                      '在此设备上免验证极速体验',
-                      style: TextStyle(color: AppColors.textHint, decoration: TextDecoration.underline),
-                    ),
-                  ),
-                ),
-              ],
+    );
+  }
+
+  Widget _buildPhoneField() {
+    return Container(
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(14),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.04),
+            blurRadius: 12,
+            offset: const Offset(0, 4),
+          ),
+        ],
+      ),
+      child: TextField(
+        controller: _phoneController,
+        keyboardType: TextInputType.phone,
+        style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w500),
+        decoration: const InputDecoration(
+          prefixIcon: Padding(
+            padding: EdgeInsets.symmetric(horizontal: 16, vertical: 16),
+            child: Text('+86', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
+          ),
+          hintText: '请输入手机号',
+          hintStyle: TextStyle(color: AppColors.textHint),
+          border: InputBorder.none,
+          contentPadding: EdgeInsets.symmetric(horizontal: 16, vertical: 18),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildSmsField() {
+    return Container(
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(14),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.04),
+            blurRadius: 12,
+            offset: const Offset(0, 4),
+          ),
+        ],
+      ),
+      child: Row(
+        children: [
+          Expanded(
+            child: TextField(
+              controller: _smsController,
+              keyboardType: TextInputType.number,
+              style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w500),
+              decoration: const InputDecoration(
+                hintText: '请输入验证码',
+                hintStyle: TextStyle(color: AppColors.textHint),
+                border: InputBorder.none,
+                contentPadding: EdgeInsets.symmetric(horizontal: 16, vertical: 18),
+              ),
             ),
           ),
-        ),
+          TextButton(
+            onPressed: _sendCode,
+            child: const Text('获取验证码', style: TextStyle(color: Color(0xFF3D6CF5), fontWeight: FontWeight.w600)),
+          ),
+          const SizedBox(width: 8),
+        ],
       ),
     );
   }

@@ -82,14 +82,39 @@ class _MainScaffoldState extends State<MainScaffold> {
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               const Center(
-                child: Text('发布内容', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+                child: Text(
+                  '发布内容',
+                  style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+                ),
               ),
               const SizedBox(height: 24),
-              _buildPublishOption(Icons.article_outlined, '分享游玩瞬间', '发布旅行笔记和攻略', route: '/post/create'),
+              _buildPublishOption(
+                Icons.article_outlined,
+                '分享游玩瞬间',
+                '发布旅行笔记和攻略',
+                route: '/post/create',
+              ),
               const Divider(),
-              _buildPublishOption(Icons.map_outlined, '创建旅行计划', '规划你的行程路线', route: '/travel_plan/create'),
+              _buildPublishOption(
+                Icons.map_outlined,
+                '创建旅行计划',
+                '规划你的行程路线',
+                route: '/travel_plan/create',
+              ),
               const Divider(),
-              _buildPublishOption(Icons.person_add_outlined, '申请成为地陪', '入驻成为本地向导', route: '/apply/guide'),
+              _buildPublishOption(
+                Icons.event_note_outlined,
+                '发布需求',
+                '发起地陪体验需求',
+                route: '/demand/create',
+              ),
+              const Divider(),
+              _buildPublishOption(
+                Icons.person_add_outlined,
+                '申请成为地陪',
+                '入驻成为本地向导',
+                route: '/apply/guide',
+              ),
             ],
           ),
         );
@@ -97,10 +122,16 @@ class _MainScaffoldState extends State<MainScaffold> {
     );
   }
 
-  Widget _buildPublishOption(IconData icon, String title, String subtitle, {String? route}) {
+  Widget _buildPublishOption(
+    IconData icon,
+    String title,
+    String subtitle, {
+    String? route,
+  }) {
     return ListTile(
       leading: Container(
-        width: 44, height: 44,
+        width: 44,
+        height: 44,
         decoration: BoxDecoration(
           color: AppColors.tagBackground,
           borderRadius: BorderRadius.circular(12),
@@ -121,7 +152,9 @@ class _MainScaffoldState extends State<MainScaffold> {
               content: Text('「$title」功能即将上线'),
               backgroundColor: AppColors.primary,
               behavior: SnackBarBehavior.floating,
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(10),
+              ),
             ),
           );
         }
@@ -134,12 +167,7 @@ class _MainScaffoldState extends State<MainScaffold> {
     return Scaffold(
       body: IndexedStack(
         index: _currentIndex > 2 ? _currentIndex - 1 : _currentIndex,
-        children: [
-          _pages[0],
-          _pages[1],
-          _pages[3],
-          _pages[4],
-        ],
+        children: [_pages[0], _pages[1], _pages[3], _pages[4]],
       ),
       bottomNavigationBar: Container(
         decoration: BoxDecoration(
@@ -158,12 +186,23 @@ class _MainScaffoldState extends State<MainScaffold> {
             child: Row(
               mainAxisAlignment: MainAxisAlignment.spaceAround,
               children: [
-                _buildNavItem(0, Icons.home_outlined, Icons.home, '首页'),
-                _buildNavItem(1, Icons.people_outline, Icons.people, '搭子'),
+                _buildNavItem(0, Icons.home_outlined, Icons.home, '广场'),
+                _buildNavItem(
+                  1,
+                  Icons.auto_awesome_mosaic_outlined,
+                  Icons.auto_awesome_mosaic,
+                  '服务',
+                ),
                 _buildCenterButton(),
                 Consumer<MessageProvider>(
                   builder: (context, msgProvider, _) {
-                    return _buildNavItem(3, Icons.chat_bubble_outline, Icons.chat_bubble, '消息', badge: msgProvider.totalUnread);
+                    return _buildNavItem(
+                      3,
+                      Icons.chat_bubble_outline,
+                      Icons.chat_bubble,
+                      '消息',
+                      badge: msgProvider.totalUnread,
+                    );
                   },
                 ),
                 _buildNavItem(4, Icons.person_outline, Icons.person, '我的'),
@@ -175,7 +214,13 @@ class _MainScaffoldState extends State<MainScaffold> {
     );
   }
 
-  Widget _buildNavItem(int index, IconData icon, IconData activeIcon, String label, {int badge = 0}) {
+  Widget _buildNavItem(
+    int index,
+    IconData icon,
+    IconData activeIcon,
+    String label, {
+    int badge = 0,
+  }) {
     final isActive = _currentIndex == index;
     return GestureDetector(
       onTap: () => _onTabTapped(index),
@@ -195,13 +240,27 @@ class _MainScaffoldState extends State<MainScaffold> {
                 ),
                 if (badge > 0)
                   Positioned(
-                    top: -2, right: -6,
+                    top: -2,
+                    right: -6,
                     child: Container(
                       padding: const EdgeInsets.all(2),
-                      decoration: const BoxDecoration(color: Colors.red, shape: BoxShape.circle),
-                      constraints: const BoxConstraints(minWidth: 16, minHeight: 16),
+                      decoration: const BoxDecoration(
+                        color: Colors.red,
+                        shape: BoxShape.circle,
+                      ),
+                      constraints: const BoxConstraints(
+                        minWidth: 16,
+                        minHeight: 16,
+                      ),
                       alignment: Alignment.center,
-                      child: Text(badge > 99 ? '..' : '$badge', style: const TextStyle(color: Colors.white, fontSize: 9, fontWeight: FontWeight.bold)),
+                      child: Text(
+                        badge > 99 ? '..' : '$badge',
+                        style: const TextStyle(
+                          color: Colors.white,
+                          fontSize: 9,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
                     ),
                   ),
               ],
@@ -225,10 +284,11 @@ class _MainScaffoldState extends State<MainScaffold> {
     return GestureDetector(
       onTap: () => _onTabTapped(2),
       child: Container(
-        width: 48, height: 48,
+        width: 52,
+        height: 52,
         decoration: BoxDecoration(
           gradient: AppColors.primaryGradient,
-          borderRadius: BorderRadius.circular(14),
+          borderRadius: BorderRadius.circular(18),
           boxShadow: [
             BoxShadow(
               color: AppColors.primary.withValues(alpha: 0.4),
@@ -237,7 +297,16 @@ class _MainScaffoldState extends State<MainScaffold> {
             ),
           ],
         ),
-        child: const Icon(Icons.add, color: Colors.white, size: 28),
+        child: const Center(
+          child: Text(
+            '伴',
+            style: TextStyle(
+              color: Colors.white,
+              fontSize: 18,
+              fontWeight: FontWeight.bold,
+            ),
+          ),
+        ),
       ),
     );
   }

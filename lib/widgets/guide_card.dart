@@ -171,11 +171,11 @@ class GuideCard extends StatelessWidget {
                             ),
                             const SizedBox(width: 8),
                             GestureDetector(
-                              onTap: () => context.push('/order_create', extra: guide),
+                            onTap: () => context.push('/order/create?guideId=${guide.id}&name=${Uri.encodeComponent(guide.name)}&avatar=${Uri.encodeComponent(guide.avatar)}'),
                               child: Container(
                                 padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
                                 decoration: BoxDecoration(
-                                  color: const Color(0xFFFF9A3E),
+                                  color: AppColors.primary,
                                   borderRadius: BorderRadius.circular(16),
                                 ),
                                 child: const Text('去下单', style: TextStyle(color: Colors.white, fontSize: 12, fontWeight: FontWeight.bold)),

@@ -1,7 +1,8 @@
-import 'package:flutter/material.dart';
-import 'package:provider/provider.dart';
 import 'package:cached_network_image/cached_network_image.dart';
+import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
+import 'package:provider/provider.dart';
+
 import '../../config/app_theme.dart';
 import '../../models/travel_post.dart';
 import '../../providers/post_provider.dart';
@@ -15,7 +16,8 @@ class HomePage extends StatefulWidget {
   State<HomePage> createState() => _HomePageState();
 }
 
-class _HomePageState extends State<HomePage> with SingleTickerProviderStateMixin {
+class _HomePageState extends State<HomePage>
+    with SingleTickerProviderStateMixin {
   late TabController _tabController;
   late TextEditingController _searchController;
   String _selectedCity = '苏州';
@@ -26,6 +28,7 @@ class _HomePageState extends State<HomePage> with SingleTickerProviderStateMixin
     super.initState();
     _tabController = TabController(length: 3, vsync: this);
     _searchController = TextEditingController();
+    _searchController.addListener(() => setState(() {}));
   }
 
   @override
@@ -42,7 +45,9 @@ class _HomePageState extends State<HomePage> with SingleTickerProviderStateMixin
           content: const Text('今天已经签到过了哦~'),
           backgroundColor: AppColors.primary,
           behavior: SnackBarBehavior.floating,
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(10),
+          ),
         ),
       );
       return;
@@ -52,30 +57,53 @@ class _HomePageState extends State<HomePage> with SingleTickerProviderStateMixin
       context: context,
       builder: (context) {
         return AlertDialog(
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(20),
+          ),
           content: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
               Container(
-                width: 80, height: 80,
+                width: 80,
+                height: 80,
                 decoration: BoxDecoration(
                   gradient: AppColors.primaryGradient,
                   borderRadius: BorderRadius.circular(20),
                 ),
-                child: const Icon(Icons.check_circle, color: Colors.white, size: 48),
+                child: const Icon(
+                  Icons.check_circle,
+                  color: Colors.white,
+                  size: 48,
+                ),
               ),
               const SizedBox(height: 16),
-              const Text('签到成功！', style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold)),
+              const Text(
+                '签到成功！',
+                style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
+              ),
               const SizedBox(height: 8),
-              const Text('连续签到可获得更多奖励哦~', style: TextStyle(color: AppColors.textHint, fontSize: 14)),
+              const Text(
+                '连续签到可获得更多奖励哦~',
+                style: TextStyle(color: AppColors.textHint, fontSize: 14),
+              ),
               const SizedBox(height: 8),
               Container(
-                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 16,
+                  vertical: 8,
+                ),
                 decoration: BoxDecoration(
                   color: AppColors.tagBackground,
                   borderRadius: BorderRadius.circular(12),
                 ),
-                child: const Text('+10 积分', style: TextStyle(color: AppColors.primary, fontSize: 16, fontWeight: FontWeight.bold)),
+                child: const Text(
+                  '+10 积分',
+                  style: TextStyle(
+                    color: AppColors.primary,
+                    fontSize: 16,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
               ),
             ],
           ),
@@ -86,7 +114,9 @@ class _HomePageState extends State<HomePage> with SingleTickerProviderStateMixin
                 style: ElevatedButton.styleFrom(
                   backgroundColor: AppColors.primary,
                   foregroundColor: Colors.white,
-                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(12),
+                  ),
                   padding: const EdgeInsets.symmetric(vertical: 12),
                 ),
                 onPressed: () => Navigator.pop(context),
@@ -113,10 +143,14 @@ class _HomePageState extends State<HomePage> with SingleTickerProviderStateMixin
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
-              const Text('选择城市', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
+              const Text(
+                '选择城市',
+                style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+              ),
               const SizedBox(height: 16),
               Wrap(
-                spacing: 10, runSpacing: 10,
+                spacing: 10,
+                runSpacing: 10,
                 children: cities.map((city) {
                   final isSelected = city == _selectedCity;
                   return GestureDetector(
@@ -125,16 +159,25 @@ class _HomePageState extends State<HomePage> with SingleTickerProviderStateMixin
                       Navigator.pop(ctx);
                     },
                     child: Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 20,
+                        vertical: 10,
+                      ),
                       decoration: BoxDecoration(
-                        color: isSelected ? AppColors.primary : AppColors.tagBackground,
+                        color: isSelected
+                            ? AppColors.primary
+                            : AppColors.tagBackground,
                         borderRadius: BorderRadius.circular(20),
                       ),
                       child: Text(
                         city,
                         style: TextStyle(
-                          color: isSelected ? Colors.white : AppColors.textPrimary,
-                          fontWeight: isSelected ? FontWeight.w600 : FontWeight.normal,
+                          color: isSelected
+                              ? Colors.white
+                              : AppColors.textPrimary,
+                          fontWeight: isSelected
+                              ? FontWeight.w600
+                              : FontWeight.normal,
                         ),
                       ),
                     ),
@@ -165,7 +208,11 @@ class _HomePageState extends State<HomePage> with SingleTickerProviderStateMixin
                 delegate: _TabBarDelegate(
                   TabBar(
                     controller: _tabController,
-                    tabs: const [Tab(text: '推荐'), Tab(text: '最新'), Tab(text: '关注')],
+                    tabs: const [
+                      Tab(text: '推荐'),
+                      Tab(text: '最新'),
+                      Tab(text: '关注'),
+                    ],
                     indicatorSize: TabBarIndicatorSize.label,
                     dividerColor: Colors.transparent,
                   ),
@@ -200,33 +247,60 @@ class _HomePageState extends State<HomePage> with SingleTickerProviderStateMixin
           Row(
             children: [
               Container(
-                width: 32, height: 32,
-                decoration: BoxDecoration(gradient: AppColors.primaryGradient, borderRadius: BorderRadius.circular(8)),
-                child: const Icon(Icons.diamond_outlined, color: Colors.white, size: 18),
+                width: 32,
+                height: 32,
+                decoration: BoxDecoration(
+                  gradient: AppColors.primaryGradient,
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: const Icon(
+                  Icons.diamond_outlined,
+                  color: Colors.white,
+                  size: 18,
+                ),
               ),
               const SizedBox(width: 8),
-              const Text('伴一下', style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold, color: AppColors.primary)),
+              const Text(
+                '伴一下',
+                style: TextStyle(
+                  fontSize: 20,
+                  fontWeight: FontWeight.bold,
+                  color: AppColors.primary,
+                ),
+              ),
               const Spacer(),
-              // 签到按钮
               GestureDetector(
                 onTap: _showSignInDialog,
                 child: Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 12,
+                    vertical: 6,
+                  ),
                   decoration: BoxDecoration(
-                    color: _hasSignedIn ? AppColors.divider : AppColors.tagBackground,
+                    color: _hasSignedIn
+                        ? AppColors.divider
+                        : AppColors.tagBackground,
                     borderRadius: BorderRadius.circular(16),
                   ),
                   child: Row(
                     mainAxisSize: MainAxisSize.min,
                     children: [
-                      Icon(Icons.calendar_today, size: 14, color: _hasSignedIn ? AppColors.textHint : AppColors.primary),
+                      Icon(
+                        Icons.calendar_today,
+                        size: 14,
+                        color: _hasSignedIn
+                            ? AppColors.textHint
+                            : AppColors.primary,
+                      ),
                       const SizedBox(width: 4),
                       Text(
                         _hasSignedIn ? '已签到' : '签到',
                         style: TextStyle(
                           fontSize: 12,
                           fontWeight: FontWeight.w500,
-                          color: _hasSignedIn ? AppColors.textHint : AppColors.primary,
+                          color: _hasSignedIn
+                              ? AppColors.textHint
+                              : AppColors.primary,
                         ),
                       ),
                     ],
@@ -234,21 +308,23 @@ class _HomePageState extends State<HomePage> with SingleTickerProviderStateMixin
                 ),
               ),
               const SizedBox(width: 12),
-              // 城市选择
               GestureDetector(
                 onTap: _showCityPicker,
                 child: Row(
                   mainAxisSize: MainAxisSize.min,
                   children: [
                     Text(_selectedCity, style: AppTextStyles.subtitle),
-                    const Icon(Icons.arrow_drop_down, size: 20, color: AppColors.textSecondary),
+                    const Icon(
+                      Icons.arrow_drop_down,
+                      size: 20,
+                      color: AppColors.textSecondary,
+                    ),
                   ],
                 ),
               ),
             ],
           ),
           const SizedBox(height: 12),
-          // 搜索栏
           Container(
             height: 38,
             padding: const EdgeInsets.symmetric(horizontal: 16),
@@ -263,12 +339,16 @@ class _HomePageState extends State<HomePage> with SingleTickerProviderStateMixin
                 Expanded(
                   child: TextField(
                     controller: _searchController,
-                    onSubmitted: (value) {
-                      context.read<PostProvider>().loadPosts(query: value);
-                    },
+                    onChanged: (value) =>
+                        context.read<PostProvider>().setSearchQuery(value),
+                    onSubmitted: (value) =>
+                        context.read<PostProvider>().loadPosts(query: value),
                     decoration: const InputDecoration(
                       hintText: '搜你感兴趣的目的地、景点、玩法',
-                      hintStyle: TextStyle(color: AppColors.textHint, fontSize: 13),
+                      hintStyle: TextStyle(
+                        color: AppColors.textHint,
+                        fontSize: 13,
+                      ),
                       border: InputBorder.none,
                       isDense: true,
                     ),
@@ -280,7 +360,11 @@ class _HomePageState extends State<HomePage> with SingleTickerProviderStateMixin
                       _searchController.clear();
                       context.read<PostProvider>().loadPosts(query: '');
                     },
-                    child: const Icon(Icons.clear, size: 16, color: AppColors.textHint),
+                    child: const Icon(
+                      Icons.clear,
+                      size: 16,
+                      color: AppColors.textHint,
+                    ),
                   ),
               ],
             ),
@@ -292,31 +376,45 @@ class _HomePageState extends State<HomePage> with SingleTickerProviderStateMixin
 
   Widget _buildCalendarCard() {
     return GestureDetector(
-      onTap: () {
-        context.push('/travel_plan/create');
-      },
+      onTap: () => context.push('/travel_plan/create'),
       child: Container(
         margin: const EdgeInsets.all(16),
         decoration: BoxDecoration(
           borderRadius: BorderRadius.circular(16),
           gradient: const LinearGradient(
-            colors: [Color(0xFFFFF5EB), Color(0xFFFFEDD5)],
-            begin: Alignment.topLeft, end: Alignment.bottomRight,
+            colors: [Color(0xFF3D6CF5), Color(0xFF86A8FF)],
+            begin: Alignment.topLeft,
+            end: Alignment.bottomRight,
           ),
           boxShadow: [
-            BoxShadow(color: AppColors.primary.withValues(alpha: 0.1), blurRadius: 12, offset: const Offset(0, 4)),
+            BoxShadow(
+              color: AppColors.primary.withValues(alpha: 0.12),
+              blurRadius: 12,
+              offset: const Offset(0, 4),
+            ),
           ],
         ),
         child: Row(
           children: [
             ClipRRect(
-              borderRadius: const BorderRadius.only(topLeft: Radius.circular(16), bottomLeft: Radius.circular(16)),
+              borderRadius: const BorderRadius.only(
+                topLeft: Radius.circular(16),
+                bottomLeft: Radius.circular(16),
+              ),
               child: CachedNetworkImage(
                 imageUrl: 'https://picsum.photos/seed/calendar/150/150',
-                width: 120, height: 130, fit: BoxFit.cover,
-                placeholder: (context, url) => Container(width: 120, height: 130, color: AppColors.tagBackground),
+                width: 120,
+                height: 130,
+                fit: BoxFit.cover,
+                placeholder: (context, url) => Container(
+                  width: 120,
+                  height: 130,
+                  color: AppColors.tagBackground,
+                ),
                 errorWidget: (context, url, error) => Container(
-                  width: 120, height: 130, color: AppColors.tagBackground,
+                  width: 120,
+                  height: 130,
+                  color: AppColors.tagBackground,
                   child: const Icon(Icons.image, color: AppColors.primary),
                 ),
               ),
@@ -333,21 +431,66 @@ class _HomePageState extends State<HomePage> with SingleTickerProviderStateMixin
                           child: Column(
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
-                              Text('浅伴行程', style: TextStyle(fontSize: 14, color: AppColors.textSecondary)),
+                              Text(
+                                '浅伴行程',
+                                style: TextStyle(
+                                  fontSize: 14,
+                                  color: Colors.white70,
+                                ),
+                              ),
                               SizedBox(height: 2),
-                              Text('Fun', style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold, color: AppColors.textPrimary)),
-                              Text('Calendar.', style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600, color: AppColors.textPrimary)),
+                              Text(
+                                'Fun',
+                                style: TextStyle(
+                                  fontSize: 20,
+                                  fontWeight: FontWeight.bold,
+                                  color: Colors.white,
+                                ),
+                              ),
+                              Text(
+                                'Calendar.',
+                                style: TextStyle(
+                                  fontSize: 16,
+                                  fontWeight: FontWeight.w600,
+                                  color: Colors.white,
+                                ),
+                              ),
                             ],
                           ),
                         ),
                         Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-                          decoration: BoxDecoration(color: AppColors.primary, borderRadius: BorderRadius.circular(12)),
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 10,
+                            vertical: 6,
+                          ),
+                          decoration: BoxDecoration(
+                            color: Colors.white.withValues(alpha: 0.18),
+                            borderRadius: BorderRadius.circular(12),
+                          ),
                           child: const Column(
                             children: [
-                              Text('3月', style: TextStyle(fontSize: 11, color: Colors.white)),
-                              Text('31', style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold, color: Colors.white)),
-                              Text('Sat', style: TextStyle(fontSize: 10, color: Colors.white70)),
+                              Text(
+                                '3月',
+                                style: TextStyle(
+                                  fontSize: 11,
+                                  color: Colors.white,
+                                ),
+                              ),
+                              Text(
+                                '31',
+                                style: TextStyle(
+                                  fontSize: 20,
+                                  fontWeight: FontWeight.bold,
+                                  color: Colors.white,
+                                ),
+                              ),
+                              Text(
+                                'Sat',
+                                style: TextStyle(
+                                  fontSize: 10,
+                                  color: Colors.white70,
+                                ),
+                              ),
                             ],
                           ),
                         ),
@@ -356,13 +499,31 @@ class _HomePageState extends State<HomePage> with SingleTickerProviderStateMixin
                     const SizedBox(height: 8),
                     Row(
                       children: [
-                        const Icon(Icons.people, size: 14, color: AppColors.textHint),
+                        const Icon(
+                          Icons.people,
+                          size: 14,
+                          color: Colors.white70,
+                        ),
                         const SizedBox(width: 4),
-                        Text('搭伴', style: AppTextStyles.caption),
+                        Text(
+                          '搭伴',
+                          style: AppTextStyles.caption.copyWith(
+                            color: Colors.white70,
+                          ),
+                        ),
                         const SizedBox(width: 12),
-                        const Icon(Icons.location_on, size: 14, color: AppColors.textHint),
+                        const Icon(
+                          Icons.location_on,
+                          size: 14,
+                          color: Colors.white70,
+                        ),
                         const SizedBox(width: 4),
-                        Text('随缘', style: AppTextStyles.caption),
+                        Text(
+                          '随缘',
+                          style: AppTextStyles.caption.copyWith(
+                            color: Colors.white70,
+                          ),
+                        ),
                       ],
                     ),
                   ],
@@ -372,9 +533,17 @@ class _HomePageState extends State<HomePage> with SingleTickerProviderStateMixin
             Padding(
               padding: const EdgeInsets.only(right: 12, bottom: 60),
               child: Container(
-                width: 30, height: 30,
-                decoration: BoxDecoration(color: AppColors.primary, borderRadius: BorderRadius.circular(8)),
-                child: const Icon(Icons.arrow_outward, color: Colors.white, size: 16),
+                width: 30,
+                height: 30,
+                decoration: BoxDecoration(
+                  color: Colors.white,
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: const Icon(
+                  Icons.arrow_outward,
+                  color: AppColors.primary,
+                  size: 16,
+                ),
               ),
             ),
           ],
@@ -390,14 +559,14 @@ class _HomePageState extends State<HomePage> with SingleTickerProviderStateMixin
         children: [
           Expanded(
             child: GestureDetector(
-              onTap: () => context.push('/apply/guide'), // 跳转申请地陪
+              onTap: () => context.push('/apply/guide'),
               child: _buildActionCard('去入驻', Icons.flag_outlined, '成为地陪'),
             ),
           ),
           const SizedBox(width: 12),
           Expanded(
             child: GestureDetector(
-              onTap: () => MainScaffold.switchTo(1), // 跳转搭子页
+              onTap: () => MainScaffold.switchTo(1),
               child: _buildActionCard('伴一下', Icons.chat_bubble_outline, '找个搭子'),
             ),
           ),
@@ -410,8 +579,15 @@ class _HomePageState extends State<HomePage> with SingleTickerProviderStateMixin
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        color: Colors.white, borderRadius: BorderRadius.circular(14),
-        boxShadow: [BoxShadow(color: Colors.black.withValues(alpha: 0.04), blurRadius: 8, offset: const Offset(0, 2))],
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(14),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.04),
+            blurRadius: 8,
+            offset: const Offset(0, 2),
+          ),
+        ],
       ),
       child: Row(
         children: [
@@ -425,8 +601,12 @@ class _HomePageState extends State<HomePage> with SingleTickerProviderStateMixin
           ),
           const Spacer(),
           Container(
-            width: 40, height: 40,
-            decoration: BoxDecoration(color: AppColors.tagBackground, borderRadius: BorderRadius.circular(10)),
+            width: 40,
+            height: 40,
+            decoration: BoxDecoration(
+              color: AppColors.tagBackground,
+              borderRadius: BorderRadius.circular(10),
+            ),
             child: Icon(icon, color: AppColors.primary, size: 22),
           ),
         ],
@@ -438,7 +618,9 @@ class _HomePageState extends State<HomePage> with SingleTickerProviderStateMixin
     return Consumer<PostProvider>(
       builder: (context, postProvider, child) {
         if (postProvider.isLoading) {
-          return const Center(child: CircularProgressIndicator(color: AppColors.primary));
+          return const Center(
+            child: CircularProgressIndicator(color: AppColors.primary),
+          );
         }
         final posts = postProvider.posts;
         if (posts.isEmpty) {
@@ -446,7 +628,11 @@ class _HomePageState extends State<HomePage> with SingleTickerProviderStateMixin
             child: Column(
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
-                Icon(Icons.article_outlined, size: 64, color: AppColors.textHint.withValues(alpha: 0.5)),
+                Icon(
+                  Icons.article_outlined,
+                  size: 64,
+                  color: AppColors.textHint.withValues(alpha: 0.5),
+                ),
                 const SizedBox(height: 16),
                 const Text('暂无内容', style: AppTextStyles.subtitle),
               ],
@@ -461,10 +647,16 @@ class _HomePageState extends State<HomePage> with SingleTickerProviderStateMixin
             child: GridView.builder(
               padding: const EdgeInsets.only(top: 8),
               gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-                crossAxisCount: 2, mainAxisSpacing: 10, crossAxisSpacing: 10, childAspectRatio: 0.7,
+                crossAxisCount: 2,
+                mainAxisSpacing: 10,
+                crossAxisSpacing: 10,
+                childAspectRatio: 0.7,
               ),
               itemCount: posts.length,
-              itemBuilder: (context, index) => TravelCard(post: posts[index]),
+              itemBuilder: (context, index) => TravelCard(
+                post: posts[index],
+                cityLabel: _selectedCity,
+              ),
             ),
           ),
         );
@@ -479,7 +671,9 @@ class _HomePageState extends State<HomePage> with SingleTickerProviderStateMixin
           future: postProvider.fetchFollowingPosts(),
           builder: (context, snapshot) {
             if (snapshot.connectionState == ConnectionState.waiting) {
-              return const Center(child: CircularProgressIndicator(color: AppColors.primary));
+              return const Center(
+                child: CircularProgressIndicator(color: AppColors.primary),
+              );
             }
             final posts = snapshot.data ?? [];
             if (posts.isEmpty) {
@@ -487,18 +681,24 @@ class _HomePageState extends State<HomePage> with SingleTickerProviderStateMixin
                 child: Column(
                   mainAxisAlignment: MainAxisAlignment.center,
                   children: [
-                    Icon(Icons.people_outline, size: 64, color: AppColors.textHint.withValues(alpha: 0.5)),
+                    Icon(
+                      Icons.people_outline,
+                      size: 64,
+                      color: AppColors.textHint.withValues(alpha: 0.5),
+                    ),
                     const SizedBox(height: 16),
                     const Text('暂无关注内容', style: AppTextStyles.subtitle),
                     const SizedBox(height: 8),
                     Text('去发现感兴趣的人吧', style: AppTextStyles.caption),
                     const SizedBox(height: 24),
                     ElevatedButton(
-                      onPressed: () => MainScaffold.switchTo(1), // 跳转搭子页
+                      onPressed: () => MainScaffold.switchTo(1),
                       style: ElevatedButton.styleFrom(
                         backgroundColor: AppColors.primary,
                         foregroundColor: Colors.white,
-                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(20),
+                        ),
                       ),
                       child: const Text('去看看'),
                     ),
@@ -508,18 +708,23 @@ class _HomePageState extends State<HomePage> with SingleTickerProviderStateMixin
             }
             return RefreshIndicator(
               color: AppColors.primary,
-              onRefresh: () async {
-                setState(() {}); // 触发重绘以重新调用 fetchFollowingPosts
-              },
+              onRefresh: () async => setState(() {}),
               child: Padding(
                 padding: const EdgeInsets.symmetric(horizontal: 12),
                 child: GridView.builder(
                   padding: const EdgeInsets.only(top: 8),
                   gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-                    crossAxisCount: 2, mainAxisSpacing: 10, crossAxisSpacing: 10, childAspectRatio: 0.7,
+                    crossAxisCount: 2,
+                    mainAxisSpacing: 10,
+                    crossAxisSpacing: 10,
+                    childAspectRatio: 0.7,
                   ),
                   itemCount: posts.length,
-                  itemBuilder: (context, index) => TravelCard(post: posts[index]),
+                  itemBuilder: (context, index) =>
+                      TravelCard(
+                        post: posts[index],
+                        cityLabel: _selectedCity,
+                      ),
                 ),
               ),
             );
@@ -533,14 +738,22 @@ class _HomePageState extends State<HomePage> with SingleTickerProviderStateMixin
 class _TabBarDelegate extends SliverPersistentHeaderDelegate {
   final TabBar tabBar;
   _TabBarDelegate(this.tabBar);
+
   @override
   double get minExtent => tabBar.preferredSize.height;
+
   @override
   double get maxExtent => tabBar.preferredSize.height;
+
   @override
-  Widget build(BuildContext context, double shrinkOffset, bool overlapsContent) {
+  Widget build(
+    BuildContext context,
+    double shrinkOffset,
+    bool overlapsContent,
+  ) {
     return Container(color: Colors.white, child: tabBar);
   }
+
   @override
   bool shouldRebuild(covariant _TabBarDelegate oldDelegate) => false;
 }

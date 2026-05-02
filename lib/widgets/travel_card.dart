@@ -8,8 +8,9 @@ import '../../providers/post_provider.dart';
 
 class TravelCard extends StatelessWidget {
   final TravelPost post;
+  final String? cityLabel;
 
-  const TravelCard({super.key, required this.post});
+  const TravelCard({super.key, required this.post, this.cityLabel});
 
   void _showPostDetail(BuildContext context) {
     context.push('/post/${post.id}');
@@ -19,6 +20,10 @@ class TravelCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final locationLabel = (cityLabel ?? '').trim().isNotEmpty
+        ? cityLabel!.trim()
+        : (post.tag.isNotEmpty ? post.tag : '城市');
+
     return GestureDetector(
       onTap: () => _showPostDetail(context),
       child: Container(
@@ -47,18 +52,6 @@ class TravelCard extends StatelessWidget {
                       ),
                     ),
                   ),
-                  if (post.tag.isNotEmpty)
-                    Positioned(
-                      bottom: 8, left: 8,
-                      child: Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-                        decoration: BoxDecoration(
-                          color: AppColors.primary.withValues(alpha: 0.85),
-                          borderRadius: BorderRadius.circular(10),
-                        ),
-                        child: Text(post.tag, style: const TextStyle(color: Colors.white, fontSize: 10, fontWeight: FontWeight.w500)),
-                      ),
-                    ),
                 ],
               ),
             ),
@@ -69,6 +62,23 @@ class TravelCard extends StatelessWidget {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
+                    if (locationLabel.isNotEmpty)
+                      Container(
+                        margin: const EdgeInsets.only(bottom: 6),
+                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                        decoration: BoxDecoration(
+                          color: AppColors.primary.withValues(alpha: 0.85),
+                          borderRadius: BorderRadius.circular(10),
+                        ),
+                        child: Text(
+                          locationLabel,
+                          style: const TextStyle(
+                            color: Colors.white,
+                            fontSize: 10,
+                            fontWeight: FontWeight.w500,
+                          ),
+                        ),
+                      ),
                     Text(
                       post.title, maxLines: 2, overflow: TextOverflow.ellipsis,
                       style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: AppColors.textPrimary, height: 1.3),

@@ -19,8 +19,11 @@ import '../pages/profile/coupons_page.dart';
 import '../pages/profile/balance_page.dart';
 import '../pages/profile/orders_page.dart';
 import '../pages/order/order_create_page.dart';
+import '../pages/order/location_picker_page.dart';
 import '../pages/admin/audit_list_page.dart';
 import '../pages/profile/user_profile_page.dart';
+import '../pages/demand/demand_list_page.dart';
+import '../pages/demand/demand_create_page.dart';
 import '../models/guide.dart';
 
 class AppRouter {
@@ -39,18 +42,12 @@ class AppRouter {
 
       if (!isLoggedIn && !isGoingToLogin) return '/login';
       if (isLoggedIn && isGoingToLogin) return '/';
-      
+
       return null; // Return null to stay on current route
     },
     routes: [
-      GoRoute(
-        path: '/',
-        builder: (context, state) => const MainScaffold(),
-      ),
-      GoRoute(
-        path: '/login',
-        builder: (context, state) => const LoginPage(),
-      ),
+      GoRoute(path: '/', builder: (context, state) => const MainScaffold()),
+      GoRoute(path: '/login', builder: (context, state) => const LoginPage()),
       GoRoute(
         path: '/post/create',
         builder: (context, state) => const PostCreatePage(),
@@ -63,7 +60,7 @@ class AppRouter {
           final post = postProvider.posts.firstWhere(
             (p) => p.id == id,
             // Fallback object to avoid exceptions if not found
-            orElse: () => postProvider.posts.first, 
+            orElse: () => postProvider.posts.first,
           );
           return PostDetailPage(post: post);
         },
@@ -114,7 +111,7 @@ class AppRouter {
           final guideId = state.uri.queryParameters['guideId'];
           final name = state.uri.queryParameters['name'] ?? '';
           final avatar = state.uri.queryParameters['avatar'] ?? '';
-          
+
           // Reconstruct a partial Guide object for the page
           // (In a real app, you'd fetch the full guide or pass it via extra)
           final guide = guideProvider.guides.firstWhere(
@@ -135,6 +132,40 @@ class AppRouter {
         },
       ),
       GoRoute(
+        path: '/order/location',
+        builder: (context, state) {
+          final initialAddress = state.extra as String?;
+          return LocationPickerPage(initialAddress: initialAddress);
+        },
+      ),
+      GoRoute(
+        path: '/demand/location',
+        builder: (context, state) {
+          final extra = state.extra;
+          String? address;
+          String? city;
+          if (extra is Map) {
+            address = extra['address']?.toString();
+            city = extra['city']?.toString();
+          } else if (extra is String) {
+            address = extra;
+          }
+          return LocationPickerPage(
+            title: '服务地点',
+            initialAddress: address,
+            initialCity: city,
+          );
+        },
+      ),
+      GoRoute(
+        path: '/demands',
+        builder: (context, state) => const DemandListPage(),
+      ),
+      GoRoute(
+        path: '/demand/create',
+        builder: (context, state) => const DemandCreatePage(),
+      ),
+      GoRoute(
         path: '/apply/guide',
         builder: (context, state) => const ApplyGuidePage(),
       ),
@@ -145,17 +176,18 @@ class AppRouter {
           return UserProfilePage(userId: id);
         },
       ),
-      GoRoute(
-        path: '/wallet',
-        builder: (context, state) => const WalletPage(),
-      ),
+      GoRoute(path: '/wallet', builder: (context, state) => const WalletPage()),
       GoRoute(
         path: '/chat/:roomId',
         builder: (context, state) {
           final roomId = state.pathParameters['roomId']!;
           final name = state.uri.queryParameters['name'] ?? '用户';
           final avatar = state.uri.queryParameters['avatar'] ?? '';
-          return ChatRoomPage(roomId: roomId, otherUserName: name, otherUserAvatar: avatar);
+          return ChatRoomPage(
+            roomId: roomId,
+            otherUserName: name,
+            otherUserAvatar: avatar,
+          );
         },
       ),
       GoRoute(

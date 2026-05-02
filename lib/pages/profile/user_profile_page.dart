@@ -121,7 +121,7 @@ class _UserProfilePageState extends State<UserProfilePage> {
                   Container(
                     decoration: const BoxDecoration(
                       gradient: LinearGradient(
-                        colors: [Color(0xFFFF9A3E), Color(0xFFFFC078)],
+                        colors: [Color(0xFF3D6CF5), Color(0xFF6C8EFF)],
                         begin: Alignment.topLeft,
                         end: Alignment.bottomRight,
                       ),
@@ -205,7 +205,7 @@ class _UserProfilePageState extends State<UserProfilePage> {
                                     onPressed: _toggleFollow,
                                     style: ElevatedButton.styleFrom(
                                       backgroundColor: _isFollowing ? Colors.white.withValues(alpha: 0.2) : Colors.white,
-                                      foregroundColor: _isFollowing ? Colors.white : const Color(0xFFFF9A3E),
+                                      foregroundColor: _isFollowing ? Colors.white : AppColors.primary,
                                       elevation: _isFollowing ? 0 : 2,
                                       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
                                       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 0),
@@ -213,7 +213,7 @@ class _UserProfilePageState extends State<UserProfilePage> {
                                     ),
                                     child: _isFollowLoading
                                         ? SizedBox(width: 14, height: 14,
-                                            child: CircularProgressIndicator(strokeWidth: 2, color: _isFollowing ? Colors.white : const Color(0xFFFF9A3E)))
+                                            child: CircularProgressIndicator(strokeWidth: 2, color: _isFollowing ? Colors.white : AppColors.primary))
                                         : Text(_isFollowing ? '已关注' : '+ 关注',
                                             style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold)),
                                   ),

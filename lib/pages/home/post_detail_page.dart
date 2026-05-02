@@ -96,7 +96,7 @@ class _PostDetailPageState extends State<PostDetailPage> {
               Row(
                 mainAxisAlignment: MainAxisAlignment.spaceEvenly,
                 children: [
-                  _shareIcon(Icons.wechat, '微信好友', Colors.green),
+                  _shareIcon(Icons.chat_bubble_outline, '微信好友', Colors.green),
                   _shareIcon(Icons.camera, '朋友圈', Colors.greenAccent),
                   _shareIcon(Icons.link, '复制链接', Colors.blue),
                 ],
