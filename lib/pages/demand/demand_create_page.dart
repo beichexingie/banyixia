@@ -182,150 +182,861 @@ class _DemandCreatePageState extends State<DemandCreatePage> {
 
   Future<void> _pickTimeRange() async {
     final now = DateTime.now();
-    final startDate = _startAt ?? now.add(const Duration(days: 1));
-    DateTime tempStart = _startAt ?? startDate;
-    DateTime tempEnd = _endAt ?? startDate.add(const Duration(hours: 4));
+    final initialDate = _startAt ?? now.add(const Duration(days: 1));
+    DateTime selectedDate = DateTime(
+      initialDate.year,
+      initialDate.month,
+      initialDate.day,
+    );
+    DateTime? tempStart = _startAt;
+    DateTime? tempEnd = _endAt;
+
+    if (tempStart == null || !_isSameDay(tempStart, selectedDate)) {
+      tempStart = DateTime(
+        selectedDate.year,
+        selectedDate.month,
+        selectedDate.day,
+        11,
+      );
+      tempEnd = tempStart.add(const Duration(hours: 3));
+    }
 
     final result = await showModalBottomSheet<Map<String, DateTime>>(
       context: context,
       isScrollControlled: true,
-      showDragHandle: true,
+      backgroundColor: Colors.transparent,
       shape: const RoundedRectangleBorder(
         borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
       ),
       builder: (context) {
-        final dates = List.generate(7, (i) => now.add(Duration(days: i + 1)));
-        final startTimes = List.generate(12, (i) => 8 + i);
-        final endTimes = List.generate(12, (i) => 9 + i);
+        final dates = List.generate(5, (i) => now.add(Duration(days: i)));
+        final hours = List.generate(18, (i) => 6 + i);
+        const minHours = 3;
+
+        DateTime atHour(DateTime date, int hour) {
+          return DateTime(date.year, date.month, date.day, hour);
+        }
+
+        int selectedHours() {
+          if (tempStart == null || tempEnd == null) return 0;
+          return tempEnd!.difference(tempStart!).inHours;
+        }
+
+        bool disabledHour(int hour) {
+          return _isSameDay(selectedDate, now) && hour <= now.hour;
+        }
+
+        String dateTitle(DateTime date, int index) {
+          if (index == 0) return '今天';
+          if (index == 1) return '明天';
+          const weekdays = ['星期一', '星期二', '星期三', '星期四', '星期五', '星期六', '星期日'];
+          return weekdays[date.weekday - 1];
+        }
+
+        void selectHour(int hour, void Function(void Function()) setModalState) {
+          if (disabledHour(hour)) return;
+          final picked = atHour(selectedDate, hour);
+          setModalState(() {
+            if (tempStart == null ||
+                tempEnd != null ||
+                !picked.isAfter(tempStart!)) {
+              tempStart = picked;
+              tempEnd = null;
+              return;
+            }
+            if (picked.difference(tempStart!).inHours < minHours) {
+              ScaffoldMessenger.of(context).showSnackBar(
+                const SnackBar(content: Text('平台预定服务时间默认 3 小时起订')),
+              );
+              return;
+            }
+            tempEnd = picked;
+          });
+        }
 
         return StatefulBuilder(
           builder: (context, setModalState) {
-            return Padding(
-              padding: EdgeInsets.only(
-                left: 16,
-                right: 16,
-                top: 8,
-                bottom: MediaQuery.of(context).viewInsets.bottom + 16,
+            final totalHours = selectedHours();
+            final canConfirm = totalHours >= minHours;
+
+            return Container(
+              decoration: const BoxDecoration(
+                color: Color(0xFFF8F7FF),
+                borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
               ),
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  const Text(
-                    '服务时间',
-                    style: TextStyle(fontSize: 18, fontWeight: FontWeight.w800),
+              child: SafeArea(
+                top: false,
+                child: Padding(
+                  padding: EdgeInsets.fromLTRB(
+                    18,
+                    18,
+                    18,
+                    MediaQuery.of(context).viewInsets.bottom + 18,
                   ),
-                  const SizedBox(height: 14),
-                  const Text(
-                    '开始日期',
-                    style: TextStyle(fontWeight: FontWeight.w700),
-                  ),
-                  const SizedBox(height: 8),
-                  SizedBox(
-                    height: 52,
-                    child: ListView.separated(
-                      scrollDirection: Axis.horizontal,
-                      itemBuilder: (context, index) {
-                        final date = dates[index];
-                        final selected = _isSameDay(tempStart, date);
-                        return ChoiceChip(
-                          label: Text('${date.month}/${date.day}'),
-                          selected: selected,
-                          onSelected: (_) => setModalState(() {
-                            tempStart = DateTime(
-                              date.year,
-                              date.month,
-                              date.day,
-                              tempStart.hour,
-                              tempStart.minute,
-                            );
-                            if (tempEnd.isBefore(tempStart)) {
-                              tempEnd = tempStart.add(const Duration(hours: 4));
-                            }
-                          }),
-                        );
-                      },
-                      separatorBuilder: (_, _) => const SizedBox(width: 8),
-                      itemCount: dates.length,
-                    ),
-                  ),
-                  const SizedBox(height: 14),
-                  const Text(
-                    '开始时间',
-                    style: TextStyle(fontWeight: FontWeight.w700),
-                  ),
-                  const SizedBox(height: 8),
-                  Wrap(
-                    spacing: 8,
-                    runSpacing: 8,
-                    children: startTimes.map((hour) {
-                      final selected = tempStart.hour == hour;
-                      return ChoiceChip(
-                        label: Text('${hour.toString().padLeft(2, '0')}:00'),
-                        selected: selected,
-                        onSelected: (_) => setModalState(() {
-                          tempStart = DateTime(
-                            tempStart.year,
-                            tempStart.month,
-                            tempStart.day,
-                            hour,
-                            0,
-                          );
-                          if (tempEnd.isBefore(tempStart)) {
-                            tempEnd = tempStart.add(const Duration(hours: 4));
-                          }
-                        }),
-                      );
-                    }).toList(),
-                  ),
-                  const SizedBox(height: 14),
-                  const Text(
-                    '结束时间',
-                    style: TextStyle(fontWeight: FontWeight.w700),
-                  ),
-                  const SizedBox(height: 8),
-                  Wrap(
-                    spacing: 8,
-                    runSpacing: 8,
-                    children: endTimes.map((hour) {
-                      final selected =
-                          tempEnd.hour == hour &&
-                          _isSameDay(tempEnd, tempStart);
-                      return ChoiceChip(
-                        label: Text('${hour.toString().padLeft(2, '0')}:00'),
-                        selected: selected,
-                        onSelected: (_) => setModalState(() {
-                          tempEnd = DateTime(
-                            tempStart.year,
-                            tempStart.month,
-                            tempStart.day,
-                            hour,
-                            0,
-                          );
-                        }),
-                      );
-                    }).toList(),
-                  ),
-                  const SizedBox(height: 18),
-                  SizedBox(
-                    width: double.infinity,
-                    height: 48,
-                    child: ElevatedButton(
-                      onPressed: () => Navigator.pop(context, {
-                        'start': tempStart,
-                        'end': tempEnd,
-                      }),
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: AppColors.primary,
-                        foregroundColor: Colors.white,
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(14),
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Row(
+                        children: [
+                          const Expanded(
+                            child: Text(
+                              '预约时间',
+                              style: TextStyle(
+                                fontSize: 22,
+                                fontWeight: FontWeight.w800,
+                                color: AppColors.textPrimary,
+                              ),
+                            ),
+                          ),
+                          IconButton(
+                            onPressed: () => Navigator.pop(context),
+                            icon: const Icon(Icons.close),
+                            color: AppColors.textSecondary,
+                          ),
+                        ],
+                      ),
+                      const Text(
+                        '具体开始时间地陪服务将通过电话联系和您确认',
+                        style: TextStyle(
+                          fontSize: 13,
+                          color: AppColors.textHint,
                         ),
                       ),
-                      child: const Text('确定'),
+                      const SizedBox(height: 20),
+                      SizedBox(
+                        height: 86,
+                        child: ListView.separated(
+                          scrollDirection: Axis.horizontal,
+                          itemBuilder: (context, index) {
+                            final date = dates[index];
+                            final selected = _isSameDay(selectedDate, date);
+                            return GestureDetector(
+                              onTap: () => setModalState(() {
+                                selectedDate = DateTime(
+                                  date.year,
+                                  date.month,
+                                  date.day,
+                                );
+                                tempStart = null;
+                                tempEnd = null;
+                              }),
+                              child: AnimatedContainer(
+                                duration: const Duration(milliseconds: 160),
+                                width: 92,
+                                padding: const EdgeInsets.symmetric(vertical: 12),
+                                decoration: BoxDecoration(
+                                  color: selected
+                                      ? const Color(0xFFC8F26D)
+                                      : Colors.white.withValues(alpha: 0.55),
+                                  borderRadius: BorderRadius.circular(10),
+                                  border: Border.all(
+                                    color: selected
+                                        ? const Color(0xFFC8F26D)
+                                        : Colors.transparent,
+                                  ),
+                                ),
+                                child: Column(
+                                  mainAxisAlignment: MainAxisAlignment.center,
+                                  children: [
+                                    Text(
+                                      dateTitle(date, index),
+                                      style: TextStyle(
+                                        fontSize: 17,
+                                        fontWeight: selected
+                                            ? FontWeight.w800
+                                            : FontWeight.w600,
+                                        color: selected
+                                            ? AppColors.textPrimary
+                                            : AppColors.textSecondary,
+                                      ),
+                                    ),
+                                    const SizedBox(height: 8),
+                                    Text(
+                                      '${date.month.toString().padLeft(2, '0')}月${date.day.toString().padLeft(2, '0')}日',
+                                      style: TextStyle(
+                                        fontSize: 13,
+                                        fontWeight: selected
+                                            ? FontWeight.w700
+                                            : FontWeight.w400,
+                                        color: selected
+                                            ? AppColors.textPrimary
+                                            : AppColors.textHint,
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            );
+                          },
+                          separatorBuilder: (_, _) => const SizedBox(width: 10),
+                          itemCount: dates.length,
+                        ),
+                      ),
+                      const SizedBox(height: 28),
+                      const Text(
+                        '预约时间段',
+                        style: TextStyle(
+                          fontSize: 22,
+                          fontWeight: FontWeight.w800,
+                          color: AppColors.textPrimary,
+                        ),
+                      ),
+                      const SizedBox(height: 6),
+                      const Text(
+                        '平台预定服务时间默认 3 小时起订',
+                        style: TextStyle(
+                          fontSize: 13,
+                          color: AppColors.textHint,
+                        ),
+                      ),
+                      const SizedBox(height: 16),
+                      GridView.builder(
+                        shrinkWrap: true,
+                        physics: const NeverScrollableScrollPhysics(),
+                        itemCount: hours.length,
+                        gridDelegate:
+                            const SliverGridDelegateWithFixedCrossAxisCount(
+                          crossAxisCount: 4,
+                          mainAxisSpacing: 12,
+                          crossAxisSpacing: 12,
+                          childAspectRatio: 2.25,
+                        ),
+                        itemBuilder: (context, index) {
+                          final hour = hours[index];
+                          final time = atHour(selectedDate, hour);
+                          final disabled = disabledHour(hour);
+                          final isStart = tempStart != null &&
+                              _isSameDay(tempStart!, selectedDate) &&
+                              tempStart!.hour == hour;
+                          final isEnd = tempEnd != null &&
+                              _isSameDay(tempEnd!, selectedDate) &&
+                              tempEnd!.hour == hour;
+                          final inRange = tempStart != null &&
+                              tempEnd != null &&
+                              time.isAfter(tempStart!) &&
+                              time.isBefore(tempEnd!);
+                          final highlighted = isStart || isEnd;
+                          final night = hour >= 20;
+
+                          return GestureDetector(
+                            onTap: () => selectHour(hour, setModalState),
+                            onLongPress: () => selectHour(hour, setModalState),
+                            child: AnimatedContainer(
+                              duration: const Duration(milliseconds: 150),
+                              decoration: BoxDecoration(
+                                color: highlighted
+                                    ? const Color(0xFFC8F26D)
+                                    : inRange
+                                        ? const Color(0xFFF0F6DA)
+                                        : disabled
+                                            ? const Color(0xFFF4F3F8)
+                                            : Colors.white.withValues(alpha: 0.75),
+                                borderRadius: BorderRadius.circular(10),
+                                border: Border.all(
+                                  color: highlighted
+                                      ? const Color(0xFFC8F26D)
+                                      : Colors.transparent,
+                                ),
+                              ),
+                              child: Stack(
+                                children: [
+                                  if (night)
+                                    const Positioned(
+                                      top: 5,
+                                      left: 8,
+                                      child: Text(
+                                        '夜间',
+                                        style: TextStyle(
+                                          fontSize: 10,
+                                          color: Color(0xFFC78F3A),
+                                        ),
+                                      ),
+                                    ),
+                                  Center(
+                                    child: Column(
+                                      mainAxisSize: MainAxisSize.min,
+                                      children: [
+                                        Text(
+                                          '${hour.toString().padLeft(2, '0')}:00',
+                                          style: TextStyle(
+                                            fontSize: 17,
+                                            fontWeight: highlighted
+                                                ? FontWeight.w800
+                                                : FontWeight.w500,
+                                            color: disabled
+                                                ? const Color(0xFFC9C7D1)
+                                                : AppColors.textPrimary,
+                                          ),
+                                        ),
+                                        const SizedBox(height: 2),
+                                        Text(
+                                          isStart
+                                              ? '开始'
+                                              : isEnd
+                                                  ? '结束'
+                                                  : '空闲',
+                                          style: TextStyle(
+                                            fontSize: 11,
+                                            color: disabled
+                                                ? const Color(0xFFD5D2DC)
+                                                : highlighted
+                                                    ? AppColors.textPrimary
+                                                    : AppColors.textHint,
+                                          ),
+                                        ),
+                                      ],
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          );
+                        },
+                      ),
+                      const SizedBox(height: 28),
+                      SizedBox(
+                        width: double.infinity,
+                        height: 56,
+                        child: ElevatedButton(
+                          onPressed: canConfirm
+                              ? () => Navigator.pop(context, {
+                                    'start': tempStart!,
+                                    'end': tempEnd!,
+                                  })
+                              : null,
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: const Color(0xFF242934),
+                            disabledBackgroundColor: const Color(0xFFB6B8C1),
+                            foregroundColor: const Color(0xFFC8F26D),
+                            disabledForegroundColor: Colors.white,
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(14),
+                            ),
+                          ),
+                          child: Text(
+                            canConfirm ? '共计${totalHours}h 确定' : '请选择至少3小时',
+                            style: const TextStyle(
+                              fontSize: 18,
+                              fontWeight: FontWeight.w800,
+                            ),
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            );
+          },
+        );
+      },
+    );
+
+    if (result != null && mounted) {
+      setState(() {
+        _startAt = result['start'];
+        _endAt = result['end'];
+      });
+    }
+  }
+
+  Future<void> _pickTimeRangeV2() async {
+    final now = DateTime.now();
+    final initialDate = _startAt ?? now.add(const Duration(days: 1));
+    const minHours = 3;
+    const startHour = 6;
+    const endHour = 23;
+    const crossAxisCount = 4;
+    const crossAxisSpacing = 12.0;
+    const mainAxisSpacing = 12.0;
+    const childAspectRatio = 2.2;
+
+    DateTime selectedDate = DateTime(
+      initialDate.year,
+      initialDate.month,
+      initialDate.day,
+    );
+    DateTime? tempStart = _startAt;
+    DateTime? tempEnd = _endAt;
+    int? dragOriginHour;
+
+    DateTime atHour(DateTime date, int hour) =>
+        DateTime(date.year, date.month, date.day, hour);
+
+    bool isDisabledHour(int hour) =>
+        _isSameDay(selectedDate, now) && hour <= now.hour;
+
+    String weekdayLabel(DateTime date) {
+      const weekdays = ['周一', '周二', '周三', '周四', '周五', '周六', '周日'];
+      return weekdays[date.weekday - 1];
+    }
+
+    void setRange(int startHourValue, int endHourValue) {
+      final rangeStart = startHourValue <= endHourValue
+          ? startHourValue
+          : endHourValue;
+      final rangeEnd = startHourValue <= endHourValue
+          ? endHourValue
+          : startHourValue;
+      tempStart = atHour(selectedDate, rangeStart);
+      tempEnd = atHour(selectedDate, rangeEnd);
+    }
+
+    int? hourFromPosition(Offset position, BoxConstraints constraints) {
+      final cellWidth =
+          (constraints.maxWidth - crossAxisSpacing * (crossAxisCount - 1)) /
+              crossAxisCount;
+      final cellHeight = cellWidth / childAspectRatio;
+      final rows = ((endHour - startHour + 1) + crossAxisCount - 1) ~/
+          crossAxisCount;
+      final blockWidth = cellWidth + crossAxisSpacing;
+      final blockHeight = cellHeight + mainAxisSpacing;
+      final col = (position.dx / blockWidth).floor();
+      final row = (position.dy / blockHeight).floor();
+      if (col < 0 || col >= crossAxisCount || row < 0 || row >= rows) {
+        return null;
+      }
+      final withinX = position.dx - col * blockWidth;
+      final withinY = position.dy - row * blockHeight;
+      if (withinX > cellWidth || withinY > cellHeight) return null;
+      final hour = startHour + row * crossAxisCount + col;
+      if (hour < startHour || hour > endHour) return null;
+      return hour;
+    }
+
+    final result = await showModalBottomSheet<Map<String, DateTime>>(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (context) {
+        final dates = List.generate(5, (i) => now.add(Duration(days: i)));
+        final hours = List.generate(endHour - startHour + 1, (i) => startHour + i);
+
+        int selectedHours() {
+          if (tempStart == null || tempEnd == null) return 0;
+          return tempEnd!.difference(tempStart!).inHours;
+        }
+
+        return StatefulBuilder(
+          builder: (context, setModalState) {
+            final totalHours = selectedHours();
+            final canConfirm = totalHours >= minHours;
+            final summaryText = tempStart != null && tempEnd != null
+                ? '${tempStart!.hour.toString().padLeft(2, '0')}:00 - ${tempEnd!.hour.toString().padLeft(2, '0')}:00'
+                : '拖动选择开始和结束时间';
+
+            return FractionallySizedBox(
+              heightFactor: 0.88,
+              child: Container(
+                decoration: const BoxDecoration(
+                  color: Color(0xFFF8F7FF),
+                  borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+                ),
+                child: SafeArea(
+                  top: false,
+                  child: Padding(
+                    padding: EdgeInsets.fromLTRB(
+                      18,
+                      14,
+                      18,
+                      MediaQuery.of(context).viewInsets.bottom + 16,
+                    ),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Center(
+                          child: Container(
+                            width: 44,
+                            height: 5,
+                            decoration: BoxDecoration(
+                              color: const Color(0xFF5A5D6A),
+                              borderRadius: BorderRadius.circular(99),
+                            ),
+                          ),
+                        ),
+                        const SizedBox(height: 18),
+                        Row(
+                          children: [
+                            const Expanded(
+                              child: Text(
+                                '服务时间',
+                                style: TextStyle(
+                                  fontSize: 22,
+                                  fontWeight: FontWeight.w800,
+                                  color: AppColors.textPrimary,
+                                ),
+                              ),
+                            ),
+                            IconButton(
+                              onPressed: () => Navigator.pop(context),
+                              icon: const Icon(Icons.close),
+                              color: AppColors.textSecondary,
+                            ),
+                          ],
+                        ),
+                        const Text(
+                          '先选日期，再在下方拖动时间块选择时长',
+                          style: TextStyle(
+                            fontSize: 13,
+                            color: AppColors.textHint,
+                          ),
+                        ),
+                        const SizedBox(height: 18),
+                        SizedBox(
+                          height: 84,
+                          child: ListView.separated(
+                            scrollDirection: Axis.horizontal,
+                            itemCount: dates.length,
+                            separatorBuilder: (_, _) => const SizedBox(width: 10),
+                            itemBuilder: (context, index) {
+                              final date = dates[index];
+                              final selected = _isSameDay(selectedDate, date);
+                              return GestureDetector(
+                                onTap: () => setModalState(() {
+                                  selectedDate = DateTime(
+                                    date.year,
+                                    date.month,
+                                    date.day,
+                                  );
+                                  tempStart = null;
+                                  tempEnd = null;
+                                  dragOriginHour = null;
+                                }),
+                                child: AnimatedContainer(
+                                  duration: const Duration(milliseconds: 180),
+                                  width: 92,
+                                  padding: const EdgeInsets.symmetric(vertical: 12),
+                                  decoration: BoxDecoration(
+                                    color: selected
+                                        ? const Color(0xFFC8F26D)
+                                        : Colors.white.withValues(alpha: 0.58),
+                                    borderRadius: BorderRadius.circular(12),
+                                    border: Border.all(
+                                      color: selected
+                                          ? const Color(0xFFC8F26D)
+                                          : const Color(0xFFD5D8E2),
+                                    ),
+                                  ),
+                                  child: Column(
+                                    mainAxisAlignment: MainAxisAlignment.center,
+                                    children: [
+                                      Text(
+                                        index == 0
+                                            ? '今天'
+                                            : index == 1
+                                                ? '明天'
+                                                : weekdayLabel(date),
+                                        style: TextStyle(
+                                          fontSize: 17,
+                                          fontWeight: selected
+                                              ? FontWeight.w800
+                                              : FontWeight.w600,
+                                          color: selected
+                                              ? AppColors.textPrimary
+                                              : AppColors.textSecondary,
+                                        ),
+                                      ),
+                                      const SizedBox(height: 6),
+                                      Text(
+                                        '${date.month.toString().padLeft(2, '0')}月${date.day.toString().padLeft(2, '0')}日',
+                                        style: TextStyle(
+                                          fontSize: 13,
+                                          fontWeight: selected
+                                              ? FontWeight.w700
+                                              : FontWeight.w400,
+                                          color: selected
+                                              ? AppColors.textPrimary
+                                              : AppColors.textHint,
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                              );
+                            },
+                          ),
+                        ),
+                        const SizedBox(height: 20),
+                        const Text(
+                          '预约时间段',
+                          style: TextStyle(
+                            fontSize: 22,
+                            fontWeight: FontWeight.w800,
+                            color: AppColors.textPrimary,
+                          ),
+                        ),
+                        const SizedBox(height: 6),
+                        const Text(
+                          '平台默认最少 3 小时起订',
+                          style: TextStyle(
+                            fontSize: 13,
+                            color: AppColors.textHint,
+                          ),
+                        ),
+                        const SizedBox(height: 14),
+                        Expanded(
+                          child: SingleChildScrollView(
+                            child: LayoutBuilder(
+                              builder: (context, constraints) {
+                                final cellWidth =
+                                    (constraints.maxWidth -
+                                            crossAxisSpacing *
+                                                (crossAxisCount - 1)) /
+                                        crossAxisCount;
+                                final cellHeight = cellWidth / childAspectRatio;
+                                final rows =
+                                    (hours.length + crossAxisCount - 1) ~/
+                                        crossAxisCount;
+                                final gridHeight = rows * cellHeight +
+                                    (rows - 1) * mainAxisSpacing;
+
+                                return SizedBox(
+                                  height: gridHeight,
+                                  child: GestureDetector(
+                                    behavior: HitTestBehavior.opaque,
+                                    onTapDown: (details) {
+                                      final hour = hourFromPosition(
+                                        details.localPosition,
+                                        constraints,
+                                      );
+                                      if (hour == null || isDisabledHour(hour)) {
+                                        return;
+                                      }
+                                      setModalState(() {
+                                        if (tempStart == null ||
+                                            tempEnd != null) {
+                                          tempStart = atHour(selectedDate, hour);
+                                          tempEnd = null;
+                                          dragOriginHour = hour;
+                                          return;
+                                        }
+                                        if (hour == tempStart!.hour) {
+                                          tempEnd = null;
+                                          dragOriginHour = hour;
+                                          return;
+                                        }
+                                        setRange(tempStart!.hour, hour);
+                                        dragOriginHour = tempStart!.hour;
+                                      });
+                                    },
+                                    onPanStart: (details) {
+                                      final hour = hourFromPosition(
+                                        details.localPosition,
+                                        constraints,
+                                      );
+                                      if (hour == null || isDisabledHour(hour)) {
+                                        return;
+                                      }
+                                      setModalState(() {
+                                        tempStart = atHour(selectedDate, hour);
+                                        tempEnd = null;
+                                        dragOriginHour = hour;
+                                      });
+                                    },
+                                    onPanUpdate: (details) {
+                                      final origin = dragOriginHour;
+                                      if (origin == null) return;
+                                      final hour = hourFromPosition(
+                                        details.localPosition,
+                                        constraints,
+                                      );
+                                      if (hour == null || isDisabledHour(hour)) {
+                                        return;
+                                      }
+                                      setModalState(() {
+                                        setRange(origin, hour);
+                                      });
+                                    },
+                                    onPanEnd: (_) => dragOriginHour = null,
+                                    child: GridView.builder(
+                                      physics:
+                                          const NeverScrollableScrollPhysics(),
+                                      itemCount: hours.length,
+                                      gridDelegate:
+                                          const SliverGridDelegateWithFixedCrossAxisCount(
+                                        crossAxisCount: crossAxisCount,
+                                        mainAxisSpacing: mainAxisSpacing,
+                                        crossAxisSpacing: crossAxisSpacing,
+                                        childAspectRatio: childAspectRatio,
+                                      ),
+                                      itemBuilder: (context, index) {
+                                        final hour = hours[index];
+                                        final time = atHour(selectedDate, hour);
+                                        final disabled = isDisabledHour(hour);
+                                        final isStart = tempStart != null &&
+                                            _isSameDay(tempStart!, selectedDate) &&
+                                            tempStart!.hour == hour;
+                                        final isEnd = tempEnd != null &&
+                                            _isSameDay(tempEnd!, selectedDate) &&
+                                            tempEnd!.hour == hour;
+                                        final inRange = tempStart != null &&
+                                            tempEnd != null &&
+                                            time.isAfter(tempStart!) &&
+                                            time.isBefore(tempEnd!);
+                                        final highlighted = isStart || isEnd;
+                                        final night = hour >= 20;
+
+                                        return AnimatedContainer(
+                                          duration:
+                                              const Duration(milliseconds: 150),
+                                          decoration: BoxDecoration(
+                                            color: highlighted
+                                                ? const Color(0xFFC8F26D)
+                                                : inRange
+                                                    ? const Color(0xFFF0F6DA)
+                                                    : disabled
+                                                        ? const Color(0xFFF4F3F8)
+                                                        : Colors.white.withValues(
+                                                            alpha: 0.82,
+                                                          ),
+                                            borderRadius:
+                                                BorderRadius.circular(12),
+                                            border: Border.all(
+                                              color: highlighted
+                                                  ? const Color(0xFFC8F26D)
+                                                  : const Color(0xFFD5D8E2),
+                                            ),
+                                          ),
+                                          child: Stack(
+                                            children: [
+                                              if (night)
+                                                const Positioned(
+                                                  top: 5,
+                                                  left: 8,
+                                                  child: Text(
+                                                    '夜间',
+                                                    style: TextStyle(
+                                                      fontSize: 10,
+                                                      color: Color(0xFFC78F3A),
+                                                    ),
+                                                  ),
+                                                ),
+                                              Center(
+                                                child: Column(
+                                                  mainAxisSize:
+                                                      MainAxisSize.min,
+                                                  children: [
+                                                    Text(
+                                                      '${hour.toString().padLeft(2, '0')}:00',
+                                                      style: TextStyle(
+                                                        fontSize: 17,
+                                                        fontWeight: highlighted
+                                                            ? FontWeight.w800
+                                                            : FontWeight.w500,
+                                                        color: disabled
+                                                            ? const Color(
+                                                                0xFFC9C7D1,
+                                                              )
+                                                            : AppColors
+                                                                .textPrimary,
+                                                      ),
+                                                    ),
+                                                    const SizedBox(height: 2),
+                                                    Text(
+                                                      isStart
+                                                          ? '开始'
+                                                          : isEnd
+                                                              ? '结束'
+                                                              : '可选',
+                                                      style: TextStyle(
+                                                        fontSize: 11,
+                                                        color: disabled
+                                                            ? const Color(
+                                                                0xFFD5D2DC,
+                                                              )
+                                                            : highlighted
+                                                                ? AppColors
+                                                                    .textPrimary
+                                                                : AppColors
+                                                                    .textHint,
+                                                      ),
+                                                    ),
+                                                  ],
+                                                ),
+                                              ),
+                                            ],
+                                          ),
+                                        );
+                                      },
+                                    ),
+                                  ),
+                                );
+                              },
+                            ),
+                          ),
+                        ),
+                        const SizedBox(height: 16),
+                        Container(
+                          width: double.infinity,
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 16,
+                            vertical: 14,
+                          ),
+                          decoration: BoxDecoration(
+                            color: Colors.white.withValues(alpha: 0.9),
+                            borderRadius: BorderRadius.circular(16),
+                          ),
+                          child: Row(
+                            children: [
+                              Expanded(
+                                child: Text(
+                                  summaryText,
+                                  style: const TextStyle(
+                                    fontSize: 14,
+                                    fontWeight: FontWeight.w700,
+                                    color: AppColors.textPrimary,
+                                  ),
+                                ),
+                              ),
+                              Text(
+                                totalHours > 0 ? '共计 ${totalHours}h' : '请选择时长',
+                                style: TextStyle(
+                                  fontSize: 13,
+                                  color: totalHours > 0
+                                      ? AppColors.primary
+                                      : AppColors.textHint,
+                                  fontWeight: FontWeight.w700,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                        const SizedBox(height: 16),
+                        SizedBox(
+                          width: double.infinity,
+                          height: 56,
+                          child: ElevatedButton(
+                            onPressed: canConfirm
+                                ? () => Navigator.pop(context, {
+                                      'start': tempStart!,
+                                      'end': tempEnd!,
+                                    })
+                                : null,
+                            style: ElevatedButton.styleFrom(
+                              backgroundColor: const Color(0xFF242934),
+                              disabledBackgroundColor: const Color(0xFFB6B8C1),
+                              foregroundColor: const Color(0xFFC8F26D),
+                              disabledForegroundColor: Colors.white,
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(16),
+                              ),
+                            ),
+                            child: Text(
+                              canConfirm
+                                  ? '共计 ${totalHours}h 确定'
+                                  : '请选择至少 ${minHours} 小时',
+                              style: const TextStyle(
+                                fontSize: 18,
+                                fontWeight: FontWeight.w800,
+                              ),
+                            ),
+                          ),
+                        ),
+                      ],
                     ),
                   ),
-                ],
+                ),
               ),
             );
           },
@@ -601,7 +1312,7 @@ class _DemandCreatePageState extends State<DemandCreatePage> {
                   value: _startAt == null || _endAt == null
                       ? '请选择服务时间'
                       : '${_formatDateTime(_startAt)} - ${_formatDateTime(_endAt)}',
-                  onTap: _pickTimeRange,
+                  onTap: _pickTimeRangeV2,
                 ),
                 const Divider(height: 24),
                 _buildInfoTile(
