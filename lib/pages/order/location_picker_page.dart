@@ -1,5 +1,8 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter_map/flutter_map.dart';
 import 'package:go_router/go_router.dart';
+import 'package:latlong2/latlong.dart';
 
 import '../../config/amap_config.dart';
 import '../../config/app_theme.dart';
@@ -22,52 +25,355 @@ class LocationPickerPage extends StatefulWidget {
 }
 
 class _LocationPickerPageState extends State<LocationPickerPage> {
+  static const LatLng _defaultLatLng = LatLng(31.299379, 120.619585);
+  static const double _defaultZoom = 15;
+
   late final TextEditingController _searchController;
   late final ScrollController _scrollController;
-  late String _selectedAddress;
-  late String _selectedCity;
   final MapService _mapService = const AmapMapService(
     apiKey: AmapConfig.webServiceKey,
   );
   final Map<String, GlobalKey> _sectionKeys = {};
+
+  late String _selectedAddress;
+  late String _selectedCity;
   MapPosition? _selectedPosition;
   List<MapSuggestion> _apiSuggestions = const [];
   String? _locationSummary;
   bool _searching = false;
+  bool _locatingFromMap = false;
+  final MapController _mapController = MapController();
+  LatLng _mapCenter = _defaultLatLng;
+  double _mapZoom = _defaultZoom;
+  LatLng _cameraTarget = _defaultLatLng;
+  LatLng? _lastResolvedTarget;
+  int _reverseGeocodeToken = 0;
 
-  final List<_LocationEntry> _entries = const [
-    _LocationEntry('A', '安吉余村', '浙江湖州'),
-    _LocationEntry('A', '澳门大三巴', '澳门'),
-    _LocationEntry('B', '北京三里屯', '北京'),
-    _LocationEntry('B', '北海银滩', '广西北海'),
-    _LocationEntry('C', '成都春熙路', '四川成都'),
-    _LocationEntry('C', '重庆洪崖洞', '重庆'),
-    _LocationEntry('D', '东极岛', '浙江舟山'),
-    _LocationEntry('D', '大理古城', '云南大理'),
-    _LocationEntry('E', '恩施大峡谷', '湖北恩施'),
-    _LocationEntry('F', '福建土楼', '福建龙岩'),
-    _LocationEntry('F', '凤凰古城', '湖南湘西'),
-    _LocationEntry('G', '广州塔', '广东广州'),
-    _LocationEntry('G', '桂林阳朔', '广西桂林'),
-    _LocationEntry('H', '杭州西湖', '浙江杭州'),
-    _LocationEntry('H', '黄山风景区', '安徽黄山'),
-    _LocationEntry('J', '金鸡湖', '江苏苏州'),
-    _LocationEntry('J', '九寨沟', '四川阿坝'),
-    _LocationEntry('K', '昆明滇池', '云南昆明'),
-    _LocationEntry('L', '丽江古城', '云南丽江'),
-    _LocationEntry('L', '拉萨布达拉宫', '西藏拉萨'),
-    _LocationEntry('M', '梅里雪山', '云南迪庆'),
-    _LocationEntry('N', '南京夫子庙', '江苏南京'),
-    _LocationEntry('N', '宁波老外滩', '浙江宁波'),
-    _LocationEntry('Q', '青岛栈桥', '山东青岛'),
-    _LocationEntry('S', '苏州拙政园', '江苏苏州'),
-    _LocationEntry('S', '上海外滩', '上海'),
-    _LocationEntry('T', '天津五大道', '天津'),
-    _LocationEntry('W', '武汉东湖', '湖北武汉'),
-    _LocationEntry('X', '西安大雁塔', '陕西西安'),
-    _LocationEntry('X', '厦门鼓浪屿', '福建厦门'),
-    _LocationEntry('Y', '云南洱海', '云南大理'),
-    _LocationEntry('Z', '珠海情侣路', '广东珠海'),
+  bool get _hasWebServiceKey => AmapConfig.webServiceKey.trim().isNotEmpty;
+  bool get _isWindowsPlatform => !kIsWeb && defaultTargetPlatform == TargetPlatform.windows;
+  bool get _isMobilePlatform =>
+      !kIsWeb &&
+      (defaultTargetPlatform == TargetPlatform.android ||
+          defaultTargetPlatform == TargetPlatform.iOS);
+
+  static const List<_CityEntry> _cities = [
+    _CityEntry('A', '阿坝藏族羌族自治州'),
+    _CityEntry('A', '阿克苏地区'),
+    _CityEntry('A', '阿拉尔市'),
+    _CityEntry('A', '阿拉善盟'),
+    _CityEntry('A', '阿勒泰地区'),
+    _CityEntry('A', '阿里地区'),
+    _CityEntry('A', '安康市'),
+    _CityEntry('A', '安庆市'),
+    _CityEntry('A', '安顺市'),
+    _CityEntry('A', '安阳市'),
+    _CityEntry('B', '白城市'),
+    _CityEntry('B', '白山市'),
+    _CityEntry('B', '白银市'),
+    _CityEntry('B', '百色市'),
+    _CityEntry('B', '蚌埠市'),
+    _CityEntry('B', '保定市'),
+    _CityEntry('B', '保山市'),
+    _CityEntry('B', '北海市'),
+    _CityEntry('B', '北京市'),
+    _CityEntry('B', '本溪市'),
+    _CityEntry('B', '毕节市'),
+    _CityEntry('B', '滨州市'),
+    _CityEntry('B', '博尔塔拉蒙古自治州'),
+    _CityEntry('B', '亳州市'),
+    _CityEntry('C', '沧州市'),
+    _CityEntry('C', '昌都市'),
+    _CityEntry('C', '昌吉回族自治州'),
+    _CityEntry('C', '长春市'),
+    _CityEntry('C', '长沙市'),
+    _CityEntry('C', '长治市'),
+    _CityEntry('C', '常德市'),
+    _CityEntry('C', '常州市'),
+    _CityEntry('C', '朝阳市'),
+    _CityEntry('C', '潮州市'),
+    _CityEntry('C', '郴州市'),
+    _CityEntry('C', '成都市'),
+    _CityEntry('C', '承德市'),
+    _CityEntry('C', '池州市'),
+    _CityEntry('C', '赤峰市'),
+    _CityEntry('C', '崇左市'),
+    _CityEntry('C', '楚雄彝族自治州'),
+    _CityEntry('C', '滁州市'),
+    _CityEntry('C', '重庆市'),
+    _CityEntry('D', '大理白族自治州'),
+    _CityEntry('D', '大连市'),
+    _CityEntry('D', '大庆市'),
+    _CityEntry('D', '大同市'),
+    _CityEntry('D', '大兴安岭地区'),
+    _CityEntry('D', '达州市'),
+    _CityEntry('D', '德宏傣族景颇族自治州'),
+    _CityEntry('D', '德阳市'),
+    _CityEntry('D', '德州市'),
+    _CityEntry('D', '定西市'),
+    _CityEntry('D', '迪庆藏族自治州'),
+    _CityEntry('D', '东莞市'),
+    _CityEntry('D', '东营市'),
+    _CityEntry('E', '鄂尔多斯市'),
+    _CityEntry('E', '鄂州市'),
+    _CityEntry('E', '恩施土家族苗族自治州'),
+    _CityEntry('F', '防城港市'),
+    _CityEntry('F', '佛山市'),
+    _CityEntry('F', '福州市'),
+    _CityEntry('F', '抚顺市'),
+    _CityEntry('F', '抚州市'),
+    _CityEntry('F', '阜新市'),
+    _CityEntry('F', '阜阳市'),
+    _CityEntry('G', '甘南藏族自治州'),
+    _CityEntry('G', '赣州市'),
+    _CityEntry('G', '甘孜藏族自治州'),
+    _CityEntry('G', '广安市'),
+    _CityEntry('G', '广元市'),
+    _CityEntry('G', '广州市'),
+    _CityEntry('G', '贵港市'),
+    _CityEntry('G', '贵阳市'),
+    _CityEntry('G', '桂林市'),
+    _CityEntry('G', '果洛藏族自治州'),
+    _CityEntry('G', '固原市'),
+    _CityEntry('H', '哈尔滨市'),
+    _CityEntry('H', '哈密市'),
+    _CityEntry('H', '海北藏族自治州'),
+    _CityEntry('H', '海东市'),
+    _CityEntry('H', '海口市'),
+    _CityEntry('H', '海南藏族自治州'),
+    _CityEntry('H', '海西蒙古族藏族自治州'),
+    _CityEntry('H', '邯郸市'),
+    _CityEntry('H', '汉中市'),
+    _CityEntry('H', '杭州市'),
+    _CityEntry('H', '合肥市'),
+    _CityEntry('H', '和田地区'),
+    _CityEntry('H', '河池市'),
+    _CityEntry('H', '河源市'),
+    _CityEntry('H', '菏泽市'),
+    _CityEntry('H', '贺州市'),
+    _CityEntry('H', '鹤壁市'),
+    _CityEntry('H', '鹤岗市'),
+    _CityEntry('H', '黑河市'),
+    _CityEntry('H', '衡水市'),
+    _CityEntry('H', '衡阳市'),
+    _CityEntry('H', '红河哈尼族彝族自治州'),
+    _CityEntry('H', '呼和浩特市'),
+    _CityEntry('H', '呼伦贝尔市'),
+    _CityEntry('H', '湖州市'),
+    _CityEntry('H', '怀化市'),
+    _CityEntry('H', '淮安市'),
+    _CityEntry('H', '淮北市'),
+    _CityEntry('H', '淮南市'),
+    _CityEntry('H', '黄冈市'),
+    _CityEntry('H', '黄南藏族自治州'),
+    _CityEntry('H', '黄山市'),
+    _CityEntry('H', '黄石市'),
+    _CityEntry('H', '惠州市'),
+    _CityEntry('J', '吉安市'),
+    _CityEntry('J', '吉林市'),
+    _CityEntry('J', '济南市'),
+    _CityEntry('J', '济宁市'),
+    _CityEntry('J', '佳木斯市'),
+    _CityEntry('J', '嘉兴市'),
+    _CityEntry('J', '嘉峪关市'),
+    _CityEntry('J', '江门市'),
+    _CityEntry('J', '焦作市'),
+    _CityEntry('J', '揭阳市'),
+    _CityEntry('J', '金昌市'),
+    _CityEntry('J', '金华市'),
+    _CityEntry('J', '锦州市'),
+    _CityEntry('J', '晋城市'),
+    _CityEntry('J', '晋中市'),
+    _CityEntry('J', '荆门市'),
+    _CityEntry('J', '荆州市'),
+    _CityEntry('J', '景德镇市'),
+    _CityEntry('J', '九江市'),
+    _CityEntry('J', '酒泉市'),
+    _CityEntry('K', '开封市'),
+    _CityEntry('K', '克拉玛依市'),
+    _CityEntry('K', '克孜勒苏柯尔克孜自治州'),
+    _CityEntry('K', '昆明市'),
+    _CityEntry('L', '来宾市'),
+    _CityEntry('L', '廊坊市'),
+    _CityEntry('L', '兰州市'),
+    _CityEntry('L', '拉萨市'),
+    _CityEntry('L', '乐山市'),
+    _CityEntry('L', '丽江市'),
+    _CityEntry('L', '丽水市'),
+    _CityEntry('L', '连云港市'),
+    _CityEntry('L', '凉山彝族自治州'),
+    _CityEntry('L', '辽阳市'),
+    _CityEntry('L', '辽源市'),
+    _CityEntry('L', '聊城市'),
+    _CityEntry('L', '临沧市'),
+    _CityEntry('L', '临汾市'),
+    _CityEntry('L', '临夏回族自治州'),
+    _CityEntry('L', '临沂市'),
+    _CityEntry('L', '林芝市'),
+    _CityEntry('L', '柳州市'),
+    _CityEntry('L', '六安市'),
+    _CityEntry('L', '六盘水市'),
+    _CityEntry('L', '龙岩市'),
+    _CityEntry('L', '娄底市'),
+    _CityEntry('L', '漯河市'),
+    _CityEntry('L', '洛阳市'),
+    _CityEntry('L', '吕梁市'),
+    _CityEntry('L', '泸州市'),
+    _CityEntry('M', '马鞍山市'),
+    _CityEntry('M', '茂名市'),
+    _CityEntry('M', '眉山市'),
+    _CityEntry('M', '梅州市'),
+    _CityEntry('M', '绵阳市'),
+    _CityEntry('M', '牡丹江市'),
+    _CityEntry('N', '南昌市'),
+    _CityEntry('N', '南充市'),
+    _CityEntry('N', '南京市'),
+    _CityEntry('N', '南宁市'),
+    _CityEntry('N', '南平市'),
+    _CityEntry('N', '南通市'),
+    _CityEntry('N', '南阳市'),
+    _CityEntry('N', '那曲市'),
+    _CityEntry('N', '内江市'),
+    _CityEntry('N', '宁波市'),
+    _CityEntry('N', '宁德市'),
+    _CityEntry('N', '怒江傈僳族自治州'),
+    _CityEntry('P', '盘锦市'),
+    _CityEntry('P', '攀枝花市'),
+    _CityEntry('P', '平顶山市'),
+    _CityEntry('P', '平凉市'),
+    _CityEntry('P', '萍乡市'),
+    _CityEntry('P', '莆田市'),
+    _CityEntry('P', '濮阳市'),
+    _CityEntry('Q', '七台河市'),
+    _CityEntry('Q', '齐齐哈尔市'),
+    _CityEntry('Q', '黔东南苗族侗族自治州'),
+    _CityEntry('Q', '黔南布依族苗族自治州'),
+    _CityEntry('Q', '黔西南布依族苗族自治州'),
+    _CityEntry('Q', '庆阳市'),
+    _CityEntry('Q', '清远市'),
+    _CityEntry('Q', '秦皇岛市'),
+    _CityEntry('Q', '钦州市'),
+    _CityEntry('Q', '青岛市'),
+    _CityEntry('Q', '曲靖市'),
+    _CityEntry('Q', '衢州市'),
+    _CityEntry('Q', '泉州市'),
+    _CityEntry('R', '日喀则市'),
+    _CityEntry('R', '日照市'),
+    _CityEntry('S', '三门峡市'),
+    _CityEntry('S', '三明市'),
+    _CityEntry('S', '三沙市'),
+    _CityEntry('S', '三亚市'),
+    _CityEntry('S', '汕头市'),
+    _CityEntry('S', '汕尾市'),
+    _CityEntry('S', '商洛市'),
+    _CityEntry('S', '商丘市'),
+    _CityEntry('S', '上海市'),
+    _CityEntry('S', '上饶市'),
+    _CityEntry('S', '山南市'),
+    _CityEntry('S', '韶关市'),
+    _CityEntry('S', '邵阳市'),
+    _CityEntry('S', '绍兴市'),
+    _CityEntry('S', '深圳市'),
+    _CityEntry('S', '沈阳市'),
+    _CityEntry('S', '十堰市'),
+    _CityEntry('S', '石家庄市'),
+    _CityEntry('S', '石嘴山市'),
+    _CityEntry('S', '双鸭山市'),
+    _CityEntry('S', '朔州市'),
+    _CityEntry('S', '四平市'),
+    _CityEntry('S', '松原市'),
+    _CityEntry('S', '苏州市'),
+    _CityEntry('S', '宿迁市'),
+    _CityEntry('S', '宿州市'),
+    _CityEntry('S', '绥化市'),
+    _CityEntry('S', '遂宁市'),
+    _CityEntry('S', '随州市'),
+    _CityEntry('T', '塔城地区'),
+    _CityEntry('T', '台州市'),
+    _CityEntry('T', '太原市'),
+    _CityEntry('T', '泰安市'),
+    _CityEntry('T', '泰州市'),
+    _CityEntry('T', '唐山市'),
+    _CityEntry('T', '天津市'),
+    _CityEntry('T', '天水市'),
+    _CityEntry('T', '铁岭市'),
+    _CityEntry('T', '铜川市'),
+    _CityEntry('T', '铜陵市'),
+    _CityEntry('T', '铜仁市'),
+    _CityEntry('T', '吐鲁番市'),
+    _CityEntry('W', '潍坊市'),
+    _CityEntry('W', '威海市'),
+    _CityEntry('W', '渭南市'),
+    _CityEntry('W', '温州市'),
+    _CityEntry('W', '文山壮族苗族自治州'),
+    _CityEntry('W', '乌海市'),
+    _CityEntry('W', '乌兰察布市'),
+    _CityEntry('W', '乌鲁木齐市'),
+    _CityEntry('W', '无锡市'),
+    _CityEntry('W', '芜湖市'),
+    _CityEntry('W', '吴忠市'),
+    _CityEntry('W', '武汉市'),
+    _CityEntry('W', '武威市'),
+    _CityEntry('W', '梧州市'),
+    _CityEntry('X', '西安市'),
+    _CityEntry('X', '西宁市'),
+    _CityEntry('X', '锡林郭勒盟'),
+    _CityEntry('X', '厦门市'),
+    _CityEntry('X', '咸宁市'),
+    _CityEntry('X', '咸阳市'),
+    _CityEntry('X', '湘潭市'),
+    _CityEntry('X', '湘西土家族苗族自治州'),
+    _CityEntry('X', '襄阳市'),
+    _CityEntry('X', '孝感市'),
+    _CityEntry('X', '忻州市'),
+    _CityEntry('X', '新乡市'),
+    _CityEntry('X', '新余市'),
+    _CityEntry('X', '信阳市'),
+    _CityEntry('X', '邢台市'),
+    _CityEntry('X', '兴安盟'),
+    _CityEntry('X', '徐州市'),
+    _CityEntry('X', '宣城市'),
+    _CityEntry('Y', '延安市'),
+    _CityEntry('Y', '延边朝鲜族自治州'),
+    _CityEntry('Y', '盐城市'),
+    _CityEntry('Y', '扬州市'),
+    _CityEntry('Y', '阳江市'),
+    _CityEntry('Y', '阳泉市'),
+    _CityEntry('Y', '伊春市'),
+    _CityEntry('Y', '伊犁哈萨克自治州'),
+    _CityEntry('Y', '宜宾市'),
+    _CityEntry('Y', '宜昌市'),
+    _CityEntry('Y', '宜春市'),
+    _CityEntry('Y', '益阳市'),
+    _CityEntry('Y', '银川市'),
+    _CityEntry('Y', '营口市'),
+    _CityEntry('Y', '永州市'),
+    _CityEntry('Y', '岳阳市'),
+    _CityEntry('Y', '运城市'),
+    _CityEntry('Y', '玉林市'),
+    _CityEntry('Y', '玉树藏族自治州'),
+    _CityEntry('Y', '榆林市'),
+    _CityEntry('Y', '玉溪市'),
+    _CityEntry('Z', '枣庄市'),
+    _CityEntry('Z', '湛江市'),
+    _CityEntry('Z', '张家界市'),
+    _CityEntry('Z', '张家口市'),
+    _CityEntry('Z', '张掖市'),
+    _CityEntry('Z', '漳州市'),
+    _CityEntry('Z', '昭通市'),
+    _CityEntry('Z', '肇庆市'),
+    _CityEntry('Z', '镇江市'),
+    _CityEntry('Z', '郑州市'),
+    _CityEntry('Z', '中山市'),
+    _CityEntry('Z', '中卫市'),
+    _CityEntry('Z', '舟山市'),
+    _CityEntry('Z', '周口市'),
+    _CityEntry('Z', '株洲市'),
+    _CityEntry('Z', '珠海市'),
+    _CityEntry('Z', '驻马店市'),
+    _CityEntry('Z', '资阳市'),
+    _CityEntry('Z', '淄博市'),
+    _CityEntry('Z', '自贡市'),
+    _CityEntry('Z', '遵义市'),
   ];
 
   @override
@@ -75,9 +381,12 @@ class _LocationPickerPageState extends State<LocationPickerPage> {
     super.initState();
     _searchController = TextEditingController();
     _scrollController = ScrollController();
-    _selectedAddress = widget.initialAddress ?? _entries.first.name;
-    _selectedCity = widget.initialCity ?? '苏州';
-    _locationSummary = widget.initialAddress ?? widget.initialCity ?? _selectedAddress;
+    _selectedAddress = widget.initialAddress ?? widget.initialCity ?? '苏州市';
+    _selectedCity = widget.initialCity ?? '苏州市';
+    _locationSummary = widget.initialAddress ?? widget.initialCity ?? '请先选择地点';
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _bootstrapInitialPosition();
+    });
   }
 
   @override
@@ -87,13 +396,24 @@ class _LocationPickerPageState extends State<LocationPickerPage> {
     super.dispose();
   }
 
-  List<_LocationEntry> get _filteredEntries {
-    final query = _searchController.text.trim().toLowerCase();
-    if (query.isEmpty) return _entries;
-    return _entries.where((entry) {
-      return entry.name.toLowerCase().contains(query) ||
-          entry.city.toLowerCase().contains(query);
-    }).toList();
+  List<_CityEntry> get _filteredCities {
+    final query = _searchController.text.trim();
+    if (query.isEmpty) return _cities;
+    return _cities.where((entry) => entry.name.contains(query)).toList();
+  }
+
+  Future<void> _bootstrapInitialPosition() async {
+    if (!_hasWebServiceKey) return;
+    final seed = widget.initialAddress?.trim().isNotEmpty == true
+        ? widget.initialAddress!.trim()
+        : widget.initialCity?.trim();
+    if (seed == null || seed.isEmpty) return;
+    await _selectPlace(
+      address: seed,
+      city: widget.initialCity?.trim().isNotEmpty == true
+          ? widget.initialCity!.trim()
+          : seed,
+    );
   }
 
   Future<void> _searchWithApi(String keyword) async {
@@ -117,9 +437,11 @@ class _LocationPickerPageState extends State<LocationPickerPage> {
           }
           if (first.latitude != null && first.longitude != null) {
             _selectedPosition = MapPosition(
-              formattedAddress: [first.city, first.district, first.name]
-                  .where((value) => value.isNotEmpty)
-                  .join(' '),
+              formattedAddress: [
+                first.city,
+                first.district,
+                first.name,
+              ].where((value) => value.isNotEmpty).join(' '),
               city: first.city,
               district: first.district,
               latitude: first.latitude,
@@ -131,10 +453,10 @@ class _LocationPickerPageState extends State<LocationPickerPage> {
       });
     } on AmapApiException catch (e) {
       if (!mounted) return;
-      _showApiPlaceholder('高德错误 ${e.code}: ${e.info}');
+      _showMessage('高德错误 ${e.code}: ${e.info}');
     } catch (e) {
       if (!mounted) return;
-      _showApiPlaceholder('搜索失败：$e');
+      _showMessage('搜索失败：$e');
     } finally {
       if (mounted) {
         setState(() => _searching = false);
@@ -147,26 +469,22 @@ class _LocationPickerPageState extends State<LocationPickerPage> {
       final result = await _mapService.currentPosition();
       if (!mounted) return;
       if (result == null) {
-        _showApiPlaceholder('暂未获取到当前位置');
+        _showMessage('暂未获取到当前位置');
         return;
       }
-      setState(() {
-        _selectedAddress = result.formattedAddress;
-        _locationSummary = result.formattedAddress;
-        _searchController.clear();
-        _apiSuggestions = const [];
-        _selectedPosition = result;
-        if (result.city.isNotEmpty) {
-          _selectedCity = result.city;
-        }
-      });
+      _applyResolvedPosition(result);
+      await _moveMapToResolvedPosition(result);
     } on AmapApiException catch (e) {
       if (!mounted) return;
-      _showApiPlaceholder('高德错误 ${e.code}: ${e.info}');
+      _showMessage('高德错误 ${e.code}: ${e.info}');
     } catch (e) {
       if (!mounted) return;
-      _showApiPlaceholder('定位失败：$e');
+      _showMessage('定位失败：$e');
     }
+  }
+
+  Future<void> _selectCity(_CityEntry city) async {
+    await _selectPlace(address: city.name, city: city.name);
   }
 
   Future<void> _selectPlace({
@@ -175,27 +493,31 @@ class _LocationPickerPageState extends State<LocationPickerPage> {
     double? latitude,
     double? longitude,
   }) async {
-    final normalizedCity = city?.trim().isNotEmpty == true ? city!.trim() : _selectedCity;
+    final normalizedCity =
+        city?.trim().isNotEmpty == true ? city!.trim() : _selectedCity;
+    final summary = normalizedCity == address
+        ? address
+        : [normalizedCity, address].where((value) => value.isNotEmpty).join(' ');
+
     setState(() {
       _selectedAddress = address;
       _selectedCity = normalizedCity;
-      _locationSummary = [normalizedCity, address]
-          .where((value) => value.isNotEmpty)
-          .join(' · ');
+      _locationSummary = summary;
       _searchController.clear();
       _apiSuggestions = const [];
-      if (latitude != null && longitude != null) {
-        _selectedPosition = MapPosition(
-          formattedAddress: _locationSummary ?? address,
-          city: normalizedCity,
-          latitude: latitude,
-          longitude: longitude,
-        );
-      }
     });
 
-    if (latitude != null && longitude != null) return;
-    if (address.trim() == '全国') return;
+    if (latitude != null && longitude != null) {
+      final position = MapPosition(
+        formattedAddress: summary,
+        city: normalizedCity,
+        latitude: latitude,
+        longitude: longitude,
+      );
+      _applyResolvedPosition(position);
+      await _moveMapToResolvedPosition(position);
+      return;
+    }
 
     try {
       final resolved = await _mapService.geocodeAddress(
@@ -203,28 +525,127 @@ class _LocationPickerPageState extends State<LocationPickerPage> {
         city: normalizedCity,
       );
       if (!mounted || resolved == null) return;
-      setState(() {
-        _selectedPosition = resolved;
-        _locationSummary = resolved.formattedAddress.isNotEmpty
-            ? resolved.formattedAddress
-            : _locationSummary;
-        if (resolved.city.isNotEmpty) {
-          _selectedCity = resolved.city;
-        }
-      });
+      _applyResolvedPosition(
+        MapPosition(
+          formattedAddress: resolved.formattedAddress.isNotEmpty
+              ? resolved.formattedAddress
+              : summary,
+          city: resolved.city.isNotEmpty ? resolved.city : normalizedCity,
+          district: resolved.district,
+          latitude: resolved.latitude,
+          longitude: resolved.longitude,
+        ),
+      );
+      await _moveMapToResolvedPosition(resolved);
     } on AmapApiException catch (e) {
       if (!mounted) return;
-      _showApiPlaceholder('高德错误 ${e.code}: ${e.info}');
+      _showMessage('高德错误 ${e.code}: ${e.info}');
     } catch (_) {
       if (!mounted) return;
-      _showApiPlaceholder('地点解析失败');
+      _showMessage('地点解析失败');
     }
+  }
+
+  void _applyResolvedPosition(MapPosition position) {
+    final lat = position.latitude;
+    final lng = position.longitude;
+    final city = position.city.isNotEmpty ? position.city : _selectedCity;
+    final address = position.formattedAddress.isNotEmpty
+        ? position.formattedAddress
+        : _selectedAddress;
+
+    setState(() {
+      _selectedPosition = MapPosition(
+        formattedAddress: address,
+        city: city,
+        district: position.district,
+        latitude: lat,
+        longitude: lng,
+      );
+      _selectedAddress = address;
+      _selectedCity = city;
+      _locationSummary = address;
+      if (lat != null && lng != null) {
+        _cameraTarget = LatLng(lat, lng);
+        _mapCenter = _cameraTarget;
+      }
+    });
+  }
+
+  Future<void> _moveMapToResolvedPosition(MapPosition position) async {
+    final lat = position.latitude;
+    final lng = position.longitude;
+    if (lat == null || lng == null) return;
+    final target = LatLng(lat, lng);
+    _cameraTarget = target;
+    _mapCenter = target;
+    if (!_isWindowsPlatform) {
+      _mapController.move(target, _mapZoom);
+    } else if (mounted) {
+      setState(() {});
+    }
+  }
+
+  Future<void> _handleMapMoveEnd(LatLng target) async {
+    _cameraTarget = target;
+    _mapCenter = target;
+    if (!_hasWebServiceKey) return;
+    if (_lastResolvedTarget != null && _isSamePoint(_lastResolvedTarget!, target)) {
+      return;
+    }
+    final token = ++_reverseGeocodeToken;
+    setState(() => _locatingFromMap = true);
+    try {
+      final result = await _mapService.reverseGeocode(
+        latitude: target.latitude,
+        longitude: target.longitude,
+      );
+      if (!mounted || token != _reverseGeocodeToken) return;
+      _lastResolvedTarget = target;
+      if (result == null) {
+        setState(() {
+          _selectedPosition = MapPosition(
+            formattedAddress: _locationSummary ?? _selectedAddress,
+            city: _selectedCity,
+            latitude: target.latitude,
+            longitude: target.longitude,
+          );
+        });
+        return;
+      }
+      _applyResolvedPosition(result);
+    } on AmapApiException catch (e) {
+      if (!mounted || token != _reverseGeocodeToken) return;
+      _showMessage('逆地理编码失败 ${e.code}: ${e.info}');
+    } catch (e) {
+      if (!mounted || token != _reverseGeocodeToken) return;
+      _showMessage('逆地理编码失败：$e');
+    } finally {
+      if (mounted && token == _reverseGeocodeToken) {
+        setState(() => _locatingFromMap = false);
+      }
+    }
+  }
+
+  bool _isSamePoint(LatLng a, LatLng b) {
+    return (a.latitude - b.latitude).abs() < 0.00001 &&
+        (a.longitude - b.longitude).abs() < 0.00001;
+  }
+
+  LatLng _pointFromDesktopTap(Offset localPosition, Size size) {
+    final dx = localPosition.dx - size.width / 2;
+    final dy = localPosition.dy - size.height / 2;
+    final lngSpan = 360 / (1 << _mapZoom.round().clamp(3, 18));
+    final latSpan = lngSpan * size.height / size.width;
+    final longitude = _cameraTarget.longitude + dx / size.width * lngSpan;
+    final latitude = _cameraTarget.latitude - dy / size.height * latSpan;
+    return LatLng(latitude.clamp(-85.0, 85.0), longitude.clamp(-180.0, 180.0));
   }
 
   @override
   Widget build(BuildContext context) {
-    final filtered = _filteredEntries;
-    final grouped = <String, List<_LocationEntry>>{};
+    final filtered = _filteredCities;
+    final grouped = <String, List<_CityEntry>>{};
     for (final item in filtered) {
       grouped.putIfAbsent(item.letter, () => []).add(item);
     }
@@ -267,23 +688,26 @@ class _LocationPickerPageState extends State<LocationPickerPage> {
               padding: const EdgeInsets.fromLTRB(18, 10, 18, 0),
               child: _buildMapArea(),
             ),
-            Padding(
-              padding: const EdgeInsets.fromLTRB(18, 10, 18, 0),
-              child: _buildQuickChips(),
-            ),
-            const SizedBox(height: 12),
+            const SizedBox(height: 14),
             Padding(
               padding: const EdgeInsets.fromLTRB(18, 0, 18, 0),
               child: Row(
                 children: [
                   const Text(
                     'A-Z',
-                    style: TextStyle(fontSize: 15, fontWeight: FontWeight.w700),
+                    style: TextStyle(
+                      fontSize: 22,
+                      fontWeight: FontWeight.w700,
+                      color: AppColors.textPrimary,
+                    ),
                   ),
-                  const SizedBox(width: 8),
-                  Text(
-                    '地点列表',
-                    style: TextStyle(fontSize: 13, color: AppColors.textSecondary),
+                  const SizedBox(width: 10),
+                  const Text(
+                    '城市列表',
+                    style: TextStyle(
+                      fontSize: 14,
+                      color: AppColors.textSecondary,
+                    ),
                   ),
                   const Spacer(),
                   TextButton(
@@ -301,7 +725,7 @@ class _LocationPickerPageState extends State<LocationPickerPage> {
                 ],
               ),
             ),
-            const SizedBox(height: 6),
+            const SizedBox(height: 8),
             Expanded(
               child: Stack(
                 children: [
@@ -320,7 +744,10 @@ class _LocationPickerPageState extends State<LocationPickerPage> {
                             curve: Curves.easeOut,
                           ),
                           child: Container(
-                            padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 3),
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 6,
+                              vertical: 3,
+                            ),
                             margin: const EdgeInsets.only(bottom: 6),
                             decoration: BoxDecoration(
                               color: AppColors.tagBackground,
@@ -374,14 +801,14 @@ class _LocationPickerPageState extends State<LocationPickerPage> {
           padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
           child: SizedBox(
             width: double.infinity,
-            height: 48,
+            height: 52,
             child: ElevatedButton(
               onPressed: () => context.pop(_selectedAddress),
               style: ElevatedButton.styleFrom(
                 backgroundColor: AppColors.primary,
                 foregroundColor: Colors.white,
                 shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(24),
+                  borderRadius: BorderRadius.circular(26),
                 ),
               ),
               child: const Text('选择此地点'),
@@ -420,63 +847,6 @@ class _LocationPickerPageState extends State<LocationPickerPage> {
     );
   }
 
-  Widget _buildQuickChips() {
-    final recommendedCities = ['苏州', '北京', '上海', '深圳', '广州', '成都', '武汉', '杭州', '西安', '重庆'];
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Wrap(
-          spacing: 10,
-          runSpacing: 10,
-          children: [
-            _chip(
-              '苏州',
-              selected: true,
-              onTap: () => _selectPlace(address: '苏州', city: '苏州'),
-            ),
-            _chip(
-              '全国',
-              onTap: () => _selectPlace(address: '全国', city: '全国'),
-            ),
-          ],
-        ),
-        const SizedBox(height: 14),
-        const Text(
-          '推荐城市',
-          style: TextStyle(fontSize: 12, color: AppColors.textSecondary),
-        ),
-        const SizedBox(height: 8),
-        Wrap(
-          spacing: 10,
-          runSpacing: 10,
-          children: recommendedCities.map((city) {
-            return _chip(
-              city,
-              onTap: () => _selectPlace(address: city, city: city),
-            );
-          }).toList(),
-        ),
-        const SizedBox(height: 14),
-        const Text(
-          '历史访问',
-          style: TextStyle(fontSize: 12, color: AppColors.textSecondary),
-        ),
-        const SizedBox(height: 8),
-        Wrap(
-          spacing: 10,
-          runSpacing: 10,
-          children: [
-            _chip(
-              _selectedCity,
-              selected: true,
-              onTap: () => _selectPlace(address: _selectedCity, city: _selectedCity),
-            ),
-          ],
-        ),
-      ],
-    );
-  }
-
   Widget _buildCurrentLocationCard() {
     final summary = _locationSummary ?? '尚未定位';
     return Container(
@@ -492,7 +862,10 @@ class _LocationPickerPageState extends State<LocationPickerPage> {
           Expanded(
             child: Text(
               '当前位置：$summary',
-              style: const TextStyle(fontSize: 12, color: AppColors.textSecondary),
+              style: const TextStyle(
+                fontSize: 12,
+                color: AppColors.textSecondary,
+              ),
             ),
           ),
           TextButton(
@@ -512,90 +885,9 @@ class _LocationPickerPageState extends State<LocationPickerPage> {
     );
   }
 
-  Widget _chip(
-    String text, {
-    bool selected = false,
-    VoidCallback? onTap,
-  }) {
-    final child = Container(
-      padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 10),
-      decoration: BoxDecoration(
-        color: selected ? const Color(0xFFD7D7D7) : const Color(0xFFE5E5E5),
-        borderRadius: BorderRadius.circular(999),
-      ),
-      child: Text(
-        text,
-        style: const TextStyle(
-          fontSize: 12,
-          color: AppColors.textPrimary,
-        ),
-      ),
-    );
-    if (onTap == null) return child;
-    return GestureDetector(onTap: onTap, child: child);
-  }
-
-  Widget _buildSearchResults(List<_LocationEntry> items) {
-    if (items.isEmpty) {
-      return const Center(child: Text('没有找到匹配地点'));
-    }
-    return ListView.separated(
-      padding: const EdgeInsets.fromLTRB(16, 4, 16, 16),
-      itemCount: items.length,
-      separatorBuilder: (_, _) => const Divider(height: 1),
-      itemBuilder: (context, index) {
-        final item = items[index];
-        final selected = item.name == _selectedAddress;
-        return ListTile(
-          contentPadding: EdgeInsets.zero,
-          leading: const Icon(Icons.place_outlined, color: AppColors.textHint),
-          title: Text(item.name),
-          subtitle: Text(item.city),
-          selected: selected,
-          trailing: selected
-              ? const Icon(Icons.check_circle, color: AppColors.primary)
-              : null,
-          onTap: () => _selectPlace(address: item.name, city: item.city),
-        );
-      },
-    );
-  }
-
-  Widget _buildApiSearchResults(List<MapSuggestion> items) {
-    if (items.isEmpty) return const SizedBox.shrink();
-    return ListView.separated(
-      padding: const EdgeInsets.fromLTRB(16, 4, 16, 16),
-      itemCount: items.length,
-      separatorBuilder: (_, _) => const Divider(height: 1),
-      itemBuilder: (context, index) {
-        final item = items[index];
-        final address = [item.city, item.district]
-            .where((value) => value.isNotEmpty)
-            .join(' ');
-        final selected = item.name == _selectedAddress;
-        return ListTile(
-          contentPadding: EdgeInsets.zero,
-          leading: const Icon(Icons.place_outlined, color: AppColors.textHint),
-          title: Text(item.name),
-          subtitle: Text(address.isEmpty ? '高德搜索结果' : address),
-          selected: selected,
-          trailing: selected
-              ? const Icon(Icons.check_circle, color: AppColors.primary)
-              : null,
-          onTap: () => _selectPlace(
-            address: item.name,
-            city: item.city.isNotEmpty ? item.city : _selectedCity,
-            latitude: item.latitude,
-            longitude: item.longitude,
-          ),
-        );
-      },
-    );
-  }
-
   Widget _buildLocationBody(
-    List<_LocationEntry> filtered,
-    Map<String, List<_LocationEntry>> grouped,
+    List<_CityEntry> filtered,
+    Map<String, List<_CityEntry>> grouped,
     List<String> letters,
   ) {
     final keyword = _searchController.text.trim();
@@ -609,42 +901,117 @@ class _LocationPickerPageState extends State<LocationPickerPage> {
     return _buildGroupedList(grouped, letters);
   }
 
+  Widget _buildSearchResults(List<_CityEntry> items) {
+    if (items.isEmpty) {
+      return const Center(child: Text('没有找到匹配地点'));
+    }
+    return ListView.separated(
+      padding: const EdgeInsets.fromLTRB(18, 0, 18, 20),
+      itemCount: items.length,
+      separatorBuilder: (_, _) =>
+          const Divider(height: 1, color: Color(0xFFEAEAEA)),
+      itemBuilder: (context, index) {
+        final item = items[index];
+        return _buildSearchResultTile(
+          title: item.name,
+          subtitle: '城市',
+          selected: item.name == _selectedAddress,
+          onTap: () => _selectCity(item),
+        );
+      },
+    );
+  }
+
+  Widget _buildApiSearchResults(List<MapSuggestion> items) {
+    if (items.isEmpty) return const SizedBox.shrink();
+    return ListView.separated(
+      padding: const EdgeInsets.fromLTRB(18, 0, 18, 20),
+      itemCount: items.length,
+      separatorBuilder: (_, _) =>
+          const Divider(height: 1, color: Color(0xFFEAEAEA)),
+      itemBuilder: (context, index) {
+        final item = items[index];
+        final subtitle = [item.city, item.district]
+            .where((value) => value.isNotEmpty)
+            .join(' ');
+        return _buildSearchResultTile(
+          title: item.name,
+          subtitle: subtitle.isEmpty ? '高德搜索结果' : subtitle,
+          selected: item.name == _selectedAddress,
+          onTap: () => _selectPlace(
+            address: item.name,
+            city: item.city.isNotEmpty ? item.city : _selectedCity,
+            latitude: item.latitude,
+            longitude: item.longitude,
+          ),
+        );
+      },
+    );
+  }
+
+  Widget _buildSearchResultTile({
+    required String title,
+    required String subtitle,
+    required bool selected,
+    required VoidCallback onTap,
+  }) {
+    return ListTile(
+      contentPadding: EdgeInsets.zero,
+      leading: const Icon(Icons.place_outlined, color: AppColors.textHint),
+      title: Text(title),
+      subtitle: Text(subtitle),
+      trailing: selected
+          ? const Icon(Icons.check_circle, color: AppColors.primary)
+          : null,
+      onTap: onTap,
+    );
+  }
+
   Widget _buildGroupedList(
-    Map<String, List<_LocationEntry>> grouped,
+    Map<String, List<_CityEntry>> grouped,
     List<String> letters,
   ) {
     return ListView.builder(
       controller: _scrollController,
-      padding: const EdgeInsets.fromLTRB(16, 0, 28, 16),
+      padding: const EdgeInsets.fromLTRB(18, 0, 28, 20),
       itemCount: letters.length,
       itemBuilder: (context, index) {
         final letter = letters[index];
         final items = grouped[letter] ?? const [];
-        return Padding(
+        return Container(
           key: _sectionKeys[letter],
-          padding: const EdgeInsets.only(bottom: 14),
+          margin: const EdgeInsets.only(bottom: 10),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Container(
-                padding: const EdgeInsets.symmetric(
-                  horizontal: 10,
-                  vertical: 6,
-                ),
-                decoration: BoxDecoration(
-                  color: AppColors.tagBackground,
-                  borderRadius: BorderRadius.circular(12),
-                ),
+              Padding(
+                padding: const EdgeInsets.only(top: 8, bottom: 8),
                 child: Text(
                   letter,
                   style: const TextStyle(
+                    fontSize: 20,
                     fontWeight: FontWeight.w700,
-                    color: AppColors.primary,
+                    color: AppColors.textPrimary,
                   ),
                 ),
               ),
-              const SizedBox(height: 8),
-              ...items.map((item) => _buildLocationTile(item)),
+              Container(
+                decoration: const BoxDecoration(
+                  border: Border(
+                    top: BorderSide(color: Color(0xFFDADADA)),
+                  ),
+                ),
+                child: Column(
+                  children: items
+                      .map(
+                        (item) => _buildCityTile(
+                          item,
+                          showBottomBorder: item != items.last,
+                        ),
+                      )
+                      .toList(),
+                ),
+              ),
             ],
           ),
         );
@@ -652,102 +1019,131 @@ class _LocationPickerPageState extends State<LocationPickerPage> {
     );
   }
 
-  Widget _buildLocationTile(_LocationEntry item) {
-    final selected = item.name == _selectedAddress;
-    return ListTile(
-      contentPadding: EdgeInsets.zero,
-      leading: const Icon(Icons.place_outlined, color: AppColors.textHint),
-      title: Text(item.name),
-      subtitle: Text(item.city),
-      selected: selected,
-      trailing: selected
-          ? const Icon(Icons.check_circle, color: AppColors.primary)
-          : null,
-      onTap: () => _selectPlace(address: item.name, city: item.city),
+  Widget _buildCityTile(
+    _CityEntry item, {
+    required bool showBottomBorder,
+  }) {
+    final selected = item.name == _selectedAddress || item.name == _selectedCity;
+    return InkWell(
+      onTap: () => _selectCity(item),
+      child: Container(
+        width: double.infinity,
+        padding: const EdgeInsets.symmetric(vertical: 14),
+        decoration: BoxDecoration(
+          border: Border(
+            bottom: BorderSide(
+              color: showBottomBorder
+                  ? const Color(0xFFDADADA)
+                  : Colors.transparent,
+            ),
+          ),
+        ),
+        child: Row(
+          children: [
+            Expanded(
+              child: Text(
+                item.name,
+                style: TextStyle(
+                  fontSize: 16,
+                  color: selected ? AppColors.primary : AppColors.textPrimary,
+                  fontWeight: selected ? FontWeight.w700 : FontWeight.w400,
+                ),
+              ),
+            ),
+            if (selected)
+              const Icon(
+                Icons.check_circle,
+                size: 18,
+                color: AppColors.primary,
+              ),
+          ],
+        ),
+      ),
     );
   }
 
-  void _jumpToLetter(String letter, Map<String, List<_LocationEntry>> grouped) {
-    if (!grouped.containsKey(letter)) {
-      _showApiPlaceholder('$letter 类地点暂未接入');
-      return;
+  Widget _buildMapArea() {
+    if (_isWindowsPlatform) {
+      return _buildWindowsMapArea();
     }
-    final key = _sectionKeys[letter];
-    final ctx = key?.currentContext;
-    if (ctx != null) {
-      Scrollable.ensureVisible(
-        ctx,
-        duration: const Duration(milliseconds: 260),
-        curve: Curves.easeOut,
-        alignment: 0.08,
+
+    if (!_isMobilePlatform) {
+      return _buildMapMessageCard(
+        title: '当前平台暂不支持动态地图',
+        description: 'Windows 已使用桌面替代方案，移动端后续会接入原生地图选点。',
       );
     }
-  }
 
-  void _showApiPlaceholder(String message) {
-    ScaffoldMessenger.of(
-      context,
-    ).showSnackBar(SnackBar(content: Text(message)));
-  }
-
-  Widget _buildMapArea() {
-    final position = _selectedPosition;
-    final mapUrl = position == null || position.latitude == null || position.longitude == null
-        ? null
-        : _mapService.staticMapUrl(
-            latitude: position.latitude!,
-            longitude: position.longitude!,
-            zoom: 14,
-            width: 640,
-            height: 340,
-          );
+    if (!_hasWebServiceKey) {
+      return _buildMapMessageCard(
+        title: '请先填写高德 Web Service Key',
+        description: '动态选点后的地址识别依赖高德逆地理编码接口，填写 webServiceKey 后即可回填地址。',
+      );
+    }
 
     return Container(
-      height: 250,
+      height: 280,
       clipBehavior: Clip.antiAlias,
       decoration: BoxDecoration(
         borderRadius: BorderRadius.circular(20),
-        gradient: const LinearGradient(
-          colors: [Color(0xFFEAF1FF), Color(0xFFF7FAFF)],
-          begin: Alignment.topCenter,
-          end: Alignment.bottomCenter,
-        ),
         border: Border.all(color: const Color(0xFFD7E4FF)),
       ),
       child: Stack(
         children: [
-          if (mapUrl != null)
-            Positioned.fill(
-              child: Image.network(
-                mapUrl,
-                fit: BoxFit.cover,
-                errorBuilder: (_, __, ___) => _buildMapFallback(),
-              ),
-            )
-          else
-            Positioned.fill(child: _buildMapFallback()),
           Positioned.fill(
-            child: DecoratedBox(
-              decoration: BoxDecoration(
-                gradient: LinearGradient(
-                  colors: [
-                    Colors.black.withValues(alpha: 0.06),
-                    Colors.black.withValues(alpha: 0.18),
-                  ],
-                  begin: Alignment.topCenter,
-                  end: Alignment.bottomCenter,
+            child: FlutterMap(
+              mapController: _mapController,
+              options: MapOptions(
+                initialCenter: _mapCenter,
+                initialZoom: _mapZoom,
+                interactionOptions: const InteractionOptions(
+                  flags: InteractiveFlag.drag | InteractiveFlag.pinchZoom,
                 ),
+                onTap: (tapPosition, point) async {
+                  _mapCenter = point;
+                  _mapController.move(point, _mapZoom);
+                  await _handleMapMoveEnd(point);
+                },
+                onPositionChanged: (camera, hasGesture) {
+                  _mapCenter = camera.center;
+                  _mapZoom = camera.zoom;
+                  _cameraTarget = camera.center;
+                  if (!hasGesture) {
+                    _handleMapMoveEnd(camera.center);
+                  }
+                },
               ),
+              children: [
+                TileLayer(
+                  urlTemplate: 'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
+                  userAgentPackageName: 'com.example.flutter_application_1',
+                ),
+              ],
             ),
           ),
           Positioned(
             left: 14,
             right: 14,
             top: 14,
+            child: _buildMapInfoCard(),
+          ),
+          const IgnorePointer(
+            child: Center(
+              child: Icon(
+                Icons.location_on,
+                size: 46,
+                color: AppColors.primary,
+              ),
+            ),
+          ),
+          Positioned(
+            left: 14,
+            right: 14,
+            bottom: 14,
             child: Container(
               padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
               decoration: BoxDecoration(
-                color: Colors.white.withValues(alpha: 0.95),
+                color: Colors.white.withValues(alpha: 0.94),
                 borderRadius: BorderRadius.circular(16),
                 boxShadow: [
                   BoxShadow(
@@ -759,59 +1155,220 @@ class _LocationPickerPageState extends State<LocationPickerPage> {
               ),
               child: Row(
                 children: [
-                  const Icon(Icons.place_outlined, color: AppColors.primary, size: 18),
+                  if (_locatingFromMap)
+                    const SizedBox(
+                      width: 16,
+                      height: 16,
+                      child: CircularProgressIndicator(strokeWidth: 2),
+                    )
+                  else
+                    const Icon(
+                      Icons.touch_app_outlined,
+                      size: 18,
+                      color: AppColors.primary,
+                    ),
                   const SizedBox(width: 8),
                   Expanded(
                     child: Text(
-                      _locationSummary ?? '请先搜索或定位一个地点',
+                      _locatingFromMap
+                          ? '正在识别地图中心点地址...'
+                          : '拖动地图，松手后自动识别中心点地址',
                       style: const TextStyle(
                         fontSize: 12,
-                        color: AppColors.textPrimary,
-                        fontWeight: FontWeight.w600,
+                        color: AppColors.textSecondary,
                       ),
                     ),
-                  ),
-                  TextButton(
-                    onPressed: _useCurrentLocation,
-                    style: TextButton.styleFrom(
-                      padding: EdgeInsets.zero,
-                      minimumSize: Size.zero,
-                      tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                    ),
-                    child: const Text('定位', style: TextStyle(color: AppColors.primary)),
                   ),
                 ],
               ),
             ),
           ),
-          const Center(
-            child: Icon(Icons.location_pin, size: 54, color: Color(0xFF3D6CF5)),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildWindowsMapArea() {
+    if (!_hasWebServiceKey) {
+      return _buildMapMessageCard(
+        title: '请先填写高德 Web Service Key',
+        description: 'Windows 替代方案使用高德静态地图和逆地理编码接口，请先补上 webServiceKey。',
+      );
+    }
+
+    final mapUrl = _mapService.staticMapUrl(
+      latitude: _cameraTarget.latitude,
+      longitude: _cameraTarget.longitude,
+      zoom: _mapZoom.round().clamp(3, 18),
+      width: 800,
+      height: 420,
+    );
+
+    return Container(
+      height: 280,
+      clipBehavior: Clip.antiAlias,
+      decoration: BoxDecoration(
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(color: const Color(0xFFD7E4FF)),
+        color: const Color(0xFFF2F4F8),
+      ),
+      child: Stack(
+        children: [
+          Positioned.fill(
+            child: LayoutBuilder(
+              builder: (context, constraints) {
+                final size = Size(
+                  constraints.maxWidth,
+                  constraints.maxHeight,
+                );
+                return GestureDetector(
+                  behavior: HitTestBehavior.opaque,
+                  onTapDown: (details) async {
+                    final target = _pointFromDesktopTap(
+                      details.localPosition,
+                      size,
+                    );
+                    await _handleMapMoveEnd(target);
+                  },
+                  child: mapUrl == null || mapUrl.isEmpty
+                      ? _buildMapFallback()
+                      : Image.network(
+                          mapUrl,
+                          fit: BoxFit.cover,
+                          errorBuilder: (_, __, ___) => _buildMapFallback(),
+                        ),
+                );
+              },
+            ),
+          ),
+          Positioned.fill(
+            child: DecoratedBox(
+              decoration: BoxDecoration(
+                gradient: LinearGradient(
+                  colors: [
+                    Colors.black.withValues(alpha: 0.04),
+                    Colors.black.withValues(alpha: 0.10),
+                  ],
+                  begin: Alignment.topCenter,
+                  end: Alignment.bottomCenter,
+                ),
+              ),
+            ),
           ),
           Positioned(
             left: 14,
-            bottom: 14,
             right: 14,
+            top: 14,
+            child: _buildMapInfoCard(),
+          ),
+          const IgnorePointer(
+            child: Center(
+              child: Icon(
+                Icons.location_on,
+                size: 46,
+                color: AppColors.primary,
+              ),
+            ),
+          ),
+          Positioned(
+            right: 14,
+            bottom: 62,
+            child: _buildDesktopMapPad(),
+          ),
+          Positioned(
+            left: 14,
+            right: 14,
+            bottom: 14,
             child: Container(
               padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
               decoration: BoxDecoration(
-                color: Colors.white.withValues(alpha: 0.95),
+                color: Colors.white.withValues(alpha: 0.94),
                 borderRadius: BorderRadius.circular(16),
+                boxShadow: [
+                  BoxShadow(
+                    color: Colors.black.withValues(alpha: 0.08),
+                    blurRadius: 14,
+                    offset: const Offset(0, 6),
+                  ),
+                ],
               ),
-              child: Text(
-                position == null
-                    ? '搜索地点后会在这里显示地图预览'
-                    : [
-                        if (position.city.isNotEmpty) position.city,
-                        if (position.district.isNotEmpty) position.district,
-                        position.formattedAddress,
-                      ].where((value) => value.isNotEmpty).join(' · '),
-                style: const TextStyle(
-                  fontSize: 12,
-                  color: AppColors.textSecondary,
-                ),
-                maxLines: 2,
-                overflow: TextOverflow.ellipsis,
+              child: Row(
+                children: [
+                  if (_locatingFromMap)
+                    const SizedBox(
+                      width: 16,
+                      height: 16,
+                      child: CircularProgressIndicator(strokeWidth: 2),
+                    )
+                  else
+                    const Icon(
+                      Icons.map_outlined,
+                      size: 18,
+                      color: AppColors.primary,
+                    ),
+                  const SizedBox(width: 8),
+                  const Expanded(
+                    child: Text(
+                      'Windows 替代方案：点击地图或使用方向键微调中心点，系统会自动识别当前地点地址',
+                      style: TextStyle(
+                        fontSize: 12,
+                        color: AppColors.textSecondary,
+                      ),
+                    ),
+                  ),
+                ],
               ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildMapInfoCard() {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+      decoration: BoxDecoration(
+        color: Colors.white.withValues(alpha: 0.95),
+        borderRadius: BorderRadius.circular(16),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.08),
+            blurRadius: 14,
+            offset: const Offset(0, 6),
+          ),
+        ],
+      ),
+      child: Row(
+        children: [
+          const Icon(
+            Icons.place_outlined,
+            color: AppColors.primary,
+            size: 18,
+          ),
+          const SizedBox(width: 8),
+          Expanded(
+            child: Text(
+              _locationSummary ?? '请先搜索、定位，或直接拖动地图选择地点',
+              style: const TextStyle(
+                fontSize: 12,
+                color: AppColors.textPrimary,
+                fontWeight: FontWeight.w600,
+              ),
+              maxLines: 2,
+              overflow: TextOverflow.ellipsis,
+            ),
+          ),
+          TextButton(
+            onPressed: _useCurrentLocation,
+            style: TextButton.styleFrom(
+              padding: EdgeInsets.zero,
+              minimumSize: Size.zero,
+              tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+            ),
+            child: const Text(
+              '定位',
+              style: TextStyle(color: AppColors.primary),
             ),
           ),
         ],
@@ -821,84 +1378,195 @@ class _LocationPickerPageState extends State<LocationPickerPage> {
 
   Widget _buildMapFallback() {
     return Container(
-      decoration: const BoxDecoration(
-        gradient: LinearGradient(
+      color: const Color(0xFFEAF1FF),
+      alignment: Alignment.center,
+      child: const Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(
+            Icons.map_outlined,
+            size: 42,
+            color: AppColors.primary,
+          ),
+          SizedBox(height: 10),
+          Text(
+            '地图预览加载中',
+            style: TextStyle(
+              fontSize: 13,
+              color: AppColors.textSecondary,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildDesktopMapPad() {
+    return Container(
+      padding: const EdgeInsets.all(8),
+      decoration: BoxDecoration(
+        color: Colors.white.withValues(alpha: 0.94),
+        borderRadius: BorderRadius.circular(18),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.08),
+            blurRadius: 14,
+            offset: const Offset(0, 6),
+          ),
+        ],
+      ),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          _mapPadButton(
+            icon: Icons.keyboard_arrow_up,
+            onTap: () => _nudgeDesktopSelection(0, 1),
+          ),
+          Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              _mapPadButton(
+                icon: Icons.keyboard_arrow_left,
+                onTap: () => _nudgeDesktopSelection(-1, 0),
+              ),
+              const SizedBox(width: 6),
+              _mapPadButton(
+                icon: Icons.add,
+                onTap: () => _changeDesktopZoom(1),
+              ),
+              const SizedBox(width: 6),
+              _mapPadButton(
+                icon: Icons.keyboard_arrow_right,
+                onTap: () => _nudgeDesktopSelection(1, 0),
+              ),
+            ],
+          ),
+          Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              const SizedBox(width: 42),
+              _mapPadButton(
+                icon: Icons.keyboard_arrow_down,
+                onTap: () => _nudgeDesktopSelection(0, -1),
+              ),
+              const SizedBox(width: 6),
+              _mapPadButton(
+                icon: Icons.remove,
+                onTap: () => _changeDesktopZoom(-1),
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _mapPadButton({
+    required IconData icon,
+    required VoidCallback onTap,
+  }) {
+    return InkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(12),
+      child: Container(
+        width: 36,
+        height: 36,
+        decoration: BoxDecoration(
+          color: AppColors.tagBackground,
+          borderRadius: BorderRadius.circular(12),
+        ),
+        child: Icon(icon, color: AppColors.primary),
+      ),
+    );
+  }
+
+  Future<void> _nudgeDesktopSelection(int xDirection, int yDirection) async {
+    final factor = 0.02 / _mapZoom.clamp(4, 18);
+    final next = LatLng(
+      _cameraTarget.latitude - (yDirection * factor),
+      _cameraTarget.longitude + (xDirection * factor),
+    );
+    await _handleMapMoveEnd(next);
+  }
+
+  Future<void> _changeDesktopZoom(int delta) async {
+    setState(() {
+      _mapZoom = (_mapZoom + delta).clamp(3, 18).toDouble();
+    });
+    await _handleMapMoveEnd(_cameraTarget);
+  }
+
+  Widget _buildMapMessageCard({
+    required String title,
+    required String description,
+  }) {
+    return Container(
+      height: 220,
+      decoration: BoxDecoration(
+        borderRadius: BorderRadius.circular(20),
+        gradient: const LinearGradient(
           colors: [Color(0xFFEAF1FF), Color(0xFFF7FAFF)],
           begin: Alignment.topCenter,
           end: Alignment.bottomCenter,
         ),
+        border: Border.all(color: const Color(0xFFD7E4FF)),
       ),
-      child: const Center(
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Icon(Icons.map_outlined, size: 46, color: AppColors.primary),
-            SizedBox(height: 10),
-            Text(
-              '搜索地点后定位到地图',
-              style: TextStyle(color: AppColors.textSecondary, fontSize: 12),
+      padding: const EdgeInsets.all(20),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          const Icon(Icons.map_outlined, size: 40, color: AppColors.primary),
+          const SizedBox(height: 12),
+          Text(
+            title,
+            style: const TextStyle(
+              fontSize: 16,
+              fontWeight: FontWeight.w700,
+              color: AppColors.textPrimary,
             ),
-          ],
-        ),
+          ),
+          const SizedBox(height: 8),
+          Text(
+            description,
+            style: const TextStyle(
+              fontSize: 13,
+              color: AppColors.textSecondary,
+              height: 1.5,
+            ),
+          ),
+        ],
       ),
     );
   }
 
-  Widget _mapAction(IconData icon, String label, VoidCallback onTap) {
-    return GestureDetector(
-      onTap: onTap,
-      child: Container(
-        width: 54,
-        height: 54,
-        decoration: BoxDecoration(
-          color: Colors.white,
-          borderRadius: BorderRadius.circular(14),
-          boxShadow: [
-            BoxShadow(
-              color: Colors.black.withValues(alpha: 0.06),
-              blurRadius: 12,
-              offset: const Offset(0, 4),
-            ),
-          ],
-        ),
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Icon(icon, size: 16, color: AppColors.textSecondary),
-            Text(
-              label,
-              style: const TextStyle(fontSize: 9, color: AppColors.textHint),
-            ),
-          ],
-        ),
-      ),
+  void _jumpToLetter(String letter, Map<String, List<_CityEntry>> grouped) {
+    if (!grouped.containsKey(letter)) {
+      _showMessage('$letter 类地点暂未接入');
+      return;
+    }
+    final key = _sectionKeys[letter];
+    final currentContext = key?.currentContext;
+    if (currentContext != null) {
+      Scrollable.ensureVisible(
+        currentContext,
+        duration: const Duration(milliseconds: 260),
+        curve: Curves.easeOut,
+        alignment: 0.08,
+      );
+    }
+  }
+
+  void _showMessage(String message) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(content: Text(message)),
     );
   }
 }
 
-class _LocationEntry {
+class _CityEntry {
   final String letter;
   final String name;
-  final String city;
 
-  const _LocationEntry(this.letter, this.name, this.city);
-}
-
-class _MapGridPainter extends CustomPainter {
-  @override
-  void paint(Canvas canvas, Size size) {
-    final paint = Paint()
-      ..color = Colors.white.withValues(alpha: 0.45)
-      ..strokeWidth = 1;
-    const step = 36.0;
-    for (double x = 0; x < size.width; x += step) {
-      canvas.drawLine(Offset(x, 0), Offset(x, size.height), paint);
-    }
-    for (double y = 0; y < size.height; y += step) {
-      canvas.drawLine(Offset(0, y), Offset(size.width, y), paint);
-    }
-  }
-
-  @override
-  bool shouldRepaint(covariant CustomPainter oldDelegate) => false;
+  const _CityEntry(this.letter, this.name);
 }
