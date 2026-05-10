@@ -1,7 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 
+import '../../config/amap_config.dart';
 import '../../config/app_theme.dart';
+import '../../services/map_service.dart';
 
 class LocationPickerPage extends StatefulWidget {
   final String? initialAddress;
@@ -24,7 +26,14 @@ class _LocationPickerPageState extends State<LocationPickerPage> {
   late final ScrollController _scrollController;
   late String _selectedAddress;
   late String _selectedCity;
+  final MapService _mapService = const AmapMapService(
+    apiKey: AmapConfig.webServiceKey,
+  );
   final Map<String, GlobalKey> _sectionKeys = {};
+  MapPosition? _selectedPosition;
+  List<MapSuggestion> _apiSuggestions = const [];
+  String? _locationSummary;
+  bool _searching = false;
 
   final List<_LocationEntry> _entries = const [
     _LocationEntry('A', '安吉余村', '浙江湖州'),
@@ -68,6 +77,7 @@ class _LocationPickerPageState extends State<LocationPickerPage> {
     _scrollController = ScrollController();
     _selectedAddress = widget.initialAddress ?? _entries.first.name;
     _selectedCity = widget.initialCity ?? '苏州';
+    _locationSummary = widget.initialAddress ?? widget.initialCity ?? _selectedAddress;
   }
 
   @override
@@ -84,6 +94,131 @@ class _LocationPickerPageState extends State<LocationPickerPage> {
       return entry.name.toLowerCase().contains(query) ||
           entry.city.toLowerCase().contains(query);
     }).toList();
+  }
+
+  Future<void> _searchWithApi(String keyword) async {
+    setState(() {
+      _searching = true;
+      _apiSuggestions = const [];
+    });
+    try {
+      final result = await _mapService.searchPlaces(
+        keyword: keyword,
+        city: _selectedCity,
+      );
+      if (!mounted) return;
+      setState(() {
+        _apiSuggestions = result;
+        if (result.isNotEmpty) {
+          final first = result.first;
+          _selectedAddress = first.name;
+          if (first.city.isNotEmpty) {
+            _selectedCity = first.city;
+          }
+          if (first.latitude != null && first.longitude != null) {
+            _selectedPosition = MapPosition(
+              formattedAddress: [first.city, first.district, first.name]
+                  .where((value) => value.isNotEmpty)
+                  .join(' '),
+              city: first.city,
+              district: first.district,
+              latitude: first.latitude,
+              longitude: first.longitude,
+            );
+            _locationSummary = _selectedPosition!.formattedAddress;
+          }
+        }
+      });
+    } on AmapApiException catch (e) {
+      if (!mounted) return;
+      _showApiPlaceholder('高德错误 ${e.code}: ${e.info}');
+    } catch (e) {
+      if (!mounted) return;
+      _showApiPlaceholder('搜索失败：$e');
+    } finally {
+      if (mounted) {
+        setState(() => _searching = false);
+      }
+    }
+  }
+
+  Future<void> _useCurrentLocation() async {
+    try {
+      final result = await _mapService.currentPosition();
+      if (!mounted) return;
+      if (result == null) {
+        _showApiPlaceholder('暂未获取到当前位置');
+        return;
+      }
+      setState(() {
+        _selectedAddress = result.formattedAddress;
+        _locationSummary = result.formattedAddress;
+        _searchController.clear();
+        _apiSuggestions = const [];
+        _selectedPosition = result;
+        if (result.city.isNotEmpty) {
+          _selectedCity = result.city;
+        }
+      });
+    } on AmapApiException catch (e) {
+      if (!mounted) return;
+      _showApiPlaceholder('高德错误 ${e.code}: ${e.info}');
+    } catch (e) {
+      if (!mounted) return;
+      _showApiPlaceholder('定位失败：$e');
+    }
+  }
+
+  Future<void> _selectPlace({
+    required String address,
+    String? city,
+    double? latitude,
+    double? longitude,
+  }) async {
+    final normalizedCity = city?.trim().isNotEmpty == true ? city!.trim() : _selectedCity;
+    setState(() {
+      _selectedAddress = address;
+      _selectedCity = normalizedCity;
+      _locationSummary = [normalizedCity, address]
+          .where((value) => value.isNotEmpty)
+          .join(' · ');
+      _searchController.clear();
+      _apiSuggestions = const [];
+      if (latitude != null && longitude != null) {
+        _selectedPosition = MapPosition(
+          formattedAddress: _locationSummary ?? address,
+          city: normalizedCity,
+          latitude: latitude,
+          longitude: longitude,
+        );
+      }
+    });
+
+    if (latitude != null && longitude != null) return;
+    if (address.trim() == '全国') return;
+
+    try {
+      final resolved = await _mapService.geocodeAddress(
+        address: address,
+        city: normalizedCity,
+      );
+      if (!mounted || resolved == null) return;
+      setState(() {
+        _selectedPosition = resolved;
+        _locationSummary = resolved.formattedAddress.isNotEmpty
+            ? resolved.formattedAddress
+            : _locationSummary;
+        if (resolved.city.isNotEmpty) {
+          _selectedCity = resolved.city;
+        }
+      });
+    } on AmapApiException catch (e) {
+      if (!mounted) return;
+      _showApiPlaceholder('高德错误 ${e.code}: ${e.info}');
+    } catch (_) {
+      if (!mounted) return;
+      _showApiPlaceholder('地点解析失败');
+    }
   }
 
   @override
@@ -114,9 +249,9 @@ class _LocationPickerPageState extends State<LocationPickerPage> {
                   Expanded(child: _buildSearchField()),
                   const SizedBox(width: 8),
                   TextButton.icon(
-                    onPressed: () => _showApiPlaceholder('地图选点 API 待接入'),
-                    icon: const Icon(Icons.map_outlined, size: 18),
-                    label: const Text('地图选点'),
+                    onPressed: _useCurrentLocation,
+                    icon: const Icon(Icons.my_location_outlined, size: 18),
+                    label: const Text('定位'),
                     style: TextButton.styleFrom(
                       foregroundColor: AppColors.textSecondary,
                     ),
@@ -126,61 +261,11 @@ class _LocationPickerPageState extends State<LocationPickerPage> {
             ),
             Padding(
               padding: const EdgeInsets.fromLTRB(18, 6, 18, 0),
-              child: Row(
-                children: [
-                  const Text(
-                    '当前位置',
-                    style: TextStyle(fontSize: 12, color: AppColors.textSecondary),
-                  ),
-                  const Spacer(),
-                  TextButton(
-                    onPressed: () => _showApiPlaceholder('重新定位 API 待接入'),
-                    style: TextButton.styleFrom(
-                      padding: EdgeInsets.zero,
-                      minimumSize: Size.zero,
-                      tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                    ),
-                    child: const Text(
-                      '重新定位',
-                      style: TextStyle(fontSize: 12, color: AppColors.primary),
-                    ),
-                  ),
-                ],
-              ),
+              child: _buildCurrentLocationCard(),
             ),
             Padding(
-              padding: const EdgeInsets.fromLTRB(18, 4, 18, 0),
-              child: Row(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  const Icon(Icons.place_outlined, size: 16, color: AppColors.textHint),
-                  const SizedBox(width: 6),
-                  Expanded(
-                    child: Text.rich(
-                      TextSpan(
-                        children: [
-                          const TextSpan(
-                            text: '江苏省苏州市姑苏区...',
-                            style: TextStyle(
-                              fontSize: 12,
-                              color: AppColors.textSecondary,
-                              height: 1.35,
-                            ),
-                          ),
-                          TextSpan(
-                            text: '（自动定位在城市中的具体位置）',
-                            style: TextStyle(
-                              fontSize: 12,
-                              color: Colors.red.shade400,
-                              height: 1.35,
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                  ),
-                ],
-              ),
+              padding: const EdgeInsets.fromLTRB(18, 10, 18, 0),
+              child: _buildMapArea(),
             ),
             Padding(
               padding: const EdgeInsets.fromLTRB(18, 10, 18, 0),
@@ -202,7 +287,7 @@ class _LocationPickerPageState extends State<LocationPickerPage> {
                   ),
                   const Spacer(),
                   TextButton(
-                    onPressed: () => _showApiPlaceholder('地图/定位 API 待接入'),
+                    onPressed: _useCurrentLocation,
                     style: TextButton.styleFrom(
                       padding: EdgeInsets.zero,
                       minimumSize: Size.zero,
@@ -220,9 +305,7 @@ class _LocationPickerPageState extends State<LocationPickerPage> {
             Expanded(
               child: Stack(
                 children: [
-                  _searchController.text.trim().isNotEmpty
-                      ? _buildSearchResults(filtered)
-                      : _buildGroupedList(grouped, letters),
+                  _buildLocationBody(filtered, grouped, letters),
                   Positioned(
                     right: 8,
                     top: 8,
@@ -318,7 +401,15 @@ class _LocationPickerPageState extends State<LocationPickerPage> {
       ),
       child: TextField(
         controller: _searchController,
-        onChanged: (_) => setState(() {}),
+        onChanged: (value) {
+          setState(() {});
+          final keyword = value.trim();
+          if (keyword.isNotEmpty) {
+            _searchWithApi(keyword);
+          } else {
+            setState(() => _apiSuggestions = const []);
+          }
+        },
         decoration: const InputDecoration(
           hintText: '城市/区县/商务等地点',
           prefixIcon: Icon(Icons.search, size: 20, color: AppColors.textHint),
@@ -341,17 +432,11 @@ class _LocationPickerPageState extends State<LocationPickerPage> {
             _chip(
               '苏州',
               selected: true,
-              onTap: () => setState(() {
-                _selectedCity = '苏州';
-                _selectedAddress = '苏州';
-              }),
+              onTap: () => _selectPlace(address: '苏州', city: '苏州'),
             ),
             _chip(
               '全国',
-              onTap: () => setState(() {
-                _selectedCity = '全国';
-                _selectedAddress = '全国';
-              }),
+              onTap: () => _selectPlace(address: '全国', city: '全国'),
             ),
           ],
         ),
@@ -367,10 +452,7 @@ class _LocationPickerPageState extends State<LocationPickerPage> {
           children: recommendedCities.map((city) {
             return _chip(
               city,
-              onTap: () => setState(() {
-                _selectedCity = city;
-                _selectedAddress = city;
-              }),
+              onTap: () => _selectPlace(address: city, city: city),
             );
           }).toList(),
         ),
@@ -387,13 +469,46 @@ class _LocationPickerPageState extends State<LocationPickerPage> {
             _chip(
               _selectedCity,
               selected: true,
-              onTap: () => setState(() {
-                _selectedAddress = _selectedCity;
-              }),
+              onTap: () => _selectPlace(address: _selectedCity, city: _selectedCity),
             ),
           ],
         ),
       ],
+    );
+  }
+
+  Widget _buildCurrentLocationCard() {
+    final summary = _locationSummary ?? '尚未定位';
+    return Container(
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: AppColors.tagBackground,
+        borderRadius: BorderRadius.circular(16),
+      ),
+      child: Row(
+        children: [
+          const Icon(Icons.place_outlined, size: 16, color: AppColors.textHint),
+          const SizedBox(width: 6),
+          Expanded(
+            child: Text(
+              '当前位置：$summary',
+              style: const TextStyle(fontSize: 12, color: AppColors.textSecondary),
+            ),
+          ),
+          TextButton(
+            onPressed: _useCurrentLocation,
+            style: TextButton.styleFrom(
+              padding: EdgeInsets.zero,
+              minimumSize: Size.zero,
+              tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+            ),
+            child: const Text(
+              '重新定位',
+              style: TextStyle(fontSize: 12, color: AppColors.primary),
+            ),
+          ),
+        ],
+      ),
     );
   }
 
@@ -440,10 +555,58 @@ class _LocationPickerPageState extends State<LocationPickerPage> {
           trailing: selected
               ? const Icon(Icons.check_circle, color: AppColors.primary)
               : null,
-          onTap: () => setState(() => _selectedAddress = item.name),
+          onTap: () => _selectPlace(address: item.name, city: item.city),
         );
       },
     );
+  }
+
+  Widget _buildApiSearchResults(List<MapSuggestion> items) {
+    if (items.isEmpty) return const SizedBox.shrink();
+    return ListView.separated(
+      padding: const EdgeInsets.fromLTRB(16, 4, 16, 16),
+      itemCount: items.length,
+      separatorBuilder: (_, _) => const Divider(height: 1),
+      itemBuilder: (context, index) {
+        final item = items[index];
+        final address = [item.city, item.district]
+            .where((value) => value.isNotEmpty)
+            .join(' ');
+        final selected = item.name == _selectedAddress;
+        return ListTile(
+          contentPadding: EdgeInsets.zero,
+          leading: const Icon(Icons.place_outlined, color: AppColors.textHint),
+          title: Text(item.name),
+          subtitle: Text(address.isEmpty ? '高德搜索结果' : address),
+          selected: selected,
+          trailing: selected
+              ? const Icon(Icons.check_circle, color: AppColors.primary)
+              : null,
+          onTap: () => _selectPlace(
+            address: item.name,
+            city: item.city.isNotEmpty ? item.city : _selectedCity,
+            latitude: item.latitude,
+            longitude: item.longitude,
+          ),
+        );
+      },
+    );
+  }
+
+  Widget _buildLocationBody(
+    List<_LocationEntry> filtered,
+    Map<String, List<_LocationEntry>> grouped,
+    List<String> letters,
+  ) {
+    final keyword = _searchController.text.trim();
+    if (keyword.isNotEmpty) {
+      return _searching
+          ? const Center(child: CircularProgressIndicator())
+          : _apiSuggestions.isNotEmpty
+              ? _buildApiSearchResults(_apiSuggestions)
+              : _buildSearchResults(filtered);
+    }
+    return _buildGroupedList(grouped, letters);
   }
 
   Widget _buildGroupedList(
@@ -500,7 +663,7 @@ class _LocationPickerPageState extends State<LocationPickerPage> {
       trailing: selected
           ? const Icon(Icons.check_circle, color: AppColors.primary)
           : null,
-      onTap: () => setState(() => _selectedAddress = item.name),
+      onTap: () => _selectPlace(address: item.name, city: item.city),
     );
   }
 
@@ -528,55 +691,94 @@ class _LocationPickerPageState extends State<LocationPickerPage> {
   }
 
   Widget _buildMapArea() {
+    final position = _selectedPosition;
+    final mapUrl = position == null || position.latitude == null || position.longitude == null
+        ? null
+        : _mapService.staticMapUrl(
+            latitude: position.latitude!,
+            longitude: position.longitude!,
+            zoom: 14,
+            width: 640,
+            height: 340,
+          );
+
     return Container(
-      height: 290,
-      decoration: const BoxDecoration(
-        gradient: LinearGradient(
+      height: 250,
+      clipBehavior: Clip.antiAlias,
+      decoration: BoxDecoration(
+        borderRadius: BorderRadius.circular(20),
+        gradient: const LinearGradient(
           colors: [Color(0xFFEAF1FF), Color(0xFFF7FAFF)],
           begin: Alignment.topCenter,
           end: Alignment.bottomCenter,
         ),
+        border: Border.all(color: const Color(0xFFD7E4FF)),
       ),
       child: Stack(
         children: [
-          Positioned.fill(child: CustomPaint(painter: _MapGridPainter())),
-          Positioned(
-            left: 18,
-            top: 18,
-            right: 18,
-            child: Container(
-              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+          if (mapUrl != null)
+            Positioned.fill(
+              child: Image.network(
+                mapUrl,
+                fit: BoxFit.cover,
+                errorBuilder: (_, __, ___) => _buildMapFallback(),
+              ),
+            )
+          else
+            Positioned.fill(child: _buildMapFallback()),
+          Positioned.fill(
+            child: DecoratedBox(
               decoration: BoxDecoration(
-                color: Colors.white,
-                borderRadius: BorderRadius.circular(24),
+                gradient: LinearGradient(
+                  colors: [
+                    Colors.black.withValues(alpha: 0.06),
+                    Colors.black.withValues(alpha: 0.18),
+                  ],
+                  begin: Alignment.topCenter,
+                  end: Alignment.bottomCenter,
+                ),
+              ),
+            ),
+          ),
+          Positioned(
+            left: 14,
+            right: 14,
+            top: 14,
+            child: Container(
+              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+              decoration: BoxDecoration(
+                color: Colors.white.withValues(alpha: 0.95),
+                borderRadius: BorderRadius.circular(16),
                 boxShadow: [
                   BoxShadow(
                     color: Colors.black.withValues(alpha: 0.08),
-                    blurRadius: 18,
+                    blurRadius: 14,
                     offset: const Offset(0, 6),
                   ),
                 ],
               ),
               child: Row(
                 children: [
-                  const Icon(
-                    Icons.location_on_outlined,
-                    color: AppColors.primary,
-                    size: 18,
-                  ),
+                  const Icon(Icons.place_outlined, color: AppColors.primary, size: 18),
                   const SizedBox(width: 8),
                   Expanded(
                     child: Text(
-                      '$_selectedCity | 搜索服务地点',
-                      style: const TextStyle(color: AppColors.textSecondary),
+                      _locationSummary ?? '请先搜索或定位一个地点',
+                      style: const TextStyle(
+                        fontSize: 12,
+                        color: AppColors.textPrimary,
+                        fontWeight: FontWeight.w600,
+                      ),
                     ),
                   ),
                   TextButton(
-                    onPressed: () => _showApiPlaceholder('定位 API 待接入'),
-                    child: const Text(
-                      '定位',
-                      style: TextStyle(color: AppColors.primary),
+                    onPressed: _useCurrentLocation,
+                    style: TextButton.styleFrom(
+                      padding: EdgeInsets.zero,
+                      minimumSize: Size.zero,
+                      tapTargetSize: MaterialTapTargetSize.shrinkWrap,
                     ),
+                    child: const Text('定位', style: TextStyle(color: AppColors.primary)),
                   ),
                 ],
               ),
@@ -586,25 +788,58 @@ class _LocationPickerPageState extends State<LocationPickerPage> {
             child: Icon(Icons.location_pin, size: 54, color: Color(0xFF3D6CF5)),
           ),
           Positioned(
-            right: 16,
-            bottom: 20,
-            child: Column(
-              children: [
-                _mapAction(
-                  Icons.map_outlined,
-                  '地图',
-                  () => _showApiPlaceholder('地图 API 待接入'),
+            left: 14,
+            bottom: 14,
+            right: 14,
+            child: Container(
+              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+              decoration: BoxDecoration(
+                color: Colors.white.withValues(alpha: 0.95),
+                borderRadius: BorderRadius.circular(16),
+              ),
+              child: Text(
+                position == null
+                    ? '搜索地点后会在这里显示地图预览'
+                    : [
+                        if (position.city.isNotEmpty) position.city,
+                        if (position.district.isNotEmpty) position.district,
+                        position.formattedAddress,
+                      ].where((value) => value.isNotEmpty).join(' · '),
+                style: const TextStyle(
+                  fontSize: 12,
+                  color: AppColors.textSecondary,
                 ),
-                const SizedBox(height: 10),
-                _mapAction(
-                  Icons.my_location,
-                  '定位',
-                  () => _showApiPlaceholder('定位 API 待接入'),
-                ),
-              ],
+                maxLines: 2,
+                overflow: TextOverflow.ellipsis,
+              ),
             ),
           ),
         ],
+      ),
+    );
+  }
+
+  Widget _buildMapFallback() {
+    return Container(
+      decoration: const BoxDecoration(
+        gradient: LinearGradient(
+          colors: [Color(0xFFEAF1FF), Color(0xFFF7FAFF)],
+          begin: Alignment.topCenter,
+          end: Alignment.bottomCenter,
+        ),
+      ),
+      child: const Center(
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Icon(Icons.map_outlined, size: 46, color: AppColors.primary),
+            SizedBox(height: 10),
+            Text(
+              '搜索地点后定位到地图',
+              style: TextStyle(color: AppColors.textSecondary, fontSize: 12),
+            ),
+          ],
+        ),
       ),
     );
   }

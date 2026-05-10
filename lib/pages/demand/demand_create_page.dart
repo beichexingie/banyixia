@@ -4,6 +4,7 @@ import 'package:provider/provider.dart';
 
 import '../../config/app_theme.dart';
 import '../../providers/demand_provider.dart';
+import '../order/location_picker_page.dart';
 
 class DemandCreatePage extends StatefulWidget {
   const DemandCreatePage({super.key});
@@ -74,7 +75,7 @@ class _DemandCreatePageState extends State<DemandCreatePage> {
     }
   }
 
-  Future<void> _pickLocation() async {
+  Future<void> _pickLocationApiReady() async {
     final result = await context.push<String>(
       '/demand/location',
       extra: {'city': _city, 'address': _location},
@@ -591,7 +592,7 @@ class _DemandCreatePageState extends State<DemandCreatePage> {
                   label: '服务地点：',
                   value: _location.isEmpty ? '请选择服务地点' : _location,
                   trailing: _buildCityChip(),
-                  onTap: _pickLocation,
+                  onTap: _pickLocationApiReady,
                 ),
                 const Divider(height: 24),
                 _buildInfoTile(
