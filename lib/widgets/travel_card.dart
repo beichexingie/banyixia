@@ -20,9 +20,7 @@ class TravelCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final locationLabel = (cityLabel ?? '').trim().isNotEmpty
-        ? cityLabel!.trim()
-        : (post.tag.isNotEmpty ? post.tag : '城市');
+    final locationLabel = _resolveLocationLabel();
 
     return GestureDetector(
       onTap: () => _showPostDetail(context),
@@ -163,5 +161,16 @@ class TravelCard extends StatelessWidget {
         ),
       ),
     );
+  }
+
+  String _resolveLocationLabel() {
+    final explicitCity = (cityLabel ?? '').trim();
+    if (explicitCity.isNotEmpty) return explicitCity;
+
+    final fallback = post.tag.trim();
+    if (fallback.isEmpty || const {'分享', '招募', '官方'}.contains(fallback)) {
+      return '城市';
+    }
+    return fallback;
   }
 }

@@ -7,7 +7,9 @@ import '../../providers/order_provider.dart';
 import '../../widgets/safety_control_panel.dart';
 
 class OrdersPage extends StatefulWidget {
-  const OrdersPage({super.key});
+  final int initialTab;
+
+  const OrdersPage({super.key, this.initialTab = 0});
 
   @override
   State<OrdersPage> createState() => _OrdersPageState();
@@ -19,7 +21,14 @@ class _OrdersPageState extends State<OrdersPage> with SingleTickerProviderStateM
   @override
   void initState() {
     super.initState();
-    _tabController = TabController(length: 5, vsync: this);
+    final initialIndex = widget.initialTab < 0
+        ? 0
+        : (widget.initialTab > 4 ? 4 : widget.initialTab);
+    _tabController = TabController(
+      length: 5,
+      vsync: this,
+      initialIndex: initialIndex,
+    );
   }
 
   @override
@@ -140,7 +149,14 @@ class _OrdersPageState extends State<OrdersPage> with SingleTickerProviderStateM
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              Text('订单号: ${order.id}', style: const TextStyle(fontSize: 12, color: AppColors.textHint)),
+              Expanded(
+                child: Text(
+                  '订单号: ${_shortId(order.id)}',
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: const TextStyle(fontSize: 12, color: AppColors.textHint),
+                ),
+              ),
               Text(statusText, style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold, color: statusColor)),
             ],
           ),
@@ -166,9 +182,19 @@ class _OrdersPageState extends State<OrdersPage> with SingleTickerProviderStateM
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text('地陪服务 - ${order.guideName}', style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
+                    Text(
+                      '地陪服务 - ${order.guideName}',
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+                    ),
                     const SizedBox(height: 4),
-                    Text('服务时间: ${order.serviceDate}', style: AppTextStyles.caption),
+                    Text(
+                      '服务时间: ${_formatDateTime(order.serviceDate)}',
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
+                      style: AppTextStyles.caption,
+                    ),
                   ],
                 ),
               ),
@@ -189,7 +215,20 @@ class _OrdersPageState extends State<OrdersPage> with SingleTickerProviderStateM
               children: [
                 if (order.status == OrderStatus.pendingPayment)
                   ElevatedButton(
-                    onPressed: () => context.read<OrderProvider>().payOrder(order.id),
+                    onPressed: () async {
+                      try {
+                        final result = await context.read<OrderProvider>().payOrder(order.id);
+                        if (!context.mounted) return;
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          SnackBar(content: Text(result.message)),
+                        );
+                      } catch (e) {
+                        if (!context.mounted) return;
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          SnackBar(content: Text('支付失败: $e')),
+                        );
+                      }
+                    },
                     style: ElevatedButton.styleFrom(
                       backgroundColor: AppColors.primary,
                       foregroundColor: Colors.white,
@@ -233,5 +272,20 @@ class _OrdersPageState extends State<OrdersPage> with SingleTickerProviderStateM
         ],
       ),
     );
+  }
+
+  String _shortId(String id) {
+    if (id.length <= 12) return id;
+    return '${id.substring(0, 6)}...${id.substring(id.length - 4)}';
+  }
+
+  String _formatDateTime(DateTime? dateTime) {
+    if (dateTime == null) return '未知';
+    final y = dateTime.year.toString().padLeft(4, '0');
+    final m = dateTime.month.toString().padLeft(2, '0');
+    final d = dateTime.day.toString().padLeft(2, '0');
+    final h = dateTime.hour.toString().padLeft(2, '0');
+    final min = dateTime.minute.toString().padLeft(2, '0');
+    return '$y-$m-$d $h:$min';
   }
 }

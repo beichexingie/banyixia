@@ -88,23 +88,12 @@ class ApplicationProvider extends ChangeNotifier {
   Future<void> auditApplication(String id, bool approved, {String? reason}) async {
     try {
       final status = approved ? 'approved' : 'rejected';
-      
-      // 1. 查询申请详情 (防止列表不同步)
-      final appResponse = await Supabase.instance.client
-          .from('guide_applications')
-          .select()
-          .eq('id', id)
-          .single();
-      final app = GuideApplication.fromJson(appResponse);
 
-      // 2. 更新申请表状态
+      // 更新申请表状态，guides 同步由数据库触发器负责。
       await Supabase.instance.client
           .from('guide_applications')
           .update({'status': status, 'reject_reason': reason})
           .eq('id', id);
-
-      // 提示：guides 表的数据同步现在由数据库触发器 (on_guide_application_approved) 自动处理
-      // 这样可以确保即使管理员没有 guides 表的写入权限，同步也会成功。
 
       // 刷新本地列表
       _pendingApplications.removeWhere((a) => a.id == id);

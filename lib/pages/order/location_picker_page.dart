@@ -396,6 +396,16 @@ class _LocationPickerPageState extends State<LocationPickerPage> {
     super.dispose();
   }
 
+  Map<String, dynamic> _buildSelectionResult() {
+    return {
+      'address': _selectedAddress,
+      'city': _normalizeCityName(_selectedCity),
+      'summary': _locationSummary ?? _selectedAddress,
+      'latitude': _selectedPosition?.latitude,
+      'longitude': _selectedPosition?.longitude,
+    };
+  }
+
   List<_CityEntry> get _filteredCities {
     final query = _searchController.text.trim();
     if (query.isEmpty) return _cities;
@@ -476,7 +486,13 @@ class _LocationPickerPageState extends State<LocationPickerPage> {
       await _moveMapToResolvedPosition(result);
     } on AmapApiException catch (e) {
       if (!mounted) return;
-      _showMessage('高德错误 ${e.code}: ${e.info}');
+      if (e.code == 'LOCATION_SERVICE_DISABLED') {
+        _showMessage('请先开启手机定位服务');
+      } else if (e.code == 'LOCATION_PERMISSION_DENIED') {
+        _showMessage('请先授予定位权限');
+      } else {
+        _showMessage('高德错误 ${e.code}: ${e.info}');
+      }
     } catch (e) {
       if (!mounted) return;
       _showMessage('定位失败：$e');
@@ -494,8 +510,10 @@ class _LocationPickerPageState extends State<LocationPickerPage> {
     double? longitude,
   }) async {
     final normalizedCity =
-        city?.trim().isNotEmpty == true ? city!.trim() : _selectedCity;
-    final summary = normalizedCity == address
+        _normalizeCityName(
+          city?.trim().isNotEmpty == true ? city!.trim() : _selectedCity,
+        );
+    final summary = normalizedCity.isEmpty || address.contains(normalizedCity)
         ? address
         : [normalizedCity, address].where((value) => value.isNotEmpty).join(' ');
 
@@ -557,13 +575,13 @@ class _LocationPickerPageState extends State<LocationPickerPage> {
     setState(() {
       _selectedPosition = MapPosition(
         formattedAddress: address,
-        city: city,
+        city: _normalizeCityName(city),
         district: position.district,
         latitude: lat,
         longitude: lng,
       );
       _selectedAddress = address;
-      _selectedCity = city;
+      _selectedCity = _normalizeCityName(city);
       _locationSummary = address;
       if (lat != null && lng != null) {
         _cameraTarget = LatLng(lat, lng);
@@ -579,7 +597,7 @@ class _LocationPickerPageState extends State<LocationPickerPage> {
     final target = LatLng(lat, lng);
     _cameraTarget = target;
     _mapCenter = target;
-    if (!_isWindowsPlatform) {
+    if (!_isWindowsPlatform && !_isMobilePlatform) {
       _mapController.move(target, _mapZoom);
     } else if (mounted) {
       setState(() {});
@@ -731,62 +749,67 @@ class _LocationPickerPageState extends State<LocationPickerPage> {
                 children: [
                   _buildLocationBody(filtered, grouped, letters),
                   Positioned(
-                    right: 8,
+                    right: 6,
                     top: 8,
                     bottom: 8,
-                    child: Column(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
-                        GestureDetector(
-                          onTap: () => _scrollController.animateTo(
-                            0,
-                            duration: const Duration(milliseconds: 220),
-                            curve: Curves.easeOut,
-                          ),
-                          child: Container(
-                            padding: const EdgeInsets.symmetric(
-                              horizontal: 6,
-                              vertical: 3,
+                    child: SizedBox(
+                      width: 22,
+                      child: ListView(
+                        shrinkWrap: true,
+                        padding: EdgeInsets.zero,
+                        children: [
+                          GestureDetector(
+                            onTap: () => _scrollController.animateTo(
+                              0,
+                              duration: const Duration(milliseconds: 220),
+                              curve: Curves.easeOut,
                             ),
-                            margin: const EdgeInsets.only(bottom: 6),
-                            decoration: BoxDecoration(
-                              color: AppColors.tagBackground,
-                              borderRadius: BorderRadius.circular(10),
-                            ),
-                            child: const Text(
-                              '顶部',
-                              style: TextStyle(
-                                fontSize: 10,
-                                color: AppColors.primary,
-                                fontWeight: FontWeight.w700,
+                            child: Container(
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 4,
+                                vertical: 3,
+                              ),
+                              margin: const EdgeInsets.only(bottom: 6),
+                              decoration: BoxDecoration(
+                                color: AppColors.tagBackground,
+                                borderRadius: BorderRadius.circular(10),
+                              ),
+                              child: const Text(
+                                '顶',
+                                style: TextStyle(
+                                  fontSize: 9,
+                                  color: AppColors.primary,
+                                  fontWeight: FontWeight.w700,
+                                ),
                               ),
                             ),
                           ),
-                        ),
-                        for (final letter in 'ABCDEFGHIJKLMNOPQRSTUVWXYZ'.split(''))
-                          Padding(
-                            padding: const EdgeInsets.symmetric(vertical: 1),
-                            child: GestureDetector(
-                              onTap: () => _jumpToLetter(letter, grouped),
-                              child: SizedBox(
-                                width: 18,
-                                height: 18,
-                                child: Center(
-                                  child: Text(
-                                    letter,
-                                    style: TextStyle(
-                                      fontSize: 10,
-                                      color: grouped.containsKey(letter)
-                                          ? AppColors.textSecondary
-                                          : AppColors.textHint,
-                                      fontWeight: FontWeight.w600,
+                          ...'ABCDEFGHIJKLMNOPQRSTUVWXYZ'.split('').map(
+                            (letter) => Padding(
+                              padding: const EdgeInsets.symmetric(vertical: 1),
+                              child: GestureDetector(
+                                onTap: () => _jumpToLetter(letter, grouped),
+                                child: SizedBox(
+                                  width: 18,
+                                  height: 18,
+                                  child: Center(
+                                    child: Text(
+                                      letter,
+                                      style: TextStyle(
+                                        fontSize: 9,
+                                        color: grouped.containsKey(letter)
+                                            ? AppColors.textSecondary
+                                            : AppColors.textHint,
+                                        fontWeight: FontWeight.w600,
+                                      ),
                                     ),
                                   ),
                                 ),
                               ),
                             ),
                           ),
-                      ],
+                        ],
+                      ),
                     ),
                   ),
                 ],
@@ -796,14 +819,14 @@ class _LocationPickerPageState extends State<LocationPickerPage> {
         ),
       ),
       bottomNavigationBar: SafeArea(
-        top: false,
-        child: Padding(
-          padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
+      top: false,
+      child: Padding(
+          padding: const EdgeInsets.fromLTRB(16, 0, 16, 20),
           child: SizedBox(
             width: double.infinity,
             height: 52,
             child: ElevatedButton(
-              onPressed: () => context.pop(_selectedAddress),
+              onPressed: () => context.pop(_buildSelectionResult()),
               style: ElevatedButton.styleFrom(
                 backgroundColor: AppColors.primary,
                 foregroundColor: Colors.white,
@@ -1063,22 +1086,15 @@ class _LocationPickerPageState extends State<LocationPickerPage> {
   }
 
   Widget _buildMapArea() {
-    if (_isWindowsPlatform) {
-      return _buildWindowsMapArea();
-    }
-
-    if (!_isMobilePlatform) {
-      return _buildMapMessageCard(
-        title: '当前平台暂不支持动态地图',
-        description: 'Windows 已使用桌面替代方案，移动端后续会接入原生地图选点。',
-      );
-    }
-
     if (!_hasWebServiceKey) {
       return _buildMapMessageCard(
         title: '请先填写高德 Web Service Key',
-        description: '动态选点后的地址识别依赖高德逆地理编码接口，填写 webServiceKey 后即可回填地址。',
+        description: '地图预览、地点搜索和逆地理编码都依赖高德 Web Service Key。',
       );
+    }
+
+    if (_isWindowsPlatform || _isMobilePlatform) {
+      return _buildWindowsMapArea();
     }
 
     return Container(
@@ -1192,9 +1208,13 @@ class _LocationPickerPageState extends State<LocationPickerPage> {
     if (!_hasWebServiceKey) {
       return _buildMapMessageCard(
         title: '请先填写高德 Web Service Key',
-        description: 'Windows 替代方案使用高德静态地图和逆地理编码接口，请先补上 webServiceKey。',
+        description: '地图预览、地点搜索和逆地理编码都依赖高德 Web Service Key，请先补上 webServiceKey。',
       );
     }
+
+    final hintText = _isMobilePlatform
+        ? '移动端预览模式：点击地图或先搜索地点，系统会自动识别当前地点地址'
+        : '桌面预览模式：点击地图或使用方向键微调中心点，系统会自动识别当前地点地址';
 
     final mapUrl = _mapService.staticMapUrl(
       latitude: _cameraTarget.latitude,
@@ -1270,11 +1290,12 @@ class _LocationPickerPageState extends State<LocationPickerPage> {
               ),
             ),
           ),
-          Positioned(
-            right: 14,
-            bottom: 62,
-            child: _buildDesktopMapPad(),
-          ),
+          if (!_isMobilePlatform)
+            Positioned(
+              right: 14,
+              bottom: 62,
+              child: _buildDesktopMapPad(),
+            ),
           Positioned(
             left: 14,
             right: 14,
@@ -1307,10 +1328,10 @@ class _LocationPickerPageState extends State<LocationPickerPage> {
                       color: AppColors.primary,
                     ),
                   const SizedBox(width: 8),
-                  const Expanded(
+                  Expanded(
                     child: Text(
-                      'Windows 替代方案：点击地图或使用方向键微调中心点，系统会自动识别当前地点地址',
-                      style: TextStyle(
+                      hintText,
+                      style: const TextStyle(
                         fontSize: 12,
                         color: AppColors.textSecondary,
                       ),
@@ -1323,6 +1344,18 @@ class _LocationPickerPageState extends State<LocationPickerPage> {
         ],
       ),
     );
+  }
+
+  String _normalizeCityName(String? raw) {
+    final city = (raw ?? '').trim();
+    if (city.isEmpty) return '';
+    const suffixes = ['特别行政区', '自治州', '自治县', '自治区', '地区', '盟', '市'];
+    for (final suffix in suffixes) {
+      if (city.endsWith(suffix) && city.length > suffix.length) {
+        return city.substring(0, city.length - suffix.length);
+      }
+    }
+    return city;
   }
 
   Widget _buildMapInfoCard() {

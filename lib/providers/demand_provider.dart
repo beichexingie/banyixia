@@ -102,52 +102,45 @@ class DemandProvider extends ChangeNotifier {
     required List<String> tags,
   }) async {
     final user = _client.auth.currentUser;
-    final createdAt = DateTime.now();
-    final demand = DemandRequest(
-      id: 'local-${createdAt.millisecondsSinceEpoch}',
-      title: title,
-      content: content,
-      city: city,
-      location: location,
-      serviceStartAt: serviceStartAt,
-      serviceEndAt: serviceEndAt,
-      peopleCount: peopleCount,
-      gender: gender,
-      budget: budget,
-      status: 'open',
-      authorId: user?.id ?? 'guest',
-      authorName: user?.userMetadata?['nickname']?.toString() ?? '我',
-      authorAvatar: user?.userMetadata?['avatar']?.toString() ?? '',
-      images: const [],
-      tags: tags,
-      applicantCount: 0,
-      createdAt: createdAt,
-    );
-
-    try {
-      await _client.from('demands').insert({
-        'title': title,
-        'content': content,
-        'city': city,
-        'location': location,
-        'service_start_at': serviceStartAt.toIso8601String(),
-        'service_end_at': serviceEndAt.toIso8601String(),
-        'people_count': peopleCount,
-        'gender': gender,
-        'budget': budget,
-        'status': 'open',
-        'author_id': demand.authorId,
-        'author_name': demand.authorName,
-        'author_avatar': demand.authorAvatar,
-        'tags': tags,
-      });
-    } catch (e) {
-      debugPrint('Create demand fallback: $e');
+    if (user == null) {
+      throw Exception('请先登录后再发布需求');
     }
 
-    _demands.insert(0, demand);
-    notifyListeners();
-    return demand;
+    final payload = {
+      'title': title,
+      'content': content,
+      'city': city,
+      'location': location,
+      'service_start_at': serviceStartAt.toIso8601String(),
+      'service_end_at': serviceEndAt.toIso8601String(),
+      'people_count': peopleCount,
+      'gender': gender,
+      'budget': budget,
+      'status': 'open',
+      'author_id': user.id,
+      'author_name': user.userMetadata?['nickname']?.toString() ?? '我',
+      'author_avatar': user.userMetadata?['avatar']?.toString() ?? '',
+      'tags': tags,
+    };
+
+    try {
+      final inserted = await _client
+          .from('demands')
+          .insert(payload)
+          .select()
+          .single();
+      final demand = DemandRequest.fromJson(inserted);
+      _demands.removeWhere((item) => item.id == demand.id);
+      _demands.insert(0, demand);
+      notifyListeners();
+      return demand;
+    } on PostgrestException catch (e) {
+      debugPrint('Create demand failed: ${e.message}');
+      throw Exception(e.message);
+    } catch (e) {
+      debugPrint('Create demand failed: $e');
+      rethrow;
+    }
   }
 
   void registerInterest(String id) {

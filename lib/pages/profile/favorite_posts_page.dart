@@ -4,7 +4,6 @@ import '../../config/app_theme.dart';
 import '../../models/travel_post.dart';
 import '../../providers/post_provider.dart';
 import '../../widgets/travel_card.dart';
-import '../home/post_detail_page.dart';
 
 class FavoritePostsPage extends StatefulWidget {
   const FavoritePostsPage({super.key});
@@ -70,21 +69,16 @@ class _FavoritePostsPageState extends State<FavoritePostsPage> {
 
     return RefreshIndicator(
       onRefresh: _loadFavorites,
-      child: ListView.builder(
-        padding: const EdgeInsets.only(top: 8, bottom: 20),
+      child: GridView.builder(
+        padding: const EdgeInsets.fromLTRB(12, 8, 12, 20),
         itemCount: _favorites.length,
-        itemBuilder: (context, index) {
-          final post = _favorites[index];
-          return Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-            child: SizedBox(
-              height: 280,
-              child: TravelCard(
-                post: post,
-              ),
-            ),
-          );
-        },
+        gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+          crossAxisCount: 2,
+          mainAxisSpacing: 10,
+          crossAxisSpacing: 10,
+          childAspectRatio: 0.7,
+        ),
+        itemBuilder: (context, index) => TravelCard(post: _favorites[index]),
       ),
     );
   }

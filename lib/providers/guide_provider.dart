@@ -54,7 +54,10 @@ class GuideProvider extends ChangeNotifier {
       }
 
       // 城市过滤
-      if (_selectedCity != '全国' && g.city != _selectedCity) return false;
+      if (_selectedCity != '全国' &&
+          _normalizeCityName(g.city) != _normalizeCityName(_selectedCity)) {
+        return false;
+      }
       
       // 性别过滤
       if (_filterGender != null && g.gender != _filterGender) return false;
@@ -147,37 +150,49 @@ class GuideProvider extends ChangeNotifier {
       debugPrint('GuideProvider: Favorite IDs: $_favoriteIds');
 
       try {
-        // 加载足迹
-        final footData = await _client
-            .from('footprints')
-            .select('guide_id, guides(*)')
-            .eq('user_id', userId)
-            .order('last_visited_at', ascending: false);
-        
-        _footprints = (footData as List)
-            .where((item) => item['guides'] != null)
-            .map((item) {
-              try {
-                final json = item['guides'];
-                if (json is List && json.isNotEmpty) {
-                  return Guide.fromJson(json[0]);
-                }
-                return Guide.fromJson(json);
-              } catch (e) {
-                debugPrint('Error parsing footprint guide: $e');
-                return null;
-              }
-            })
-            .whereType<Guide>()
-            .toList();
-        
-        debugPrint('GuideProvider: Interactions results: Favs: ${_favoriteIds.length}, Likes: ${_likedIds.length}, Footprints: ${_footprints.length}');
+        await _loadFootprints(userId);
+        debugPrint(
+          'GuideProvider: Interactions results: Favs: ${_favoriteIds.length}, Likes: ${_likedIds.length}, Footprints: ${_footprints.length}',
+        );
       } catch (e) {
         debugPrint('Error loading user footprints specifically: $e');
       }
     } catch (e) {
       debugPrint('Error loading user interactions: $e');
     }
+  }
+
+  Future<void> _loadFootprints(String userId) async {
+    final footData = await _client
+        .from('footprints')
+        .select('guide_id')
+        .eq('user_id', userId)
+        .order('last_visited_at', ascending: false);
+
+    final guideIds = (footData as List)
+        .map((item) => item['guide_id']?.toString() ?? '')
+        .where((id) => id.isNotEmpty)
+        .toList();
+
+    if (guideIds.isEmpty) {
+      _footprints = [];
+      return;
+    }
+
+    final guidesData = await _client
+        .from('guides')
+        .select()
+        .inFilter('id', guideIds);
+
+    final guidesById = <String, Guide>{
+      for (final item in guidesData as List)
+        item['id']?.toString() ?? '': Guide.fromJson(item),
+    };
+
+    _footprints = guideIds
+        .map((id) => guidesById[id])
+        .whereType<Guide>()
+        .toList();
   }
 
   /// 切换收藏状态
@@ -244,24 +259,8 @@ class GuideProvider extends ChangeNotifier {
         'guide_id': guideId,
         'last_visited_at': DateTime.now().toIso8601String(),
       });
-      
-      // 重新加载本地状态
-      final footData = await _client
-          .from('footprints')
-          .select('guide_id, guides(*)')
-          .eq('user_id', userId)
-          .order('last_visited_at', ascending: false);
-      
-      _footprints = (footData as List)
-          .where((item) => item['guides'] != null)
-          .map((item) {
-            final json = item['guides'];
-            if (json is List && json.isNotEmpty) {
-              return Guide.fromJson(json[0]);
-            }
-            return Guide.fromJson(json);
-          })
-          .toList();
+
+      await _loadFootprints(userId);
       notifyListeners();
     } catch (e) {
       debugPrint('Error recording footprint: $e');
@@ -270,7 +269,19 @@ class GuideProvider extends ChangeNotifier {
 
   /// 切换城市筛选
   void setCity(String city) {
-    _selectedCity = city;
+    _selectedCity = _normalizeCityName(city);
     notifyListeners();
+  }
+
+  String _normalizeCityName(String? raw) {
+    final city = (raw ?? '').trim();
+    if (city.isEmpty || city == '全国') return city;
+    const suffixes = ['特别行政区', '自治州', '自治县', '自治区', '地区', '盟', '市'];
+    for (final suffix in suffixes) {
+      if (city.endsWith(suffix) && city.length > suffix.length) {
+        return city.substring(0, city.length - suffix.length);
+      }
+    }
+    return city;
   }
 }

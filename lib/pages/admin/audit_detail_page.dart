@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../../config/app_theme.dart';
 import '../../models/guide_application.dart';
+import '../../providers/application_provider.dart';
 import '../../providers/user_provider.dart';
 
 class AuditDetailPage extends StatefulWidget {
@@ -18,7 +19,10 @@ class _AuditDetailPageState extends State<AuditDetailPage> {
   void _approve() async {
     setState(() => _isProcessing = true);
     try {
-      await context.read<UserProvider>().approveApplication(widget.application.id);
+      await context.read<ApplicationProvider>().auditApplication(
+        widget.application.id,
+        true,
+      );
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('审批已通过')));
         Navigator.pop(context, true);
@@ -62,7 +66,11 @@ class _AuditDetailPageState extends State<AuditDetailPage> {
   void _reject(String reason) async {
     setState(() => _isProcessing = true);
     try {
-      await context.read<UserProvider>().rejectApplication(widget.application.id, reason);
+      await context.read<ApplicationProvider>().auditApplication(
+        widget.application.id,
+        false,
+        reason: reason,
+      );
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('申请已驳回')));
         Navigator.pop(context, true);
@@ -78,6 +86,22 @@ class _AuditDetailPageState extends State<AuditDetailPage> {
 
   @override
   Widget build(BuildContext context) {
+    if (!context.watch<UserProvider>().isAdmin) {
+      return Scaffold(
+        appBar: AppBar(title: const Text('申请详情')),
+        body: const Center(
+          child: Padding(
+            padding: EdgeInsets.all(24),
+            child: Text(
+              '当前账号没有审核权限。',
+              style: TextStyle(fontSize: 15, color: AppColors.textSecondary),
+              textAlign: TextAlign.center,
+            ),
+          ),
+        ),
+      );
+    }
+
     final app = widget.application;
     return Scaffold(
       appBar: AppBar(title: const Text('申请详情')),

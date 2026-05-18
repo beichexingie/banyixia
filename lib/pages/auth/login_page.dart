@@ -1,5 +1,7 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import '../../config/auth_config.dart';
 import '../../config/app_theme.dart';
 import '../../providers/user_provider.dart';
 
@@ -31,8 +33,8 @@ class _LoginPageState extends State<LoginPage> {
       return;
     }
 
-    final phone = _phoneController.text.trim();
-    if (phone.isEmpty || phone.length < 11) {
+    final phone = _normalizePhone(_phoneController.text);
+    if (phone.isEmpty || phone.length != 11) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('请输入有效的手机号')),
       );
@@ -40,7 +42,7 @@ class _LoginPageState extends State<LoginPage> {
     }
 
     try {
-      await context.read<UserProvider>().sendSmsCode('+86$phone');
+      await context.read<UserProvider>().sendSmsCode('${AuthConfig.defaultCountryCode}$phone');
       if (!mounted) return;
       setState(() => _isCodeSent = true);
       ScaffoldMessenger.of(context).showSnackBar(
@@ -55,9 +57,17 @@ class _LoginPageState extends State<LoginPage> {
     }
   }
 
+  String _normalizePhone(String raw) {
+    final digitsOnly = raw.replaceAll(RegExp(r'[^0-9]'), '');
+    if (digitsOnly.startsWith('86') && digitsOnly.length == 13) {
+      return digitsOnly.substring(2);
+    }
+    return digitsOnly;
+  }
+
   Future<void> _verifyAndLogin() async {
     final smsCode = _smsController.text.trim();
-    if (smsCode.isEmpty || smsCode.length < 6) {
+    if (smsCode.isEmpty || smsCode.length < AuthConfig.otpLength) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('请输入有效的验证码')),
       );
@@ -178,14 +188,27 @@ class _LoginPageState extends State<LoginPage> {
                       ),
                     ),
                     const SizedBox(height: 16),
-                    Center(
-                      child: TextButton(
-                        onPressed: () => context.read<UserProvider>().mockLogin(),
-                        child: const Text(
-                          '免验证码快速体验',
-                          style: TextStyle(color: AppColors.textHint, decoration: TextDecoration.underline),
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        TextButton(
+                          onPressed: () => context.read<UserProvider>().mockLogin(),
+                          child: const Text(
+                            '免验证码快速体验',
+                            style: TextStyle(color: AppColors.textHint, decoration: TextDecoration.underline),
+                          ),
                         ),
-                      ),
+                        if (kDebugMode) ...[
+                          const SizedBox(width: 8),
+                          TextButton(
+                            onPressed: () => context.read<UserProvider>().mockAdminLogin(),
+                            child: const Text(
+                              '管理员测试',
+                              style: TextStyle(color: AppColors.textHint, decoration: TextDecoration.underline),
+                            ),
+                          ),
+                        ],
+                      ],
                     ),
                     const SizedBox(height: 40),
                     Center(
@@ -228,7 +251,7 @@ class _LoginPageState extends State<LoginPage> {
         decoration: const InputDecoration(
           prefixIcon: Padding(
             padding: EdgeInsets.symmetric(horizontal: 16, vertical: 16),
-            child: Text('+86', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
+            child: Text(AuthConfig.defaultCountryCode, style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
           ),
           hintText: '请输入手机号',
           hintStyle: TextStyle(color: AppColors.textHint),

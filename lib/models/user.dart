@@ -3,8 +3,16 @@ class User {
   final String id;
   final String nickname;
   final String avatar;
+  final String bio;
+  final String gender;
+  final String city;
+  final String birthday;
+  final String wechat;
+  final String occupation;
+  final String guideIntroduction;
+  final List<String> guideTags;
   final int vipLevel;
-  final String title; // 身份称号，如"资深玩家"
+  final String title;
   final double balance;
   final int couponCount;
   final int followCount;
@@ -12,11 +20,21 @@ class User {
   final bool isBanned;
   final int cancelCount;
   final bool isAdmin;
+  final bool isGuide;
+  final String? guideApplicationStatus;
 
   User({
     required this.id,
     required this.nickname,
     this.avatar = '',
+    this.bio = '',
+    this.gender = '',
+    this.city = '',
+    this.birthday = '',
+    this.wechat = '',
+    this.occupation = '',
+    this.guideIntroduction = '',
+    this.guideTags = const [],
     this.vipLevel = 0,
     this.title = '',
     this.balance = 0.0,
@@ -26,31 +44,41 @@ class User {
     this.isBanned = false,
     this.cancelCount = 0,
     this.isAdmin = false,
+    this.isGuide = false,
+    this.guideApplicationStatus,
   });
 
-  /// 默认未登录用户
   factory User.guest() {
-    return User(
-      id: '',
-      nickname: '未登录',
-    );
+    return User(id: '', nickname: '未登录');
   }
 
-  /// 从 JSON 构造（后续对接 API 用）
   factory User.fromJson(Map<String, dynamic> json) {
     return User(
       id: json['id']?.toString() ?? '',
       nickname: json['nickname'] ?? '',
       avatar: json['avatar'] ?? '',
-      vipLevel: json['vipLevel'] ?? 0,
+      bio: json['bio'] ?? '',
+      gender: json['gender'] ?? '',
+      city: json['city'] ?? '',
+      birthday: json['birthday'] ?? '',
+      wechat: json['wechat'] ?? '',
+      occupation: json['occupation'] ?? '',
+      guideIntroduction:
+          json['guideIntroduction'] ?? json['guide_introduction'] ?? '',
+      guideTags: List<String>.from(
+        json['guideTags'] ?? json['guide_tags'] ?? const [],
+      ),
+      vipLevel: json['vipLevel'] ?? json['vip_level'] ?? 0,
       title: json['title'] ?? '',
       balance: (json['balance'] ?? 0).toDouble(),
-      couponCount: json['couponCount'] ?? 0,
-      followCount: json['followCount'] ?? 0,
-      fansCount: json['fansCount'] ?? 0,
+      couponCount: json['couponCount'] ?? json['coupon_count'] ?? 0,
+      followCount: json['followCount'] ?? json['follow_count'] ?? 0,
+      fansCount: json['fansCount'] ?? json['fans_count'] ?? 0,
       isBanned: json['is_banned'] ?? false,
       cancelCount: json['cancel_count'] ?? 0,
       isAdmin: json['is_admin'] ?? false,
+      isGuide: json['is_guide'] ?? false,
+      guideApplicationStatus: json['guide_application_status'],
     );
   }
 
@@ -59,6 +87,14 @@ class User {
       'id': id,
       'nickname': nickname,
       'avatar': avatar,
+      'bio': bio,
+      'gender': gender,
+      'city': city,
+      'birthday': birthday,
+      'wechat': wechat,
+      'occupation': occupation,
+      'guide_introduction': guideIntroduction,
+      'guide_tags': guideTags,
       'vipLevel': vipLevel,
       'title': title,
       'balance': balance,
@@ -68,10 +104,29 @@ class User {
       'is_banned': isBanned,
       'cancel_count': cancelCount,
       'is_admin': isAdmin,
+      'is_guide': isGuide,
+      'guide_application_status': guideApplicationStatus,
     };
   }
 
   bool get isLoggedIn => id.isNotEmpty;
+  bool get hasPendingGuideApplication => guideApplicationStatus == 'pending';
+  bool get hasRejectedGuideApplication => guideApplicationStatus == 'rejected';
+  bool get isGuideApproved => isGuide || guideApplicationStatus == 'approved';
+  bool get canAccessAdmin => isLoggedIn && isAdmin && !isBanned;
+  bool get canApplyAsGuide =>
+      isLoggedIn &&
+      !isBanned &&
+      !isGuideApproved &&
+      !hasPendingGuideApplication;
+
+  String get identityLabel {
+    if (isAdmin && isGuideApproved) return '管理员 / 认证地陪';
+    if (isAdmin) return '管理员';
+    if (isGuideApproved) return '认证地陪';
+    if (hasPendingGuideApplication) return '地陪审核中';
+    return '普通用户';
+  }
 
   String get vipLabel => vipLevel > 0 ? 'VIP$vipLevel' : '';
 }

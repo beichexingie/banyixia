@@ -1,8 +1,11 @@
 import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart' as supabase;
+
 import '../models/user.dart';
+import '../services/phone_auth_service.dart';
 
 class UserProvider extends ChangeNotifier {
+  final PhoneAuthService _phoneAuthService;
   User _user = User.guest();
   bool _isLoading = false;
   String? _pendingPhoneNumber;
@@ -10,20 +13,24 @@ class UserProvider extends ChangeNotifier {
   User get user => _user;
   bool get isLoading => _isLoading;
   bool get isLoggedIn => _user.id.isNotEmpty && _user.id != '0';
+  bool get isAdmin => _user.canAccessAdmin;
+  bool get isGuide => _user.isGuideApproved;
+  bool get isBanned => _user.isBanned;
 
-  UserProvider() {
+  UserProvider({PhoneAuthService? phoneAuthService})
+    : _phoneAuthService = phoneAuthService ?? SupabasePhoneAuthService() {
     _initAuthListener();
   }
 
   void _initAuthListener() {
     try {
-      supabase.Supabase.instance.client.auth.onAuthStateChange.listen((data) async {
+      supabase.Supabase.instance.client.auth.onAuthStateChange.listen((
+        data,
+      ) async {
         final session = data.session;
-        if (session != null && session.user != null) {
-          // User is signed in via Supabase Auth, now sync with Supabase Database
-          await _syncUserWithDatabase(session.user!);
+        if (session?.user != null) {
+          await _syncUserWithDatabase(session!.user);
         } else {
-          // User is signed out.
           _user = User.guest();
           notifyListeners();
         }
@@ -35,6 +42,111 @@ class UserProvider extends ChangeNotifier {
     }
   }
 
+  Map<String, dynamic> _metadataFromAuthUser(supabase.User user) {
+    final raw = user.userMetadata;
+    if (raw is Map<String, dynamic>) {
+      return raw;
+    }
+    return <String, dynamic>{};
+  }
+
+  List<String> _parseGuideTags(dynamic value) {
+    if (value is List) {
+      return value
+          .map((item) => item.toString().trim())
+          .where((item) => item.isNotEmpty)
+          .toList();
+    }
+    if (value is String && value.trim().isNotEmpty) {
+      return value
+          .split(RegExp(r'[,，/\s]+'))
+          .map((item) => item.trim())
+          .where((item) => item.isNotEmpty)
+          .toList();
+    }
+    return const [];
+  }
+
+  String? _firstNonEmptyString(List<dynamic> values) {
+    for (final value in values) {
+      final text = value?.toString().trim();
+      if (text != null && text.isNotEmpty) {
+        return text;
+      }
+    }
+    return null;
+  }
+
+  User _buildUserFromSources({
+    required supabase.User authUser,
+    required _UserRoleContext roleContext,
+    Map<String, dynamic>? dbRow,
+    String? fallbackNickname,
+    String? fallbackAvatar,
+  }) {
+    final metadata = _metadataFromAuthUser(authUser);
+    final row = dbRow ?? const <String, dynamic>{};
+    return User(
+      id: authUser.id,
+      nickname: _firstNonEmptyString([
+            row['nickname'],
+            metadata['nickname'],
+            fallbackNickname,
+            authUser.phone,
+          ]) ??
+          '新用户',
+      avatar: _firstNonEmptyString([
+            row['avatar'],
+            metadata['avatar'],
+            fallbackAvatar,
+          ]) ??
+          'https://picsum.photos/seed/user/100/100',
+      bio: _firstNonEmptyString([row['bio'], metadata['bio']]) ?? '',
+      gender: _firstNonEmptyString([row['gender'], metadata['gender']]) ?? '',
+      city: _firstNonEmptyString([row['city'], metadata['city']]) ?? '',
+      birthday:
+          _firstNonEmptyString([row['birthday'], metadata['birthday']]) ?? '',
+      wechat: _firstNonEmptyString([row['wechat'], metadata['wechat']]) ?? '',
+      occupation:
+          _firstNonEmptyString([row['occupation'], metadata['occupation']]) ??
+          '',
+      guideIntroduction:
+          _firstNonEmptyString([
+            row['guide_introduction'],
+            metadata['guide_introduction'],
+          ]) ??
+          '',
+      guideTags: _parseGuideTags(row['guide_tags'] ?? metadata['guide_tags']),
+      vipLevel: row['vip_level'] ?? row['vipLevel'] ?? 1,
+      title: _firstNonEmptyString([row['title'], metadata['title']]) ?? '初级旅行家',
+      balance: (row['balance'] ?? 0.0).toDouble(),
+      couponCount: row['coupon_count'] ?? row['couponCount'] ?? 0,
+      followCount: roleContext.followCount,
+      fansCount: roleContext.fansCount,
+      isBanned: row['is_banned'] ?? false,
+      cancelCount: row['cancel_count'] ?? 0,
+      isAdmin: row['is_admin'] ?? false,
+      isGuide: roleContext.isGuide,
+      guideApplicationStatus: roleContext.applicationStatus,
+    );
+  }
+
+  Map<String, dynamic> _profileMetadataFromUser(User user) {
+    return {
+      'nickname': user.nickname,
+      'avatar': user.avatar,
+      'bio': user.bio,
+      'gender': user.gender,
+      'city': user.city,
+      'birthday': user.birthday,
+      'wechat': user.wechat,
+      'occupation': user.occupation,
+      'guide_introduction': user.guideIntroduction,
+      'guide_tags': user.guideTags,
+      'title': user.title,
+    };
+  }
+
   Future<void> _syncUserWithDatabase(supabase.User supaUser) async {
     try {
       final client = supabase.Supabase.instance.client;
@@ -43,46 +155,22 @@ class UserProvider extends ChangeNotifier {
           .select()
           .eq('id', supaUser.id)
           .maybeSingle();
+      final roleContext = await _loadRoleContext(supaUser.id);
 
       if (response != null) {
-        // 实时统计关注数和粉丝数
-        final results = await Future.wait([
-          client.from('follows').count().eq('follower_id', supaUser.id),
-          client.from('follows').count().eq('followed_id', supaUser.id),
-        ]);
-        
-        // User exists in Database, load their data
-        _user = User(
-          id: supaUser.id,
-          nickname: response['nickname'] ?? supaUser.phone ?? '新用户',
-          avatar: response['avatar'] ?? 'https://picsum.photos/seed/user/100/100',
-          vipLevel: response['vip_level'] ?? 1,
-          title: response['title'] ?? '初级旅行家',
-          balance: (response['balance'] ?? 0.0).toDouble(),
-          couponCount: response['coupon_count'] ?? 0,
-          followCount: results[0] as int? ?? 0,
-          fansCount: results[1] as int? ?? 0,
-          isBanned: response['is_banned'] ?? false,
-          cancelCount: response['cancel_count'] ?? 0,
-          isAdmin: response['is_admin'] ?? false,
+        _user = _buildUserFromSources(
+          authUser: supaUser,
+          roleContext: roleContext,
+          dbRow: response,
         );
       } else {
-        // New user, create a default profile in Database
-        _user = User(
-          id: supaUser.id,
-          nickname: supaUser.phone ?? '新用户',
-          avatar: 'https://picsum.photos/seed/user/100/100',
-          vipLevel: 1,
-          title: '初级旅行家',
-          balance: 0.0,
-          couponCount: 3,
-          followCount: 0,
-          fansCount: 0,
-          isBanned: false,
-          cancelCount: 0,
-          isAdmin: false, // 新用户默认非管理员
+        _user = _buildUserFromSources(
+          authUser: supaUser,
+          roleContext: roleContext,
+          fallbackNickname: supaUser.phone ?? '新用户',
+          fallbackAvatar: 'https://picsum.photos/seed/user/100/100',
         );
-        
+
         await client.from('users').upsert({
           'id': _user.id,
           'nickname': _user.nickname,
@@ -98,19 +186,47 @@ class UserProvider extends ChangeNotifier {
       notifyListeners();
     } catch (e) {
       debugPrint('Supabase Sync Error: $e');
-      // Fallback to basic auth info if Database fails
-      _user = User(
-        id: supaUser.id,
-        nickname: supaUser.phone ?? '新用户',
-        avatar: 'https://picsum.photos/seed/user/100/100',
-        vipLevel: 1,
-        title: '初级旅行家',
-        balance: 0.0,
-        couponCount: 0,
-        followCount: 0,
-        fansCount: 0,
+      _user = _buildUserFromSources(
+        authUser: supaUser,
+        roleContext: const _UserRoleContext(),
+        fallbackNickname: supaUser.phone ?? '新用户',
+        fallbackAvatar: 'https://picsum.photos/seed/user/100/100',
       );
       notifyListeners();
+    }
+  }
+
+  Future<_UserRoleContext> _loadRoleContext(String userId) async {
+    final client = supabase.Supabase.instance.client;
+    try {
+      final results = await Future.wait<Object?>([
+        client.from('follows').count().eq('follower_id', userId),
+        client.from('follows').count().eq('followed_id', userId),
+        client.from('guides').select('id').eq('id', userId).maybeSingle(),
+        client
+            .from('guide_applications')
+            .select('status')
+            .eq('user_id', userId)
+            .order('created_at', ascending: false)
+            .limit(1)
+            .maybeSingle(),
+      ]);
+
+      final guideRow = results[2];
+      final applicationRow = results[3];
+      final applicationStatus = applicationRow is Map<String, dynamic>
+          ? applicationRow['status']?.toString()
+          : null;
+
+      return _UserRoleContext(
+        followCount: results[0] as int? ?? 0,
+        fansCount: results[1] as int? ?? 0,
+        isGuide: guideRow != null || applicationStatus == 'approved',
+        applicationStatus: applicationStatus,
+      );
+    } catch (e) {
+      debugPrint('loadRoleContext error: $e');
+      return const _UserRoleContext();
     }
   }
 
@@ -119,17 +235,14 @@ class UserProvider extends ChangeNotifier {
     notifyListeners();
 
     try {
-      await supabase.Supabase.instance.client.auth.signInWithOtp(
-        phone: phoneNumber,
-      );
-      // Save the phone number so we can verify the OTP against it later
+      await _phoneAuthService.sendCode(phoneNumber);
       _pendingPhoneNumber = phoneNumber;
       _isLoading = false;
       notifyListeners();
     } catch (e) {
       _isLoading = false;
       notifyListeners();
-      debugPrint("sendSmsCode error: $e");
+      debugPrint('sendSmsCode error: $e');
       if (e is supabase.AuthException) {
         throw Exception('发送失败: ${e.message}');
       }
@@ -141,25 +254,20 @@ class UserProvider extends ChangeNotifier {
     if (_pendingPhoneNumber == null) {
       throw Exception('请先获取验证码');
     }
-    
+
     _isLoading = true;
     notifyListeners();
 
     try {
-      await supabase.Supabase.instance.client.auth.verifyOTP(
-        type: supabase.OtpType.sms,
-        phone: _pendingPhoneNumber,
-        token: smsCode,
-      );
-      
+      await _phoneAuthService.verifyCode(_pendingPhoneNumber!, smsCode);
       _isLoading = false;
       notifyListeners();
     } catch (e) {
       _isLoading = false;
       notifyListeners();
-      debugPrint("verifySmsCode error: $e");
+      debugPrint('verifySmsCode error: $e');
       if (e is supabase.AuthException) {
-         throw Exception('验证码错误: ${e.message}');
+        throw Exception('验证码错误: ${e.message}');
       }
       throw Exception('验证失败');
     }
@@ -169,20 +277,40 @@ class UserProvider extends ChangeNotifier {
     await supabase.Supabase.instance.client.auth.signOut();
   }
 
-  /// 更新用户信息
   Future<void> updateUser(User newUser) async {
     final oldUser = _user;
     _user = newUser;
     notifyListeners();
-    
+
     if (isLoggedIn && !_user.id.startsWith('mock')) {
       try {
-        await supabase.Supabase.instance.client.from('users').update({
+        final client = supabase.Supabase.instance.client;
+        await client.auth.updateUser(
+          supabase.UserAttributes(data: _profileMetadataFromUser(_user)),
+        );
+        await client.from('users').update({
           'nickname': _user.nickname,
           'avatar': _user.avatar,
+          'title': _user.title,
         }).eq('id', _user.id);
+
+        if (_user.isGuideApproved) {
+          await client
+              .from('guides')
+              .update({
+                'name': _user.nickname,
+                'avatar': _user.avatar,
+                'description': _user.guideIntroduction.isNotEmpty
+                    ? _user.guideIntroduction
+                    : _user.bio,
+                'city': _user.city,
+                'gender': _user.gender,
+                'tags': _user.guideTags,
+              })
+              .eq('id', _user.id);
+        }
       } catch (e) {
-        _user = oldUser; // 还原状态
+        _user = oldUser;
         notifyListeners();
         debugPrint('Error updating user in Supabase: $e');
         throw Exception('$e');
@@ -190,12 +318,11 @@ class UserProvider extends ChangeNotifier {
     }
   }
 
-  /// 关注用户
   Future<void> followUser(String targetId) async {
     if (!isLoggedIn) throw Exception('请先登录后操作');
-    
+
     if (targetId.isEmpty || targetId.startsWith('mock_')) {
-      return; // mock data, do nothing
+      return;
     }
 
     try {
@@ -203,21 +330,20 @@ class UserProvider extends ChangeNotifier {
         'follower_id': user.id,
         'followed_id': targetId,
       });
-      // 这里的用户统计建议通过数据库 Trigger 自动更新，
-      // 但为了 UI 实时性，我们可以重新加载一下当前用户信息
-      await _syncUserWithDatabase(supabase.Supabase.instance.client.auth.currentUser!);
+      await _syncUserWithDatabase(
+        supabase.Supabase.instance.client.auth.currentUser!,
+      );
     } catch (e) {
       debugPrint('Follow error: $e');
       throw Exception('关注失败: 可能未开通此服务或网络异常');
     }
   }
 
-  /// 取消关注
   Future<void> unfollowUser(String targetId) async {
     if (!isLoggedIn) throw Exception('请先登录');
-    
+
     if (targetId.isEmpty || targetId.startsWith('mock_')) {
-      return; 
+      return;
     }
 
     try {
@@ -225,14 +351,15 @@ class UserProvider extends ChangeNotifier {
         'follower_id': user.id,
         'followed_id': targetId,
       });
-      await _syncUserWithDatabase(supabase.Supabase.instance.client.auth.currentUser!);
+      await _syncUserWithDatabase(
+        supabase.Supabase.instance.client.auth.currentUser!,
+      );
     } catch (e) {
       debugPrint('Unfollow error: $e');
       throw Exception('取消关注失败');
     }
   }
 
-  /// 检查是否已关注
   Future<bool> isFollowing(String targetId) async {
     if (!isLoggedIn) return false;
     try {
@@ -242,12 +369,11 @@ class UserProvider extends ChangeNotifier {
           .match({'follower_id': user.id, 'followed_id': targetId})
           .maybeSingle();
       return response != null;
-    } catch (e) {
+    } catch (_) {
       return false;
     }
   }
 
-  /// 获取关注列表
   Future<List<User>> getFollowingUsers() async {
     if (!isLoggedIn) return [];
     try {
@@ -255,61 +381,46 @@ class UserProvider extends ChangeNotifier {
           .from('follows')
           .select('*, users!follows_followed_id_fkey(*)')
           .eq('follower_id', user.id);
-      
-      return (response as List).map((e) {
-        final userData = e['users'];
-        if (userData == null) return User.guest();
-        return User.fromJson(userData as Map<String, dynamic>);
-      }).where((u) => u.isLoggedIn).toList();
+
+      return (response as List)
+          .map((e) {
+            final userData = e['users'];
+            if (userData == null) return User.guest();
+            return User.fromJson(userData as Map<String, dynamic>);
+          })
+          .where((u) => u.isLoggedIn)
+          .toList();
     } catch (e) {
       debugPrint('getFollowingUsers error: $e');
       return [];
     }
   }
 
-  /// 获取任意用户的公开资料
   Future<User?> fetchUserById(String userId) async {
     try {
-      // 1. 获取基本资料
-      final response = await supabase.Supabase.instance.client
+      final client = supabase.Supabase.instance.client;
+      final response = await client
           .from('users')
           .select()
           .eq('id', userId)
           .maybeSingle();
       if (response == null) return null;
 
-      // 2. 实时统计关注数和粉丝数 (避免 reads stale counts in 'users' table)
       final results = await Future.wait([
-        supabase.Supabase.instance.client
-            .from('follows')
-            .count()
-            .eq('follower_id', userId),
-        supabase.Supabase.instance.client
-            .from('follows')
-            .count()
-            .eq('followed_id', userId),
+        client.from('follows').count().eq('follower_id', userId),
+        client.from('follows').count().eq('followed_id', userId),
       ]);
 
-      final followCount = results[0] as int? ?? 0;
-      final fansCount = results[1] as int? ?? 0;
-
-      return User(
-        id: userId,
-        nickname: response['nickname'] ?? '用户',
-        avatar: response['avatar'] ?? '',
-        vipLevel: response['vip_level'] ?? 0,
-        title: response['title'] ?? '',
-        balance: (response['balance'] ?? 0.0).toDouble(),
-        couponCount: response['coupon_count'] ?? 0,
-        followCount: followCount,
-        fansCount: fansCount,
-      );
+      return User.fromJson({
+        ...response,
+        'follow_count': results[0] as int? ?? 0,
+        'fans_count': results[1] as int? ?? 0,
+      });
     } catch (e) {
       debugPrint('fetchUserById error: $e');
       return null;
     }
   }
-
 
   void mockLogin() {
     _isLoading = true;
@@ -319,63 +430,56 @@ class UserProvider extends ChangeNotifier {
         id: 'mock_123',
         nickname: '本地测试用户',
         avatar: 'https://picsum.photos/seed/me/100/100',
+        city: '苏州',
+        bio: '喜欢城市漫游、打卡和临时约伴。',
+        occupation: '自由职业',
         vipLevel: 1,
         title: '体验用户',
         balance: 100.0,
         couponCount: 1,
         followCount: 10,
         fansCount: 5,
-        isAdmin: true, // 设置为管理员以便进入审核页面
+        isAdmin: false,
+        isGuide: false,
       );
       _isLoading = false;
       notifyListeners();
     });
   }
 
-  // --- 管理员审核相关 (Admin Audit) ---
-
-  /// 获取所有待审核请求
-  Future<List<Map<String, dynamic>>> fetchPendingApplications() async {
-    try {
-      final response = await supabase.Supabase.instance.client
-          .from('guide_applications')
-          .select()
-          .eq('status', 'pending')
-          .order('created_at', ascending: false);
-      return List<Map<String, dynamic>>.from(response);
-    } catch (e) {
-      debugPrint('fetchPendingApplications error: $e');
-      return [];
-    }
+  void mockAdminLogin() {
+    _isLoading = true;
+    notifyListeners();
+    Future.delayed(const Duration(milliseconds: 500), () {
+      _user = User(
+        id: 'mock_admin_001',
+        nickname: '本地测试管理员',
+        avatar: 'https://picsum.photos/seed/admin/100/100',
+        city: '苏州',
+        vipLevel: 1,
+        title: '平台管理员',
+        balance: 100.0,
+        couponCount: 0,
+        followCount: 0,
+        fansCount: 0,
+        isAdmin: true,
+      );
+      _isLoading = false;
+      notifyListeners();
+    });
   }
+}
 
-  /// 审核通过
-  Future<void> approveApplication(String id) async {
-    try {
-      await supabase.Supabase.instance.client
-          .from('guide_applications')
-          .update({'status': 'approved'})
-          .eq('id', id);
-      // RPC 触发钱包创建已在 SQL 层实现
-    } catch (e) {
-      debugPrint('approveApplication error: $e');
-      throw Exception('审批通过失败: $e');
-    }
-  }
+class _UserRoleContext {
+  final int followCount;
+  final int fansCount;
+  final bool isGuide;
+  final String? applicationStatus;
 
-  /// 审核驳回
-  Future<void> rejectApplication(String id, String reason) async {
-    try {
-      await supabase.Supabase.instance.client
-          .from('guide_applications')
-          .update({
-            'status': 'rejected',
-            'reject_reason': reason,
-          })
-          .eq('id', id);
-    } catch (e) {
-      debugPrint('rejectApplication error: $e');
-      throw Exception('驳回失败: $e');
-    }
-  }
+  const _UserRoleContext({
+    this.followCount = 0,
+    this.fansCount = 0,
+    this.isGuide = false,
+    this.applicationStatus,
+  });
 }

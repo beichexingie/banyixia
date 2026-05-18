@@ -2,14 +2,25 @@ import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import '../models/order.dart';
 import '../services/risk_control_service.dart';
+import '../services/payment_service.dart';
 
 /// 订单状态管理
 class OrderProvider extends ChangeNotifier {
   List<Order> _orders = [];
   bool _isLoading = false;
+  final PaymentService _paymentService;
+
+  OrderProvider({PaymentService? paymentService})
+      : _paymentService = paymentService ?? const AlipayPaymentService();
 
   List<Order> get orders => _orders;
   bool get isLoading => _isLoading;
+
+  String _buildMerchantOrderNo(Order order) {
+    final compactId = order.id.replaceAll('-', '').toUpperCase();
+    final millis = DateTime.now().millisecondsSinceEpoch;
+    return 'BX${millis}${compactId.substring(0, compactId.length > 12 ? 12 : compactId.length)}';
+  }
 
   /// 按状态筛选订单
   List<Order> getOrdersByStatus(OrderStatus status) {
@@ -28,7 +39,10 @@ class OrderProvider extends ChangeNotifier {
 
     try {
       final userId = Supabase.instance.client.auth.currentUser?.id;
-      if (userId == null) return;
+      if (userId == null) {
+        _orders = [];
+        return;
+      }
 
       final response = await Supabase.instance.client
           .from('orders')
@@ -39,30 +53,52 @@ class OrderProvider extends ChangeNotifier {
       _orders = (response as List).map((data) => Order.fromJson(data)).toList();
     } catch (e) {
       debugPrint('Load orders error: $e');
+    } finally {
+      _isLoading = false;
+      notifyListeners();
     }
-
-    _isLoading = false;
-    notifyListeners();
   }
 
-  /// 模拟支付并进入托管
-  Future<void> payOrder(String orderId) async {
+  /// 发起支付宝支付
+  Future<PaymentResult> payOrder(String orderId) async {
     try {
       final order = _orders.firstWhere((o) => o.id == orderId);
-      
-      // 1. 更新订单状态为进行中
-      await Supabase.instance.client
-          .from('orders')
-          .update({'status': OrderStatus.inProgress.index})
-          .eq('id', orderId);
+      debugPrint('OrderProvider: payOrder start orderId=$orderId guideId=${order.guideId} amount=${order.amount}');
 
-      // 2. 进入资金托管 (增加导游的冻结余额)
-      await Supabase.instance.client.rpc('increment_pending_balance', params: {
-        'target_user_id': order.guideId,
-        'amount': order.amount,
-      });
+      final result = await _paymentService.pay(
+        PaymentRequest(
+          orderId: order.id,
+          merchantOrderNo: _buildMerchantOrderNo(order),
+          amount: order.amount,
+          subject: order.serviceName.isNotEmpty ? order.serviceName : '地陪服务订单',
+          paymentMethod: 'alipay',
+        ),
+      );
+      debugPrint('OrderProvider: payment result outcome=${result.outcome} success=${result.success} msg=${result.message}');
+
+      final paymentStatus = switch (result.outcome) {
+        PaymentOutcome.success => 'paid',
+        PaymentOutcome.cancelled => 'cancelled',
+        PaymentOutcome.failed => 'failed',
+      };
+
+      await Supabase.instance.client.from('orders').update({
+        'payment_status': paymentStatus,
+        if (result.transactionId != null) 'payment_request_id': result.transactionId,
+        if (result.outcome == PaymentOutcome.success)
+          'status': OrderStatus.inProgress.index,
+      }).eq('id', orderId);
+
+      if (result.outcome == PaymentOutcome.success) {
+        final orderNow = _orders.firstWhere((o) => o.id == orderId);
+        await Supabase.instance.client.rpc('increment_pending_balance', params: {
+          'target_user_id': orderNow.guideId,
+          'amount': orderNow.amount,
+        });
+      }
 
       await loadOrders();
+      return result;
     } catch (e) {
       debugPrint('Pay order error: $e');
       throw Exception('支付失败');
@@ -125,12 +161,17 @@ class OrderProvider extends ChangeNotifier {
   /// 创建订单
   Future<void> createOrder(Order order) async {
     try {
-      await Supabase.instance.client.from('orders').insert(order.toJson());
-      _orders.insert(0, order);
+      final response = await Supabase.instance.client
+          .from('orders')
+          .insert(order.toJson())
+          .select()
+          .single();
+      final createdOrder = Order.fromJson(response as Map<String, dynamic>);
+      _orders.insert(0, createdOrder);
       notifyListeners();
     } catch (e) {
       debugPrint('Create order error: $e');
-      throw Exception('下单失败');
+      throw Exception('下单失败: $e');
     }
   }
 

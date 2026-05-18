@@ -1,5 +1,5 @@
-// Travel Plan Creation Page
 import 'package:flutter/material.dart';
+import 'package:go_router/go_router.dart';
 import '../../config/app_theme.dart';
 
 class TravelPlanCreatePage extends StatelessWidget {
@@ -7,73 +7,128 @@ class TravelPlanCreatePage extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final titleController = TextEditingController();
-    final descController = TextEditingController();
-    DateTime? startDate;
-    DateTime? endDate;
-
     return Scaffold(
+      backgroundColor: AppColors.background,
       appBar: AppBar(
-        title: const Text('创建旅行计划'),
-        backgroundColor: AppColors.primary,
+        title: const Text('出行发布'),
+        centerTitle: true,
       ),
       body: Padding(
-        padding: const EdgeInsets.all(16),
-        child: ListView(
+        padding: const EdgeInsets.all(20),
+        child: Column(
           children: [
-            TextField(
-              controller: titleController,
-              decoration: const InputDecoration(labelText: '标题'),
+            Container(
+              width: double.infinity,
+              padding: const EdgeInsets.all(18),
+              decoration: BoxDecoration(
+                color: Colors.white,
+                borderRadius: BorderRadius.circular(20),
+              ),
+              child: const Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    '旅行计划入口已并入其他发布能力',
+                    style: TextStyle(
+                      fontSize: 18,
+                      fontWeight: FontWeight.w700,
+                      color: AppColors.textPrimary,
+                    ),
+                  ),
+                  SizedBox(height: 10),
+                  Text(
+                    '现在可以直接发布需求，或者发布招募帖，避免出现一个独立但无实际业务支撑的空页面。',
+                    style: TextStyle(
+                      fontSize: 14,
+                      color: AppColors.textSecondary,
+                      height: 1.6,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(height: 16),
+            _QuickEntryCard(
+              icon: Icons.event_note_outlined,
+              title: '发需求',
+              subtitle: '定制你的地陪体验',
+              onTap: () => context.push('/demand/create'),
             ),
             const SizedBox(height: 12),
-            TextField(
-              controller: descController,
-              maxLines: 4,
-              decoration: const InputDecoration(labelText: '描述'),
+            _QuickEntryCard(
+              icon: Icons.campaign_outlined,
+              title: '发布招募',
+              subtitle: '寻找同行伙伴或活动参与者',
+              onTap: () => context.push('/post/create?mode=recruit'),
             ),
-            const SizedBox(height: 12),
-            ListTile(
-              title: const Text('开始日期'),
-              subtitle: Text(startDate != null ? startDate!.toLocal().toString().split(' ')[0] : '未选择'),
-              trailing: const Icon(Icons.calendar_today),
-              onTap: () async {
-                final picked = await showDatePicker(
-                  context: context,
-                  initialDate: DateTime.now(),
-                  firstDate: DateTime(2020),
-                  lastDate: DateTime(2100),
-                );
-                if (picked != null) {
-                  startDate = picked;
-                }
-              },
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _QuickEntryCard extends StatelessWidget {
+  final IconData icon;
+  final String title;
+  final String subtitle;
+  final VoidCallback onTap;
+
+  const _QuickEntryCard({
+    required this.icon,
+    required this.title,
+    required this.subtitle,
+    required this.onTap,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return InkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(18),
+      child: Container(
+        width: double.infinity,
+        padding: const EdgeInsets.all(18),
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(18),
+        ),
+        child: Row(
+          children: [
+            Container(
+              width: 46,
+              height: 46,
+              decoration: BoxDecoration(
+                color: AppColors.tagBackground,
+                borderRadius: BorderRadius.circular(14),
+              ),
+              child: Icon(icon, color: AppColors.primary),
             ),
-            ListTile(
-              title: const Text('结束日期'),
-              subtitle: Text(endDate != null ? endDate!.toLocal().toString().split(' ')[0] : '未选择'),
-              trailing: const Icon(Icons.calendar_today),
-              onTap: () async {
-                final picked = await showDatePicker(
-                  context: context,
-                  initialDate: DateTime.now(),
-                  firstDate: DateTime(2020),
-                  lastDate: DateTime(2100),
-                );
-                if (picked != null) {
-                  endDate = picked;
-                }
-              },
+            const SizedBox(width: 12),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    title,
+                    style: const TextStyle(
+                      fontSize: 16,
+                      fontWeight: FontWeight.w700,
+                      color: AppColors.textPrimary,
+                    ),
+                  ),
+                  const SizedBox(height: 4),
+                  Text(
+                    subtitle,
+                    style: const TextStyle(
+                      fontSize: 13,
+                      color: AppColors.textSecondary,
+                    ),
+                  ),
+                ],
+              ),
             ),
-            const SizedBox(height: 24),
-            ElevatedButton(
-              onPressed: () {
-                ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(content: Text('旅行计划已创建 (模拟)')),
-                );
-                Navigator.of(context).pop();
-              },
-              child: const Text('提交'),
-            ),
+            const Icon(Icons.chevron_right, color: AppColors.textHint),
           ],
         ),
       ),

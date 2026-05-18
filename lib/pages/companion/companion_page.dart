@@ -76,7 +76,9 @@ class _CompanionPageState extends State<CompanionPage> {
                     const Padding(
                       padding: EdgeInsets.only(top: 80),
                       child: Center(
-                        child: CircularProgressIndicator(color: AppColors.primary),
+                        child: CircularProgressIndicator(
+                          color: AppColors.primary,
+                        ),
                       ),
                     )
                   else if (guides.isEmpty)
@@ -105,16 +107,11 @@ class _CompanionPageState extends State<CompanionPage> {
       children: [
         Expanded(child: _topButton('入驻', () => context.push('/apply/guide'))),
         const SizedBox(width: 12),
-        Expanded(child: _topButton('需求定制', () => context.push('/demand/create'))),
-        const SizedBox(width: 12),
         Expanded(
-          child: _topButton(
-            '联系我们',
-            () => ScaffoldMessenger.of(context).showSnackBar(
-              const SnackBar(content: Text('联系入口后续可接入客服 API')),
-            ),
-          ),
+          child: _topButton('需求定制', () => context.push('/demand/create')),
         ),
+        const SizedBox(width: 12),
+        Expanded(child: _topButton('需求列表', () => context.push('/demands'))),
       ],
     );
   }
@@ -182,7 +179,7 @@ class _CompanionPageState extends State<CompanionPage> {
     return Row(
       children: [
         GestureDetector(
-          onTap: _showCityPicker,
+          onTap: _pickCityWithLocationPicker,
           child: Row(
             mainAxisSize: MainAxisSize.min,
             children: [
@@ -195,34 +192,42 @@ class _CompanionPageState extends State<CompanionPage> {
                 ),
               ),
               const SizedBox(width: 2),
-              const Icon(Icons.keyboard_arrow_down, size: 18, color: AppColors.textHint),
+              const Icon(
+                Icons.keyboard_arrow_down,
+                size: 18,
+                color: AppColors.textHint,
+              ),
             ],
           ),
         ),
-        const Spacer(),
-        Container(
-          width: 170,
-          height: 34,
-          padding: const EdgeInsets.symmetric(horizontal: 12),
-          decoration: BoxDecoration(
-            color: Colors.white,
-            borderRadius: BorderRadius.circular(18),
-          ),
-          child: Row(
-            children: [
-              Expanded(
-                child: TextField(
-                  controller: _searchController,
-                  decoration: const InputDecoration(
-                    hintText: '请输入内容',
-                    hintStyle: TextStyle(fontSize: 12, color: AppColors.textHint),
-                    border: InputBorder.none,
-                    isDense: true,
+        const SizedBox(width: 12),
+        Expanded(
+          child: Container(
+            height: 34,
+            padding: const EdgeInsets.symmetric(horizontal: 12),
+            decoration: BoxDecoration(
+              color: Colors.white,
+              borderRadius: BorderRadius.circular(18),
+            ),
+            child: Row(
+              children: [
+                Expanded(
+                  child: TextField(
+                    controller: _searchController,
+                    decoration: const InputDecoration(
+                      hintText: '请输入内容',
+                      hintStyle: TextStyle(
+                        fontSize: 12,
+                        color: AppColors.textHint,
+                      ),
+                      border: InputBorder.none,
+                      isDense: true,
+                    ),
                   ),
                 ),
-              ),
-              const Icon(Icons.search, size: 18, color: AppColors.textHint),
-            ],
+                const Icon(Icons.search, size: 18, color: AppColors.textHint),
+              ],
+            ),
           ),
         ),
       ],
@@ -246,38 +251,33 @@ class _CompanionPageState extends State<CompanionPage> {
     return labels[index % labels.length];
   }
 
-  void _showCityPicker() {
-    final cities = ['苏州', '北京', '上海', '杭州', '成都', '西安', '长沙', '重庆', '广州', '深圳', '全国'];
-    showModalBottomSheet(
-      context: context,
-      showDragHandle: true,
-      shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
-      ),
-      builder: (context) {
-        return SafeArea(
-          child: Padding(
-            padding: const EdgeInsets.all(16),
-            child: Wrap(
-              spacing: 10,
-              runSpacing: 10,
-              children: cities.map((city) {
-                final selected = city == _selectedCity;
-                return ChoiceChip(
-                  label: Text(city),
-                  selected: selected,
-                  onSelected: (_) {
-                    setState(() => _selectedCity = city);
-                    context.read<GuideProvider>().setCity(city == '全国' ? '全国' : city);
-                    Navigator.pop(context);
-                  },
-                );
-              }).toList(),
-            ),
-          ),
-        );
+  Future<void> _pickCityWithLocationPicker() async {
+    final result = await context.push<Map<String, dynamic>>(
+      '/demand/location',
+      extra: {
+        'city': _selectedCity,
+        'address': _selectedCity == '全国' ? '苏州' : _selectedCity,
       },
     );
+    if (result == null || !mounted) return;
+
+    final city = _normalizeCityName(result['city']?.toString());
+    if (city.isEmpty) return;
+
+    setState(() => _selectedCity = city);
+    context.read<GuideProvider>().setCity(city);
+  }
+
+  String _normalizeCityName(String? raw) {
+    final city = (raw ?? '').trim();
+    if (city.isEmpty) return '';
+    const suffixes = ['特别行政区', '自治州', '自治县', '自治区', '地区', '盟', '市'];
+    for (final suffix in suffixes) {
+      if (city.endsWith(suffix) && city.length > suffix.length) {
+        return city.substring(0, city.length - suffix.length);
+      }
+    }
+    return city;
   }
 
   Widget _buildEmptyState() {
@@ -293,12 +293,22 @@ class _CompanionPageState extends State<CompanionPage> {
                 color: AppColors.tagBackground,
                 borderRadius: BorderRadius.circular(22),
               ),
-              child: const Icon(Icons.search_off_outlined, color: AppColors.primary, size: 34),
+              child: const Icon(
+                Icons.search_off_outlined,
+                color: AppColors.primary,
+                size: 34,
+              ),
             ),
             const SizedBox(height: 14),
-            const Text('暂无匹配服务', style: TextStyle(fontSize: 16, fontWeight: FontWeight.w700)),
+            const Text(
+              '暂无匹配服务',
+              style: TextStyle(fontSize: 16, fontWeight: FontWeight.w700),
+            ),
             const SizedBox(height: 6),
-            const Text('换个城市或关键词试试', style: TextStyle(color: AppColors.textHint)),
+            const Text(
+              '换个城市或关键词试试',
+              style: TextStyle(color: AppColors.textHint),
+            ),
           ],
         ),
       ),

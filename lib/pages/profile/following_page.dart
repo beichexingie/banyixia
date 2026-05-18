@@ -98,7 +98,7 @@ class _FollowingPageState extends State<FollowingPage> {
                           ),
                         ),
                         title: Text(user.nickname, style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: AppColors.textPrimary)),
-                        subtitle: Text(user.title.isNotEmpty ? user.title : '个人用户', 
+                        subtitle: Text(user.title.isNotEmpty ? user.title : user.identityLabel, 
                                     style: const TextStyle(fontSize: 13, color: AppColors.textSecondary)),
                         trailing: OutlinedButton(
                           onPressed: () => _unfollowUser(user),

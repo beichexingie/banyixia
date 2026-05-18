@@ -2,7 +2,7 @@
 CREATE TABLE IF NOT EXISTS public.orders (
   id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
   user_id UUID REFERENCES public.users(id) ON DELETE CASCADE NOT NULL,
-  guide_id UUID REFERENCES public.users(id) ON DELETE CASCADE NOT NULL, -- 关联到用户表的导游ID
+  guide_id UUID REFERENCES public.guides(id) ON DELETE CASCADE NOT NULL, -- 关联到地陪表的导游ID
   guide_name TEXT,
   guide_avatar TEXT,
   status INTEGER DEFAULT 0, -- 对应 OrderStatus 枚举

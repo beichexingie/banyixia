@@ -96,10 +96,10 @@ class _MainScaffoldState extends State<MainScaffold> {
               ),
               const Divider(),
               _buildPublishOption(
-                Icons.map_outlined,
-                '创建旅行计划',
-                '规划你的行程路线',
-                route: '/travel_plan/create',
+                Icons.campaign_outlined,
+                '发布招募',
+                '发起招募帖寻找同行伙伴',
+                route: '/post/create?mode=recruit',
               ),
               const Divider(),
               _buildPublishOption(

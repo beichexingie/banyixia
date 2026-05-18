@@ -1,3 +1,4 @@
+import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import '../providers/user_provider.dart';
 import '../providers/post_provider.dart';
@@ -24,6 +25,7 @@ import '../pages/admin/audit_list_page.dart';
 import '../pages/profile/user_profile_page.dart';
 import '../pages/demand/demand_list_page.dart';
 import '../pages/demand/demand_create_page.dart';
+import '../pages/common/state_notice_page.dart';
 import '../models/guide.dart';
 
 class AppRouter {
@@ -50,7 +52,10 @@ class AppRouter {
       GoRoute(path: '/login', builder: (context, state) => const LoginPage()),
       GoRoute(
         path: '/post/create',
-        builder: (context, state) => const PostCreatePage(),
+        builder: (context, state) {
+          final mode = state.uri.queryParameters['mode'] ?? 'share';
+          return PostCreatePage(mode: mode);
+        },
       ),
       GoRoute(
         path: '/post/:id',
@@ -99,7 +104,11 @@ class AppRouter {
       ),
       GoRoute(
         path: '/profile/orders',
-        builder: (context, state) => const OrdersPage(),
+        builder: (context, state) {
+          final initialTab =
+              int.tryParse(state.uri.queryParameters['tab'] ?? '0') ?? 0;
+          return OrdersPage(initialTab: initialTab);
+        },
       ),
       GoRoute(
         path: '/travel_plan/create',
@@ -109,33 +118,40 @@ class AppRouter {
         path: '/order/create',
         builder: (context, state) {
           final guideId = state.uri.queryParameters['guideId'];
-          final name = state.uri.queryParameters['name'] ?? '';
-          final avatar = state.uri.queryParameters['avatar'] ?? '';
-
-          // Reconstruct a partial Guide object for the page
-          // (In a real app, you'd fetch the full guide or pass it via extra)
-          final guide = guideProvider.guides.firstWhere(
-            (g) => g.id == guideId,
-            orElse: () => Guide(
-              id: guideId ?? '0',
-              name: name,
-              avatar: avatar,
-              description: '为您提供贴心的陪游服务',
-              city: '北京',
-              rating: 5.0,
-              tags: ['专业导游'],
-              images: [avatar],
-              verified: true,
-            ),
-          );
+          Guide? guide;
+          if (guideId != null && guideId.trim().isNotEmpty) {
+            try {
+              guide = guideProvider.guides.firstWhere((g) => g.id == guideId);
+            } catch (_) {
+              guide = null;
+            }
+          }
+          if (guide == null || !guide.verified) {
+            return const StateNoticePage(
+              title: '地陪不可下单',
+              message: '当前地陪不存在、未通过审核，或页面信息已经过期，请返回服务页重新选择。',
+              icon: Icons.person_off_outlined,
+            );
+          }
           return OrderCreatePage(guide: guide);
         },
       ),
       GoRoute(
         path: '/order/location',
         builder: (context, state) {
-          final initialAddress = state.extra as String?;
-          return LocationPickerPage(initialAddress: initialAddress);
+          final extra = state.extra;
+          String? address;
+          String? city;
+          if (extra is Map) {
+            address = extra['address']?.toString();
+            city = extra['city']?.toString();
+          } else if (extra is String) {
+            address = extra;
+          }
+          return LocationPickerPage(
+            initialAddress: address,
+            initialCity: city,
+          );
         },
       ),
       GoRoute(
@@ -167,7 +183,16 @@ class AppRouter {
       ),
       GoRoute(
         path: '/apply/guide',
-        builder: (context, state) => const ApplyGuidePage(),
+        builder: (context, state) {
+          if (userProvider.isBanned) {
+            return const StateNoticePage(
+              title: '账号受限',
+              message: '当前账号处于限制状态，暂时不能提交地陪入驻申请，请联系客服处理。',
+              icon: Icons.gpp_bad_outlined,
+            );
+          }
+          return const ApplyGuidePage();
+        },
       ),
       GoRoute(
         path: '/user/:id',
@@ -192,7 +217,16 @@ class AppRouter {
       ),
       GoRoute(
         path: '/admin/audit',
-        builder: (context, state) => const AuditListPage(),
+        builder: (context, state) {
+          if (!userProvider.isAdmin) {
+            return const StateNoticePage(
+              title: '无权限访问',
+              message: '这个页面仅对管理员开放，当前账号不能查看审核后台。',
+              icon: Icons.lock_outline,
+            );
+          }
+          return const AuditListPage();
+        },
       ),
     ],
   );

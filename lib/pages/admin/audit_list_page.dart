@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../../config/app_theme.dart';
+import '../../providers/application_provider.dart';
 import '../../providers/user_provider.dart';
 import '../../models/guide_application.dart';
 import './audit_detail_page.dart';
@@ -24,15 +25,49 @@ class _AuditListPageState extends State<AuditListPage> {
 
   Future<void> _loadApplications() async {
     setState(() => _isLoading = true);
-    final results = await context.read<UserProvider>().fetchPendingApplications();
-    setState(() {
-      _applications = results.map((e) => GuideApplication.fromJson(e)).toList();
-      _isLoading = false;
-    });
+    if (!context.read<UserProvider>().isAdmin) {
+      if (mounted) {
+        setState(() {
+          _applications = [];
+          _isLoading = false;
+        });
+      }
+      return;
+    }
+
+    await context.read<ApplicationProvider>().loadPendingApplications();
+    final results = context.read<ApplicationProvider>().pendingApplications;
+    if (mounted) {
+      setState(() {
+        _applications = results;
+        _isLoading = false;
+      });
+    }
   }
 
   @override
   Widget build(BuildContext context) {
+    final canAccess = context.watch<UserProvider>().isAdmin;
+    if (!canAccess) {
+      return Scaffold(
+        backgroundColor: AppColors.background,
+        appBar: AppBar(
+          title: const Text('地陪入驻审核', style: TextStyle(fontWeight: FontWeight.bold)),
+          centerTitle: true,
+        ),
+        body: const Center(
+          child: Padding(
+            padding: EdgeInsets.all(24),
+            child: Text(
+              '当前账号没有审核权限。',
+              style: TextStyle(fontSize: 15, color: AppColors.textSecondary),
+              textAlign: TextAlign.center,
+            ),
+          ),
+        ),
+      );
+    }
+
     return Scaffold(
       backgroundColor: AppColors.background,
       appBar: AppBar(

@@ -131,65 +131,37 @@ class _HomePageState extends State<HomePage>
   }
 
   void _showCityPicker() {
-    final cities = ['苏州', '北京', '上海', '杭州', '成都', '西安', '长沙', '重庆', '天津', '广州'];
-    showModalBottomSheet(
-      context: context,
-      shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
-      ),
-      builder: (ctx) {
-        return Container(
-          padding: const EdgeInsets.all(20),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              const Text(
-                '选择城市',
-                style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
-              ),
-              const SizedBox(height: 16),
-              Wrap(
-                spacing: 10,
-                runSpacing: 10,
-                children: cities.map((city) {
-                  final isSelected = city == _selectedCity;
-                  return GestureDetector(
-                    onTap: () {
-                      setState(() => _selectedCity = city);
-                      Navigator.pop(ctx);
-                    },
-                    child: Container(
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 20,
-                        vertical: 10,
-                      ),
-                      decoration: BoxDecoration(
-                        color: isSelected
-                            ? AppColors.primary
-                            : AppColors.tagBackground,
-                        borderRadius: BorderRadius.circular(20),
-                      ),
-                      child: Text(
-                        city,
-                        style: TextStyle(
-                          color: isSelected
-                              ? Colors.white
-                              : AppColors.textPrimary,
-                          fontWeight: isSelected
-                              ? FontWeight.w600
-                              : FontWeight.normal,
-                        ),
-                      ),
-                    ),
-                  );
-                }).toList(),
-              ),
-              const SizedBox(height: 16),
-            ],
-          ),
-        );
+    _pickCityWithLocationPicker();
+  }
+
+  Future<void> _pickCityWithLocationPicker() async {
+    final result = await context.push<Map<String, dynamic>>(
+      '/demand/location',
+      extra: {
+        'city': _selectedCity,
+        'address': _selectedCity,
       },
     );
+    if (result == null || !mounted) return;
+
+    final city = _normalizeCityName(result['city']?.toString());
+    if (city.isEmpty) return;
+
+    setState(() {
+      _selectedCity = city;
+    });
+  }
+
+  String _normalizeCityName(String? raw) {
+    final city = (raw ?? '').trim();
+    if (city.isEmpty) return '';
+    const suffixes = ['特别行政区', '自治州', '自治县', '自治区', '地区', '盟', '市'];
+    for (final suffix in suffixes) {
+      if (city.endsWith(suffix) && city.length > suffix.length) {
+        return city.substring(0, city.length - suffix.length);
+      }
+    }
+    return city;
   }
 
   @override
@@ -375,8 +347,10 @@ class _HomePageState extends State<HomePage>
   }
 
   Widget _buildCalendarCard() {
+    final now = DateTime.now();
+    const weekdays = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
     return GestureDetector(
-      onTap: () => context.push('/travel_plan/create'),
+      onTap: () => context.push('/demand/create'),
       child: Container(
         margin: const EdgeInsets.all(16),
         decoration: BoxDecoration(
@@ -467,17 +441,17 @@ class _HomePageState extends State<HomePage>
                             color: Colors.white.withValues(alpha: 0.18),
                             borderRadius: BorderRadius.circular(12),
                           ),
-                          child: const Column(
+                          child: Column(
                             children: [
                               Text(
-                                '3月',
+                                '${now.month}月',
                                 style: TextStyle(
                                   fontSize: 11,
                                   color: Colors.white,
                                 ),
                               ),
                               Text(
-                                '31',
+                                '${now.day}',
                                 style: TextStyle(
                                   fontSize: 20,
                                   fontWeight: FontWeight.bold,
@@ -485,7 +459,7 @@ class _HomePageState extends State<HomePage>
                                 ),
                               ),
                               Text(
-                                'Sat',
+                                weekdays[now.weekday - 1],
                                 style: TextStyle(
                                   fontSize: 10,
                                   color: Colors.white70,
@@ -506,7 +480,7 @@ class _HomePageState extends State<HomePage>
                         ),
                         const SizedBox(width: 4),
                         Text(
-                          '搭伴',
+                          '需求定制',
                           style: AppTextStyles.caption.copyWith(
                             color: Colors.white70,
                           ),
@@ -519,7 +493,7 @@ class _HomePageState extends State<HomePage>
                         ),
                         const SizedBox(width: 4),
                         Text(
-                          '随缘',
+                          _selectedCity,
                           style: AppTextStyles.caption.copyWith(
                             color: Colors.white70,
                           ),

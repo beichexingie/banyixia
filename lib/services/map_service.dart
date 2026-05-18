@@ -219,6 +219,14 @@ class AmapMapService implements MapService {
   Future<MapPosition?> currentPosition() async {
     if (!_isEnabled) return null;
 
+    final serviceEnabled = await Geolocator.isLocationServiceEnabled();
+    if (!serviceEnabled) {
+      throw const AmapApiException(
+        code: 'LOCATION_SERVICE_DISABLED',
+        info: '定位服务未开启',
+      );
+    }
+
     final permission = await Geolocator.checkPermission();
     var resolvedPermission = permission;
     if (resolvedPermission == LocationPermission.denied) {

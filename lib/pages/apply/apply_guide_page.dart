@@ -5,7 +5,6 @@ import '../../config/app_theme.dart';
 import '../../models/guide_application.dart';
 import '../../providers/application_provider.dart';
 import '../../providers/user_provider.dart';
-import '../../providers/guide_provider.dart';
 
 class ApplyGuidePage extends StatefulWidget {
   const ApplyGuidePage({super.key});
@@ -128,7 +127,14 @@ class _ApplyGuidePageState extends State<ApplyGuidePage> {
     }
 
     final currentUser = context.watch<UserProvider>().user;
-    final isGuide = context.watch<GuideProvider>().guides.any((g) => g.id == currentUser.id);
+    final isGuide = currentUser.isGuideApproved;
+
+    if (currentUser.isBanned) {
+      return _buildRestrictedPage(
+        title: '账号受限',
+        description: '当前账号处于限制状态，暂时不能申请成为地陪，请联系客服后再试。',
+      );
+    }
 
     if (isGuide) {
       return _buildStatusPage(GuideApplication(
@@ -181,6 +187,48 @@ class _ApplyGuidePageState extends State<ApplyGuidePage> {
           ),
           _buildBottomBar(),
         ],
+      ),
+    );
+  }
+
+  Widget _buildRestrictedPage({
+    required String title,
+    required String description,
+  }) {
+    return Scaffold(
+      appBar: AppBar(
+        title: const Text('申请成为地陪', style: TextStyle(fontWeight: FontWeight.bold)),
+        backgroundColor: Colors.white,
+        foregroundColor: AppColors.textPrimary,
+        elevation: 0,
+      ),
+      body: Center(
+        child: Padding(
+          padding: const EdgeInsets.all(32),
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Icon(Icons.lock_person_outlined, size: 72, color: AppColors.primary.withValues(alpha: 0.85)),
+              const SizedBox(height: 20),
+              Text(title, style: const TextStyle(fontSize: 22, fontWeight: FontWeight.bold)),
+              const SizedBox(height: 12),
+              Text(description, textAlign: TextAlign.center, style: const TextStyle(fontSize: 14, color: AppColors.textSecondary, height: 1.6)),
+              const SizedBox(height: 28),
+              SizedBox(
+                width: double.infinity,
+                child: ElevatedButton(
+                  onPressed: () => context.pop(),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: AppColors.primary,
+                    foregroundColor: Colors.white,
+                    padding: const EdgeInsets.symmetric(vertical: 14),
+                  ),
+                  child: const Text('返回'),
+                ),
+              ),
+            ],
+          ),
+        ),
       ),
     );
   }

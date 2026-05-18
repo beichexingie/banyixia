@@ -6,6 +6,7 @@ import '../../config/app_theme.dart';
 import '../../models/guide.dart';
 import '../../models/order.dart';
 import '../../providers/order_provider.dart';
+import '../../providers/user_provider.dart';
 
 class OrderCreatePage extends StatefulWidget {
   final Guide guide;
@@ -42,12 +43,20 @@ class _OrderCreatePageState extends State<OrderCreatePage> {
   }
 
   Future<void> _pickLocation() async {
-    final result = await context.push<String>(
+    final result = await context.push<Map<String, dynamic>>(
       '/order/location',
-      extra: _selectedAddress,
+      extra: {
+        'address': _selectedAddress,
+        'city': widget.guide.city,
+      },
     );
     if (result != null && mounted) {
-      setState(() => _selectedAddress = result);
+      setState(() {
+        _selectedAddress =
+            result['summary']?.toString() ??
+            result['address']?.toString() ??
+            _selectedAddress;
+      });
     }
   }
 
@@ -179,6 +188,24 @@ class _OrderCreatePageState extends State<OrderCreatePage> {
       );
       return;
     }
+    if (context.read<UserProvider>().isBanned) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('当前账号受限，暂时不能下单')),
+      );
+      return;
+    }
+    if (widget.guide.id.trim().isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('导游信息异常，请重新进入页面')),
+      );
+      return;
+    }
+    if (widget.guide.id == userId) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('不能给自己下单，请选择其他地陪')),
+      );
+      return;
+    }
 
     if (_totalAmount <= 0) {
       ScaffoldMessenger.of(context).showSnackBar(
@@ -204,6 +231,8 @@ class _OrderCreatePageState extends State<OrderCreatePage> {
         status: OrderStatus.pendingPayment,
         amount: _totalAmount,
         serviceName: '$serviceNames / $_selectedAddress',
+        paymentMethod: _paymentMethod,
+        paymentStatus: 'pending',
         serviceDate: _serviceDateTime,
         createdAt: DateTime.now(),
       );

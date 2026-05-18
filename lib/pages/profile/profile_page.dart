@@ -8,13 +8,11 @@ import '../../models/order.dart';
 import '../../models/user.dart' as app_model;
 import '../../providers/user_provider.dart';
 import '../../providers/order_provider.dart';
-import '../../providers/guide_provider.dart';
 import 'package:go_router/go_router.dart';
 import '../main_scaffold.dart';
 import 'favorite_posts_page.dart';
 import 'footprint_posts_page.dart';
 import 'following_page.dart';
-import '../admin/audit_list_page.dart';
 
 class ProfilePage extends StatelessWidget {
   const ProfilePage({super.key});
@@ -22,7 +20,7 @@ class ProfilePage extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final user = context.watch<UserProvider>().user;
-    final isGuide = context.watch<GuideProvider>().guides.any((g) => g.id == user.id);
+    final isGuide = user.isGuideApproved;
 
     return Scaffold(
       backgroundColor: AppColors.background,
@@ -202,8 +200,7 @@ class ProfilePage extends StatelessWidget {
     return Consumer<UserProvider>(
       builder: (context, userProvider, child) {
         final user = userProvider.user;
-        
-        final cityLabel = context.watch<GuideProvider>().selectedCity;
+        final cityLabel = user.city.trim().isEmpty ? '未填写' : user.city.trim();
 
         return Container(
           decoration: const BoxDecoration(
@@ -235,7 +232,7 @@ class ProfilePage extends StatelessWidget {
                       const SizedBox(width: 16),
                       if (user.isAdmin)
                         GestureDetector(
-                          onTap: () => Navigator.push(context, MaterialPageRoute(builder: (context) => const AuditListPage())),
+                          onTap: () => context.push('/admin/audit'),
                           child: const Row(
                             mainAxisSize: MainAxisSize.min,
                             children: [
@@ -346,9 +343,23 @@ class ProfilePage extends StatelessWidget {
                               ),
                               const SizedBox(height: 2),
                               Text(
-                                'IP: $cityLabel',
+                                '身份: ${user.identityLabel}',
                                 style: TextStyle(fontSize: 12, color: Colors.white.withValues(alpha: 0.85)),
                               ),
+                              const SizedBox(height: 2),
+                              Text(
+                                '城市: $cityLabel',
+                                style: TextStyle(fontSize: 12, color: Colors.white.withValues(alpha: 0.85)),
+                              ),
+                              if (user.bio.trim().isNotEmpty) ...[
+                                const SizedBox(height: 4),
+                                Text(
+                                  user.bio.trim(),
+                                  maxLines: 2,
+                                  overflow: TextOverflow.ellipsis,
+                                  style: TextStyle(fontSize: 12, color: Colors.white.withValues(alpha: 0.8)),
+                                ),
+                              ],
                               if (user.title.isNotEmpty) ...[
                                 const SizedBox(height: 4),
                                 Text(
@@ -451,10 +462,10 @@ class ProfilePage extends StatelessWidget {
               Row(
                 mainAxisAlignment: MainAxisAlignment.spaceAround,
                 children: [
-                  _buildOrderItem(context, Icons.payment, '待付款', orderProvider.getCountByStatus(OrderStatus.pendingPayment), '待付款订单'),
-                  _buildOrderItem(context, Icons.access_time, '进行中', orderProvider.getCountByStatus(OrderStatus.inProgress), '进行中订单'),
-                  _buildOrderItem(context, Icons.rate_review_outlined, '待评价', orderProvider.getCountByStatus(OrderStatus.pendingReview), '待评价订单'),
-                  _buildOrderItem(context, Icons.cancel_outlined, '已取消', orderProvider.getCountByStatus(OrderStatus.cancelled), '已取消订单'),
+                  _buildOrderItem(context, Icons.payment, '待付款', orderProvider.getCountByStatus(OrderStatus.pendingPayment), 1),
+                  _buildOrderItem(context, Icons.access_time, '进行中', orderProvider.getCountByStatus(OrderStatus.inProgress), 2),
+                  _buildOrderItem(context, Icons.rate_review_outlined, '待评价', orderProvider.getCountByStatus(OrderStatus.pendingReview), 3),
+                  _buildOrderItem(context, Icons.cancel_outlined, '已取消', orderProvider.getCountByStatus(OrderStatus.cancelled), 4),
                 ],
               ),
             ],
@@ -464,9 +475,9 @@ class ProfilePage extends StatelessWidget {
     );
   }
 
-  Widget _buildOrderItem(BuildContext context, IconData icon, String label, int count, String msg) {
+  Widget _buildOrderItem(BuildContext context, IconData icon, String label, int count, int tabIndex) {
     return GestureDetector(
-      onTap: () => _showSnack(context, '暂无$msg'),
+      onTap: () => context.push('/profile/orders?tab=$tabIndex'),
       child: Column(
         children: [
           Stack(
@@ -482,7 +493,7 @@ class ProfilePage extends StatelessWidget {
                   top: -4, right: -4,
                   child: Container(
                     padding: const EdgeInsets.all(4),
-                    decoration: BoxDecoration(color: AppColors.primary.withValues(alpha: 0.1), shape: BoxShape.circle),
+                    decoration: const BoxDecoration(color: AppColors.primary, shape: BoxShape.circle),
                     constraints: const BoxConstraints(minWidth: 18, minHeight: 18),
                     child: Text('$count', textAlign: TextAlign.center,
                       style: const TextStyle(color: Colors.white, fontSize: 10, fontWeight: FontWeight.bold)),
@@ -692,21 +703,45 @@ class _EditProfileDialog extends StatefulWidget {
 
 class _EditProfileDialogState extends State<_EditProfileDialog> {
   late TextEditingController _nicknameController;
+  late TextEditingController _cityController;
+  late TextEditingController _birthdayController;
+  late TextEditingController _wechatController;
+  late TextEditingController _occupationController;
+  late TextEditingController _bioController;
+  late TextEditingController _guideIntroductionController;
+  late TextEditingController _guideTagsController;
   late UserProvider _userProvider;
   Uint8List? _avatarBytes;
   String? _avatarMimeType;
+  String _selectedGender = '';
   bool _isUploading = false;
 
   @override
   void initState() {
     super.initState();
     _userProvider = context.read<UserProvider>();
-    _nicknameController = TextEditingController(text: _userProvider.user.nickname);
+    final user = _userProvider.user;
+    _nicknameController = TextEditingController(text: user.nickname);
+    _cityController = TextEditingController(text: user.city);
+    _birthdayController = TextEditingController(text: user.birthday);
+    _wechatController = TextEditingController(text: user.wechat);
+    _occupationController = TextEditingController(text: user.occupation);
+    _bioController = TextEditingController(text: user.bio);
+    _guideIntroductionController = TextEditingController(text: user.guideIntroduction);
+    _guideTagsController = TextEditingController(text: user.guideTags.join('，'));
+    _selectedGender = user.gender;
   }
 
   @override
   void dispose() {
     _nicknameController.dispose();
+    _cityController.dispose();
+    _birthdayController.dispose();
+    _wechatController.dispose();
+    _occupationController.dispose();
+    _bioController.dispose();
+    _guideIntroductionController.dispose();
+    _guideTagsController.dispose();
     super.dispose();
   }
 
@@ -761,12 +796,29 @@ class _EditProfileDialogState extends State<_EditProfileDialog> {
           id: user.id,
           nickname: newName,
           avatar: finalAvatarUrl,
+          bio: _bioController.text.trim(),
+          gender: _selectedGender.trim(),
+          city: _cityController.text.trim(),
+          birthday: _birthdayController.text.trim(),
+          wechat: _wechatController.text.trim(),
+          occupation: _occupationController.text.trim(),
+          guideIntroduction: _guideIntroductionController.text.trim(),
+          guideTags: _guideTagsController.text
+              .split(RegExp(r'[,，/\s]+'))
+              .map((item) => item.trim())
+              .where((item) => item.isNotEmpty)
+              .toList(),
           vipLevel: user.vipLevel,
           title: user.title,
           balance: user.balance,
           couponCount: user.couponCount,
           followCount: user.followCount,
           fansCount: user.fansCount,
+          isBanned: user.isBanned,
+          cancelCount: user.cancelCount,
+          isAdmin: user.isAdmin,
+          isGuide: user.isGuide,
+          guideApplicationStatus: user.guideApplicationStatus,
         ),
       );
 
@@ -802,72 +854,164 @@ class _EditProfileDialogState extends State<_EditProfileDialog> {
     }
   }
 
+  Future<void> _pickBirthday() async {
+    final now = DateTime.now();
+    final initial = DateTime.tryParse(_birthdayController.text.trim()) ??
+        DateTime(now.year - 20, now.month, now.day);
+    final picked = await showDatePicker(
+      context: context,
+      initialDate: initial,
+      firstDate: DateTime(1950),
+      lastDate: now,
+    );
+    if (picked == null || !mounted) return;
+    setState(() {
+      _birthdayController.text =
+          '${picked.year.toString().padLeft(4, '0')}-${picked.month.toString().padLeft(2, '0')}-${picked.day.toString().padLeft(2, '0')}';
+    });
+  }
+
+  Widget _buildInput(
+    String label,
+    TextEditingController controller, {
+    int maxLines = 1,
+    String? hintText,
+    Widget? suffixIcon,
+    TextInputType? keyboardType,
+    bool readOnly = false,
+    VoidCallback? onTap,
+  }) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 12),
+      child: TextField(
+        controller: controller,
+        enabled: !_isUploading,
+        maxLines: maxLines,
+        keyboardType: keyboardType,
+        readOnly: readOnly,
+        onTap: onTap,
+        decoration: InputDecoration(
+          labelText: label,
+          hintText: hintText,
+          suffixIcon: suffixIcon,
+          border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+          focusedBorder: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(12),
+            borderSide: const BorderSide(color: AppColors.primary),
+          ),
+        ),
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final user = _userProvider.user;
-    
+    final ImageProvider<Object>? previewImage = _avatarBytes != null
+        ? MemoryImage(_avatarBytes!)
+        : (user.avatar.isNotEmpty ? NetworkImage(user.avatar) : null);
+
     return AlertDialog(
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
       title: const Text('编辑资料'),
-      content: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          // 头像
-          GestureDetector(
-            onTap: _isUploading ? null : _pickAndUploadAvatar,
-            child: Stack(
+      content: SizedBox(
+        width: double.maxFinite,
+        child: ConstrainedBox(
+          constraints: BoxConstraints(
+            maxHeight: MediaQuery.of(context).size.height * 0.7,
+          ),
+          child: SingleChildScrollView(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
               children: [
-                CircleAvatar(
-                  radius: 40,
-                  backgroundColor: const Color(0xFFE0E0E0),
-                  backgroundImage: _avatarBytes != null 
-                      ? MemoryImage(_avatarBytes!) as ImageProvider
-                      : NetworkImage(user.avatar),
-                  child: _avatarBytes == null && user.avatar.isEmpty
-                      ? const Icon(Icons.person, size: 40, color: Colors.white)
-                      : null,
-                ),
-                Positioned(
-                  bottom: 0, right: 0,
-                  child: Container(
-                    width: 28, height: 28,
-                    decoration: BoxDecoration(
-                      color: AppColors.primary,
-                      shape: BoxShape.circle,
-                      border: Border.all(color: Colors.white, width: 2),
-                    ),
-                    child: const Icon(Icons.camera_alt, size: 14, color: Colors.white),
+                GestureDetector(
+                  onTap: _isUploading ? null : _pickAndUploadAvatar,
+                  child: Stack(
+                    children: [
+                      CircleAvatar(
+                        radius: 40,
+                        backgroundColor: const Color(0xFFE0E0E0),
+                        backgroundImage: previewImage,
+                        child: previewImage == null
+                            ? const Icon(Icons.person, size: 40, color: Colors.white)
+                            : null,
+                      ),
+                      Positioned(
+                        bottom: 0,
+                        right: 0,
+                        child: Container(
+                          width: 28,
+                          height: 28,
+                          decoration: BoxDecoration(
+                            color: AppColors.primary,
+                            shape: BoxShape.circle,
+                            border: Border.all(color: Colors.white, width: 2),
+                          ),
+                          child: const Icon(Icons.camera_alt, size: 14, color: Colors.white),
+                        ),
+                      ),
+                      if (_isUploading)
+                        Positioned.fill(
+                          child: Container(
+                            decoration: const BoxDecoration(
+                              color: Colors.black45,
+                              shape: BoxShape.circle,
+                            ),
+                            child: const Center(
+                              child: CircularProgressIndicator(color: Colors.white),
+                            ),
+                          ),
+                        ),
+                    ],
                   ),
                 ),
-                if (_isUploading)
-                  Positioned.fill(
-                    child: Container(
-                      decoration: const BoxDecoration(
-                        color: Colors.black45,
-                        shape: BoxShape.circle,
-                      ),
-                      child: const Center(
-                        child: CircularProgressIndicator(color: Colors.white),
+                const SizedBox(height: 20),
+                _buildInput('昵称', _nicknameController),
+                _buildInput('所在城市', _cityController, hintText: '例如：苏州'),
+                Padding(
+                  padding: const EdgeInsets.only(bottom: 12),
+                  child: DropdownButtonFormField<String>(
+                    value: _selectedGender.isEmpty ? null : _selectedGender,
+                    items: const [
+                      DropdownMenuItem(value: '男', child: Text('男')),
+                      DropdownMenuItem(value: '女', child: Text('女')),
+                      DropdownMenuItem(value: '不限', child: Text('不限')),
+                    ],
+                    onChanged: _isUploading
+                        ? null
+                        : (value) => setState(() => _selectedGender = value ?? ''),
+                    decoration: InputDecoration(
+                      labelText: '性别',
+                      border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+                      focusedBorder: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(12),
+                        borderSide: const BorderSide(color: AppColors.primary),
                       ),
                     ),
                   ),
+                ),
+                _buildInput(
+                  '生日',
+                  _birthdayController,
+                  readOnly: true,
+                  onTap: _pickBirthday,
+                  suffixIcon: const Icon(Icons.calendar_today_outlined),
+                ),
+                _buildInput('微信号', _wechatController),
+                _buildInput('职业', _occupationController),
+                _buildInput('个人简介', _bioController, maxLines: 3),
+                if (user.isGuideApproved) ...[
+                  _buildInput('地陪介绍', _guideIntroductionController, maxLines: 4),
+                  _buildInput(
+                    '地陪标签',
+                    _guideTagsController,
+                    hintText: '多个标签用逗号分隔',
+                  ),
+                ],
               ],
             ),
           ),
-          const SizedBox(height: 20),
-          TextField(
-            controller: _nicknameController,
-            enabled: !_isUploading,
-            decoration: InputDecoration(
-              labelText: '昵称',
-              border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
-              focusedBorder: OutlineInputBorder(
-                borderRadius: BorderRadius.circular(12),
-                borderSide: const BorderSide(color: AppColors.primary),
-              ),
-            ),
-          ),
-        ],
+        ),
       ),
       actions: [
         TextButton(

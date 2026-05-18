@@ -43,46 +43,42 @@ class _DemandCreatePageState extends State<DemandCreatePage> {
   }
 
   Future<void> _pickCity() async {
-    final cities = ['苏州', '北京', '上海', '杭州', '成都', '西安', '长沙', '重庆', '广州', '深圳'];
-    final selected = await showModalBottomSheet<String>(
-      context: context,
-      showDragHandle: true,
-      shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
-      ),
-      builder: (context) {
-        return SafeArea(
-          child: Padding(
-            padding: const EdgeInsets.fromLTRB(16, 8, 16, 16),
-            child: Wrap(
-              spacing: 10,
-              runSpacing: 10,
-              children: cities.map((city) {
-                final selected = city == _city;
-                return ChoiceChip(
-                  label: Text(city),
-                  selected: selected,
-                  onSelected: (_) => Navigator.pop(context, city),
-                );
-              }).toList(),
-            ),
-          ),
-        );
-      },
+    final result = await context.push<Map<String, dynamic>>(
+      '/demand/location',
+      extra: {'city': _city, 'address': _location.isEmpty ? _city : _location},
     );
-    if (selected != null && mounted) {
-      setState(() => _city = selected);
-    }
+    if (result == null || !mounted) return;
+
+    final city = _normalizeCityName(result['city']?.toString());
+    if (city.isEmpty) return;
+
+    setState(() {
+      _city = city;
+      if (_location.isEmpty) {
+        _location =
+            result['summary']?.toString() ??
+            result['address']?.toString() ??
+            _location;
+      }
+    });
   }
 
   Future<void> _pickLocationApiReady() async {
-    final result = await context.push<String>(
+    final result = await context.push<Map<String, dynamic>>(
       '/demand/location',
       extra: {'city': _city, 'address': _location},
     );
-    if (result != null && mounted) {
-      setState(() => _location = result);
-    }
+    if (result == null || !mounted) return;
+
+    setState(() {
+      _city = _normalizeCityName(result['city']?.toString()).isEmpty
+          ? _city
+          : _normalizeCityName(result['city']?.toString());
+      _location =
+          result['summary']?.toString() ??
+          result['address']?.toString() ??
+          _location;
+    });
   }
 
   Future<void> _pickPeopleAndGender() async {
@@ -170,8 +166,6 @@ class _DemandCreatePageState extends State<DemandCreatePage> {
         );
       },
     );
-
-    tempController.dispose();
     if (result != null && mounted) {
       setState(() {
         _peopleController.text = result['people'] ?? '';
@@ -233,7 +227,10 @@ class _DemandCreatePageState extends State<DemandCreatePage> {
           return weekdays[date.weekday - 1];
         }
 
-        void selectHour(int hour, void Function(void Function()) setModalState) {
+        void selectHour(
+          int hour,
+          void Function(void Function()) setModalState,
+        ) {
           if (disabledHour(hour)) return;
           final picked = atHour(selectedDate, hour);
           setModalState(() {
@@ -324,7 +321,9 @@ class _DemandCreatePageState extends State<DemandCreatePage> {
                               child: AnimatedContainer(
                                 duration: const Duration(milliseconds: 160),
                                 width: 92,
-                                padding: const EdgeInsets.symmetric(vertical: 12),
+                                padding: const EdgeInsets.symmetric(
+                                  vertical: 12,
+                                ),
                                 decoration: BoxDecoration(
                                   color: selected
                                       ? const Color(0xFFC8F26D)
@@ -397,22 +396,25 @@ class _DemandCreatePageState extends State<DemandCreatePage> {
                         itemCount: hours.length,
                         gridDelegate:
                             const SliverGridDelegateWithFixedCrossAxisCount(
-                          crossAxisCount: 4,
-                          mainAxisSpacing: 12,
-                          crossAxisSpacing: 12,
-                          childAspectRatio: 2.25,
-                        ),
+                              crossAxisCount: 4,
+                              mainAxisSpacing: 12,
+                              crossAxisSpacing: 12,
+                              childAspectRatio: 2.25,
+                            ),
                         itemBuilder: (context, index) {
                           final hour = hours[index];
                           final time = atHour(selectedDate, hour);
                           final disabled = disabledHour(hour);
-                          final isStart = tempStart != null &&
+                          final isStart =
+                              tempStart != null &&
                               _isSameDay(tempStart!, selectedDate) &&
                               tempStart!.hour == hour;
-                          final isEnd = tempEnd != null &&
+                          final isEnd =
+                              tempEnd != null &&
                               _isSameDay(tempEnd!, selectedDate) &&
                               tempEnd!.hour == hour;
-                          final inRange = tempStart != null &&
+                          final inRange =
+                              tempStart != null &&
                               tempEnd != null &&
                               time.isAfter(tempStart!) &&
                               time.isBefore(tempEnd!);
@@ -428,10 +430,10 @@ class _DemandCreatePageState extends State<DemandCreatePage> {
                                 color: highlighted
                                     ? const Color(0xFFC8F26D)
                                     : inRange
-                                        ? const Color(0xFFF0F6DA)
-                                        : disabled
-                                            ? const Color(0xFFF4F3F8)
-                                            : Colors.white.withValues(alpha: 0.75),
+                                    ? const Color(0xFFF0F6DA)
+                                    : disabled
+                                    ? const Color(0xFFF4F3F8)
+                                    : Colors.white.withValues(alpha: 0.75),
                                 borderRadius: BorderRadius.circular(10),
                                 border: Border.all(
                                   color: highlighted
@@ -474,15 +476,15 @@ class _DemandCreatePageState extends State<DemandCreatePage> {
                                           isStart
                                               ? '开始'
                                               : isEnd
-                                                  ? '结束'
-                                                  : '空闲',
+                                              ? '结束'
+                                              : '空闲',
                                           style: TextStyle(
                                             fontSize: 11,
                                             color: disabled
                                                 ? const Color(0xFFD5D2DC)
                                                 : highlighted
-                                                    ? AppColors.textPrimary
-                                                    : AppColors.textHint,
+                                                ? AppColors.textPrimary
+                                                : AppColors.textHint,
                                           ),
                                         ),
                                       ],
@@ -501,9 +503,9 @@ class _DemandCreatePageState extends State<DemandCreatePage> {
                         child: ElevatedButton(
                           onPressed: canConfirm
                               ? () => Navigator.pop(context, {
-                                    'start': tempStart!,
-                                    'end': tempEnd!,
-                                  })
+                                  'start': tempStart!,
+                                  'end': tempEnd!,
+                                })
                               : null,
                           style: ElevatedButton.styleFrom(
                             backgroundColor: const Color(0xFF242934),
@@ -550,7 +552,7 @@ class _DemandCreatePageState extends State<DemandCreatePage> {
     const crossAxisCount = 4;
     const crossAxisSpacing = 12.0;
     const mainAxisSpacing = 12.0;
-    const childAspectRatio = 2.2;
+    const childAspectRatio = 1.68;
 
     DateTime selectedDate = DateTime(
       initialDate.year,
@@ -586,10 +588,10 @@ class _DemandCreatePageState extends State<DemandCreatePage> {
     int? hourFromPosition(Offset position, BoxConstraints constraints) {
       final cellWidth =
           (constraints.maxWidth - crossAxisSpacing * (crossAxisCount - 1)) /
-              crossAxisCount;
-      final cellHeight = cellWidth / childAspectRatio;
-      final rows = ((endHour - startHour + 1) + crossAxisCount - 1) ~/
           crossAxisCount;
+      final cellHeight = cellWidth / childAspectRatio;
+      final rows =
+          ((endHour - startHour + 1) + crossAxisCount - 1) ~/ crossAxisCount;
       final blockWidth = cellWidth + crossAxisSpacing;
       final blockHeight = cellHeight + mainAxisSpacing;
       final col = (position.dx / blockWidth).floor();
@@ -611,7 +613,10 @@ class _DemandCreatePageState extends State<DemandCreatePage> {
       backgroundColor: Colors.transparent,
       builder: (context) {
         final dates = List.generate(5, (i) => now.add(Duration(days: i)));
-        final hours = List.generate(endHour - startHour + 1, (i) => startHour + i);
+        final hours = List.generate(
+          endHour - startHour + 1,
+          (i) => startHour + i,
+        );
 
         int selectedHours() {
           if (tempStart == null || tempEnd == null) return 0;
@@ -688,7 +693,8 @@ class _DemandCreatePageState extends State<DemandCreatePage> {
                           child: ListView.separated(
                             scrollDirection: Axis.horizontal,
                             itemCount: dates.length,
-                            separatorBuilder: (_, _) => const SizedBox(width: 10),
+                            separatorBuilder: (_, _) =>
+                                const SizedBox(width: 10),
                             itemBuilder: (context, index) {
                               final date = dates[index];
                               final selected = _isSameDay(selectedDate, date);
@@ -706,7 +712,9 @@ class _DemandCreatePageState extends State<DemandCreatePage> {
                                 child: AnimatedContainer(
                                   duration: const Duration(milliseconds: 180),
                                   width: 92,
-                                  padding: const EdgeInsets.symmetric(vertical: 12),
+                                  padding: const EdgeInsets.symmetric(
+                                    vertical: 12,
+                                  ),
                                   decoration: BoxDecoration(
                                     color: selected
                                         ? const Color(0xFFC8F26D)
@@ -725,8 +733,8 @@ class _DemandCreatePageState extends State<DemandCreatePage> {
                                         index == 0
                                             ? '今天'
                                             : index == 1
-                                                ? '明天'
-                                                : weekdayLabel(date),
+                                            ? '明天'
+                                            : weekdayLabel(date),
                                         style: TextStyle(
                                           fontSize: 17,
                                           fontWeight: selected
@@ -781,14 +789,15 @@ class _DemandCreatePageState extends State<DemandCreatePage> {
                               builder: (context, constraints) {
                                 final cellWidth =
                                     (constraints.maxWidth -
-                                            crossAxisSpacing *
-                                                (crossAxisCount - 1)) /
-                                        crossAxisCount;
+                                        crossAxisSpacing *
+                                            (crossAxisCount - 1)) /
+                                    crossAxisCount;
                                 final cellHeight = cellWidth / childAspectRatio;
                                 final rows =
                                     (hours.length + crossAxisCount - 1) ~/
-                                        crossAxisCount;
-                                final gridHeight = rows * cellHeight +
+                                    crossAxisCount;
+                                final gridHeight =
+                                    rows * cellHeight +
                                     (rows - 1) * mainAxisSpacing;
 
                                 return SizedBox(
@@ -800,13 +809,17 @@ class _DemandCreatePageState extends State<DemandCreatePage> {
                                         details.localPosition,
                                         constraints,
                                       );
-                                      if (hour == null || isDisabledHour(hour)) {
+                                      if (hour == null ||
+                                          isDisabledHour(hour)) {
                                         return;
                                       }
                                       setModalState(() {
                                         if (tempStart == null ||
                                             tempEnd != null) {
-                                          tempStart = atHour(selectedDate, hour);
+                                          tempStart = atHour(
+                                            selectedDate,
+                                            hour,
+                                          );
                                           tempEnd = null;
                                           dragOriginHour = hour;
                                           return;
@@ -825,7 +838,8 @@ class _DemandCreatePageState extends State<DemandCreatePage> {
                                         details.localPosition,
                                         constraints,
                                       );
-                                      if (hour == null || isDisabledHour(hour)) {
+                                      if (hour == null ||
+                                          isDisabledHour(hour)) {
                                         return;
                                       }
                                       setModalState(() {
@@ -841,7 +855,8 @@ class _DemandCreatePageState extends State<DemandCreatePage> {
                                         details.localPosition,
                                         constraints,
                                       );
-                                      if (hour == null || isDisabledHour(hour)) {
+                                      if (hour == null ||
+                                          isDisabledHour(hour)) {
                                         return;
                                       }
                                       setModalState(() {
@@ -855,22 +870,31 @@ class _DemandCreatePageState extends State<DemandCreatePage> {
                                       itemCount: hours.length,
                                       gridDelegate:
                                           const SliverGridDelegateWithFixedCrossAxisCount(
-                                        crossAxisCount: crossAxisCount,
-                                        mainAxisSpacing: mainAxisSpacing,
-                                        crossAxisSpacing: crossAxisSpacing,
-                                        childAspectRatio: childAspectRatio,
-                                      ),
+                                            crossAxisCount: crossAxisCount,
+                                            mainAxisSpacing: mainAxisSpacing,
+                                            crossAxisSpacing: crossAxisSpacing,
+                                            childAspectRatio: childAspectRatio,
+                                          ),
                                       itemBuilder: (context, index) {
                                         final hour = hours[index];
                                         final time = atHour(selectedDate, hour);
                                         final disabled = isDisabledHour(hour);
-                                        final isStart = tempStart != null &&
-                                            _isSameDay(tempStart!, selectedDate) &&
+                                        final isStart =
+                                            tempStart != null &&
+                                            _isSameDay(
+                                              tempStart!,
+                                              selectedDate,
+                                            ) &&
                                             tempStart!.hour == hour;
-                                        final isEnd = tempEnd != null &&
-                                            _isSameDay(tempEnd!, selectedDate) &&
+                                        final isEnd =
+                                            tempEnd != null &&
+                                            _isSameDay(
+                                              tempEnd!,
+                                              selectedDate,
+                                            ) &&
                                             tempEnd!.hour == hour;
-                                        final inRange = tempStart != null &&
+                                        final inRange =
+                                            tempStart != null &&
                                             tempEnd != null &&
                                             time.isAfter(tempStart!) &&
                                             time.isBefore(tempEnd!);
@@ -878,20 +902,22 @@ class _DemandCreatePageState extends State<DemandCreatePage> {
                                         final night = hour >= 20;
 
                                         return AnimatedContainer(
-                                          duration:
-                                              const Duration(milliseconds: 150),
+                                          duration: const Duration(
+                                            milliseconds: 150,
+                                          ),
                                           decoration: BoxDecoration(
                                             color: highlighted
                                                 ? const Color(0xFFC8F26D)
                                                 : inRange
-                                                    ? const Color(0xFFF0F6DA)
-                                                    : disabled
-                                                        ? const Color(0xFFF4F3F8)
-                                                        : Colors.white.withValues(
-                                                            alpha: 0.82,
-                                                          ),
-                                            borderRadius:
-                                                BorderRadius.circular(12),
+                                                ? const Color(0xFFF0F6DA)
+                                                : disabled
+                                                ? const Color(0xFFF4F3F8)
+                                                : Colors.white.withValues(
+                                                    alpha: 0.82,
+                                                  ),
+                                            borderRadius: BorderRadius.circular(
+                                              12,
+                                            ),
                                             border: Border.all(
                                               color: highlighted
                                                   ? const Color(0xFFC8F26D)
@@ -902,14 +928,12 @@ class _DemandCreatePageState extends State<DemandCreatePage> {
                                             children: [
                                               if (night)
                                                 const Positioned(
-                                                  top: 5,
+                                                  top: 6,
                                                   left: 8,
-                                                  child: Text(
-                                                    '夜间',
-                                                    style: TextStyle(
-                                                      fontSize: 10,
-                                                      color: Color(0xFFC78F3A),
-                                                    ),
+                                                  child: Icon(
+                                                    Icons.nights_stay_rounded,
+                                                    size: 11,
+                                                    color: Color(0xFFC78F3A),
                                                   ),
                                                 ),
                                               Center(
@@ -920,7 +944,8 @@ class _DemandCreatePageState extends State<DemandCreatePage> {
                                                     Text(
                                                       '${hour.toString().padLeft(2, '0')}:00',
                                                       style: TextStyle(
-                                                        fontSize: 17,
+                                                        fontSize: 16,
+                                                        height: 1,
                                                         fontWeight: highlighted
                                                             ? FontWeight.w800
                                                             : FontWeight.w500,
@@ -929,27 +954,28 @@ class _DemandCreatePageState extends State<DemandCreatePage> {
                                                                 0xFFC9C7D1,
                                                               )
                                                             : AppColors
-                                                                .textPrimary,
+                                                                  .textPrimary,
                                                       ),
                                                     ),
-                                                    const SizedBox(height: 2),
+                                                    const SizedBox(height: 1),
                                                     Text(
                                                       isStart
                                                           ? '开始'
                                                           : isEnd
-                                                              ? '结束'
-                                                              : '可选',
+                                                          ? '结束'
+                                                          : '可选',
                                                       style: TextStyle(
-                                                        fontSize: 11,
+                                                        fontSize: 9,
+                                                        height: 1,
                                                         color: disabled
                                                             ? const Color(
                                                                 0xFFD5D2DC,
                                                               )
                                                             : highlighted
-                                                                ? AppColors
-                                                                    .textPrimary
-                                                                : AppColors
-                                                                    .textHint,
+                                                            ? AppColors
+                                                                  .textPrimary
+                                                            : AppColors
+                                                                  .textHint,
                                                       ),
                                                     ),
                                                   ],
@@ -1009,9 +1035,9 @@ class _DemandCreatePageState extends State<DemandCreatePage> {
                           child: ElevatedButton(
                             onPressed: canConfirm
                                 ? () => Navigator.pop(context, {
-                                      'start': tempStart!,
-                                      'end': tempEnd!,
-                                    })
+                                    'start': tempStart!,
+                                    'end': tempEnd!,
+                                  })
                                 : null,
                             style: ElevatedButton.styleFrom(
                               backgroundColor: const Color(0xFF242934),
@@ -1095,7 +1121,7 @@ class _DemandCreatePageState extends State<DemandCreatePage> {
       ScaffoldMessenger.of(
         context,
       ).showSnackBar(const SnackBar(content: Text('需求已发布')));
-      context.pop();
+      context.go('/demands');
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(
@@ -1168,7 +1194,7 @@ class _DemandCreatePageState extends State<DemandCreatePage> {
                             ),
                           )
                         : const Text(
-                            '立即获取报价',
+                            '发布需求',
                             style: TextStyle(
                               fontSize: 16,
                               fontWeight: FontWeight.w700,
@@ -1339,7 +1365,7 @@ class _DemandCreatePageState extends State<DemandCreatePage> {
                 const SizedBox(width: 10),
                 const Expanded(
                   child: Text(
-                    '本服务由**保险全程保障您的人身财产安全',
+                    '本服务由平台合作保险全程保障您的人身财产安全',
                     style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600),
                   ),
                 ),
@@ -1432,6 +1458,18 @@ class _DemandCreatePageState extends State<DemandCreatePage> {
         ],
       ),
     );
+  }
+
+  String _normalizeCityName(String? raw) {
+    final city = (raw ?? '').trim();
+    if (city.isEmpty) return '';
+    const suffixes = ['特别行政区', '自治州', '自治县', '自治区', '地区', '盟', '市'];
+    for (final suffix in suffixes) {
+      if (city.endsWith(suffix) && city.length > suffix.length) {
+        return city.substring(0, city.length - suffix.length);
+      }
+    }
+    return city;
   }
 
   Widget _bottomAction(

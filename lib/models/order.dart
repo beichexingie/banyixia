@@ -17,6 +17,9 @@ class Order {
   final OrderStatus status;
   final double amount;
   final String serviceName;
+  final String paymentMethod;
+  final String paymentStatus;
+  final String? paymentRequestId;
   final DateTime createdAt;
   final DateTime? serviceDate;
 
@@ -29,6 +32,9 @@ class Order {
     required this.status,
     required this.amount,
     this.serviceName = '',
+    this.paymentMethod = '',
+    this.paymentStatus = '',
+    this.paymentRequestId,
     DateTime? createdAt,
     this.serviceDate,
   }) : createdAt = createdAt ?? DateTime.now();
@@ -43,6 +49,9 @@ class Order {
       status: OrderStatus.values[json['status'] ?? 0],
       amount: (json['amount'] ?? 0).toDouble(),
       serviceName: json['service_name'] ?? '',
+      paymentMethod: json['payment_method'] ?? '',
+      paymentStatus: json['payment_status'] ?? '',
+      paymentRequestId: json['payment_request_id']?.toString(),
       createdAt: json['created_at'] != null
           ? DateTime.tryParse(json['created_at']) ?? DateTime.now()
           : DateTime.now(),
@@ -61,6 +70,9 @@ class Order {
       'status': status.index,
       'amount': amount,
       'service_name': serviceName,
+      'payment_method': paymentMethod,
+      'payment_status': paymentStatus,
+      if (paymentRequestId != null) 'payment_request_id': paymentRequestId,
       'created_at': createdAt.toIso8601String(),
     };
     if (id.isNotEmpty) {
