@@ -1,7 +1,8 @@
 import 'dart:convert';
-import 'dart:io';
+import 'dart:math' as math;
 
 import 'package:geolocator/geolocator.dart';
+import 'package:http/http.dart' as http;
 
 class MapSuggestion {
   final String name;
@@ -79,6 +80,8 @@ class AmapApiException implements Exception {
 
 class AmapMapService implements MapService {
   final String apiKey;
+  static const double _earthRadius = 6378245.0;
+  static const double _eccentricity = 0.00669342162296594323;
 
   const AmapMapService({this.apiKey = ''});
 
@@ -113,7 +116,10 @@ class AmapMapService implements MapService {
       if (item is! Map) {
         return const MapSuggestion(name: '', city: '');
       }
-      final location = _parseLocation(item['location']?.toString());
+      final gcjLocation = _parseLocation(item['location']?.toString());
+      final location = gcjLocation == null
+          ? null
+          : _gcj02ToWgs84(gcjLocation.$1!, gcjLocation.$2!);
       return MapSuggestion(
         name: item['name']?.toString() ?? '',
         city: item['city']?.toString() ?? city?.trim() ?? '',
@@ -148,7 +154,10 @@ class AmapMapService implements MapService {
 
     final first = geocodes.first;
     if (first is! Map) return null;
-    final location = _parseLocation(first['location']?.toString());
+    final gcjLocation = _parseLocation(first['location']?.toString());
+    final location = gcjLocation == null
+        ? null
+        : _gcj02ToWgs84(gcjLocation.$1!, gcjLocation.$2!);
 
     return MapPosition(
       formattedAddress: first['formatted_address']?.toString() ?? address.trim(),
@@ -165,13 +174,14 @@ class AmapMapService implements MapService {
     required double longitude,
   }) async {
     if (!_isEnabled) return null;
+    final gcjLocation = _wgs84ToGcj02(latitude, longitude);
 
     final uri = Uri.https(
       'restapi.amap.com',
       '/v3/geocode/regeo',
       <String, String>{
         'key': apiKey.trim(),
-        'location': '$longitude,$latitude',
+        'location': '${gcjLocation.$2},${gcjLocation.$1}',
         'radius': '1000',
         'extensions': 'base',
       },
@@ -202,15 +212,16 @@ class AmapMapService implements MapService {
     int height = 320,
   }) {
     if (!_isEnabled) return '';
+    final gcjLocation = _wgs84ToGcj02(latitude, longitude);
     return Uri.https(
       'restapi.amap.com',
       '/v3/staticmap',
       <String, String>{
         'key': apiKey.trim(),
-        'location': '$longitude,$latitude',
+        'location': '${gcjLocation.$2},${gcjLocation.$1}',
         'zoom': zoom.toString(),
         'size': '${width}*${height}',
-        'markers': 'mid,,A:$longitude,$latitude',
+        'markers': 'mid,,A:${gcjLocation.$2},${gcjLocation.$1}',
       },
     ).toString();
   }
@@ -250,23 +261,18 @@ class AmapMapService implements MapService {
   }
 
   Future<Map<String, dynamic>?> _getJson(Uri uri) async {
-    final client = HttpClient();
     try {
-      final request = await client.getUrl(uri);
-      final response = await request.close();
+      final response = await http.get(uri);
       if (response.statusCode < 200 || response.statusCode >= 300) {
         return null;
       }
-      final body = await utf8.decoder.bind(response).join();
-      final decoded = jsonDecode(body);
+      final decoded = jsonDecode(response.body);
       if (decoded is Map<String, dynamic>) {
         return decoded;
       }
       return null;
     } catch (_) {
       return null;
-    } finally {
-      client.close(force: true);
     }
   }
 
@@ -307,6 +313,98 @@ class AmapMapService implements MapService {
   String _extractDistrict(dynamic addressComponent) {
     if (addressComponent is! Map) return '';
     return addressComponent['district']?.toString() ?? '';
+  }
+
+  (double, double) _wgs84ToGcj02(double latitude, double longitude) {
+    if (_outOfChina(latitude, longitude)) return (latitude, longitude);
+    final dLat = _transformLatitude(longitude - 105.0, latitude - 35.0);
+    final dLng = _transformLongitude(longitude - 105.0, latitude - 35.0);
+    final radLat = latitude / 180.0 * 3.1415926535897932384626;
+    final magic = 1 - _eccentricity * math.sin(radLat) * math.sin(radLat);
+    final sqrtMagic = math.sqrt(magic);
+    final mgLat = latitude +
+        (dLat * 180.0) /
+            ((_earthRadius * (1 - _eccentricity)) / (magic * sqrtMagic) *
+                3.1415926535897932384626);
+    final mgLng = longitude +
+        (dLng * 180.0) /
+            (_earthRadius / sqrtMagic *
+                math.cos(radLat) *
+                3.1415926535897932384626);
+    return (mgLat, mgLng);
+  }
+
+  (double, double) _gcj02ToWgs84(double latitude, double longitude) {
+    if (_outOfChina(latitude, longitude)) return (latitude, longitude);
+    final converted = _wgs84ToGcj02(latitude, longitude);
+    return (latitude * 2 - converted.$1, longitude * 2 - converted.$2);
+  }
+
+  bool _outOfChina(double latitude, double longitude) {
+    return longitude < 72.004 ||
+        longitude > 137.8347 ||
+        latitude < 0.8293 ||
+        latitude > 55.8271;
+  }
+
+  double _transformLatitude(double longitude, double latitude) {
+    var value = -100.0 +
+        2.0 * longitude +
+        3.0 * latitude +
+        0.2 * latitude * latitude +
+        0.1 * longitude * latitude +
+        0.2 * math.sqrt(longitude.abs());
+    value +=
+        (20.0 * math.sin(6.0 * longitude * 3.1415926535897932384626) +
+                20.0 * math.sin(2.0 * longitude * 3.1415926535897932384626)) *
+            2.0 /
+            3.0;
+    value +=
+        (20.0 * math.sin(latitude * 3.1415926535897932384626) +
+                40.0 *
+                    math.sin(latitude / 3.0 * 3.1415926535897932384626)) *
+            2.0 /
+            3.0;
+    value +=
+        (160.0 *
+                    math.sin(latitude / 12.0 * 3.1415926535897932384626) +
+                320 *
+                    math.sin(
+                      latitude * 3.1415926535897932384626 / 30.0,
+                    )) *
+            2.0 /
+            3.0;
+    return value;
+  }
+
+  double _transformLongitude(double longitude, double latitude) {
+    var value = 300.0 +
+        longitude +
+        2.0 * latitude +
+        0.1 * longitude * longitude +
+        0.1 * longitude * latitude +
+        0.1 * math.sqrt(longitude.abs());
+    value +=
+        (20.0 * math.sin(6.0 * longitude * 3.1415926535897932384626) +
+                20.0 * math.sin(2.0 * longitude * 3.1415926535897932384626)) *
+            2.0 /
+            3.0;
+    value +=
+        (20.0 * math.sin(longitude * 3.1415926535897932384626) +
+                40.0 *
+                    math.sin(longitude / 3.0 * 3.1415926535897932384626)) *
+            2.0 /
+            3.0;
+    value +=
+        (150.0 *
+                    math.sin(longitude / 12.0 * 3.1415926535897932384626) +
+                300.0 *
+                    math.sin(
+                      longitude / 30.0 * 3.1415926535897932384626,
+                    )) *
+            2.0 /
+            3.0;
+    return value;
   }
 }
 

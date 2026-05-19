@@ -1,4 +1,5 @@
-import 'package:flutter/foundation.dart';
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_map/flutter_map.dart';
 import 'package:go_router/go_router.dart';
@@ -48,13 +49,9 @@ class _LocationPickerPageState extends State<LocationPickerPage> {
   LatLng _cameraTarget = _defaultLatLng;
   LatLng? _lastResolvedTarget;
   int _reverseGeocodeToken = 0;
+  Timer? _reverseGeocodeDebounce;
 
   bool get _hasWebServiceKey => AmapConfig.webServiceKey.trim().isNotEmpty;
-  bool get _isWindowsPlatform => !kIsWeb && defaultTargetPlatform == TargetPlatform.windows;
-  bool get _isMobilePlatform =>
-      !kIsWeb &&
-      (defaultTargetPlatform == TargetPlatform.android ||
-          defaultTargetPlatform == TargetPlatform.iOS);
 
   static const List<_CityEntry> _cities = [
     _CityEntry('A', '阿坝藏族羌族自治州'),
@@ -391,6 +388,7 @@ class _LocationPickerPageState extends State<LocationPickerPage> {
 
   @override
   void dispose() {
+    _reverseGeocodeDebounce?.cancel();
     _searchController.dispose();
     _scrollController.dispose();
     super.dispose();
@@ -595,16 +593,25 @@ class _LocationPickerPageState extends State<LocationPickerPage> {
     final lng = position.longitude;
     if (lat == null || lng == null) return;
     final target = LatLng(lat, lng);
+    _reverseGeocodeDebounce?.cancel();
+    _reverseGeocodeToken++;
     _cameraTarget = target;
     _mapCenter = target;
-    if (!_isWindowsPlatform && !_isMobilePlatform) {
-      _mapController.move(target, _mapZoom);
-    } else if (mounted) {
-      setState(() {});
-    }
+    _mapController.move(target, _mapZoom);
+  }
+
+  void _scheduleReverseGeocode(LatLng target) {
+    if (!_hasWebServiceKey) return;
+    _reverseGeocodeDebounce?.cancel();
+    _reverseGeocodeToken++;
+    _reverseGeocodeDebounce = Timer(
+      const Duration(milliseconds: 700),
+      () => _handleMapMoveEnd(target),
+    );
   }
 
   Future<void> _handleMapMoveEnd(LatLng target) async {
+    _reverseGeocodeDebounce?.cancel();
     _cameraTarget = target;
     _mapCenter = target;
     if (!_hasWebServiceKey) return;
@@ -650,7 +657,7 @@ class _LocationPickerPageState extends State<LocationPickerPage> {
         (a.longitude - b.longitude).abs() < 0.00001;
   }
 
-  LatLng _pointFromDesktopTap(Offset localPosition, Size size) {
+  /* LatLng _pointFromDesktopTap(Offset localPosition, Size size) {
     final dx = localPosition.dx - size.width / 2;
     final dy = localPosition.dy - size.height / 2;
     final lngSpan = 360 / (1 << _mapZoom.round().clamp(3, 18));
@@ -658,7 +665,7 @@ class _LocationPickerPageState extends State<LocationPickerPage> {
     final longitude = _cameraTarget.longitude + dx / size.width * lngSpan;
     final latitude = _cameraTarget.latitude - dy / size.height * latSpan;
     return LatLng(latitude.clamp(-85.0, 85.0), longitude.clamp(-180.0, 180.0));
-  }
+  } */
 
   @override
   Widget build(BuildContext context) {
@@ -1093,10 +1100,6 @@ class _LocationPickerPageState extends State<LocationPickerPage> {
       );
     }
 
-    if (_isWindowsPlatform || _isMobilePlatform) {
-      return _buildWindowsMapArea();
-    }
-
     return Container(
       height: 280,
       clipBehavior: Clip.antiAlias,
@@ -1124,8 +1127,8 @@ class _LocationPickerPageState extends State<LocationPickerPage> {
                   _mapCenter = camera.center;
                   _mapZoom = camera.zoom;
                   _cameraTarget = camera.center;
-                  if (!hasGesture) {
-                    _handleMapMoveEnd(camera.center);
+                  if (hasGesture) {
+                    _scheduleReverseGeocode(camera.center);
                   }
                 },
               ),
@@ -1204,7 +1207,7 @@ class _LocationPickerPageState extends State<LocationPickerPage> {
     );
   }
 
-  Widget _buildWindowsMapArea() {
+  /* Widget _buildWindowsMapArea() {
     if (!_hasWebServiceKey) {
       return _buildMapMessageCard(
         title: '请先填写高德 Web Service Key',
@@ -1344,7 +1347,7 @@ class _LocationPickerPageState extends State<LocationPickerPage> {
         ],
       ),
     );
-  }
+  } */
 
   String _normalizeCityName(String? raw) {
     final city = (raw ?? '').trim();
@@ -1409,7 +1412,7 @@ class _LocationPickerPageState extends State<LocationPickerPage> {
     );
   }
 
-  Widget _buildMapFallback() {
+  /* Widget _buildMapFallback() {
     return Container(
       color: const Color(0xFFEAF1FF),
       alignment: Alignment.center,
@@ -1432,9 +1435,9 @@ class _LocationPickerPageState extends State<LocationPickerPage> {
         ],
       ),
     );
-  }
+  } */
 
-  Widget _buildDesktopMapPad() {
+  /* Widget _buildDesktopMapPad() {
     return Container(
       padding: const EdgeInsets.all(8),
       decoration: BoxDecoration(
@@ -1527,7 +1530,7 @@ class _LocationPickerPageState extends State<LocationPickerPage> {
       _mapZoom = (_mapZoom + delta).clamp(3, 18).toDouble();
     });
     await _handleMapMoveEnd(_cameraTarget);
-  }
+  } */
 
   Widget _buildMapMessageCard({
     required String title,
