@@ -1,8 +1,10 @@
 import 'dart:convert';
 import 'dart:math' as math;
 
+import 'package:flutter/foundation.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:http/http.dart' as http;
+import 'package:latlong2/latlong.dart';
 
 class MapSuggestion {
   final String name;
@@ -119,7 +121,7 @@ class AmapMapService implements MapService {
       final gcjLocation = _parseLocation(item['location']?.toString());
       final location = gcjLocation == null
           ? null
-          : _gcj02ToWgs84(gcjLocation.$1!, gcjLocation.$2!);
+          : _gcj02ToWgs84Exact(gcjLocation.$1!, gcjLocation.$2!);
       return MapSuggestion(
         name: item['name']?.toString() ?? '',
         city: item['city']?.toString() ?? city?.trim() ?? '',
@@ -157,7 +159,7 @@ class AmapMapService implements MapService {
     final gcjLocation = _parseLocation(first['location']?.toString());
     final location = gcjLocation == null
         ? null
-        : _gcj02ToWgs84(gcjLocation.$1!, gcjLocation.$2!);
+        : _gcj02ToWgs84Exact(gcjLocation.$1!, gcjLocation.$2!);
 
     return MapPosition(
       formattedAddress: first['formatted_address']?.toString() ?? address.trim(),
@@ -252,12 +254,49 @@ class AmapMapService implements MapService {
     }
 
     final position = await Geolocator.getCurrentPosition(
-      desiredAccuracy: LocationAccuracy.high,
+      desiredAccuracy: LocationAccuracy.bestForNavigation,
     );
+    final rawPoint = LatLng(position.latitude, position.longitude);
+    final normalizedPoint =
+        _shouldTreatDeviceLocationAsGcj(rawPoint)
+            ? toWgs84LatLng(rawPoint)
+            : rawPoint;
+
     return reverseGeocode(
-      latitude: position.latitude,
-      longitude: position.longitude,
+      latitude: normalizedPoint.latitude,
+      longitude: normalizedPoint.longitude,
     );
+  }
+
+  LatLng toGcj02LatLng(LatLng point) {
+    final converted = _wgs84ToGcj02(point.latitude, point.longitude);
+    return LatLng(converted.$1, converted.$2);
+  }
+
+  LatLng toWgs84LatLng(LatLng point) {
+    final converted = _gcj02ToWgs84Exact(point.latitude, point.longitude);
+    return LatLng(converted.$1, converted.$2);
+  }
+
+  bool _shouldTreatDeviceLocationAsGcj(LatLng point) {
+    if (_outOfChina(point.latitude, point.longitude)) {
+      return false;
+    }
+
+    if (kIsWeb) {
+      return true;
+    }
+
+    switch (defaultTargetPlatform) {
+      case TargetPlatform.windows:
+      case TargetPlatform.macOS:
+      case TargetPlatform.linux:
+        return true;
+      case TargetPlatform.android:
+      case TargetPlatform.iOS:
+      case TargetPlatform.fuchsia:
+        return false;
+    }
   }
 
   Future<Map<String, dynamic>?> _getJson(Uri uri) async {
@@ -338,6 +377,23 @@ class AmapMapService implements MapService {
     if (_outOfChina(latitude, longitude)) return (latitude, longitude);
     final converted = _wgs84ToGcj02(latitude, longitude);
     return (latitude * 2 - converted.$1, longitude * 2 - converted.$2);
+  }
+
+  (double, double) _gcj02ToWgs84Exact(double latitude, double longitude) {
+    if (_outOfChina(latitude, longitude)) return (latitude, longitude);
+
+    var guessLat = latitude;
+    var guessLng = longitude;
+    for (var i = 0; i < 8; i++) {
+      final converted = _wgs84ToGcj02(guessLat, guessLng);
+      final dLat = converted.$1 - latitude;
+      final dLng = converted.$2 - longitude;
+      guessLat -= dLat;
+      guessLng -= dLng;
+      if (dLat.abs() < 1e-7 && dLng.abs() < 1e-7) break;
+    }
+
+    return (guessLat, guessLng);
   }
 
   bool _outOfChina(double latitude, double longitude) {

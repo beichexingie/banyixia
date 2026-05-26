@@ -1,7 +1,7 @@
 import 'dart:async';
+import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
-import 'package:flutter_map/flutter_map.dart';
 import 'package:go_router/go_router.dart';
 import 'package:latlong2/latlong.dart';
 
@@ -28,6 +28,8 @@ class LocationPickerPage extends StatefulWidget {
 class _LocationPickerPageState extends State<LocationPickerPage> {
   static const LatLng _defaultLatLng = LatLng(31.299379, 120.619585);
   static const double _defaultZoom = 15;
+  static const String _amapTileUrl =
+      'https://webrd0{s}.is.autonavi.com/appmaptile?lang=zh_cn&size=1&scale=1&style=7&x={x}&y={y}&z={z}';
 
   late final TextEditingController _searchController;
   late final ScrollController _scrollController;
@@ -35,6 +37,7 @@ class _LocationPickerPageState extends State<LocationPickerPage> {
     apiKey: AmapConfig.webServiceKey,
   );
   final Map<String, GlobalKey> _sectionKeys = {};
+  final ValueNotifier<int> _mapPanelVersion = ValueNotifier<int>(0);
 
   late String _selectedAddress;
   late String _selectedCity;
@@ -43,15 +46,17 @@ class _LocationPickerPageState extends State<LocationPickerPage> {
   String? _locationSummary;
   bool _searching = false;
   bool _locatingFromMap = false;
-  final MapController _mapController = MapController();
-  LatLng _mapCenter = _defaultLatLng;
   double _mapZoom = _defaultZoom;
-  LatLng _cameraTarget = _defaultLatLng;
+  LatLng _mapTarget = _defaultLatLng;
+  Offset _mapDragOffset = Offset.zero;
+  LatLng? _dragStartTarget;
   LatLng? _lastResolvedTarget;
   int _reverseGeocodeToken = 0;
   Timer? _reverseGeocodeDebounce;
 
   bool get _hasWebServiceKey => AmapConfig.webServiceKey.trim().isNotEmpty;
+  AmapMapService? get _amapMapService =>
+      _mapService is AmapMapService ? _mapService as AmapMapService : null;
 
   static const List<_CityEntry> _cities = [
     _CityEntry('A', '阿坝藏族羌族自治州'),
@@ -389,9 +394,14 @@ class _LocationPickerPageState extends State<LocationPickerPage> {
   @override
   void dispose() {
     _reverseGeocodeDebounce?.cancel();
+    _mapPanelVersion.dispose();
     _searchController.dispose();
     _scrollController.dispose();
     super.dispose();
+  }
+
+  void _notifyMapPanelChanged() {
+    _mapPanelVersion.value++;
   }
 
   Map<String, dynamic> _buildSelectionResult() {
@@ -582,10 +592,10 @@ class _LocationPickerPageState extends State<LocationPickerPage> {
       _selectedCity = _normalizeCityName(city);
       _locationSummary = address;
       if (lat != null && lng != null) {
-        _cameraTarget = LatLng(lat, lng);
-        _mapCenter = _cameraTarget;
+        _mapTarget = _displayTargetFromWgs84(LatLng(lat, lng));
       }
     });
+    _notifyMapPanelChanged();
   }
 
   Future<void> _moveMapToResolvedPosition(MapPosition position) async {
@@ -595,9 +605,12 @@ class _LocationPickerPageState extends State<LocationPickerPage> {
     final target = LatLng(lat, lng);
     _reverseGeocodeDebounce?.cancel();
     _reverseGeocodeToken++;
-    _cameraTarget = target;
-    _mapCenter = target;
-    _mapController.move(target, _mapZoom);
+    if (!mounted) return;
+    final displayTarget = _displayTargetFromWgs84(target);
+    setState(() {
+      _mapTarget = displayTarget;
+    });
+    _notifyMapPanelChanged();
   }
 
   void _scheduleReverseGeocode(LatLng target) {
@@ -612,30 +625,34 @@ class _LocationPickerPageState extends State<LocationPickerPage> {
 
   Future<void> _handleMapMoveEnd(LatLng target) async {
     _reverseGeocodeDebounce?.cancel();
-    _cameraTarget = target;
-    _mapCenter = target;
+    _mapTarget = target;
+    _notifyMapPanelChanged();
     if (!_hasWebServiceKey) return;
-    if (_lastResolvedTarget != null && _isSamePoint(_lastResolvedTarget!, target)) {
+    final wgsTarget = _requestTargetFromDisplay(target);
+    if (_lastResolvedTarget != null &&
+        _isSamePoint(_lastResolvedTarget!, wgsTarget)) {
       return;
     }
     final token = ++_reverseGeocodeToken;
     setState(() => _locatingFromMap = true);
+    _notifyMapPanelChanged();
     try {
       final result = await _mapService.reverseGeocode(
-        latitude: target.latitude,
-        longitude: target.longitude,
+        latitude: wgsTarget.latitude,
+        longitude: wgsTarget.longitude,
       );
       if (!mounted || token != _reverseGeocodeToken) return;
-      _lastResolvedTarget = target;
+      _lastResolvedTarget = wgsTarget;
       if (result == null) {
         setState(() {
           _selectedPosition = MapPosition(
             formattedAddress: _locationSummary ?? _selectedAddress,
             city: _selectedCity,
-            latitude: target.latitude,
-            longitude: target.longitude,
+            latitude: wgsTarget.latitude,
+            longitude: wgsTarget.longitude,
           );
         });
+        _notifyMapPanelChanged();
         return;
       }
       _applyResolvedPosition(result);
@@ -648,6 +665,7 @@ class _LocationPickerPageState extends State<LocationPickerPage> {
     } finally {
       if (mounted && token == _reverseGeocodeToken) {
         setState(() => _locatingFromMap = false);
+        _notifyMapPanelChanged();
       }
     }
   }
@@ -655,6 +673,280 @@ class _LocationPickerPageState extends State<LocationPickerPage> {
   bool _isSamePoint(LatLng a, LatLng b) {
     return (a.latitude - b.latitude).abs() < 0.00001 &&
         (a.longitude - b.longitude).abs() < 0.00001;
+  }
+
+  double _worldSize(double zoom) {
+    return 256 * math.pow(2, zoom).toDouble();
+  }
+
+  double _longitudeToPixelX(double longitude, double zoom) {
+    return (longitude + 180.0) / 360.0 * _worldSize(zoom);
+  }
+
+  double _latitudeToPixelY(double latitude, double zoom) {
+    final clamped = latitude.clamp(-85.05112878, 85.05112878).toDouble();
+    final radian = clamped * math.pi / 180.0;
+    return (1 -
+            math.log(math.tan(radian) + 1 / math.cos(radian)) / math.pi) /
+        2 *
+        _worldSize(zoom);
+  }
+
+  LatLng _pixelToLatLng(double pixelX, double pixelY, double zoom) {
+    final size = _worldSize(zoom);
+    final longitude = pixelX / size * 360.0 - 180.0;
+    final n = math.pi - 2.0 * math.pi * pixelY / size;
+    final latitude =
+        180.0 / math.pi * math.atan(0.5 * (math.exp(n) - math.exp(-n)));
+    return LatLng(latitude, longitude);
+  }
+
+  LatLng _offsetTarget(LatLng center, Offset pixelOffset, double zoom) {
+    final pixelX = _longitudeToPixelX(center.longitude, zoom) + pixelOffset.dx;
+    final pixelY = _latitudeToPixelY(center.latitude, zoom) + pixelOffset.dy;
+    return _pixelToLatLng(pixelX, pixelY, zoom);
+  }
+
+  LatLng _targetFromTap(Offset localPosition, Size size) {
+    final pixelOffset = Offset(
+      localPosition.dx - size.width / 2,
+      localPosition.dy - size.height / 2,
+    );
+    return _offsetTarget(_mapTarget, pixelOffset, _mapZoom);
+  }
+
+  void _beginMapDrag() {
+    _reverseGeocodeDebounce?.cancel();
+    _reverseGeocodeToken++;
+    _dragStartTarget = _mapTarget;
+    _mapDragOffset = Offset.zero;
+  }
+
+  void _updateMapDrag(Offset delta) {
+    if (_dragStartTarget == null) return;
+    final nextOffset = _mapDragOffset + delta;
+    final previewTarget = _offsetTarget(
+      _dragStartTarget!,
+      Offset(-nextOffset.dx, -nextOffset.dy),
+      _mapZoom,
+    );
+    setState(() {
+      _mapDragOffset = nextOffset;
+      _mapTarget = previewTarget;
+    });
+    _notifyMapPanelChanged();
+  }
+
+  Future<void> _finishMapDrag() async {
+    final target = _mapTarget;
+    setState(() {
+      _mapDragOffset = Offset.zero;
+      _dragStartTarget = null;
+    });
+    _notifyMapPanelChanged();
+    _scheduleReverseGeocode(target);
+  }
+
+  void _cancelMapDrag() {
+    final target = _dragStartTarget;
+    if (target == null) return;
+    setState(() {
+      _mapTarget = target;
+      _mapDragOffset = Offset.zero;
+      _dragStartTarget = null;
+    });
+    _notifyMapPanelChanged();
+  }
+
+  void _changeMapZoom(int delta) {
+    setState(() {
+      _mapZoom = (_mapZoom + delta).clamp(3, 18).toDouble();
+    });
+    _notifyMapPanelChanged();
+  }
+
+  String _buildAmapTileUrl(int x, int y, int z) {
+    final subdomain = ((x + y).abs() % 4) + 1;
+    return _amapTileUrl
+        .replaceFirst('{s}', subdomain.toString())
+        .replaceFirst('{x}', x.toString())
+        .replaceFirst('{y}', y.toString())
+        .replaceFirst('{z}', z.toString());
+  }
+
+  Widget _buildMapZoomButton({
+    required IconData icon,
+    required VoidCallback onTap,
+  }) {
+    return Material(
+      color: Colors.white.withValues(alpha: 0.95),
+      borderRadius: BorderRadius.circular(12),
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(12),
+        child: SizedBox(
+          width: 36,
+          height: 36,
+          child: Icon(icon, size: 18, color: AppColors.primary),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildAmapTileSurface() {
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final size = Size(constraints.maxWidth, constraints.maxHeight);
+        final zoom = _mapZoom.round().clamp(3, 18);
+        final zoomDouble = zoom.toDouble();
+        final tileCount = 1 << zoom;
+        final centerX = _longitudeToPixelX(_mapTarget.longitude, zoomDouble);
+        final centerY = _latitudeToPixelY(_mapTarget.latitude, zoomDouble);
+        final topLeftX = centerX - size.width / 2;
+        final topLeftY = centerY - size.height / 2;
+        final startTileX = (topLeftX / 256).floor() - 1;
+        final endTileX = ((topLeftX + size.width) / 256).floor() + 1;
+        final startTileY = (topLeftY / 256).floor() - 1;
+        final endTileY = ((topLeftY + size.height) / 256).floor() + 1;
+
+        final tiles = <Widget>[];
+        for (var tileY = startTileY; tileY <= endTileY; tileY++) {
+          if (tileY < 0 || tileY >= tileCount) continue;
+          for (var tileX = startTileX; tileX <= endTileX; tileX++) {
+            final wrappedX = ((tileX % tileCount) + tileCount) % tileCount;
+            final left = tileX * 256 - topLeftX;
+            final top = tileY * 256 - topLeftY;
+            tiles.add(
+              Positioned(
+                left: left,
+                top: top,
+                width: 256,
+                height: 256,
+                child: Image.network(
+                  _buildAmapTileUrl(wrappedX, tileY, zoom),
+                  fit: BoxFit.cover,
+                  errorBuilder: (_, __, ___) => Container(
+                    color: const Color(0xFFEAF1FF),
+                    alignment: Alignment.center,
+                    child: const Icon(
+                      Icons.map_outlined,
+                      size: 18,
+                      color: AppColors.textHint,
+                    ),
+                  ),
+                ),
+              ),
+            );
+          }
+        }
+
+        return GestureDetector(
+          behavior: HitTestBehavior.opaque,
+          onTapUp: (details) async {
+            final target = _targetFromTap(details.localPosition, size);
+            setState(() => _mapTarget = target);
+            _notifyMapPanelChanged();
+            await _handleMapMoveEnd(target);
+          },
+          onPanStart: (_) => _beginMapDrag(),
+          onPanUpdate: (details) => _updateMapDrag(details.delta),
+          onPanEnd: (_) => _finishMapDrag(),
+          onPanCancel: _cancelMapDrag,
+          child: Stack(children: tiles),
+        );
+      },
+    );
+  }
+
+  Future<void> _openFullscreenMap() async {
+    await Navigator.of(context).push(
+      MaterialPageRoute<void>(
+        builder: (context) {
+          return ValueListenableBuilder<int>(
+            valueListenable: _mapPanelVersion,
+            builder: (context, _, __) {
+              return Scaffold(
+                backgroundColor: Colors.white,
+                body: SafeArea(
+                  child: Column(
+                    children: [
+                      Padding(
+                        padding: const EdgeInsets.fromLTRB(12, 8, 12, 8),
+                        child: Row(
+                          children: [
+                            IconButton(
+                              onPressed: () => Navigator.of(context).pop(),
+                              icon: const Icon(Icons.arrow_back_ios_new, size: 18),
+                            ),
+                            const Expanded(
+                              child: Text(
+                                '地图选点',
+                                style: TextStyle(
+                                  fontSize: 18,
+                                  fontWeight: FontWeight.w700,
+                                  color: AppColors.textPrimary,
+                                ),
+                              ),
+                            ),
+                            TextButton.icon(
+                              onPressed: _useCurrentLocation,
+                              icon: const Icon(Icons.my_location_outlined, size: 18),
+                              label: const Text('定位'),
+                              style: TextButton.styleFrom(
+                                foregroundColor: AppColors.textSecondary,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                      Expanded(
+                        child: Padding(
+                          padding: const EdgeInsets.fromLTRB(12, 0, 12, 12),
+                          child: _buildMapPanel(isFullscreen: true),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              );
+            },
+          );
+        },
+      ),
+    );
+  }
+
+
+
+
+
+
+
+
+
+  Widget _buildStaticMapFallback() {
+    return Container(
+      color: const Color(0xFFEAF1FF),
+      alignment: Alignment.center,
+      child: const Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(
+            Icons.map_outlined,
+            size: 42,
+            color: AppColors.primary,
+          ),
+          SizedBox(height: 10),
+          Text(
+            '地图暂时加载失败',
+            style: TextStyle(
+              fontSize: 13,
+              color: AppColors.textSecondary,
+            ),
+          ),
+        ],
+      ),
+    );
   }
 
   /* LatLng _pointFromDesktopTap(Offset localPosition, Size size) {
@@ -666,6 +958,14 @@ class _LocationPickerPageState extends State<LocationPickerPage> {
     final latitude = _cameraTarget.latitude - dy / size.height * latSpan;
     return LatLng(latitude.clamp(-85.0, 85.0), longitude.clamp(-180.0, 180.0));
   } */
+
+  LatLng _displayTargetFromWgs84(LatLng point) {
+    return _amapMapService?.toGcj02LatLng(point) ?? point;
+  }
+
+  LatLng _requestTargetFromDisplay(LatLng point) {
+    return _amapMapService?.toWgs84LatLng(point) ?? point;
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -1092,7 +1392,31 @@ class _LocationPickerPageState extends State<LocationPickerPage> {
     );
   }
 
-  Widget _buildMapArea() {
+  Widget _buildMapActionColumn({required bool showFullscreenButton}) {
+    return Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        if (showFullscreenButton) ...[
+          _buildMapZoomButton(
+            icon: Icons.fullscreen,
+            onTap: _openFullscreenMap,
+          ),
+          const SizedBox(width: 8),
+        ],
+        _buildMapZoomButton(
+          icon: Icons.add,
+          onTap: () => _changeMapZoom(1),
+        ),
+        const SizedBox(width: 8),
+        _buildMapZoomButton(
+          icon: Icons.remove,
+          onTap: () => _changeMapZoom(-1),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildMapPanel({bool isFullscreen = false}) {
     if (!_hasWebServiceKey) {
       return _buildMapMessageCard(
         title: '请先填写高德 Web Service Key',
@@ -1100,45 +1424,24 @@ class _LocationPickerPageState extends State<LocationPickerPage> {
       );
     }
 
+    final screenWidth = MediaQuery.sizeOf(context).width;
+    final bottomHintWidthFactor = screenWidth < 600
+        ? 0.93
+        : isFullscreen
+        ? 0.84
+        : 0.78;
+
     return Container(
-      height: 280,
+      height: isFullscreen ? null : 360,
       clipBehavior: Clip.antiAlias,
       decoration: BoxDecoration(
-        borderRadius: BorderRadius.circular(20),
+        borderRadius: BorderRadius.circular(isFullscreen ? 24 : 20),
         border: Border.all(color: const Color(0xFFD7E4FF)),
       ),
       child: Stack(
         children: [
           Positioned.fill(
-            child: FlutterMap(
-              mapController: _mapController,
-              options: MapOptions(
-                initialCenter: _mapCenter,
-                initialZoom: _mapZoom,
-                interactionOptions: const InteractionOptions(
-                  flags: InteractiveFlag.drag | InteractiveFlag.pinchZoom,
-                ),
-                onTap: (tapPosition, point) async {
-                  _mapCenter = point;
-                  _mapController.move(point, _mapZoom);
-                  await _handleMapMoveEnd(point);
-                },
-                onPositionChanged: (camera, hasGesture) {
-                  _mapCenter = camera.center;
-                  _mapZoom = camera.zoom;
-                  _cameraTarget = camera.center;
-                  if (hasGesture) {
-                    _scheduleReverseGeocode(camera.center);
-                  }
-                },
-              ),
-              children: [
-                TileLayer(
-                  urlTemplate: 'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
-                  userAgentPackageName: 'com.example.flutter_application_1',
-                ),
-              ],
-            ),
+            child: _buildAmapTileSurface(),
           ),
           Positioned(
             left: 14,
@@ -1155,56 +1458,71 @@ class _LocationPickerPageState extends State<LocationPickerPage> {
               ),
             ),
           ),
-          Positioned(
-            left: 14,
-            right: 14,
-            bottom: 14,
-            child: Container(
-              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
-              decoration: BoxDecoration(
-                color: Colors.white.withValues(alpha: 0.94),
-                borderRadius: BorderRadius.circular(16),
-                boxShadow: [
-                  BoxShadow(
-                    color: Colors.black.withValues(alpha: 0.08),
-                    blurRadius: 14,
-                    offset: const Offset(0, 6),
-                  ),
-                ],
-              ),
-              child: Row(
-                children: [
-                  if (_locatingFromMap)
-                    const SizedBox(
-                      width: 16,
-                      height: 16,
-                      child: CircularProgressIndicator(strokeWidth: 2),
-                    )
-                  else
-                    const Icon(
-                      Icons.touch_app_outlined,
-                      size: 18,
-                      color: AppColors.primary,
+          Align(
+            alignment: Alignment.bottomCenter,
+            child: Padding(
+              padding: const EdgeInsets.fromLTRB(14, 14, 14, 14),
+              child: FractionallySizedBox(
+                widthFactor: bottomHintWidthFactor,
+                child: ConstrainedBox(
+                  constraints: const BoxConstraints(maxWidth: 620),
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+                    decoration: BoxDecoration(
+                      color: Colors.white.withValues(alpha: 0.94),
+                      borderRadius: BorderRadius.circular(16),
+                      boxShadow: [
+                        BoxShadow(
+                          color: Colors.black.withValues(alpha: 0.08),
+                          blurRadius: 14,
+                          offset: const Offset(0, 6),
+                        ),
+                      ],
                     ),
-                  const SizedBox(width: 8),
-                  Expanded(
-                    child: Text(
-                      _locatingFromMap
-                          ? '正在识别地图中心点地址...'
-                          : '拖动地图，松手后自动识别中心点地址',
-                      style: const TextStyle(
-                        fontSize: 12,
-                        color: AppColors.textSecondary,
-                      ),
+                    child: Row(
+                      children: [
+                        if (_locatingFromMap)
+                          const SizedBox(
+                            width: 16,
+                            height: 16,
+                            child: CircularProgressIndicator(strokeWidth: 2),
+                          )
+                        else
+                          const Icon(
+                            Icons.touch_app_outlined,
+                            size: 18,
+                            color: AppColors.primary,
+                          ),
+                        const SizedBox(width: 8),
+                        Expanded(
+                          child: Text(
+                            _locatingFromMap
+                                ? '正在识别地图中心点地址...'
+                                : '拖动地图或点击位置即可选点，支持右侧按钮缩放',
+                            style: const TextStyle(
+                              fontSize: 12,
+                              color: AppColors.textSecondary,
+                            ),
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                        ),
+                        const SizedBox(width: 8),
+                        _buildMapActionColumn(showFullscreenButton: !isFullscreen),
+                      ],
                     ),
                   ),
-                ],
+                ),
               ),
             ),
           ),
         ],
       ),
     );
+  }
+
+  Widget _buildMapArea() {
+    return _buildMapPanel();
   }
 
   /* Widget _buildWindowsMapArea() {
