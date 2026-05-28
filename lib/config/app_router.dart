@@ -9,7 +9,6 @@ import '../pages/home/post_detail_page.dart';
 import '../pages/home/post_create_page.dart';
 import '../pages/apply/apply_guide_page.dart';
 import '../pages/messages/chat_room_page.dart';
-import '../pages/companion/guide_detail_page.dart';
 import '../pages/profile/settings_page.dart';
 import '../pages/travel_plan/travel_plan_create_page.dart';
 import '../pages/profile/notification_settings_page.dart';
@@ -73,9 +72,8 @@ class AppRouter {
       GoRoute(
         path: '/guide/:id',
         builder: (context, state) {
-          final id = state.pathParameters['id'];
-          // Use guideId to allow the page to fetch its own data if needed
-          return GuideDetailPage(guideId: id);
+          final id = state.pathParameters['id']!;
+          return UserProfilePage(userId: id);
         },
       ),
       GoRoute(
@@ -118,12 +116,12 @@ class AppRouter {
         path: '/order/create',
         builder: (context, state) {
           final guideId = state.uri.queryParameters['guideId'];
-          Guide? guide;
+          Guide? guide = state.extra is Guide ? state.extra as Guide : null;
           if (guideId != null && guideId.trim().isNotEmpty) {
             try {
-              guide = guideProvider.guides.firstWhere((g) => g.id == guideId);
+              guide ??= guideProvider.guides.firstWhere((g) => g.id == guideId);
             } catch (_) {
-              guide = null;
+              // 保留 extra 里带来的地陪信息
             }
           }
           if (guide == null || !guide.verified) {

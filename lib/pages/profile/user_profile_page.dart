@@ -3,12 +3,15 @@ import 'package:provider/provider.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:go_router/go_router.dart';
 import '../../models/user.dart';
+import '../../models/guide.dart';
 import '../../models/travel_post.dart';
+import '../../providers/message_provider.dart';
 import '../../providers/user_provider.dart';
 import '../../providers/post_provider.dart';
+import '../../providers/guide_provider.dart';
 import '../../config/app_theme.dart';
 
-/// 普通用户公开主页（非地陪）
+/// 统一公开主页，普通用户与地陪共用
 class UserProfilePage extends StatefulWidget {
   final String userId;
 
@@ -20,6 +23,7 @@ class UserProfilePage extends StatefulWidget {
 
 class _UserProfilePageState extends State<UserProfilePage> {
   User? _profileUser;
+  Guide? _guideProfile;
   List<TravelPost> _userPosts = [];
   bool _isLoading = true;
   bool _isFollowing = false;
@@ -42,9 +46,24 @@ class _UserProfilePageState extends State<UserProfilePage> {
       userProvider.isFollowing(widget.userId),
     ]);
 
+    if (!mounted) return;
+
+    Guide? guideProfile;
+    final loadedUser = results[0] as User?;
+    if (loadedUser?.isGuideApproved == true) {
+      final guideProvider = context.read<GuideProvider>();
+      for (final guide in guideProvider.guides) {
+        if (guide.id == widget.userId) {
+          guideProfile = guide;
+          break;
+        }
+      }
+    }
+
     if (mounted) {
       setState(() {
-        _profileUser = results[0] as User?;
+        _profileUser = loadedUser;
+        _guideProfile = guideProfile;
         _userPosts = results[1] as List<TravelPost>;
         _isFollowing = results[2] as bool;
         _isLoading = false;
@@ -109,7 +128,7 @@ class _UserProfilePageState extends State<UserProfilePage> {
         slivers: [
           // 顶部渐变 AppBar
           SliverAppBar(
-            expandedHeight: 220,
+            expandedHeight: 258,
             pinned: true,
             backgroundColor: Colors.white,
             iconTheme: const IconThemeData(color: Colors.white),
@@ -130,7 +149,7 @@ class _UserProfilePageState extends State<UserProfilePage> {
                   // 用户信息
                   SafeArea(
                     child: Padding(
-                      padding: const EdgeInsets.fromLTRB(20, 50, 20, 20),
+                      padding: const EdgeInsets.fromLTRB(20, 44, 20, 16),
                       child: Column(
                         mainAxisAlignment: MainAxisAlignment.end,
                         crossAxisAlignment: CrossAxisAlignment.start,
@@ -160,8 +179,38 @@ class _UserProfilePageState extends State<UserProfilePage> {
                                   children: [
                                     Row(
                                       children: [
-                                        Text(user.nickname,
-                                            style: const TextStyle(fontSize: 20, fontWeight: FontWeight.bold, color: Colors.white)),
+                                        Flexible(
+                                          child: Text(
+                                            user.nickname,
+                                            style: const TextStyle(
+                                              fontSize: 20,
+                                              fontWeight: FontWeight.bold,
+                                              color: Colors.white,
+                                            ),
+                                            overflow: TextOverflow.ellipsis,
+                                          ),
+                                        ),
+                                        if (user.isGuideApproved) ...[
+                                          const SizedBox(width: 8),
+                                          Container(
+                                            padding: const EdgeInsets.symmetric(
+                                              horizontal: 8,
+                                              vertical: 2,
+                                            ),
+                                            decoration: BoxDecoration(
+                                              color: const Color(0xFFFFF3D6),
+                                              borderRadius: BorderRadius.circular(10),
+                                            ),
+                                            child: const Text(
+                                              '认证地陪',
+                                              style: TextStyle(
+                                                fontSize: 10,
+                                                color: Color(0xFFB87900),
+                                                fontWeight: FontWeight.bold,
+                                              ),
+                                            ),
+                                          ),
+                                        ],
                                         if (user.vipLabel.isNotEmpty) ...[ 
                                           const SizedBox(width: 8),
                                           Container(
@@ -230,6 +279,17 @@ class _UserProfilePageState extends State<UserProfilePage> {
                               _statItem('笔记', _userPosts.length),
                             ],
                           ),
+                          const SizedBox(height: 8),
+                          Text(
+                            user.bio.isNotEmpty ? user.bio : user.identityLabel,
+                            maxLines: 2,
+                            overflow: TextOverflow.ellipsis,
+                            style: TextStyle(
+                              fontSize: 13,
+                              color: Colors.white.withValues(alpha: 0.9),
+                              height: 1.4,
+                            ),
+                          ),
                         ],
                       ),
                     ),
@@ -239,11 +299,26 @@ class _UserProfilePageState extends State<UserProfilePage> {
             ),
           ),
 
+          if (user.isGuideApproved)
+            SliverToBoxAdapter(
+              child: Padding(
+                padding: const EdgeInsets.fromLTRB(16, 16, 16, 0),
+                child: _buildGuideSection(user, isSelf),
+              ),
+            ),
+
           // 分隔标题
-          const SliverToBoxAdapter(
+          SliverToBoxAdapter(
             child: Padding(
-              padding: EdgeInsets.fromLTRB(16, 16, 16, 8),
-              child: Text('Ta 的旅行笔记', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: AppColors.textPrimary)),
+              padding: const EdgeInsets.fromLTRB(16, 16, 16, 8),
+              child: Text(
+                user.isGuideApproved ? 'Ta 的动态与笔记' : 'Ta 的旅行笔记',
+                style: const TextStyle(
+                  fontSize: 16,
+                  fontWeight: FontWeight.bold,
+                  color: AppColors.textPrimary,
+                ),
+              ),
             ),
           ),
 
@@ -293,6 +368,185 @@ class _UserProfilePageState extends State<UserProfilePage> {
         Text('$count', style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: Colors.white)),
         Text(label, style: TextStyle(fontSize: 11, color: Colors.white.withValues(alpha: 0.8))),
       ],
+    );
+  }
+
+  Future<void> _contactGuide(Guide guide) async {
+    try {
+      final roomId = await context.read<MessageProvider>().getOrCreateRoom(guide.id);
+      if (!mounted) return;
+      context.push(
+        '/chat/$roomId?name=${Uri.encodeComponent(guide.name)}&avatar=${Uri.encodeComponent(guide.avatar)}',
+      );
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(e.toString())),
+      );
+    }
+  }
+
+  Widget _buildGuideSection(User user, bool isSelf) {
+    final tags = _guideProfile?.tags.isNotEmpty == true
+        ? _guideProfile!.tags
+        : user.guideTags;
+    final introduction = [
+      user.guideIntroduction,
+      _guideProfile?.description ?? '',
+      user.bio,
+    ].firstWhere((item) => item.trim().isNotEmpty, orElse: () => '已通过平台审核，可提供本地陪同与行程协助服务。');
+    final city = user.city.isNotEmpty ? user.city : (_guideProfile?.city ?? '暂未填写城市');
+    final guideForOrder =
+        _guideProfile ??
+        Guide(
+          id: user.id,
+          name: user.nickname,
+          avatar: user.avatar,
+          verified: user.isGuideApproved,
+          tags: tags,
+          description: introduction,
+          city: city,
+          gender: user.gender,
+        );
+
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(18),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.04),
+            blurRadius: 10,
+            offset: const Offset(0, 4),
+          ),
+        ],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              const Text(
+                '地陪服务信息',
+                style: TextStyle(
+                  fontSize: 16,
+                  fontWeight: FontWeight.bold,
+                  color: AppColors.textPrimary,
+                ),
+              ),
+              const Spacer(),
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                decoration: BoxDecoration(
+                  color: const Color(0xFFEAF1FF),
+                  borderRadius: BorderRadius.circular(999),
+                ),
+                child: const Text(
+                  '同一主页展示',
+                  style: TextStyle(
+                    fontSize: 11,
+                    color: AppColors.primary,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 12),
+          Row(
+            children: [
+              const Icon(Icons.location_on_outlined, size: 16, color: AppColors.textHint),
+              const SizedBox(width: 6),
+              Expanded(
+                child: Text(
+                  city,
+                  style: const TextStyle(fontSize: 13, color: AppColors.textSecondary),
+                ),
+              ),
+            ],
+          ),
+          if (tags.isNotEmpty) ...[
+            const SizedBox(height: 12),
+            Wrap(
+              spacing: 8,
+              runSpacing: 8,
+              children: tags
+                  .map(
+                    (tag) => Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                      decoration: BoxDecoration(
+                        color: AppColors.tagBackground,
+                        borderRadius: BorderRadius.circular(999),
+                      ),
+                      child: Text(
+                        tag,
+                        style: const TextStyle(
+                          fontSize: 12,
+                          color: AppColors.textSecondary,
+                        ),
+                      ),
+                    ),
+                  )
+                  .toList(),
+            ),
+          ],
+          const SizedBox(height: 12),
+          Text(
+            introduction,
+            style: const TextStyle(
+              fontSize: 13,
+              color: AppColors.textSecondary,
+              height: 1.6,
+            ),
+          ),
+          if (!isSelf) ...[
+            const SizedBox(height: 14),
+            Row(
+              children: [
+                Expanded(
+                  child: OutlinedButton(
+                    onPressed: () => _contactGuide(guideForOrder),
+                    style: OutlinedButton.styleFrom(
+                      foregroundColor: AppColors.primary,
+                      side: const BorderSide(color: AppColors.primary),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(14),
+                      ),
+                      padding: const EdgeInsets.symmetric(vertical: 14),
+                    ),
+                    child: const Text(
+                      '联系地陪',
+                      style: TextStyle(fontWeight: FontWeight.w600),
+                    ),
+                  ),
+                ),
+                const SizedBox(width: 10),
+                Expanded(
+                  child: ElevatedButton(
+                    onPressed: () => context.push(
+                      '/order/create?guideId=${widget.userId}',
+                      extra: guideForOrder,
+                    ),
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: AppColors.primary,
+                      foregroundColor: Colors.white,
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(14),
+                      ),
+                      padding: const EdgeInsets.symmetric(vertical: 14),
+                    ),
+                    child: const Text(
+                      '向 TA 发需求',
+                      style: TextStyle(fontWeight: FontWeight.w600),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ],
+        ],
+      ),
     );
   }
 }

@@ -49,7 +49,8 @@ class GuideProvider extends ChangeNotifier {
         final query = _searchQuery.toLowerCase();
         final matches = g.name.toLowerCase().contains(query) ||
             g.city.toLowerCase().contains(query) ||
-            g.description.toLowerCase().contains(query);
+            g.description.toLowerCase().contains(query) ||
+            g.tags.join(' ').toLowerCase().contains(query);
         if (!matches) return false;
       }
 
@@ -90,6 +91,48 @@ class GuideProvider extends ChangeNotifier {
     _initAuthListener();
   }
 
+  Future<List<Guide>> _hydrateGuides(List rawGuides) async {
+    if (rawGuides.isEmpty) return [];
+
+    final guideIds = rawGuides
+        .map((item) => item['id']?.toString() ?? '')
+        .where((id) => id.isNotEmpty)
+        .toList();
+
+    final userRows = await _client
+        .from('users')
+        .select('id, nickname, avatar, city, gender, bio, guide_introduction, guide_tags')
+        .inFilter('id', guideIds);
+
+    final usersById = <String, Map<String, dynamic>>{
+      for (final item in userRows as List)
+        item['id']?.toString() ?? '': Map<String, dynamic>.from(item),
+    };
+
+    return rawGuides.map((json) {
+      final guideMap = Map<String, dynamic>.from(json);
+      final guideId = guideMap['id']?.toString() ?? '';
+      final userMap = usersById[guideId];
+
+      return Guide.fromJson({
+        ...guideMap,
+        if (userMap != null) ...{
+          'name': (userMap['nickname']?.toString().trim().isNotEmpty ?? false)
+              ? userMap['nickname']
+              : guideMap['name'],
+          'avatar': (userMap['avatar']?.toString().trim().isNotEmpty ?? false)
+              ? userMap['avatar']
+              : guideMap['avatar'],
+          // 服务页的服务城市、说明、标签以 guides 表为准，避免用户资料覆盖掉接单信息
+          'city': guideMap['city'],
+          'gender': guideMap['gender'],
+          'description': guideMap['description'],
+          'tags': guideMap['tags'],
+        },
+      });
+    }).toList();
+  }
+
   void _initAuthListener() {
     _client.auth.onAuthStateChange.listen((data) {
       final session = data.session;
@@ -116,7 +159,7 @@ class GuideProvider extends ChangeNotifier {
       debugPrint('GuideProvider: Loading guides from Supabase...');
       final data = await _client.from('guides').select().order('created_at');
       if (data != null) {
-        _guides = (data as List).map((json) => Guide.fromJson(json)).toList();
+        _guides = await _hydrateGuides(data as List);
         debugPrint('GuideProvider: Loaded ${_guides.length} guides.');
       }
       
@@ -184,9 +227,9 @@ class GuideProvider extends ChangeNotifier {
         .select()
         .inFilter('id', guideIds);
 
+    final hydratedGuides = await _hydrateGuides(guidesData as List);
     final guidesById = <String, Guide>{
-      for (final item in guidesData as List)
-        item['id']?.toString() ?? '': Guide.fromJson(item),
+      for (final item in hydratedGuides) item.id: item,
     };
 
     _footprints = guideIds

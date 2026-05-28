@@ -213,7 +213,10 @@ class _MessagesPageState extends State<MessagesPage> {
                   ),
                   const SizedBox(height: 4),
                   Text(
-                    room.lastMessage ?? '快开始聊天吧',
+                    room.lastMessage ??
+                        (room.orderServiceName?.trim().isNotEmpty == true
+                            ? '订单沟通: ${room.orderServiceName}'
+                            : '快开始聊天吧'),
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
                     style: const TextStyle(fontSize: 13, color: AppColors.textSecondary),
@@ -234,9 +237,9 @@ class _MessagesPageState extends State<MessagesPage> {
         children: [
           Icon(Icons.chat_bubble_outline, size: 64, color: AppColors.textHint.withValues(alpha: 0.5)),
           const SizedBox(height: 16),
-          const Text('暂无对话', style: AppTextStyles.subtitle),
+          const Text('暂无会话', style: AppTextStyles.subtitle),
           const SizedBox(height: 8),
-          Text('去服务页找一位地陪聊聊吧', style: AppTextStyles.caption),
+          Text('历史聊天和订单沟通都会显示在这里', style: AppTextStyles.caption),
         ],
       ),
     );

@@ -22,6 +22,27 @@ class OrderProvider extends ChangeNotifier {
     return 'BX${millis}${compactId.substring(0, compactId.length > 12 ? 12 : compactId.length)}';
   }
 
+  Future<void> _ensureOrderChatRoom(Order order) async {
+    if (order.userId.isEmpty || order.guideId.isEmpty || order.id.isEmpty) {
+      return;
+    }
+
+    final existing = await Supabase.instance.client
+        .from('chat_rooms')
+        .select('id')
+        .eq('order_id', order.id)
+        .maybeSingle();
+
+    if (existing != null) {
+      return;
+    }
+
+    await Supabase.instance.client.from('chat_rooms').insert({
+      'participant_ids': [order.userId, order.guideId],
+      'order_id': order.id,
+    });
+  }
+
   /// 按状态筛选订单
   List<Order> getOrdersByStatus(OrderStatus status) {
     return _orders.where((o) => o.status == status).toList();
@@ -95,6 +116,13 @@ class OrderProvider extends ChangeNotifier {
           'target_user_id': orderNow.guideId,
           'amount': orderNow.amount,
         });
+        await _ensureOrderChatRoom(
+          orderNow.copyWith(
+            status: OrderStatus.inProgress,
+            paymentStatus: paymentStatus,
+            paymentRequestId: result.transactionId,
+          ),
+        );
       }
 
       await loadOrders();
@@ -167,6 +195,7 @@ class OrderProvider extends ChangeNotifier {
           .select()
           .single();
       final createdOrder = Order.fromJson(response as Map<String, dynamic>);
+      await _ensureOrderChatRoom(createdOrder);
       _orders.insert(0, createdOrder);
       notifyListeners();
     } catch (e) {

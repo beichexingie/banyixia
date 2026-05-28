@@ -29,13 +29,13 @@ class _PostCreatePageState extends State<PostCreatePage> {
   bool _isUploading = false;
 
   bool get _isRecruitMode => widget.mode == 'recruit';
-  String get _pageTitle => _isRecruitMode ? '发布招募' : '发布新帖';
+  String get _pageTitle => _isRecruitMode ? '发布招募/自荐' : '发布新帖';
   String get _defaultTag => _isRecruitMode ? '招募' : '分享';
   String get _titleHint => _isRecruitMode
-      ? '写个招募标题，例如：端午苏州 CityWalk 招募'
+      ? '写个标题，例如：端午苏州 CityWalk 招募 / 北京本地地陪自荐'
       : '填写标题会有更多赞哦~';
   String get _contentHint => _isRecruitMode
-      ? '写清时间、地点、人数、要求和联系方式，让感兴趣的人能快速报名。'
+      ? '写清时间、地点、人数、要求；如果是自荐贴，就写清服务特色、接单范围和擅长内容。'
       : '添加正文，分享你的旅行日记...';
 
   @override
@@ -301,7 +301,7 @@ class _PostCreatePageState extends State<PostCreatePage> {
                   borderRadius: BorderRadius.circular(14),
                 ),
                 child: const Text(
-                  '招募帖先复用当前帖子系统发布，后续可以继续细分成独立频道、审核流和数据库分类。',
+                  '招募贴/自荐贴当前先复用帖子系统发布，后续可以继续拆成独立频道、审核流和数据库分类。',
                   style: TextStyle(
                     fontSize: 13,
                     color: AppColors.textSecondary,

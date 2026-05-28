@@ -4,10 +4,10 @@ import 'package:go_router/go_router.dart';
 import '../../models/guide.dart';
 import '../../config/app_theme.dart';
 import '../../providers/guide_provider.dart';
+import '../../providers/message_provider.dart';
 import '../../providers/user_provider.dart';
 import 'package:provider/provider.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
-import '../../providers/message_provider.dart';
 
 class GuideDetailPage extends StatefulWidget {
   final Guide? guide;
@@ -227,7 +227,26 @@ class _GuideDetailPageState extends State<GuideDetailPage> {
     );
   }
 
+  Future<void> _contactGuide() async {
+    if (_guide == null) return;
+    try {
+      final roomId = await context.read<MessageProvider>().getOrCreateRoom(
+        _guide!.id,
+      );
+      if (!mounted) return;
+      context.push(
+        '/chat/$roomId?name=${Uri.encodeComponent(_guide!.name)}&avatar=${Uri.encodeComponent(_guide!.avatar)}',
+      );
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(e.toString())),
+      );
+    }
+  }
+
   Widget _buildTopProfileArea() {
+    final isSelfGuide = context.read<UserProvider>().user.id == _guide!.id;
     return Column(
       children: [
         // 顶部背景
@@ -280,19 +299,33 @@ class _GuideDetailPageState extends State<GuideDetailPage> {
                       child: const Text('已认证', style: TextStyle(color: AppColors.primary, fontSize: 10, fontWeight: FontWeight.bold)),
                     ),
                   const Spacer(),
-                  OutlinedButton(
-                    onPressed: _toggleFollow,
-                    style: OutlinedButton.styleFrom(
-                      foregroundColor: _isFollowing ? AppColors.textSecondary : AppColors.primary,
-                      side: BorderSide(color: _isFollowing ? AppColors.divider : AppColors.primary),
-                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-                      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 0),
-                      minimumSize: const Size(0, 32),
+                  if (!isSelfGuide)
+                    OutlinedButton(
+                      onPressed: _toggleFollow,
+                      style: OutlinedButton.styleFrom(
+                        foregroundColor: _isFollowing ? AppColors.textSecondary : AppColors.primary,
+                        side: BorderSide(color: _isFollowing ? AppColors.divider : AppColors.primary),
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+                        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 0),
+                        minimumSize: const Size(0, 32),
+                      ),
+                      child: _isFollowLoading
+                          ? const SizedBox(
+                              width: 14,
+                              height: 14,
+                              child: CircularProgressIndicator(
+                                strokeWidth: 2,
+                                color: AppColors.primary,
+                              ),
+                            )
+                          : Text(
+                              _isFollowing ? '已关注' : '关注',
+                              style: const TextStyle(
+                                fontSize: 12,
+                                fontWeight: FontWeight.bold,
+                              ),
+                            ),
                     ),
-                    child: _isFollowLoading 
-                      ? const SizedBox(width: 14, height: 14, child: CircularProgressIndicator(strokeWidth: 2, color: AppColors.primary))
-                      : Text(_isFollowing ? '已关注' : '关注', style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold)),
-                  ),
                 ],
               ),
               const SizedBox(height: 6),
@@ -478,16 +511,7 @@ class _GuideDetailPageState extends State<GuideDetailPage> {
           child: Row(
             children: [
               GestureDetector(
-                onTap: () async {
-                  final msgProvider = context.read<MessageProvider>();
-                  try {
-                    final roomId = await msgProvider.getOrCreateRoom(_guide!.id);
-                    if (!mounted) return;
-                    context.push('/chat/$roomId?name=${Uri.encodeComponent(_guide!.name)}&avatar=${Uri.encodeComponent(_guide!.avatar)}');
-                  } catch (e) {
-                    ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(e.toString())));
-                  }
-                },
+                onTap: _contactGuide,
                 child: Column(
                   mainAxisSize: MainAxisSize.min,
                   children: [

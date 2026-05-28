@@ -7,8 +7,8 @@ import '../../models/post_comment.dart';
 import '../../providers/post_provider.dart';
 import '../../providers/user_provider.dart';
 import '../../providers/guide_provider.dart';
-import '../../config/app_theme.dart';
 import '../../providers/message_provider.dart';
+import '../../config/app_theme.dart';
 
 class PostDetailPage extends StatefulWidget {
   final TravelPost post;
@@ -72,6 +72,23 @@ class _PostDetailPageState extends State<PostDetailPage> {
         _comments = comments;
         _isLoadingComments = false;
       });
+    }
+  }
+
+  Future<void> _contactGuide() async {
+    try {
+      final roomId = await context.read<MessageProvider>().getOrCreateRoom(
+        widget.post.authorId,
+      );
+      if (!mounted) return;
+      context.push(
+        '/chat/$roomId?name=${Uri.encodeComponent(widget.post.authorName)}&avatar=${Uri.encodeComponent(widget.post.authorAvatar)}',
+      );
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(e.toString())),
+      );
     }
   }
 
@@ -243,6 +260,8 @@ class _PostDetailPageState extends State<PostDetailPage> {
 
   @override
   Widget build(BuildContext context) {
+    final isSelfPost = context.read<UserProvider>().user.id == widget.post.authorId;
+
     return Scaffold(
       backgroundColor: Colors.white,
       body: CustomScrollView(
@@ -285,12 +304,7 @@ class _PostDetailPageState extends State<PostDetailPage> {
                   GestureDetector(
                     behavior: HitTestBehavior.opaque,
                     onTap: () {
-                      final isGuide = context.read<GuideProvider>().guides.any((g) => g.id == widget.post.authorId);
-                      if (isGuide) {
-                        context.push('/guide/${widget.post.authorId}');
-                      } else {
-                        context.push('/user/${widget.post.authorId}');
-                      }
+                      context.push('/user/${widget.post.authorId}');
                     },
                     child: Row(
                       children: [
@@ -310,18 +324,32 @@ class _PostDetailPageState extends State<PostDetailPage> {
                           ],
                         ),
                         const Spacer(),
-                        OutlinedButton(
-                          onPressed: _toggleFollow,
-                          style: OutlinedButton.styleFrom(
-                            foregroundColor: _isFollowing ? AppColors.textSecondary : AppColors.primary,
-                            side: BorderSide(color: _isFollowing ? AppColors.divider : AppColors.primary),
-                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-                            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 0),
+                        if (!isSelfPost)
+                          OutlinedButton(
+                            onPressed: _toggleFollow,
+                            style: OutlinedButton.styleFrom(
+                              foregroundColor: _isFollowing ? AppColors.textSecondary : AppColors.primary,
+                              side: BorderSide(color: _isFollowing ? AppColors.divider : AppColors.primary),
+                              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+                              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 0),
+                            ),
+                            child: _isFollowLoading
+                                ? const SizedBox(
+                                    width: 14,
+                                    height: 14,
+                                    child: CircularProgressIndicator(
+                                      strokeWidth: 2,
+                                      color: AppColors.primary,
+                                    ),
+                                  )
+                                : Text(
+                                    _isFollowing ? '已关注' : '关注',
+                                    style: const TextStyle(
+                                      fontSize: 13,
+                                      fontWeight: FontWeight.bold,
+                                    ),
+                                  ),
                           ),
-                          child: _isFollowLoading 
-                            ? const SizedBox(width: 14, height: 14, child: CircularProgressIndicator(strokeWidth: 2, color: AppColors.primary))
-                            : Text(_isFollowing ? '已关注' : '关注', style: const TextStyle(fontSize: 13, fontWeight: FontWeight.bold)),
-                        ),
                       ],
                     ),
                   ),
@@ -394,17 +422,7 @@ class _PostDetailPageState extends State<PostDetailPage> {
                               ),
                               const SizedBox(width: 8),
                               ElevatedButton(
-                                onPressed: () async {
-                                  final msgProvider = context.read<MessageProvider>();
-                                  try {
-                                    final roomId = await msgProvider.getOrCreateRoom(widget.post.authorId);
-                                    if (mounted) {
-                                      context.push('/chat/$roomId?name=${Uri.encodeComponent(widget.post.authorName)}&avatar=${Uri.encodeComponent(widget.post.authorAvatar)}');
-                                    }
-                                  } catch (e) {
-                                    ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(e.toString())));
-                                  }
-                                },
+                                onPressed: _contactGuide,
                                 style: ElevatedButton.styleFrom(
                                   backgroundColor: AppColors.primary,
                                   foregroundColor: Colors.white,
@@ -416,7 +434,7 @@ class _PostDetailPageState extends State<PostDetailPage> {
                             ],
                           ),
                              const SizedBox(height: 12),
-                             const Text('该作者同时也是平台认证地陪，点击咨询可预订其陪游服务。', style: TextStyle(fontSize: 13, color: AppColors.textSecondary)),
+                             const Text('该作者同时也是平台认证地陪，下单创建订单后即可联系沟通。', style: TextStyle(fontSize: 13, color: AppColors.textSecondary)),
                            ],
                          ),
                        ),

@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:provider/provider.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
+
 import '../../config/app_theme.dart';
 import '../../models/guide.dart';
 import '../../models/order.dart';
@@ -18,28 +19,77 @@ class OrderCreatePage extends StatefulWidget {
 }
 
 class _OrderCreatePageState extends State<OrderCreatePage> {
+  final TextEditingController _titleController = TextEditingController();
   final TextEditingController _noteController = TextEditingController();
+  final TextEditingController _budgetController = TextEditingController();
 
-  late final List<_ServicePackage> _packages = [
-    _ServicePackage(key: 'fun', title: '文娱活动', tag: '轻松陪玩', price: 400.0),
-    _ServicePackage(key: 'business', title: '商务活动', tag: '定制服务', price: 600.0),
-  ];
-
-  String _selectedAddress = '苏州阳澄湖旅游度假村';
-  DateTime _serviceDateTime = DateTime.now().add(const Duration(days: 1, hours: 2));
+  late String _selectedAddress;
+  DateTime _serviceDateTime = DateTime.now().add(
+    const Duration(days: 1, hours: 2),
+  );
   int _peopleCount = 1;
-  String _gender = '男';
+  String _gender = '不限';
   String _paymentMethod = 'alipay';
   bool _agreed = true;
   bool _isSubmitting = false;
 
-  double get _totalAmount =>
-      _packages.fold<double>(0, (sum, item) => sum + item.price * item.quantity);
+  double get _manualBudget {
+    final raw = _budgetController.text.trim();
+    if (raw.isEmpty) return 0;
+    return double.tryParse(raw) ?? 0;
+  }
+
+  double get _systemEstimate {
+    double total = 299;
+    if (_peopleCount > 1) {
+      total += (_peopleCount - 1) * 80;
+    }
+    if (_serviceDateTime.weekday == DateTime.saturday ||
+        _serviceDateTime.weekday == DateTime.sunday) {
+      total += 60;
+    }
+
+    final keywords = '${_titleController.text} ${_noteController.text}';
+    if (keywords.contains('包天') || keywords.contains('全天')) {
+      total += 180;
+    }
+    if (keywords.contains('商务') ||
+        keywords.contains('接机') ||
+        keywords.contains('会展')) {
+      total += 120;
+    }
+    return total;
+  }
+
+  double get _displayAmount => _manualBudget > 0 ? _manualBudget : _systemEstimate;
+
+  @override
+  void initState() {
+    super.initState();
+    _selectedAddress = widget.guide.city.isNotEmpty ? widget.guide.city : '待选择服务地点';
+    _titleController.addListener(_refreshEstimate);
+    _noteController.addListener(_refreshEstimate);
+    _budgetController.addListener(_refreshEstimate);
+  }
 
   @override
   void dispose() {
-    _noteController.dispose();
+    _titleController
+      ..removeListener(_refreshEstimate)
+      ..dispose();
+    _noteController
+      ..removeListener(_refreshEstimate)
+      ..dispose();
+    _budgetController
+      ..removeListener(_refreshEstimate)
+      ..dispose();
     super.dispose();
+  }
+
+  void _refreshEstimate() {
+    if (mounted) {
+      setState(() {});
+    }
   }
 
   Future<void> _pickLocation() async {
@@ -65,7 +115,7 @@ class _OrderCreatePageState extends State<OrderCreatePage> {
       context: context,
       initialDate: _serviceDateTime,
       firstDate: DateTime.now(),
-      lastDate: DateTime.now().add(const Duration(days: 30)),
+      lastDate: DateTime.now().add(const Duration(days: 90)),
     );
     if (pickedDate == null || !mounted) return;
 
@@ -87,42 +137,52 @@ class _OrderCreatePageState extends State<OrderCreatePage> {
   }
 
   void _pickPeopleAndGender() {
-    showModalBottomSheet(
+    showModalBottomSheet<void>(
       context: context,
+      isScrollControlled: true,
       shape: const RoundedRectangleBorder(
         borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
       ),
       builder: (ctx) {
-        int tempPeople = _peopleCount;
+        final peopleController = TextEditingController(
+          text: _peopleCount.toString(),
+        );
         String tempGender = _gender;
 
         return StatefulBuilder(
           builder: (context, setModalState) {
             return Padding(
-              padding: const EdgeInsets.fromLTRB(20, 20, 20, 32),
+              padding: EdgeInsets.fromLTRB(
+                20,
+                20,
+                20,
+                24 + MediaQuery.of(ctx).viewInsets.bottom,
+              ),
               child: Column(
                 mainAxisSize: MainAxisSize.min,
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  const Text('服务人数及性别', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
-                  const SizedBox(height: 16),
-                  const Text('人数'),
-                  const SizedBox(height: 8),
-                  Wrap(
-                    spacing: 10,
-                    runSpacing: 10,
-                    children: List.generate(6, (index) {
-                      final value = index + 1;
-                      final selected = tempPeople == value;
-                      return ChoiceChip(
-                        label: Text('$value人'),
-                        selected: selected,
-                        onSelected: (_) => setModalState(() => tempPeople = value),
-                      );
-                    }),
+                  const Text(
+                    '服务人数及偏好',
+                    style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
                   ),
                   const SizedBox(height: 16),
-                  const Text('性别'),
+                  TextField(
+                    controller: peopleController,
+                    keyboardType: TextInputType.number,
+                    decoration: InputDecoration(
+                      labelText: '服务人数',
+                      hintText: '请输入人数',
+                      filled: true,
+                      fillColor: const Color(0xFFF7F8FC),
+                      border: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(14),
+                        borderSide: BorderSide.none,
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: 16),
+                  const Text('地陪性别偏好'),
                   const SizedBox(height: 8),
                   Wrap(
                     spacing: 10,
@@ -141,8 +201,10 @@ class _OrderCreatePageState extends State<OrderCreatePage> {
                     width: double.infinity,
                     child: ElevatedButton(
                       onPressed: () {
+                        final parsedPeople =
+                            int.tryParse(peopleController.text.trim()) ?? 1;
                         setState(() {
-                          _peopleCount = tempPeople;
+                          _peopleCount = parsedPeople < 1 ? 1 : parsedPeople;
                           _gender = tempGender;
                         });
                         Navigator.pop(ctx);
@@ -150,7 +212,9 @@ class _OrderCreatePageState extends State<OrderCreatePage> {
                       style: ElevatedButton.styleFrom(
                         backgroundColor: const Color(0xFF3D6CF5),
                         foregroundColor: Colors.white,
-                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(16),
+                        ),
                         padding: const EdgeInsets.symmetric(vertical: 14),
                       ),
                       child: const Text('确定'),
@@ -163,12 +227,6 @@ class _OrderCreatePageState extends State<OrderCreatePage> {
         );
       },
     );
-  }
-
-  void _changePackageQuantity(_ServicePackage package, int delta) {
-    setState(() {
-      package.quantity = (package.quantity + delta).clamp(1, 9).toInt();
-    });
   }
 
   Future<void> _submitOrder() async {
@@ -196,7 +254,7 @@ class _OrderCreatePageState extends State<OrderCreatePage> {
     }
     if (widget.guide.id.trim().isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('导游信息异常，请重新进入页面')),
+        const SnackBar(content: Text('地陪信息异常，请重新进入页面')),
       );
       return;
     }
@@ -207,9 +265,18 @@ class _OrderCreatePageState extends State<OrderCreatePage> {
       return;
     }
 
-    if (_totalAmount <= 0) {
+    final title = _titleController.text.trim();
+    if (title.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('请先选择服务')),
+        const SnackBar(content: Text('请填写需求标题')),
+      );
+      return;
+    }
+
+    final amount = _displayAmount;
+    if (amount <= 0) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('金额异常，请检查预算或需求信息')),
       );
       return;
     }
@@ -217,10 +284,13 @@ class _OrderCreatePageState extends State<OrderCreatePage> {
     setState(() => _isSubmitting = true);
 
     try {
-      final serviceNames = _packages
-          .where((item) => item.quantity > 0)
-          .map((item) => '${item.title} x${item.quantity}')
-          .join('，');
+      final detail = _noteController.text.trim();
+      final serviceSummary = [
+        title,
+        _selectedAddress,
+        '${_peopleCount}人',
+        _gender,
+      ].join(' / ');
 
       final newOrder = Order(
         id: '',
@@ -229,8 +299,8 @@ class _OrderCreatePageState extends State<OrderCreatePage> {
         guideName: widget.guide.name,
         guideAvatar: widget.guide.avatar,
         status: OrderStatus.pendingPayment,
-        amount: _totalAmount,
-        serviceName: '$serviceNames / $_selectedAddress',
+        amount: amount,
+        serviceName: detail.isEmpty ? serviceSummary : '$serviceSummary / $detail',
         paymentMethod: _paymentMethod,
         paymentStatus: 'pending',
         serviceDate: _serviceDateTime,
@@ -241,7 +311,7 @@ class _OrderCreatePageState extends State<OrderCreatePage> {
 
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('需求已提交，稍后可在订单里继续处理')),
+        const SnackBar(content: Text('需求已提交，可前往订单继续支付与处理')),
       );
       context.pop();
     } catch (e) {
@@ -265,9 +335,16 @@ class _OrderCreatePageState extends State<OrderCreatePage> {
         backgroundColor: const Color(0xFFF4F6FB),
         elevation: 0,
         centerTitle: true,
-        title: const Text('发需求', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+        title: const Text(
+          '发需求',
+          style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+        ),
         leading: IconButton(
-          icon: const Icon(Icons.arrow_back_ios_new, color: AppColors.textPrimary, size: 18),
+          icon: const Icon(
+            Icons.arrow_back_ios_new,
+            color: AppColors.textPrimary,
+            size: 18,
+          ),
           onPressed: () => context.pop(),
         ),
       ),
@@ -280,11 +357,11 @@ class _OrderCreatePageState extends State<OrderCreatePage> {
                 children: [
                   _buildGuideCard(),
                   const SizedBox(height: 12),
-                  _buildServiceSection(),
-                  const SizedBox(height: 12),
-                  _buildRequirementCard(),
+                  _buildDemandCard(),
                   const SizedBox(height: 12),
                   _buildInfoCard(),
+                  const SizedBox(height: 12),
+                  _buildEstimateCard(),
                   const SizedBox(height: 12),
                   _buildSafetyCard(),
                   const SizedBox(height: 12),
@@ -312,7 +389,9 @@ class _OrderCreatePageState extends State<OrderCreatePage> {
         children: [
           CircleAvatar(
             radius: 28,
-            backgroundImage: widget.guide.avatar.isNotEmpty ? NetworkImage(widget.guide.avatar) : null,
+            backgroundImage: widget.guide.avatar.isNotEmpty
+                ? NetworkImage(widget.guide.avatar)
+                : null,
             child: widget.guide.avatar.isEmpty ? const Icon(Icons.person) : null,
           ),
           const SizedBox(width: 12),
@@ -325,29 +404,41 @@ class _OrderCreatePageState extends State<OrderCreatePage> {
                     Flexible(
                       child: Text(
                         widget.guide.name,
-                        style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+                        style: const TextStyle(
+                          fontSize: 18,
+                          fontWeight: FontWeight.bold,
+                        ),
                         overflow: TextOverflow.ellipsis,
                       ),
                     ),
                     const SizedBox(width: 6),
-                    if (widget.guide.verified)
-                      Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                        decoration: BoxDecoration(
-                          color: const Color(0xFF3D6CF5).withValues(alpha: 0.1),
-                          borderRadius: BorderRadius.circular(10),
-                        ),
-                        child: const Text(
-                          '已认证',
-                          style: TextStyle(fontSize: 10, color: Color(0xFF3D6CF5), fontWeight: FontWeight.w600),
+                    Container(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 6,
+                        vertical: 2,
+                      ),
+                      decoration: BoxDecoration(
+                        color: const Color(0xFFEAF1FF),
+                        borderRadius: BorderRadius.circular(10),
+                      ),
+                      child: const Text(
+                        '认证地陪',
+                        style: TextStyle(
+                          fontSize: 10,
+                          color: Color(0xFF3D6CF5),
+                          fontWeight: FontWeight.w600,
                         ),
                       ),
+                    ),
                   ],
                 ),
                 const SizedBox(height: 4),
                 Text(
-                  '${widget.guide.city} · ${widget.guide.tags.isNotEmpty ? widget.guide.tags.first : '本地陪游'}',
-                  style: const TextStyle(color: AppColors.textSecondary, fontSize: 12),
+                  '${widget.guide.city} · ${widget.guide.tags.isNotEmpty ? widget.guide.tags.first : '本地陪同'}',
+                  style: const TextStyle(
+                    color: AppColors.textSecondary,
+                    fontSize: 12,
+                  ),
                 ),
               ],
             ),
@@ -358,7 +449,7 @@ class _OrderCreatePageState extends State<OrderCreatePage> {
     );
   }
 
-  Widget _buildServiceSection() {
+  Widget _buildDemandCard() {
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
@@ -368,114 +459,40 @@ class _OrderCreatePageState extends State<OrderCreatePage> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const Text('共2项可选', style: TextStyle(fontSize: 13, color: AppColors.textSecondary)),
-          const SizedBox(height: 12),
-          ..._packages.map((item) => Padding(
-                padding: const EdgeInsets.only(bottom: 12),
-                child: _buildPackageCard(item),
-              )),
-          Container(
-            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-            decoration: BoxDecoration(
-              color: AppColors.tagBackground,
-              borderRadius: BorderRadius.circular(999),
-            ),
-            child: const Text(
-              '订单须知',
-              style: TextStyle(fontSize: 11, color: AppColors.textSecondary),
-            ),
+          const Text(
+            '需求内容',
+            style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
           ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildPackageCard(_ServicePackage item) {
-    return Container(
-      padding: const EdgeInsets.all(14),
-      decoration: BoxDecoration(
-        border: Border.all(color: AppColors.divider),
-        borderRadius: BorderRadius.circular(14),
-      ),
-      child: Row(
-        children: [
-          Container(
-            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-            decoration: BoxDecoration(
-              color: const Color(0xFF3D6CF5).withValues(alpha: 0.1),
-              borderRadius: BorderRadius.circular(10),
-            ),
-            child: Text(item.tag, style: const TextStyle(fontSize: 11, color: Color(0xFF3D6CF5))),
-          ),
-          const SizedBox(width: 12),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(item.title, style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w600)),
-                const SizedBox(height: 2),
-                Text('¥${item.price.toStringAsFixed(0)}/天', style: const TextStyle(fontSize: 13, color: Color(0xFFE84B2B), fontWeight: FontWeight.w700)),
-              ],
+          const SizedBox(height: 14),
+          TextField(
+            controller: _titleController,
+            maxLength: 20,
+            decoration: InputDecoration(
+              labelText: '需求标题',
+              hintText: '例如：陪同逛展、接机陪游、城市漫步',
+              counterText: '',
+              filled: true,
+              fillColor: const Color(0xFFF7F8FC),
+              border: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(14),
+                borderSide: BorderSide.none,
+              ),
             ),
           ),
-          _buildCountPicker(item),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildCountPicker(_ServicePackage item) {
-    return Container(
-      decoration: BoxDecoration(
-        border: Border.all(color: AppColors.divider),
-        borderRadius: BorderRadius.circular(10),
-      ),
-      child: Row(
-        children: [
-          _countButton(Icons.remove, () => _changePackageQuantity(item, -1)),
-          Container(
-            width: 40,
-            alignment: Alignment.center,
-            child: Text('${item.quantity}', style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w600)),
-          ),
-          _countButton(Icons.add, () => _changePackageQuantity(item, 1)),
-        ],
-      ),
-    );
-  }
-
-  Widget _countButton(IconData icon, VoidCallback onTap) {
-    return InkWell(
-      onTap: onTap,
-      child: SizedBox(
-        width: 34,
-        height: 34,
-        child: Icon(icon, size: 18),
-      ),
-    );
-  }
-
-  Widget _buildRequirementCard() {
-    return Container(
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(18),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          const Text('请输入需求标题（20字以内）', style: TextStyle(fontSize: 15, color: AppColors.textSecondary)),
-          const SizedBox(height: 8),
-          const Divider(height: 1),
           const SizedBox(height: 12),
           TextField(
             controller: _noteController,
             maxLines: 6,
-            decoration: const InputDecoration(
-              border: InputBorder.none,
-              hintText: '例如：商务活动、文娱活动、陪同出行等具体需求',
-              hintStyle: TextStyle(color: AppColors.textHint),
+            decoration: InputDecoration(
+              labelText: '详细说明',
+              hintText: '写清楚你的出行目的、陪同内容、集合方式、额外要求等',
+              alignLabelWithHint: true,
+              filled: true,
+              fillColor: const Color(0xFFF7F8FC),
+              border: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(14),
+                borderSide: BorderSide.none,
+              ),
             ),
           ),
         ],
@@ -507,7 +524,7 @@ class _OrderCreatePageState extends State<OrderCreatePage> {
           ),
           const Divider(height: 22),
           _buildInfoRow(
-            '服务人数及性别',
+            '服务人数及偏好',
             '$_peopleCount人 · $_gender',
             onTap: _pickPeopleAndGender,
             icon: Icons.people_outline,
@@ -517,14 +534,102 @@ class _OrderCreatePageState extends State<OrderCreatePage> {
     );
   }
 
-  Widget _buildInfoRow(String title, String value, {VoidCallback? onTap, IconData icon = Icons.place_outlined}) {
+  Widget _buildEstimateCard() {
+    final usingManualBudget = _manualBudget > 0;
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(18),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Text(
+            '金额与报价',
+            style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
+          ),
+          const SizedBox(height: 14),
+          TextField(
+            controller: _budgetController,
+            keyboardType: const TextInputType.numberWithOptions(decimal: true),
+            decoration: InputDecoration(
+              labelText: '你的预算（可不填）',
+              hintText: '不填写则采用系统预估报价',
+              prefixText: '¥ ',
+              filled: true,
+              fillColor: const Color(0xFFF7F8FC),
+              border: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(14),
+                borderSide: BorderSide.none,
+              ),
+            ),
+          ),
+          const SizedBox(height: 14),
+          Container(
+            padding: const EdgeInsets.all(14),
+            decoration: BoxDecoration(
+              color: const Color(0xFFF7F8FC),
+              borderRadius: BorderRadius.circular(14),
+            ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  children: [
+                    const Text(
+                      '系统预估报价',
+                      style: TextStyle(
+                        fontSize: 14,
+                        color: AppColors.textSecondary,
+                      ),
+                    ),
+                    const Spacer(),
+                    Text(
+                      '¥${_systemEstimate.toStringAsFixed(0)}',
+                      style: const TextStyle(
+                        fontSize: 18,
+                        color: Color(0xFFE84B2B),
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 8),
+                Text(
+                  usingManualBudget
+                      ? '当前将按你填写的预算发起订单，后续可接入真实报价或议价接口。'
+                      : '当前先使用系统预估报价占位，后续可替换为真实报价接口。',
+                  style: const TextStyle(
+                    fontSize: 12,
+                    color: AppColors.textSecondary,
+                    height: 1.5,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildInfoRow(
+    String title,
+    String value, {
+    VoidCallback? onTap,
+    IconData icon = Icons.place_outlined,
+  }) {
     return InkWell(
       onTap: onTap,
       child: Row(
         children: [
           Icon(icon, size: 18, color: AppColors.textHint),
           const SizedBox(width: 8),
-          Text(title, style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w500)),
+          Text(
+            title,
+            style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w500),
+          ),
           const Spacer(),
           Flexible(
             child: Text(
@@ -553,8 +658,11 @@ class _OrderCreatePageState extends State<OrderCreatePage> {
           SizedBox(width: 10),
           Expanded(
             child: Text(
-              '本服务由平台保险全程保障您的财产与人身安全',
-              style: TextStyle(fontSize: 13, color: AppColors.textSecondary),
+              '平台将保留资金托管与风险保障逻辑，后续可继续扩展真实报价和售后流程。',
+              style: TextStyle(
+                fontSize: 13,
+                color: AppColors.textSecondary,
+              ),
             ),
           ),
           Icon(Icons.chevron_right, color: AppColors.textHint),
@@ -573,17 +681,35 @@ class _OrderCreatePageState extends State<OrderCreatePage> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const Text('支付方式', style: TextStyle(fontSize: 15, fontWeight: FontWeight.w600)),
+          const Text(
+            '支付方式',
+            style: TextStyle(fontSize: 15, fontWeight: FontWeight.w600),
+          ),
           const SizedBox(height: 12),
-          _buildPaymentItem('wechat', '微信支付', Icons.chat_bubble_outline, const Color(0xFF09B83E)),
+          _buildPaymentItem(
+            'wechat',
+            '微信支付',
+            Icons.chat_bubble_outline,
+            const Color(0xFF09B83E),
+          ),
           const SizedBox(height: 10),
-          _buildPaymentItem('alipay', '支付宝支付', Icons.payments_outlined, const Color(0xFF3D6CF5)),
+          _buildPaymentItem(
+            'alipay',
+            '支付宝支付',
+            Icons.payments_outlined,
+            const Color(0xFF3D6CF5),
+          ),
         ],
       ),
     );
   }
 
-  Widget _buildPaymentItem(String value, String label, IconData icon, Color color) {
+  Widget _buildPaymentItem(
+    String value,
+    String label,
+    IconData icon,
+    Color color,
+  ) {
     final selected = _paymentMethod == value;
     return InkWell(
       onTap: () => setState(() => _paymentMethod = value),
@@ -617,8 +743,11 @@ class _OrderCreatePageState extends State<OrderCreatePage> {
             child: Padding(
               padding: EdgeInsets.only(top: 12),
               child: Text(
-                '我已阅读并同意《支付协议》和《免责协议》',
-                style: TextStyle(fontSize: 12, color: AppColors.textSecondary),
+                '我已阅读并同意《支付协议》《服务协议》和《免责协议》',
+                style: TextStyle(
+                  fontSize: 12,
+                  color: AppColors.textSecondary,
+                ),
               ),
             ),
           ),
@@ -629,7 +758,12 @@ class _OrderCreatePageState extends State<OrderCreatePage> {
 
   Widget _buildBottomBar() {
     return Container(
-      padding: EdgeInsets.fromLTRB(16, 10, 16, 10 + MediaQuery.of(context).padding.bottom),
+      padding: EdgeInsets.fromLTRB(
+        16,
+        10,
+        16,
+        10 + MediaQuery.of(context).padding.bottom,
+      ),
       decoration: BoxDecoration(
         color: Colors.white,
         boxShadow: [
@@ -642,53 +776,53 @@ class _OrderCreatePageState extends State<OrderCreatePage> {
       ),
       child: Row(
         children: [
-          Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              IconButton(
-                onPressed: () => ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(content: Text('预览功能已保留，当前直接提交更快')),
-                ),
-                icon: const Icon(Icons.visibility_outlined, color: AppColors.textSecondary),
-              ),
-              const Text('预览', style: TextStyle(fontSize: 10, color: AppColors.textHint)),
-            ],
-          ),
-          Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              IconButton(
-                onPressed: () => ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(content: Text('草稿已自动保存到本地状态')),
-                ),
-                icon: const Icon(Icons.save_outlined, color: AppColors.textSecondary),
-              ),
-              const Text('存草稿', style: TextStyle(fontSize: 10, color: AppColors.textHint)),
-            ],
-          ),
-          const SizedBox(width: 8),
           Expanded(
-            child: SizedBox(
-              height: 48,
-              child: ElevatedButton(
-                onPressed: _isSubmitting ? null : _submitOrder,
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: const Color(0xFF3D6CF5),
-                  foregroundColor: Colors.white,
-                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
-                  elevation: 0,
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                const Text(
+                  '当前金额',
+                  style: TextStyle(fontSize: 12, color: AppColors.textSecondary),
                 ),
-                child: _isSubmitting
-                    ? const SizedBox(
-                        width: 18,
-                        height: 18,
-                        child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2),
-                      )
-                    : Text(
-                        '立即预约 ¥${_totalAmount.toStringAsFixed(0)}',
-                        style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
-                      ),
+                const SizedBox(height: 4),
+                Text(
+                  '¥${_displayAmount.toStringAsFixed(0)}',
+                  style: const TextStyle(
+                    fontSize: 22,
+                    fontWeight: FontWeight.bold,
+                    color: Color(0xFFE84B2B),
+                  ),
+                ),
+              ],
+            ),
+          ),
+          SizedBox(
+            height: 48,
+            width: 168,
+            child: ElevatedButton(
+              onPressed: _isSubmitting ? null : _submitOrder,
+              style: ElevatedButton.styleFrom(
+                backgroundColor: const Color(0xFF3D6CF5),
+                foregroundColor: Colors.white,
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(24),
+                ),
+                elevation: 0,
               ),
+              child: _isSubmitting
+                  ? const SizedBox(
+                      width: 20,
+                      height: 20,
+                      child: CircularProgressIndicator(
+                        strokeWidth: 2,
+                        color: Colors.white,
+                      ),
+                    )
+                  : const Text(
+                      '提交需求',
+                      style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
+                    ),
             ),
           ),
         ],
@@ -697,23 +831,10 @@ class _OrderCreatePageState extends State<OrderCreatePage> {
   }
 
   String _formatDateTime(DateTime dateTime) {
-    return '${dateTime.year}-${dateTime.month.toString().padLeft(2, '0')}-${dateTime.day.toString().padLeft(2, '0')} '
-        '${dateTime.hour.toString().padLeft(2, '0')}:${dateTime.minute.toString().padLeft(2, '0')}';
+    final twoDigitMonth = dateTime.month.toString().padLeft(2, '0');
+    final twoDigitDay = dateTime.day.toString().padLeft(2, '0');
+    final twoDigitHour = dateTime.hour.toString().padLeft(2, '0');
+    final twoDigitMinute = dateTime.minute.toString().padLeft(2, '0');
+    return '${dateTime.year}-$twoDigitMonth-$twoDigitDay $twoDigitHour:$twoDigitMinute';
   }
-}
-
-class _ServicePackage {
-  final String key;
-  final String title;
-  final String tag;
-  final double price;
-  int quantity;
-
-  _ServicePackage({
-    required this.key,
-    required this.title,
-    required this.tag,
-    required this.price,
-    this.quantity = 1,
-  });
 }

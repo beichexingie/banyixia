@@ -12,6 +12,7 @@ class ChatRoom {
   // 扩展字段：对方信息 (用于UI显示)
   final String? otherParticipantName;
   final String? otherParticipantAvatar;
+  final String? orderServiceName;
   final int unreadCount;
 
   ChatRoom({
@@ -23,6 +24,7 @@ class ChatRoom {
     required this.createdAt,
     this.otherParticipantName,
     this.otherParticipantAvatar,
+    this.orderServiceName,
     this.unreadCount = 0,
   });
 
@@ -43,6 +45,7 @@ class ChatRoom {
   ChatRoom copyWith({
     String? otherParticipantName,
     String? otherParticipantAvatar,
+    String? orderServiceName,
     int? unreadCount,
   }) {
     return ChatRoom(
@@ -54,6 +57,7 @@ class ChatRoom {
       createdAt: createdAt,
       otherParticipantName: otherParticipantName ?? this.otherParticipantName,
       otherParticipantAvatar: otherParticipantAvatar ?? this.otherParticipantAvatar,
+      orderServiceName: orderServiceName ?? this.orderServiceName,
       unreadCount: unreadCount ?? this.unreadCount,
     );
   }

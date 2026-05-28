@@ -97,8 +97,8 @@ class _MainScaffoldState extends State<MainScaffold> {
               const Divider(),
               _buildPublishOption(
                 Icons.campaign_outlined,
-                '发布招募',
-                '发起招募帖寻找同行伙伴',
+                '发布招募/自荐',
+                '发起招募帖或自荐贴，展示自己的同行计划或地陪服务',
                 route: '/post/create?mode=recruit',
               ),
               const Divider(),

@@ -1,8 +1,10 @@
 import 'package:flutter/material.dart';
+import 'package:go_router/go_router.dart';
 import 'package:provider/provider.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 import '../../config/app_theme.dart';
 import '../../models/order.dart';
+import '../../providers/message_provider.dart';
 import '../../providers/order_provider.dart';
 import '../../widgets/safety_control_panel.dart';
 
@@ -29,6 +31,23 @@ class _OrdersPageState extends State<OrdersPage> with SingleTickerProviderStateM
       vsync: this,
       initialIndex: initialIndex,
     );
+  }
+
+  Future<void> _contactGuide(Order order) async {
+    try {
+      final roomId = await context.read<MessageProvider>().getOrCreateRoom(
+        order.guideId,
+      );
+      if (!mounted) return;
+      context.push(
+        '/chat/$roomId?name=${Uri.encodeComponent(order.guideName)}&avatar=${Uri.encodeComponent(order.guideAvatar)}',
+      );
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(e.toString())),
+      );
+    }
   }
 
   @override
@@ -213,6 +232,18 @@ class _OrdersPageState extends State<OrdersPage> with SingleTickerProviderStateM
             Row(
               mainAxisAlignment: MainAxisAlignment.end,
               children: [
+                OutlinedButton(
+                  onPressed: () => _contactGuide(order),
+                  style: OutlinedButton.styleFrom(
+                    foregroundColor: AppColors.primary,
+                    side: const BorderSide(color: AppColors.primary),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                  ),
+                  child: const Text('联系地陪'),
+                ),
+                const SizedBox(width: 10),
                 if (order.status == OrderStatus.pendingPayment)
                   ElevatedButton(
                     onPressed: () async {

@@ -325,6 +325,10 @@ class UserProvider extends ChangeNotifier {
       return;
     }
 
+    if (targetId == user.id) {
+      throw Exception('不能关注自己');
+    }
+
     try {
       await supabase.Supabase.instance.client.from('follows').insert({
         'follower_id': user.id,
@@ -362,6 +366,7 @@ class UserProvider extends ChangeNotifier {
 
   Future<bool> isFollowing(String targetId) async {
     if (!isLoggedIn) return false;
+    if (targetId.isEmpty || targetId == user.id) return false;
     try {
       final response = await supabase.Supabase.instance.client
           .from('follows')
@@ -399,23 +404,62 @@ class UserProvider extends ChangeNotifier {
   Future<User?> fetchUserById(String userId) async {
     try {
       final client = supabase.Supabase.instance.client;
-      final response = await client
-          .from('users')
-          .select()
-          .eq('id', userId)
-          .maybeSingle();
-      if (response == null) return null;
-
-      final results = await Future.wait([
+      final results = await Future.wait<Object?>([
+        client.from('users').select().eq('id', userId).maybeSingle(),
+        client.from('guides').select().eq('id', userId).maybeSingle(),
         client.from('follows').count().eq('follower_id', userId),
         client.from('follows').count().eq('followed_id', userId),
+        client
+            .from('guide_applications')
+            .select('status')
+            .eq('user_id', userId)
+            .order('created_at', ascending: false)
+            .limit(1)
+            .maybeSingle(),
       ]);
 
-      return User.fromJson({
+      final response = results[0] as Map<String, dynamic>?;
+      if (response == null) return null;
+      final guideRow = results[1] as Map<String, dynamic>?;
+      final applicationRow = results[4] as Map<String, dynamic>?;
+      final applicationStatus = applicationRow == null
+          ? null
+          : applicationRow['status']?.toString();
+
+      final merged = <String, dynamic>{
         ...response,
-        'follow_count': results[0] as int? ?? 0,
-        'fans_count': results[1] as int? ?? 0,
-      });
+        'nickname': _firstNonEmptyString([
+          response['nickname'],
+          guideRow == null ? null : guideRow['name'],
+        ]),
+        'avatar': _firstNonEmptyString([
+          response['avatar'],
+          guideRow == null ? null : guideRow['avatar'],
+        ]),
+        'city': _firstNonEmptyString([
+          response['city'],
+          guideRow == null ? null : guideRow['city'],
+        ]),
+        'gender': _firstNonEmptyString([
+          response['gender'],
+          guideRow == null ? null : guideRow['gender'],
+        ]),
+        'guide_introduction': _firstNonEmptyString([
+          response['guide_introduction'],
+          guideRow == null ? null : guideRow['description'],
+          response['bio'],
+        ]),
+        'guide_tags':
+            (guideRow == null ? null : guideRow['tags']) ??
+            response['guide_tags'] ??
+            const [],
+        'follow_count': results[2] as int? ?? 0,
+        'fans_count': results[3] as int? ?? 0,
+        'is_guide': guideRow != null || applicationStatus == 'approved',
+        'guide_application_status': applicationStatus,
+      };
+
+      return User.fromJson(merged);
     } catch (e) {
       debugPrint('fetchUserById error: $e');
       return null;

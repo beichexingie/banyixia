@@ -84,6 +84,38 @@ class Order {
     return map;
   }
 
+  Order copyWith({
+    String? id,
+    String? userId,
+    String? guideId,
+    String? guideName,
+    String? guideAvatar,
+    OrderStatus? status,
+    double? amount,
+    String? serviceName,
+    String? paymentMethod,
+    String? paymentStatus,
+    String? paymentRequestId,
+    DateTime? createdAt,
+    DateTime? serviceDate,
+  }) {
+    return Order(
+      id: id ?? this.id,
+      userId: userId ?? this.userId,
+      guideId: guideId ?? this.guideId,
+      guideName: guideName ?? this.guideName,
+      guideAvatar: guideAvatar ?? this.guideAvatar,
+      status: status ?? this.status,
+      amount: amount ?? this.amount,
+      serviceName: serviceName ?? this.serviceName,
+      paymentMethod: paymentMethod ?? this.paymentMethod,
+      paymentStatus: paymentStatus ?? this.paymentStatus,
+      paymentRequestId: paymentRequestId ?? this.paymentRequestId,
+      createdAt: createdAt ?? this.createdAt,
+      serviceDate: serviceDate ?? this.serviceDate,
+    );
+  }
+
   String get statusLabel {
     switch (status) {
       case OrderStatus.pendingPayment:
