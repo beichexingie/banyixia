@@ -20,6 +20,9 @@ class Order {
   final String paymentMethod;
   final String paymentStatus;
   final String? paymentRequestId;
+  final String? merchantOrderNo;
+  final String? providerTradeNo;
+  final DateTime? paidAt;
   final DateTime createdAt;
   final DateTime? serviceDate;
 
@@ -35,6 +38,9 @@ class Order {
     this.paymentMethod = '',
     this.paymentStatus = '',
     this.paymentRequestId,
+    this.merchantOrderNo,
+    this.providerTradeNo,
+    this.paidAt,
     DateTime? createdAt,
     this.serviceDate,
   }) : createdAt = createdAt ?? DateTime.now();
@@ -52,6 +58,11 @@ class Order {
       paymentMethod: json['payment_method'] ?? '',
       paymentStatus: json['payment_status'] ?? '',
       paymentRequestId: json['payment_request_id']?.toString(),
+      merchantOrderNo: json['merchant_order_no']?.toString(),
+      providerTradeNo: json['provider_trade_no']?.toString(),
+      paidAt: json['paid_at'] != null
+          ? DateTime.tryParse(json['paid_at'])
+          : null,
       createdAt: json['created_at'] != null
           ? DateTime.tryParse(json['created_at']) ?? DateTime.now()
           : DateTime.now(),
@@ -73,6 +84,9 @@ class Order {
       'payment_method': paymentMethod,
       'payment_status': paymentStatus,
       if (paymentRequestId != null) 'payment_request_id': paymentRequestId,
+      if (merchantOrderNo != null) 'merchant_order_no': merchantOrderNo,
+      if (providerTradeNo != null) 'provider_trade_no': providerTradeNo,
+      if (paidAt != null) 'paid_at': paidAt!.toIso8601String(),
       'created_at': createdAt.toIso8601String(),
     };
     if (id.isNotEmpty) {
@@ -96,6 +110,9 @@ class Order {
     String? paymentMethod,
     String? paymentStatus,
     String? paymentRequestId,
+    String? merchantOrderNo,
+    String? providerTradeNo,
+    DateTime? paidAt,
     DateTime? createdAt,
     DateTime? serviceDate,
   }) {
@@ -111,6 +128,9 @@ class Order {
       paymentMethod: paymentMethod ?? this.paymentMethod,
       paymentStatus: paymentStatus ?? this.paymentStatus,
       paymentRequestId: paymentRequestId ?? this.paymentRequestId,
+      merchantOrderNo: merchantOrderNo ?? this.merchantOrderNo,
+      providerTradeNo: providerTradeNo ?? this.providerTradeNo,
+      paidAt: paidAt ?? this.paidAt,
       createdAt: createdAt ?? this.createdAt,
       serviceDate: serviceDate ?? this.serviceDate,
     );

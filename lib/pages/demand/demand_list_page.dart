@@ -129,6 +129,25 @@ class _DemandListPageState extends State<DemandListPage> {
     return demands;
   }
 
+  Future<void> _pickCity() async {
+    final currentCity = context.read<DemandProvider>().selectedCity;
+    final seedCity = currentCity == '全国' ? '苏州' : currentCity;
+
+    final result = await context.push<Map<String, dynamic>>(
+      '/demand/location',
+      extra: {
+        'city': seedCity,
+        'address': seedCity,
+      },
+    );
+    if (result == null || !mounted) return;
+
+    final city = _normalizeCityName(result['city']?.toString());
+    if (city.isEmpty) return;
+
+    context.read<DemandProvider>().setCity(city);
+  }
+
   Widget _buildSearchBar() {
     return Container(
       height: 42,
@@ -173,8 +192,9 @@ class _DemandListPageState extends State<DemandListPage> {
   }
 
   Widget _buildCitySelector() {
+    final selectedCity = context.watch<DemandProvider>().selectedCity;
     return GestureDetector(
-      onTap: _showCitySheet,
+      onTap: selectedCity == '全国' ? _pickCity : null,
       child: Container(
         height: 42,
         padding: const EdgeInsets.symmetric(horizontal: 12),
@@ -192,63 +212,28 @@ class _DemandListPageState extends State<DemandListPage> {
             ),
             const SizedBox(width: 4),
             Text(
-              context.watch<DemandProvider>().selectedCity,
+              selectedCity,
               style: const TextStyle(fontWeight: FontWeight.w600),
             ),
-            const Icon(
-              Icons.arrow_drop_down,
-              size: 18,
-              color: AppColors.primary,
-            ),
+            const SizedBox(width: 4),
+            if (selectedCity == '全国')
+              const Icon(
+                Icons.arrow_drop_down,
+                size: 18,
+                color: AppColors.primary,
+              )
+            else
+              GestureDetector(
+                onTap: () => context.read<DemandProvider>().setCity('全国'),
+                child: const Icon(
+                  Icons.close,
+                  size: 16,
+                  color: AppColors.primary,
+                ),
+              ),
           ],
         ),
       ),
-    );
-  }
-
-  void _showCitySheet() {
-    final cities = [
-      '全国',
-      '苏州',
-      '北京',
-      '上海',
-      '杭州',
-      '成都',
-      '西安',
-      '长沙',
-      '重庆',
-      '广州',
-      '深圳',
-    ];
-    showModalBottomSheet(
-      context: context,
-      showDragHandle: true,
-      shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
-      ),
-      builder: (context) {
-        return SafeArea(
-          child: Padding(
-            padding: const EdgeInsets.all(16),
-            child: Wrap(
-              spacing: 10,
-              runSpacing: 10,
-              children: cities.map((city) {
-                final selected =
-                    city == context.read<DemandProvider>().selectedCity;
-                return ChoiceChip(
-                  label: Text(city),
-                  selected: selected,
-                  onSelected: (_) {
-                    context.read<DemandProvider>().setCity(city);
-                    Navigator.pop(context);
-                  },
-                );
-              }).toList(),
-            ),
-          ),
-        );
-      },
     );
   }
 
@@ -308,5 +293,18 @@ class _DemandListPageState extends State<DemandListPage> {
         ],
       ),
     );
+  }
+
+  String _normalizeCityName(String? raw) {
+    final city = (raw ?? '').trim();
+    if (city.isEmpty) return '';
+
+    const suffixes = ['特别行政区', '自治州', '自治区', '地区', '盟', '市'];
+    for (final suffix in suffixes) {
+      if (city.endsWith(suffix) && city.length > suffix.length) {
+        return city.substring(0, city.length - suffix.length);
+      }
+    }
+    return city;
   }
 }

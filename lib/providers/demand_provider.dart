@@ -20,7 +20,8 @@ class DemandProvider extends ChangeNotifier {
 
   List<DemandRequest> get filteredDemands {
     return _demands.where((demand) {
-      if (_selectedCity != '全国' && demand.city != _selectedCity) {
+      if (_selectedCity != '全国' &&
+          _normalizeCityName(demand.city) != _normalizeCityName(_selectedCity)) {
         return false;
       }
       if (_selectedStatus != null && demand.status != _selectedStatus) {
@@ -45,7 +46,7 @@ class DemandProvider extends ChangeNotifier {
   }
 
   void setCity(String city) {
-    _selectedCity = city;
+    _selectedCity = city == '全国' ? city : _normalizeCityName(city);
     notifyListeners();
   }
 
@@ -225,5 +226,18 @@ class DemandProvider extends ChangeNotifier {
         createdAt: DateTime.now().subtract(const Duration(days: 1)),
       ),
     ];
+  }
+
+  String _normalizeCityName(String? raw) {
+    final city = (raw ?? '').trim();
+    if (city.isEmpty) return '';
+
+    const suffixes = ['特别行政区', '自治州', '自治区', '地区', '盟', '市'];
+    for (final suffix in suffixes) {
+      if (city.endsWith(suffix) && city.length > suffix.length) {
+        return city.substring(0, city.length - suffix.length);
+      }
+    }
+    return city;
   }
 }

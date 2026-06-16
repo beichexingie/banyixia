@@ -1,7 +1,10 @@
 import 'dart:async';
 import 'dart:math' as math;
 
+import 'package:amap_flutter_base/amap_flutter_base.dart' as amap_base;
+import 'package:amap_flutter_map/amap_flutter_map.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/foundation.dart';
 import 'package:go_router/go_router.dart';
 import 'package:latlong2/latlong.dart';
 
@@ -38,6 +41,9 @@ class _LocationPickerPageState extends State<LocationPickerPage> {
   );
   final Map<String, GlobalKey> _sectionKeys = {};
   final ValueNotifier<int> _mapPanelVersion = ValueNotifier<int>(0);
+  AMapController? _nativeMapController;
+  bool _nativeMapReady = false;
+  bool _movingNativeCamera = false;
 
   late String _selectedAddress;
   late String _selectedCity;
@@ -55,6 +61,8 @@ class _LocationPickerPageState extends State<LocationPickerPage> {
   Timer? _reverseGeocodeDebounce;
 
   bool get _hasWebServiceKey => AmapConfig.webServiceKey.trim().isNotEmpty;
+  bool get _preferNativeAmap =>
+      !kIsWeb && defaultTargetPlatform == TargetPlatform.android;
   AmapMapService? get _amapMapService =>
       _mapService is AmapMapService ? _mapService as AmapMapService : null;
 
@@ -611,6 +619,32 @@ class _LocationPickerPageState extends State<LocationPickerPage> {
       _mapTarget = displayTarget;
     });
     _notifyMapPanelChanged();
+    if (_preferNativeAmap) {
+      await _moveNativeCamera(displayTarget, zoom: _mapZoom);
+    }
+  }
+
+  Future<void> _moveNativeCamera(LatLng target, {double? zoom}) async {
+    final controller = _nativeMapController;
+    if (controller == null) return;
+
+    _movingNativeCamera = true;
+    try {
+      await controller.moveCamera(
+        CameraUpdate.newCameraPosition(
+          CameraPosition(
+            target: amap_base.LatLng(target.latitude, target.longitude),
+            zoom: zoom ?? _mapZoom,
+          ),
+        ),
+      );
+    } catch (_) {
+      // Ignore native camera errors and keep the current fallback state.
+    } finally {
+      Future<void>.delayed(const Duration(milliseconds: 220), () {
+        _movingNativeCamera = false;
+      });
+    }
   }
 
   void _scheduleReverseGeocode(LatLng target) {
@@ -1393,7 +1427,7 @@ class _LocationPickerPageState extends State<LocationPickerPage> {
   }
 
   Widget _buildMapActionColumn({required bool showFullscreenButton}) {
-    return Row(
+    return Column(
       mainAxisSize: MainAxisSize.min,
       children: [
         if (showFullscreenButton) ...[
@@ -1401,18 +1435,134 @@ class _LocationPickerPageState extends State<LocationPickerPage> {
             icon: Icons.fullscreen,
             onTap: _openFullscreenMap,
           ),
-          const SizedBox(width: 8),
+          const SizedBox(height: 8),
         ],
+        _buildMapZoomButton(
+          icon: Icons.my_location_outlined,
+          onTap: _useCurrentLocation,
+        ),
+        const SizedBox(height: 8),
         _buildMapZoomButton(
           icon: Icons.add,
           onTap: () => _changeMapZoom(1),
         ),
-        const SizedBox(width: 8),
+        const SizedBox(height: 8),
         _buildMapZoomButton(
           icon: Icons.remove,
           onTap: () => _changeMapZoom(-1),
         ),
       ],
+    );
+  }
+
+  Widget _buildNativeMapSurface() {
+    return AMapWidget(
+      privacyStatement: const amap_base.AMapPrivacyStatement(
+        hasContains: true,
+        hasShow: true,
+        hasAgree: true,
+      ),
+      apiKey: const amap_base.AMapApiKey(androidKey: ''),
+      initialCameraPosition: CameraPosition(
+        target: amap_base.LatLng(_mapTarget.latitude, _mapTarget.longitude),
+        zoom: _mapZoom,
+      ),
+      myLocationStyleOptions: MyLocationStyleOptions(
+        true,
+        circleFillColor: const Color(0x223D6CF5),
+        circleStrokeColor: const Color(0x883D6CF5),
+        circleStrokeWidth: 1.2,
+      ),
+      compassEnabled: false,
+      scaleEnabled: false,
+      touchPoiEnabled: true,
+      buildingsEnabled: true,
+      onMapCreated: (controller) {
+        _nativeMapController = controller;
+        _nativeMapReady = true;
+      },
+      onCameraMove: (position) {
+        if (!_nativeMapReady) return;
+        final target = LatLng(
+          position.target.latitude,
+          position.target.longitude,
+        );
+        if (!mounted) return;
+        setState(() {
+          _mapTarget = target;
+          _mapZoom = position.zoom;
+        });
+        _notifyMapPanelChanged();
+      },
+      onCameraMoveEnd: (_) {
+        if (_movingNativeCamera) return;
+        _scheduleReverseGeocode(_mapTarget);
+      },
+      onTap: (point) async {
+        final target = LatLng(point.latitude, point.longitude);
+        if (!mounted) return;
+        setState(() => _mapTarget = target);
+        _notifyMapPanelChanged();
+        await _handleMapMoveEnd(target);
+      },
+    );
+  }
+
+  Widget _buildMapFloatingActionColumn({required bool showFullscreenButton}) {
+    return Positioned(
+      right: 14,
+      bottom: 88,
+      child: Container(
+        padding: const EdgeInsets.all(6),
+        decoration: BoxDecoration(
+          color: Colors.white.withValues(alpha: 0.96),
+          borderRadius: BorderRadius.circular(18),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withValues(alpha: 0.08),
+              blurRadius: 14,
+              offset: const Offset(0, 6),
+            ),
+          ],
+        ),
+        child: _buildMapActionColumn(showFullscreenButton: showFullscreenButton),
+      ),
+    );
+  }
+
+  Widget _buildMapTopBadge() {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+      decoration: BoxDecoration(
+        color: Colors.white.withValues(alpha: 0.95),
+        borderRadius: BorderRadius.circular(14),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.08),
+            blurRadius: 12,
+            offset: const Offset(0, 6),
+          ),
+        ],
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          const Icon(
+            Icons.near_me_outlined,
+            size: 16,
+            color: AppColors.primary,
+          ),
+          const SizedBox(width: 6),
+          Text(
+            _selectedCity.isEmpty ? '定位中' : _selectedCity,
+            style: const TextStyle(
+              fontSize: 12,
+              fontWeight: FontWeight.w700,
+              color: AppColors.textPrimary,
+            ),
+          ),
+        ],
+      ),
     );
   }
 
@@ -1441,14 +1591,24 @@ class _LocationPickerPageState extends State<LocationPickerPage> {
       child: Stack(
         children: [
           Positioned.fill(
-            child: _buildAmapTileSurface(),
+            child: _preferNativeAmap
+                ? _buildNativeMapSurface()
+                : _buildAmapTileSurface(),
           ),
           Positioned(
             left: 14,
             right: 14,
             top: 14,
-            child: _buildMapInfoCard(),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                _buildMapTopBadge(),
+                const SizedBox(height: 10),
+                _buildMapInfoCard(),
+              ],
+            ),
           ),
+          _buildMapFloatingActionColumn(showFullscreenButton: !isFullscreen),
           const IgnorePointer(
             child: Center(
               child: Icon(
@@ -1507,8 +1667,6 @@ class _LocationPickerPageState extends State<LocationPickerPage> {
                             overflow: TextOverflow.ellipsis,
                           ),
                         ),
-                        const SizedBox(width: 8),
-                        _buildMapActionColumn(showFullscreenButton: !isFullscreen),
                       ],
                     ),
                   ),

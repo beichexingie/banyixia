@@ -303,6 +303,8 @@ class _OrderCreatePageState extends State<OrderCreatePage> {
         serviceName: detail.isEmpty ? serviceSummary : '$serviceSummary / $detail',
         paymentMethod: _paymentMethod,
         paymentStatus: 'pending',
+        merchantOrderNo:
+            'BX${DateTime.now().millisecondsSinceEpoch}${userId.replaceAll('-', '').substring(0, userId.length > 8 ? 8 : userId.length)}',
         serviceDate: _serviceDateTime,
         createdAt: DateTime.now(),
       );

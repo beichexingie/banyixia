@@ -5,6 +5,7 @@ import 'package:alipay_payment/alipay_payment.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart';
 import 'package:http/http.dart' as http;
+import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../config/payment_config.dart';
 
@@ -172,8 +173,11 @@ class AlipayPaymentService implements PaymentService {
 
     final response = await http.post(
       uri,
-      headers: const {
+      headers: {
         'Content-Type': 'application/json',
+        'apikey': PaymentConfig.supabaseAnonKey,
+        'Authorization':
+            'Bearer ${Supabase.instance.client.auth.currentSession?.accessToken ?? PaymentConfig.supabaseAnonKey}',
       },
       body: jsonEncode({
         'order_id': request.orderId,

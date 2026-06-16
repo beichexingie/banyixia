@@ -1,7 +1,8 @@
+import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:provider/provider.dart';
-import 'package:cached_network_image/cached_network_image.dart';
+
 import '../../config/app_theme.dart';
 import '../../models/order.dart';
 import '../../providers/message_provider.dart';
@@ -17,15 +18,14 @@ class OrdersPage extends StatefulWidget {
   State<OrdersPage> createState() => _OrdersPageState();
 }
 
-class _OrdersPageState extends State<OrdersPage> with SingleTickerProviderStateMixin {
+class _OrdersPageState extends State<OrdersPage>
+    with SingleTickerProviderStateMixin {
   late TabController _tabController;
 
   @override
   void initState() {
     super.initState();
-    final initialIndex = widget.initialTab < 0
-        ? 0
-        : (widget.initialTab > 4 ? 4 : widget.initialTab);
+    final initialIndex = widget.initialTab.clamp(0, 4);
     _tabController = TabController(
       length: 5,
       vsync: this,
@@ -33,11 +33,17 @@ class _OrdersPageState extends State<OrdersPage> with SingleTickerProviderStateM
     );
   }
 
+  @override
+  void dispose() {
+    _tabController.dispose();
+    super.dispose();
+  }
+
   Future<void> _contactGuide(Order order) async {
     try {
       final roomId = await context.read<MessageProvider>().getOrCreateRoom(
-        order.guideId,
-      );
+            order.guideId,
+          );
       if (!mounted) return;
       context.push(
         '/chat/$roomId?name=${Uri.encodeComponent(order.guideName)}&avatar=${Uri.encodeComponent(order.guideAvatar)}',
@@ -50,10 +56,20 @@ class _OrdersPageState extends State<OrdersPage> with SingleTickerProviderStateM
     }
   }
 
-  @override
-  void dispose() {
-    _tabController.dispose();
-    super.dispose();
+  Future<void> _runDebugPayment() async {
+    try {
+      final result =
+          await context.read<OrderProvider>().createAndPayDebugOrder();
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('0.01 元测试支付结果：${result.message}')),
+      );
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('测试支付失败：$e')),
+      );
+    }
   }
 
   @override
@@ -63,6 +79,18 @@ class _OrdersPageState extends State<OrdersPage> with SingleTickerProviderStateM
       appBar: AppBar(
         title: const Text('我的订单'),
         centerTitle: true,
+        actions: [
+          TextButton(
+            onPressed: _runDebugPayment,
+            child: const Text(
+              '0.01测试',
+              style: TextStyle(
+                color: AppColors.primary,
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+          ),
+        ],
         bottom: TabBar(
           controller: _tabController,
           isScrollable: true,
@@ -85,15 +113,30 @@ class _OrdersPageState extends State<OrdersPage> with SingleTickerProviderStateM
           }
 
           final allOrders = orderProvider.orders;
-
           return TabBarView(
             controller: _tabController,
             children: [
               _buildOrderList(allOrders),
-              _buildOrderList(allOrders.where((o) => o.status == OrderStatus.pendingPayment).toList()),
-              _buildOrderList(allOrders.where((o) => o.status == OrderStatus.inProgress).toList()),
-              _buildOrderList(allOrders.where((o) => o.status == OrderStatus.pendingReview).toList()),
-              _buildOrderList(allOrders.where((o) => o.status == OrderStatus.cancelled).toList()),
+              _buildOrderList(
+                allOrders
+                    .where((o) => o.status == OrderStatus.pendingPayment)
+                    .toList(),
+              ),
+              _buildOrderList(
+                allOrders
+                    .where((o) => o.status == OrderStatus.inProgress)
+                    .toList(),
+              ),
+              _buildOrderList(
+                allOrders
+                    .where((o) => o.status == OrderStatus.pendingReview)
+                    .toList(),
+              ),
+              _buildOrderList(
+                allOrders
+                    .where((o) => o.status == OrderStatus.cancelled)
+                    .toList(),
+              ),
             ],
           );
         },
@@ -107,9 +150,26 @@ class _OrdersPageState extends State<OrdersPage> with SingleTickerProviderStateM
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            Icon(Icons.receipt_long, size: 60, color: AppColors.textHint.withValues(alpha: 0.5)),
+            Icon(
+              Icons.receipt_long,
+              size: 60,
+              color: AppColors.textHint.withValues(alpha: 0.5),
+            ),
             const SizedBox(height: 16),
             const Text('暂无相关订单', style: AppTextStyles.subtitle),
+            const SizedBox(height: 10),
+            const Padding(
+              padding: EdgeInsets.symmetric(horizontal: 32),
+              child: Text(
+                '右上角的 0.01 测试 用于验证正式支付通路，只测试用户向平台支付，不代表地陪真实结算。',
+                textAlign: TextAlign.center,
+                style: TextStyle(
+                  fontSize: 12,
+                  color: AppColors.textSecondary,
+                  height: 1.5,
+                ),
+              ),
+            ),
           ],
         ),
       );
@@ -118,39 +178,14 @@ class _OrdersPageState extends State<OrdersPage> with SingleTickerProviderStateM
     return ListView.builder(
       padding: const EdgeInsets.all(16),
       itemCount: orders.length,
-      itemBuilder: (context, index) {
-        final order = orders[index];
-        return _buildOrderCard(order);
-      },
+      itemBuilder: (context, index) => _buildOrderCard(orders[index]),
     );
   }
 
   Widget _buildOrderCard(Order order) {
-    String statusText;
-    Color statusColor;
-
-    switch (order.status) {
-      case OrderStatus.pendingPayment:
-        statusText = '待付款';
-        statusColor = const Color(0xFFFF9800);
-        break;
-      case OrderStatus.inProgress:
-        statusText = '进行中';
-        statusColor = AppColors.primary;
-        break;
-      case OrderStatus.pendingReview:
-        statusText = '待评价';
-        statusColor = const Color(0xFF4CAF50);
-        break;
-      case OrderStatus.completed:
-        statusText = '已完成';
-        statusColor = AppColors.textSecondary;
-        break;
-      case OrderStatus.cancelled:
-        statusText = '已取消';
-        statusColor = AppColors.textHint;
-        break;
-    }
+    final (statusText, statusColor) = _statusMeta(order.status);
+    final isDebugOrder = order.serviceName.contains('0.01')
+        || (order.merchantOrderNo?.startsWith('DBG') ?? false);
 
     return Container(
       margin: const EdgeInsets.only(bottom: 16),
@@ -159,24 +194,57 @@ class _OrdersPageState extends State<OrdersPage> with SingleTickerProviderStateM
         color: Colors.white,
         borderRadius: BorderRadius.circular(16),
         boxShadow: [
-          BoxShadow(color: Colors.black.withValues(alpha: 0.04), blurRadius: 8, offset: const Offset(0, 2)),
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.04),
+            blurRadius: 8,
+            offset: const Offset(0, 2),
+          ),
         ],
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
               Expanded(
                 child: Text(
-                  '订单号: ${_shortId(order.id)}',
+                  '订单号 ${_shortId(order.id)}',
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
-                  style: const TextStyle(fontSize: 12, color: AppColors.textHint),
+                  style: const TextStyle(
+                    fontSize: 12,
+                    color: AppColors.textHint,
+                  ),
                 ),
               ),
-              Text(statusText, style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold, color: statusColor)),
+              if (isDebugOrder)
+                Container(
+                  margin: const EdgeInsets.only(right: 8),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 8,
+                    vertical: 4,
+                  ),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFFFFF4E8),
+                    borderRadius: BorderRadius.circular(999),
+                  ),
+                  child: const Text(
+                    '测试单',
+                    style: TextStyle(
+                      fontSize: 11,
+                      color: Color(0xFFE68A00),
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                ),
+              Text(
+                statusText,
+                style: TextStyle(
+                  fontSize: 14,
+                  fontWeight: FontWeight.bold,
+                  color: statusColor,
+                ),
+              ),
             ],
           ),
           if (order.status == OrderStatus.inProgress) ...[
@@ -191,9 +259,20 @@ class _OrdersPageState extends State<OrdersPage> with SingleTickerProviderStateM
                 borderRadius: BorderRadius.circular(8),
                 child: CachedNetworkImage(
                   imageUrl: order.guideAvatar,
-                  width: 60, height: 60, fit: BoxFit.cover,
-                  placeholder: (context, url) => Container(width: 60, height: 60, color: AppColors.tagBackground),
-                  errorWidget: (context, url, err) => Container(width: 60, height: 60, color: AppColors.tagBackground, child: const Icon(Icons.person)),
+                  width: 60,
+                  height: 60,
+                  fit: BoxFit.cover,
+                  placeholder: (context, url) => Container(
+                    width: 60,
+                    height: 60,
+                    color: AppColors.tagBackground,
+                  ),
+                  errorWidget: (context, url, err) => Container(
+                    width: 60,
+                    height: 60,
+                    color: AppColors.tagBackground,
+                    child: const Icon(Icons.person),
+                  ),
                 ),
               ),
               const SizedBox(width: 12),
@@ -202,18 +281,47 @@ class _OrdersPageState extends State<OrdersPage> with SingleTickerProviderStateM
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(
-                      '地陪服务 - ${order.guideName}',
+                      isDebugOrder
+                          ? '支付联调测试订单'
+                          : '地陪服务 - ${order.guideName}',
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
-                      style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+                      style: const TextStyle(
+                        fontSize: 16,
+                        fontWeight: FontWeight.bold,
+                      ),
                     ),
                     const SizedBox(height: 4),
                     Text(
-                      '服务时间: ${_formatDateTime(order.serviceDate)}',
+                      isDebugOrder
+                          ? '用于验证正式支付、异步回调、订单状态更新'
+                          : '服务时间：${_formatDateTime(order.serviceDate)}',
                       maxLines: 2,
                       overflow: TextOverflow.ellipsis,
                       style: AppTextStyles.caption,
                     ),
+                    if ((order.merchantOrderNo ?? '').isNotEmpty) ...[
+                      const SizedBox(height: 6),
+                      Text(
+                        '商户单号：${order.merchantOrderNo}',
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: const TextStyle(
+                          fontSize: 11,
+                          color: AppColors.textHint,
+                        ),
+                      ),
+                    ],
+                    if ((order.paymentStatus).isNotEmpty) ...[
+                      const SizedBox(height: 4),
+                      Text(
+                        '支付状态：${order.paymentStatus}',
+                        style: const TextStyle(
+                          fontSize: 11,
+                          color: AppColors.textSecondary,
+                        ),
+                      ),
+                    ],
                   ],
                 ),
               ),
@@ -223,32 +331,60 @@ class _OrdersPageState extends State<OrdersPage> with SingleTickerProviderStateM
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              const Text('总价', style: TextStyle(fontSize: 14, color: AppColors.textSecondary)),
-              Text('¥${order.amount.toStringAsFixed(2)}', style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: AppColors.textPrimary)),
+              const Text(
+                '总价',
+                style: TextStyle(
+                  fontSize: 14,
+                  color: AppColors.textSecondary,
+                ),
+              ),
+              Text(
+                '¥${order.amount.toStringAsFixed(2)}',
+                style: const TextStyle(
+                  fontSize: 18,
+                  fontWeight: FontWeight.bold,
+                  color: AppColors.textPrimary,
+                ),
+              ),
             ],
           ),
-          if (order.status == OrderStatus.pendingPayment || order.status == OrderStatus.inProgress) ...[
+          if (isDebugOrder) ...[
+            const SizedBox(height: 10),
+            const Text(
+              '说明：这笔 0.01 元测试单只验证“用户向平台发起支付”是否成功。地陪真实收款、分账或提现，不依赖这一笔测试。',
+              style: TextStyle(
+                fontSize: 12,
+                color: AppColors.textSecondary,
+                height: 1.5,
+              ),
+            ),
+          ],
+          if (order.status == OrderStatus.pendingPayment ||
+              order.status == OrderStatus.inProgress) ...[
             const SizedBox(height: 16),
             Row(
               mainAxisAlignment: MainAxisAlignment.end,
               children: [
-                OutlinedButton(
-                  onPressed: () => _contactGuide(order),
-                  style: OutlinedButton.styleFrom(
-                    foregroundColor: AppColors.primary,
-                    side: const BorderSide(color: AppColors.primary),
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(12),
+                if (!isDebugOrder) ...[
+                  OutlinedButton(
+                    onPressed: () => _contactGuide(order),
+                    style: OutlinedButton.styleFrom(
+                      foregroundColor: AppColors.primary,
+                      side: const BorderSide(color: AppColors.primary),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(12),
+                      ),
                     ),
+                    child: const Text('联系地陪'),
                   ),
-                  child: const Text('联系地陪'),
-                ),
-                const SizedBox(width: 10),
+                  const SizedBox(width: 10),
+                ],
                 if (order.status == OrderStatus.pendingPayment)
                   ElevatedButton(
                     onPressed: () async {
                       try {
-                        final result = await context.read<OrderProvider>().payOrder(order.id);
+                        final result =
+                            await context.read<OrderProvider>().payOrder(order.id);
                         if (!context.mounted) return;
                         ScaffoldMessenger.of(context).showSnackBar(
                           SnackBar(content: Text(result.message)),
@@ -256,24 +392,28 @@ class _OrdersPageState extends State<OrdersPage> with SingleTickerProviderStateM
                       } catch (e) {
                         if (!context.mounted) return;
                         ScaffoldMessenger.of(context).showSnackBar(
-                          SnackBar(content: Text('支付失败: $e')),
+                          SnackBar(content: Text('支付失败：$e')),
                         );
                       }
                     },
                     style: ElevatedButton.styleFrom(
                       backgroundColor: AppColors.primary,
                       foregroundColor: Colors.white,
-                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(12),
+                      ),
                     ),
-                    child: const Text('立即支付'),
+                    child: Text(isDebugOrder ? '继续测试支付' : '立即支付'),
                   ),
-                if (order.status == OrderStatus.inProgress)
+                if (order.status == OrderStatus.inProgress && !isDebugOrder)
                   ElevatedButton(
                     onPressed: () => _showConfirmComplete(context, order),
                     style: ElevatedButton.styleFrom(
                       backgroundColor: Colors.green,
                       foregroundColor: Colors.white,
-                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(12),
+                      ),
                     ),
                     child: const Text('确认完成'),
                   ),
@@ -285,20 +425,38 @@ class _OrdersPageState extends State<OrdersPage> with SingleTickerProviderStateM
     );
   }
 
+  (String, Color) _statusMeta(OrderStatus status) {
+    switch (status) {
+      case OrderStatus.pendingPayment:
+        return ('待付款', const Color(0xFFFF9800));
+      case OrderStatus.inProgress:
+        return ('进行中', AppColors.primary);
+      case OrderStatus.pendingReview:
+        return ('待评价', const Color(0xFF4CAF50));
+      case OrderStatus.completed:
+        return ('已完成', AppColors.textSecondary);
+      case OrderStatus.cancelled:
+        return ('已取消', AppColors.textHint);
+    }
+  }
+
   void _showConfirmComplete(BuildContext context, Order order) {
     showDialog(
       context: context,
       builder: (context) => AlertDialog(
         title: const Text('确认完成服务？'),
-        content: const Text('确认后资金将结算给地陪，无法退款。'),
+        content: const Text('确认后资金将进入结算流程，通常不再支持退款。'),
         actions: [
-          TextButton(onPressed: () => Navigator.pop(context), child: const Text('取消')),
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('取消'),
+          ),
           ElevatedButton(
             onPressed: () async {
               Navigator.pop(context);
               await context.read<OrderProvider>().completeOrder(order.id);
             },
-            child: const Text('确认确认'),
+            child: const Text('确认完成'),
           ),
         ],
       ),

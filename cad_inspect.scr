@@ -1,0 +1,9 @@
+(setq out (open "D:/APP/flutter_application_1/cad_inspect_output.txt" "w"))
+(write-line (strcat "DWGNAME=" (getvar "DWGNAME")) out)
+(write-line (strcat "CTAB=" (getvar "CTAB")) out)
+(write-line (strcat "TILEMODE=" (itoa (getvar "TILEMODE"))) out)
+(write-line (strcat "EXTMIN=" (vl-princ-to-string (getvar "EXTMIN"))) out)
+(write-line (strcat "EXTMAX=" (vl-princ-to-string (getvar "EXTMAX"))) out)
+(foreach lay (layoutlist) (write-line (strcat "LAYOUT=" lay) out))
+(close out)
+qsave

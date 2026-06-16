@@ -15,7 +15,7 @@ class AppConfig {
 
   static const String amapWebServiceKey = String.fromEnvironment(
     'AMAP_WEB_SERVICE_KEY',
-    defaultValue: '3174fea4534bc0320acc10c5f95d2472',
+    defaultValue: 'f365608ae7958031b8930c795f5d7329',
   );
 
   static const String paymentBackendBaseUrlOverride = String.fromEnvironment(
@@ -25,7 +25,7 @@ class AppConfig {
 
   static const bool alipayUseSandbox = bool.fromEnvironment(
     'ALIPAY_USE_SANDBOX',
-    defaultValue: true,
+    defaultValue: false,
   );
 
   static String get paymentBackendBaseUrl {
