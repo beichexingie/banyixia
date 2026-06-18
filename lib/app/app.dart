@@ -12,42 +12,49 @@ import '../providers/order_provider.dart';
 import '../providers/post_provider.dart';
 import '../providers/user_provider.dart';
 import '../services/payment_service.dart';
-import '../services/phone_auth_service.dart';
+import '../bootstrap/app_bootstrap.dart';
+import '../services/session_service.dart';
 
 class BanyixiaApp extends StatelessWidget {
-  final PhoneAuthService? phoneAuthService;
   final PaymentService? paymentService;
 
   const BanyixiaApp({
     super.key,
-    this.phoneAuthService,
     this.paymentService,
   });
 
   @override
   Widget build(BuildContext context) {
-    final resolvedPhoneAuthService =
-        phoneAuthService ?? SupabasePhoneAuthService();
+    final sessionService = AppBootstrap.sessionService;
     final resolvedPaymentService =
         paymentService ?? const AlipayPaymentService();
 
     return MultiProvider(
       providers: [
         ChangeNotifierProvider(
-          create: (_) => UserProvider(
-            phoneAuthService: resolvedPhoneAuthService,
-          ),
+          create: (_) => UserProvider(sessionService: sessionService),
         ),
-        ChangeNotifierProvider(create: (_) => PostProvider()..loadPosts()),
-        ChangeNotifierProvider(create: (_) => GuideProvider()..loadGuides()),
-        ChangeNotifierProvider(create: (_) => DemandProvider()..loadDemands()),
+        ChangeNotifierProvider(
+          create: (_) => PostProvider(sessionService: sessionService)..loadPosts(),
+        ),
+        ChangeNotifierProvider(
+          create: (_) => GuideProvider(sessionService: sessionService)..loadGuides(),
+        ),
+        ChangeNotifierProvider(
+          create: (_) => DemandProvider(sessionService: sessionService)..loadDemands(),
+        ),
         ChangeNotifierProvider(
           create: (_) => OrderProvider(
             paymentService: resolvedPaymentService,
+            sessionService: sessionService,
           )..loadOrders(),
         ),
-        ChangeNotifierProvider(create: (_) => MessageProvider()..loadRooms()),
-        ChangeNotifierProvider(create: (_) => ApplicationProvider()),
+        ChangeNotifierProvider(
+          create: (_) => MessageProvider(sessionService: sessionService)..loadRooms(),
+        ),
+        ChangeNotifierProvider(
+          create: (_) => ApplicationProvider(sessionService: sessionService),
+        ),
       ],
       child: Builder(
         builder: (context) {

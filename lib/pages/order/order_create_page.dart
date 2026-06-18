@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:provider/provider.dart';
-import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../../config/app_theme.dart';
 import '../../models/guide.dart';
@@ -239,7 +238,7 @@ class _OrderCreatePageState extends State<OrderCreatePage> {
       return;
     }
 
-    final userId = Supabase.instance.client.auth.currentUser?.id;
+    final userId = context.read<UserProvider>().user.id;
     if (userId == null) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('请先登录')),

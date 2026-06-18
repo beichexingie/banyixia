@@ -13,7 +13,7 @@ CREATE TABLE IF NOT EXISTS public.chat_rooms (
 CREATE TABLE IF NOT EXISTS public.messages (
     id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
     room_id UUID NOT NULL REFERENCES public.chat_rooms(id) ON DELETE CASCADE,
-    sender_id UUID NOT NULL REFERENCES auth.users(id),
+    sender_id UUID NOT NULL REFERENCES public.users(id),
     content TEXT NOT NULL,
     type TEXT DEFAULT 'text', -- text, image, order_card
     is_read BOOLEAN DEFAULT false,

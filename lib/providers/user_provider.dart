@@ -1,252 +1,119 @@
 import 'package:flutter/material.dart';
-import 'package:supabase_flutter/supabase_flutter.dart' as supabase;
 
 import '../models/user.dart';
-import '../services/phone_auth_service.dart';
+import '../services/ecs_api_client.dart';
+import '../services/session_service.dart';
 
 class UserProvider extends ChangeNotifier {
-  final PhoneAuthService _phoneAuthService;
+  final SessionService _sessionService;
+  final EcsApiClient _api;
+
   User _user = User.guest();
   bool _isLoading = false;
   String? _pendingPhoneNumber;
 
   User get user => _user;
   bool get isLoading => _isLoading;
-  bool get isLoggedIn => _user.id.isNotEmpty && _user.id != '0';
+  bool get isLoggedIn =>
+      _user.id.isNotEmpty && _user.id != '0' && !_user.id.startsWith('guest');
   bool get isAdmin => _user.canAccessAdmin;
   bool get isGuide => _user.isGuideApproved;
   bool get isBanned => _user.isBanned;
+  String? get accessToken => _sessionService.currentSession?.accessToken;
 
-  UserProvider({PhoneAuthService? phoneAuthService})
-    : _phoneAuthService = phoneAuthService ?? SupabasePhoneAuthService() {
-    _initAuthListener();
+  UserProvider({
+    required SessionService sessionService,
+    EcsApiClient? apiClient,
+  })  : _sessionService = sessionService,
+        _api = apiClient ?? EcsApiClient() {
+    _sessionService.sessionListenable.addListener(_handleSessionChanged);
+    _handleSessionChanged();
   }
 
-  void _initAuthListener() {
-    try {
-      supabase.Supabase.instance.client.auth.onAuthStateChange.listen((
-        data,
-      ) async {
-        final session = data.session;
-        if (session?.user != null) {
-          await _syncUserWithDatabase(session!.user);
-        } else {
-          _user = User.guest();
-          notifyListeners();
-        }
-      });
-    } catch (e) {
-      debugPrint('Supabase Auth Error: $e');
+  void _handleSessionChanged() {
+    final session = _sessionService.currentSession;
+    if (session == null) {
       _user = User.guest();
       notifyListeners();
+      return;
     }
+    _loadCurrentUser(session);
   }
 
-  Map<String, dynamic> _metadataFromAuthUser(supabase.User user) {
-    final raw = user.userMetadata;
-    if (raw is Map<String, dynamic>) {
-      return raw;
-    }
-    return <String, dynamic>{};
+  String? _authToken() {
+    return _sessionService.currentSession?.accessToken;
   }
 
-  List<String> _parseGuideTags(dynamic value) {
-    if (value is List) {
-      return value
-          .map((item) => item.toString().trim())
-          .where((item) => item.isNotEmpty)
-          .toList();
-    }
-    if (value is String && value.trim().isNotEmpty) {
-      return value
-          .split(RegExp(r'[,，/\s]+'))
-          .map((item) => item.trim())
-          .where((item) => item.isNotEmpty)
-          .toList();
-    }
-    return const [];
-  }
-
-  String? _firstNonEmptyString(List<dynamic> values) {
-    for (final value in values) {
-      final text = value?.toString().trim();
-      if (text != null && text.isNotEmpty) {
-        return text;
-      }
-    }
-    return null;
-  }
-
-  User _buildUserFromSources({
-    required supabase.User authUser,
-    required _UserRoleContext roleContext,
-    Map<String, dynamic>? dbRow,
-    String? fallbackNickname,
-    String? fallbackAvatar,
-  }) {
-    final metadata = _metadataFromAuthUser(authUser);
-    final row = dbRow ?? const <String, dynamic>{};
-    return User(
-      id: authUser.id,
-      nickname: _firstNonEmptyString([
-            row['nickname'],
-            metadata['nickname'],
-            fallbackNickname,
-            authUser.phone,
-          ]) ??
-          '新用户',
-      avatar: _firstNonEmptyString([
-            row['avatar'],
-            metadata['avatar'],
-            fallbackAvatar,
-          ]) ??
-          'https://picsum.photos/seed/user/100/100',
-      bio: _firstNonEmptyString([row['bio'], metadata['bio']]) ?? '',
-      gender: _firstNonEmptyString([row['gender'], metadata['gender']]) ?? '',
-      city: _firstNonEmptyString([row['city'], metadata['city']]) ?? '',
-      birthday:
-          _firstNonEmptyString([row['birthday'], metadata['birthday']]) ?? '',
-      wechat: _firstNonEmptyString([row['wechat'], metadata['wechat']]) ?? '',
-      occupation:
-          _firstNonEmptyString([row['occupation'], metadata['occupation']]) ??
-          '',
-      guideIntroduction:
-          _firstNonEmptyString([
-            row['guide_introduction'],
-            metadata['guide_introduction'],
-          ]) ??
-          '',
-      guideTags: _parseGuideTags(row['guide_tags'] ?? metadata['guide_tags']),
-      vipLevel: row['vip_level'] ?? row['vipLevel'] ?? 1,
-      title: _firstNonEmptyString([row['title'], metadata['title']]) ?? '初级旅行家',
-      balance: (row['balance'] ?? 0.0).toDouble(),
-      couponCount: row['coupon_count'] ?? row['couponCount'] ?? 0,
-      followCount: roleContext.followCount,
-      fansCount: roleContext.fansCount,
-      isBanned: row['is_banned'] ?? false,
-      cancelCount: row['cancel_count'] ?? 0,
-      isAdmin: row['is_admin'] ?? false,
-      isGuide: roleContext.isGuide,
-      guideApplicationStatus: roleContext.applicationStatus,
-    );
-  }
-
-  Map<String, dynamic> _profileMetadataFromUser(User user) {
+  Map<String, dynamic> _normalizeUserPayload(Map<String, dynamic> json) {
     return {
-      'nickname': user.nickname,
-      'avatar': user.avatar,
-      'bio': user.bio,
-      'gender': user.gender,
-      'city': user.city,
-      'birthday': user.birthday,
-      'wechat': user.wechat,
-      'occupation': user.occupation,
-      'guide_introduction': user.guideIntroduction,
-      'guide_tags': user.guideTags,
-      'title': user.title,
+      'id': json['id']?.toString() ?? '',
+      'nickname': json['nickname'] ?? '',
+      'avatar': json['avatar'] ?? '',
+      'bio': json['bio'] ?? '',
+      'gender': json['gender'] ?? '',
+      'city': json['city'] ?? '',
+      'birthday': json['birthday'] ?? '',
+      'wechat': json['wechat'] ?? '',
+      'occupation': json['occupation'] ?? '',
+      'guide_introduction': json['guide_introduction'] ?? '',
+      'guide_tags': json['guide_tags'] ?? const [],
+      'vip_level': json['vip_level'] ?? 0,
+      'title': json['title'] ?? '',
+      'balance': json['balance'] ?? 0,
+      'coupon_count': json['coupon_count'] ?? 0,
+      'follow_count': json['follow_count'] ?? 0,
+      'fans_count': json['fans_count'] ?? 0,
+      'is_banned': json['is_banned'] ?? false,
+      'cancel_count': json['cancel_count'] ?? 0,
+      'is_admin': json['is_admin'] ?? false,
+      'is_guide': json['is_guide'] ?? false,
+      'guide_application_status': json['guide_application_status'],
     };
   }
 
-  Future<void> _syncUserWithDatabase(supabase.User supaUser) async {
-    try {
-      final client = supabase.Supabase.instance.client;
-      final response = await client
-          .from('users')
-          .select()
-          .eq('id', supaUser.id)
-          .maybeSingle();
-      final roleContext = await _loadRoleContext(supaUser.id);
-
-      if (response != null) {
-        _user = _buildUserFromSources(
-          authUser: supaUser,
-          roleContext: roleContext,
-          dbRow: response,
-        );
-      } else {
-        _user = _buildUserFromSources(
-          authUser: supaUser,
-          roleContext: roleContext,
-          fallbackNickname: supaUser.phone ?? '新用户',
-          fallbackAvatar: 'https://picsum.photos/seed/user/100/100',
-        );
-
-        await client.from('users').upsert({
-          'id': _user.id,
-          'nickname': _user.nickname,
-          'avatar': _user.avatar,
-          'vip_level': _user.vipLevel,
-          'title': _user.title,
-          'balance': _user.balance,
-          'coupon_count': _user.couponCount,
-          'follow_count': _user.followCount,
-          'fans_count': _user.fansCount,
-        });
-      }
-      notifyListeners();
-    } catch (e) {
-      debugPrint('Supabase Sync Error: $e');
-      _user = _buildUserFromSources(
-        authUser: supaUser,
-        roleContext: const _UserRoleContext(),
-        fallbackNickname: supaUser.phone ?? '新用户',
-        fallbackAvatar: 'https://picsum.photos/seed/user/100/100',
-      );
-      notifyListeners();
-    }
+  User _buildUserFromApi(Map<String, dynamic> json) {
+    return User.fromJson(_normalizeUserPayload(json));
   }
 
-  Future<_UserRoleContext> _loadRoleContext(String userId) async {
-    final client = supabase.Supabase.instance.client;
+  Future<void> _loadCurrentUser(AppSession session) async {
     try {
-      final results = await Future.wait<Object?>([
-        client.from('follows').count().eq('follower_id', userId),
-        client.from('follows').count().eq('followed_id', userId),
-        client.from('guides').select('id').eq('id', userId).maybeSingle(),
-        client
-            .from('guide_applications')
-            .select('status')
-            .eq('user_id', userId)
-            .order('created_at', ascending: false)
-            .limit(1)
-            .maybeSingle(),
-      ]);
-
-      final guideRow = results[2];
-      final applicationRow = results[3];
-      final applicationStatus = applicationRow is Map<String, dynamic>
-          ? applicationRow['status']?.toString()
-          : null;
-
-      return _UserRoleContext(
-        followCount: results[0] as int? ?? 0,
-        fansCount: results[1] as int? ?? 0,
-        isGuide: guideRow != null || applicationStatus == 'approved',
-        applicationStatus: applicationStatus,
+      final response = await _api.get(
+        '/users/me',
+        authToken: session.accessToken,
       );
+      final data = response['data'];
+      if (data is Map<String, dynamic>) {
+        _user = _buildUserFromApi(data);
+      } else {
+        _user = User(
+          id: session.userId,
+          nickname: session.phone ?? '新用户',
+          avatar: 'https://picsum.photos/seed/user/100/100',
+        );
+      }
     } catch (e) {
-      debugPrint('loadRoleContext error: $e');
-      return const _UserRoleContext();
+      debugPrint('Load current user error: $e');
+      _user = User(
+        id: session.userId,
+        nickname: session.phone ?? '新用户',
+        avatar: 'https://picsum.photos/seed/user/100/100',
+      );
     }
+    notifyListeners();
   }
 
   Future<void> sendSmsCode(String phoneNumber) async {
     _isLoading = true;
     notifyListeners();
-
     try {
-      await _phoneAuthService.sendCode(phoneNumber);
+      await _sessionService.sendSmsCode(phoneNumber);
       _pendingPhoneNumber = phoneNumber;
-      _isLoading = false;
-      notifyListeners();
     } catch (e) {
+      debugPrint('sendSmsCode error: $e');
+      rethrow;
+    } finally {
       _isLoading = false;
       notifyListeners();
-      debugPrint('sendSmsCode error: $e');
-      if (e is supabase.AuthException) {
-        throw Exception('发送失败: ${e.message}');
-      }
-      rethrow;
     }
   }
 
@@ -257,24 +124,25 @@ class UserProvider extends ChangeNotifier {
 
     _isLoading = true;
     notifyListeners();
-
     try {
-      await _phoneAuthService.verifyCode(_pendingPhoneNumber!, smsCode);
-      _isLoading = false;
-      notifyListeners();
-    } catch (e) {
-      _isLoading = false;
-      notifyListeners();
-      debugPrint('verifySmsCode error: $e');
-      if (e is supabase.AuthException) {
-        throw Exception('验证码错误: ${e.message}');
+      await _sessionService.verifySmsCode(_pendingPhoneNumber!, smsCode);
+      final session = _sessionService.currentSession;
+      if (session != null) {
+        await _loadCurrentUser(session);
       }
-      throw Exception('验证失败');
+    } catch (e) {
+      debugPrint('verifySmsCode error: $e');
+      rethrow;
+    } finally {
+      _isLoading = false;
+      notifyListeners();
     }
   }
 
-  void logout() async {
-    await supabase.Supabase.instance.client.auth.signOut();
+  Future<void> logout() async {
+    await _sessionService.logout();
+    _user = User.guest();
+    notifyListeners();
   }
 
   Future<void> updateUser(User newUser) async {
@@ -282,98 +150,71 @@ class UserProvider extends ChangeNotifier {
     _user = newUser;
     notifyListeners();
 
-    if (isLoggedIn && !_user.id.startsWith('mock')) {
-      try {
-        final client = supabase.Supabase.instance.client;
-        await client.auth.updateUser(
-          supabase.UserAttributes(data: _profileMetadataFromUser(_user)),
-        );
-        await client.from('users').update({
-          'nickname': _user.nickname,
-          'avatar': _user.avatar,
-          'title': _user.title,
-        }).eq('id', _user.id);
-
-        if (_user.isGuideApproved) {
-          await client
-              .from('guides')
-              .update({
-                'name': _user.nickname,
-                'avatar': _user.avatar,
-                'description': _user.guideIntroduction.isNotEmpty
-                    ? _user.guideIntroduction
-                    : _user.bio,
-                'city': _user.city,
-                'gender': _user.gender,
-                'tags': _user.guideTags,
-              })
-              .eq('id', _user.id);
-        }
-      } catch (e) {
-        _user = oldUser;
-        notifyListeners();
-        debugPrint('Error updating user in Supabase: $e');
-        throw Exception('$e');
+    try {
+      final token = _authToken();
+      if (token == null || token.isEmpty || newUser.id.startsWith('mock')) {
+        return;
       }
+      final response = await _api.put(
+        '/users/me',
+        authToken: token,
+        body: newUser.toJson(),
+      );
+      final data = response['data'];
+      if (data is Map<String, dynamic>) {
+        _user = _buildUserFromApi(data);
+        notifyListeners();
+      }
+    } catch (e) {
+      _user = oldUser;
+      notifyListeners();
+      throw Exception('更新失败: $e');
     }
   }
 
   Future<void> followUser(String targetId) async {
     if (!isLoggedIn) throw Exception('请先登录后操作');
-
-    if (targetId.isEmpty || targetId.startsWith('mock_')) {
-      return;
-    }
-
-    if (targetId == user.id) {
-      throw Exception('不能关注自己');
-    }
+    if (targetId.isEmpty || targetId.startsWith('mock_')) return;
+    if (targetId == user.id) throw Exception('不能关注自己');
 
     try {
-      await supabase.Supabase.instance.client.from('follows').insert({
-        'follower_id': user.id,
-        'followed_id': targetId,
-      });
-      await _syncUserWithDatabase(
-        supabase.Supabase.instance.client.auth.currentUser!,
+      await _api.post(
+        '/users/$targetId/follow',
+        authToken: _authToken(),
       );
+      await _loadCurrentUser(_sessionService.currentSession!);
     } catch (e) {
-      debugPrint('Follow error: $e');
-      throw Exception('关注失败: 可能未开通此服务或网络异常');
+      throw Exception('关注失败: $e');
     }
   }
 
   Future<void> unfollowUser(String targetId) async {
     if (!isLoggedIn) throw Exception('请先登录');
-
-    if (targetId.isEmpty || targetId.startsWith('mock_')) {
-      return;
-    }
+    if (targetId.isEmpty || targetId.startsWith('mock_')) return;
 
     try {
-      await supabase.Supabase.instance.client.from('follows').delete().match({
-        'follower_id': user.id,
-        'followed_id': targetId,
-      });
-      await _syncUserWithDatabase(
-        supabase.Supabase.instance.client.auth.currentUser!,
+      await _api.delete(
+        '/users/$targetId/follow',
+        authToken: _authToken(),
       );
+      await _loadCurrentUser(_sessionService.currentSession!);
     } catch (e) {
-      debugPrint('Unfollow error: $e');
-      throw Exception('取消关注失败');
+      throw Exception('取消关注失败: $e');
     }
   }
 
   Future<bool> isFollowing(String targetId) async {
-    if (!isLoggedIn) return false;
-    if (targetId.isEmpty || targetId == user.id) return false;
+    if (!isLoggedIn || targetId.isEmpty || targetId == user.id) return false;
     try {
-      final response = await supabase.Supabase.instance.client
-          .from('follows')
-          .select()
-          .match({'follower_id': user.id, 'followed_id': targetId})
-          .maybeSingle();
-      return response != null;
+      final response = await _api.get(
+        '/users/$targetId/context',
+        authToken: _authToken(),
+      );
+      final data = response['data'];
+      if (data is Map<String, dynamic>) {
+        return data['is_following'] == true;
+      }
+      return false;
     } catch (_) {
       return false;
     }
@@ -382,18 +223,15 @@ class UserProvider extends ChangeNotifier {
   Future<List<User>> getFollowingUsers() async {
     if (!isLoggedIn) return [];
     try {
-      final response = await supabase.Supabase.instance.client
-          .from('follows')
-          .select('*, users!follows_followed_id_fkey(*)')
-          .eq('follower_id', user.id);
-
-      return (response as List)
-          .map((e) {
-            final userData = e['users'];
-            if (userData == null) return User.guest();
-            return User.fromJson(userData as Map<String, dynamic>);
-          })
-          .where((u) => u.isLoggedIn)
+      final response = await _api.get(
+        '/users/me/following',
+        authToken: _authToken(),
+      );
+      final data = response['data'];
+      if (data is! List) return [];
+      return data
+          .whereType<Map<String, dynamic>>()
+          .map(User.fromJson)
           .toList();
     } catch (e) {
       debugPrint('getFollowingUsers error: $e');
@@ -403,127 +241,44 @@ class UserProvider extends ChangeNotifier {
 
   Future<User?> fetchUserById(String userId) async {
     try {
-      final client = supabase.Supabase.instance.client;
-      final results = await Future.wait<Object?>([
-        client.from('users').select().eq('id', userId).maybeSingle(),
-        client.from('guides').select().eq('id', userId).maybeSingle(),
-        client.from('follows').count().eq('follower_id', userId),
-        client.from('follows').count().eq('followed_id', userId),
-        client
-            .from('guide_applications')
-            .select('status')
-            .eq('user_id', userId)
-            .order('created_at', ascending: false)
-            .limit(1)
-            .maybeSingle(),
-      ]);
-
-      final response = results[0] as Map<String, dynamic>?;
-      if (response == null) return null;
-      final guideRow = results[1] as Map<String, dynamic>?;
-      final applicationRow = results[4] as Map<String, dynamic>?;
-      final applicationStatus = applicationRow == null
-          ? null
-          : applicationRow['status']?.toString();
-
-      final merged = <String, dynamic>{
-        ...response,
-        'nickname': _firstNonEmptyString([
-          response['nickname'],
-          guideRow == null ? null : guideRow['name'],
-        ]),
-        'avatar': _firstNonEmptyString([
-          response['avatar'],
-          guideRow == null ? null : guideRow['avatar'],
-        ]),
-        'city': _firstNonEmptyString([
-          response['city'],
-          guideRow == null ? null : guideRow['city'],
-        ]),
-        'gender': _firstNonEmptyString([
-          response['gender'],
-          guideRow == null ? null : guideRow['gender'],
-        ]),
-        'guide_introduction': _firstNonEmptyString([
-          response['guide_introduction'],
-          guideRow == null ? null : guideRow['description'],
-          response['bio'],
-        ]),
-        'guide_tags':
-            (guideRow == null ? null : guideRow['tags']) ??
-            response['guide_tags'] ??
-            const [],
-        'follow_count': results[2] as int? ?? 0,
-        'fans_count': results[3] as int? ?? 0,
-        'is_guide': guideRow != null || applicationStatus == 'approved',
-        'guide_application_status': applicationStatus,
-      };
-
-      return User.fromJson(merged);
-    } catch (e) {
-      debugPrint('fetchUserById error: $e');
+      final response = await _api.get(
+        '/users/$userId',
+        authToken: _authToken(),
+      );
+      final data = response['data'];
+      if (data is Map<String, dynamic>) {
+        return _buildUserFromApi(data);
+      }
+      return null;
+    } catch (_) {
       return null;
     }
   }
 
-  void mockLogin() {
-    _isLoading = true;
+  Future<void> mockLogin() async {
+    _user = User(
+      id: 'mock_user',
+      nickname: '测试用户',
+      avatar: 'https://picsum.photos/seed/mock-user/100/100',
+      city: '北京',
+    );
     notifyListeners();
-    Future.delayed(const Duration(milliseconds: 500), () {
-      _user = User(
-        id: 'mock_123',
-        nickname: '本地测试用户',
-        avatar: 'https://picsum.photos/seed/me/100/100',
-        city: '苏州',
-        bio: '喜欢城市漫游、打卡和临时约伴。',
-        occupation: '自由职业',
-        vipLevel: 1,
-        title: '体验用户',
-        balance: 100.0,
-        couponCount: 1,
-        followCount: 10,
-        fansCount: 5,
-        isAdmin: false,
-        isGuide: false,
-      );
-      _isLoading = false;
-      notifyListeners();
-    });
   }
 
-  void mockAdminLogin() {
-    _isLoading = true;
+  Future<void> mockAdminLogin() async {
+    _user = User(
+      id: 'mock_admin',
+      nickname: '管理员',
+      avatar: 'https://picsum.photos/seed/mock-admin/100/100',
+      isAdmin: true,
+      city: '北京',
+    );
     notifyListeners();
-    Future.delayed(const Duration(milliseconds: 500), () {
-      _user = User(
-        id: 'mock_admin_001',
-        nickname: '本地测试管理员',
-        avatar: 'https://picsum.photos/seed/admin/100/100',
-        city: '苏州',
-        vipLevel: 1,
-        title: '平台管理员',
-        balance: 100.0,
-        couponCount: 0,
-        followCount: 0,
-        fansCount: 0,
-        isAdmin: true,
-      );
-      _isLoading = false;
-      notifyListeners();
-    });
   }
-}
 
-class _UserRoleContext {
-  final int followCount;
-  final int fansCount;
-  final bool isGuide;
-  final String? applicationStatus;
-
-  const _UserRoleContext({
-    this.followCount = 0,
-    this.fansCount = 0,
-    this.isGuide = false,
-    this.applicationStatus,
-  });
+  @override
+  void dispose() {
+    _sessionService.sessionListenable.removeListener(_handleSessionChanged);
+    super.dispose();
+  }
 }

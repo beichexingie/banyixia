@@ -1,11 +1,13 @@
 import 'package:flutter/foundation.dart';
 import 'package:flutter/widgets.dart';
-import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../config/app_config.dart';
+import '../services/session_service.dart';
 
 class AppBootstrap {
   const AppBootstrap._();
+
+  static late final SessionService sessionService;
 
   static Future<void> initialize() async {
     WidgetsFlutterBinding.ensureInitialized();
@@ -17,13 +19,11 @@ class AppBootstrap {
       );
     }
 
-    await Supabase.initialize(
-      url: AppConfig.supabaseUrl,
-      anonKey: AppConfig.supabaseAnonKey,
-    );
+    sessionService = EcsSessionService();
+    await sessionService.initialize();
 
     debugPrint(
-      'AppBootstrap: Supabase initialized, sandbox=${AppConfig.alipayUseSandbox}',
+      'AppBootstrap: ECS session initialized, sandbox=${AppConfig.alipayUseSandbox}',
     );
   }
 }

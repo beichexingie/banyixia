@@ -7,7 +7,6 @@ import '../../providers/guide_provider.dart';
 import '../../providers/message_provider.dart';
 import '../../providers/user_provider.dart';
 import 'package:provider/provider.dart';
-import 'package:supabase_flutter/supabase_flutter.dart';
 
 class GuideDetailPage extends StatefulWidget {
   final Guide? guide;
@@ -49,15 +48,11 @@ class _GuideDetailPageState extends State<GuideDetailPage> {
   Future<void> _fetchGuide() async {
     setState(() => _isLoading = true);
     try {
-      final data = await Supabase.instance.client
-          .from('guides')
-          .select()
-          .eq('id', widget.guideId!)
-          .maybeSingle();
-      
+      final data = await context.read<GuideProvider>().getGuideById(widget.guideId!);
+
       if (data != null && mounted) {
         setState(() {
-          _guide = Guide.fromJson(data);
+          _guide = data;
           _isLoading = false;
         });
         _initData();

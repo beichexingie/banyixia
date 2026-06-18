@@ -83,8 +83,7 @@ CREATE TABLE public.users (
   follow_count integer DEFAULT 0,
   fans_count integer DEFAULT 0,
   created_at timestamp with time zone DEFAULT now(),
-  CONSTRAINT users_pkey PRIMARY KEY (id),
-  CONSTRAINT users_id_fkey FOREIGN KEY (id) REFERENCES auth.users(id)
+  CONSTRAINT users_pkey PRIMARY KEY (id)
 );
 
 DROP TABLE IF EXISTS public.follows CASCADE;

@@ -2,7 +2,6 @@ import 'dart:typed_data';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:image_picker/image_picker.dart';
-import 'package:supabase_flutter/supabase_flutter.dart';
 import '../../config/app_theme.dart';
 import '../../models/order.dart';
 import '../../models/user.dart' as app_model;
@@ -13,6 +12,7 @@ import '../main_scaffold.dart';
 import 'favorite_posts_page.dart';
 import 'footprint_posts_page.dart';
 import 'following_page.dart';
+import '../../services/ecs_api_client.dart';
 
 class ProfilePage extends StatelessWidget {
   const ProfilePage({super.key});
@@ -775,17 +775,18 @@ class _EditProfileDialogState extends State<_EditProfileDialog> {
     try {
       // Mock user bypasses real upload
       if (user.id != '00000000-0000-0000-0000-000000000000' && _avatarBytes != null) {
-        final supabase = Supabase.instance.client;
-        final fileName = '${user.id}_${DateTime.now().millisecondsSinceEpoch}.jpg';
-        final filePath = 'uploads/$fileName';
-
-        await supabase.storage.from('avatars').uploadBinary(
-          filePath,
-          _avatarBytes!,
-          fileOptions: FileOptions(cacheControl: '3600', upsert: true, contentType: _avatarMimeType ?? 'image/jpeg'),
+        final api = EcsApiClient();
+        final response = await api.post(
+          '/uploads/avatar',
+          authToken: _userProvider.accessToken,
+          body: {
+            'filename': '${user.id}_${DateTime.now().millisecondsSinceEpoch}.jpg',
+          },
         );
-
-        finalAvatarUrl = supabase.storage.from('avatars').getPublicUrl(filePath);
+        final data = response['data'];
+        if (data is Map<String, dynamic>) {
+          finalAvatarUrl = data['url']?.toString() ?? finalAvatarUrl;
+        }
       } else if (_avatarBytes != null) {
         // Mock user local preview URL (won't persist across restarts but updates UI)
          finalAvatarUrl = 'https://picsum.photos/seed/${DateTime.now().millisecondsSinceEpoch}/100/100';

@@ -1,16 +1,21 @@
 import 'package:flutter/material.dart';
-import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../models/demand_request.dart';
+import '../services/ecs_api_client.dart';
+import '../services/session_service.dart';
 
 class DemandProvider extends ChangeNotifier {
-  final _client = Supabase.instance.client;
+  final EcsApiClient _api = EcsApiClient();
+  final SessionService _sessionService;
 
   List<DemandRequest> _demands = [];
   bool _isLoading = false;
   String _searchQuery = '';
   String _selectedCity = '全国';
   String? _selectedStatus;
+
+  DemandProvider({SessionService? sessionService})
+      : _sessionService = sessionService ?? EcsSessionService();
 
   List<DemandRequest> get demands => _demands;
   bool get isLoading => _isLoading;
@@ -62,19 +67,23 @@ class DemandProvider extends ChangeNotifier {
     notifyListeners();
   }
 
+  String? _token() => _sessionService.currentSession?.accessToken;
+
   Future<void> loadDemands({String? query}) async {
     _isLoading = true;
     if (query != null) _searchQuery = query;
     notifyListeners();
-
     try {
-      final response = await _client
-          .from('demands')
-          .select()
-          .order('created_at', ascending: false);
-      if (response.isNotEmpty) {
-        _demands = response
-            .map((item) => DemandRequest.fromJson(item))
+      final response = await _api.get(
+        '/demands',
+        authToken: _token(),
+        query: _searchQuery.isNotEmpty ? {'q': _searchQuery} : null,
+      );
+      final data = response['data'];
+      if (data is List) {
+        _demands = data
+            .whereType<Map<String, dynamic>>()
+            .map(DemandRequest.fromJson)
             .toList();
       } else if (_demands.isEmpty) {
         _loadMockDemands();
@@ -102,46 +111,35 @@ class DemandProvider extends ChangeNotifier {
     required String budget,
     required List<String> tags,
   }) async {
-    final user = _client.auth.currentUser;
-    if (user == null) {
-      throw Exception('请先登录后再发布需求');
-    }
-
-    final payload = {
-      'title': title,
-      'content': content,
-      'city': city,
-      'location': location,
-      'service_start_at': serviceStartAt.toIso8601String(),
-      'service_end_at': serviceEndAt.toIso8601String(),
-      'people_count': peopleCount,
-      'gender': gender,
-      'budget': budget,
-      'status': 'open',
-      'author_id': user.id,
-      'author_name': user.userMetadata?['nickname']?.toString() ?? '我',
-      'author_avatar': user.userMetadata?['avatar']?.toString() ?? '',
-      'tags': tags,
-    };
-
-    try {
-      final inserted = await _client
-          .from('demands')
-          .insert(payload)
-          .select()
-          .single();
-      final demand = DemandRequest.fromJson(inserted);
+    final response = await _api.post(
+      '/demands',
+      authToken: _token(),
+      body: {
+        'title': title,
+        'content': content,
+        'city': city,
+        'location': location,
+        'service_start_at': serviceStartAt.toIso8601String(),
+        'service_end_at': serviceEndAt.toIso8601String(),
+        'people_count': peopleCount,
+        'gender': gender,
+        'budget': budget,
+        'status': 'open',
+        'author_id': _sessionService.currentSession?.userId,
+        'author_name': '我',
+        'author_avatar': '',
+        'tags': tags,
+      },
+    );
+    final data = response['data'];
+    if (data is Map<String, dynamic>) {
+      final demand = DemandRequest.fromJson(data);
       _demands.removeWhere((item) => item.id == demand.id);
       _demands.insert(0, demand);
       notifyListeners();
       return demand;
-    } on PostgrestException catch (e) {
-      debugPrint('Create demand failed: ${e.message}');
-      throw Exception(e.message);
-    } catch (e) {
-      debugPrint('Create demand failed: $e');
-      rethrow;
     }
+    throw Exception('创建失败');
   }
 
   void registerInterest(String id) {
@@ -179,59 +177,12 @@ class DemandProvider extends ChangeNotifier {
         applicantCount: 3,
         createdAt: DateTime.now().subtract(const Duration(hours: 3)),
       ),
-      DemandRequest(
-        id: 'd2',
-        title: '周末西安博物馆搭子',
-        content: '周末想去陕西历史博物馆和大唐不夜城，最好对路线熟悉、会拍照。',
-        city: '西安',
-        location: '陕西历史博物馆',
-        serviceStartAt: DateTime.now().add(const Duration(days: 2, hours: 1)),
-        serviceEndAt: DateTime.now().add(const Duration(days: 2, hours: 8)),
-        peopleCount: 2,
-        gender: '女',
-        budget: '200-400',
-        status: 'applying',
-        authorId: 'u2',
-        authorName: '小林',
-        authorAvatar: 'https://picsum.photos/seed/demand-user2/100/100',
-        images: [
-          'https://picsum.photos/seed/demand2-a/400/300',
-          'https://picsum.photos/seed/demand2-b/400/300',
-        ],
-        tags: const ['博物馆', '拍照'],
-        applicantCount: 6,
-        createdAt: DateTime.now().subtract(const Duration(hours: 8)),
-      ),
-      DemandRequest(
-        id: 'd3',
-        title: '成都美食陪吃体验',
-        content: '想要一个本地人带着我吃串串、火锅、甜品，顺便聊聊成都生活。',
-        city: '成都',
-        location: '春熙路',
-        serviceStartAt: DateTime.now().add(const Duration(days: 3, hours: 3)),
-        serviceEndAt: DateTime.now().add(const Duration(days: 3, hours: 9)),
-        peopleCount: 1,
-        gender: '不限',
-        budget: '150-300',
-        status: 'open',
-        authorId: 'u3',
-        authorName: '阿飞',
-        authorAvatar: 'https://picsum.photos/seed/demand-user3/100/100',
-        images: [
-          'https://picsum.photos/seed/demand3-a/400/300',
-          'https://picsum.photos/seed/demand3-b/400/300',
-        ],
-        tags: const ['美食', '聊天'],
-        applicantCount: 2,
-        createdAt: DateTime.now().subtract(const Duration(days: 1)),
-      ),
     ];
   }
 
   String _normalizeCityName(String? raw) {
     final city = (raw ?? '').trim();
     if (city.isEmpty) return '';
-
     const suffixes = ['特别行政区', '自治州', '自治区', '地区', '盟', '市'];
     for (final suffix in suffixes) {
       if (city.endsWith(suffix) && city.length > suffix.length) {

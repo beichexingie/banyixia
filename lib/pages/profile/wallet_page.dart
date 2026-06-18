@@ -2,7 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../../config/app_theme.dart';
 import '../../providers/order_provider.dart';
-import 'package:supabase_flutter/supabase_flutter.dart';
+import '../../providers/user_provider.dart';
+import '../../services/ecs_api_client.dart';
 
 class WalletPage extends StatefulWidget {
   const WalletPage({super.key});
@@ -15,6 +16,7 @@ class _WalletPageState extends State<WalletPage> {
   Map<String, dynamic> _walletData = {'balance': 0.0, 'pending_balance': 0.0, 'total_earned': 0.0};
   List<dynamic> _transactions = [];
   bool _isLoading = true;
+  final _api = EcsApiClient();
 
   @override
   void initState() {
@@ -25,28 +27,15 @@ class _WalletPageState extends State<WalletPage> {
   Future<void> _loadData() async {
     setState(() => _isLoading = true);
     try {
-      final userId = Supabase.instance.client.auth.currentUser?.id;
+      final userId = context.read<UserProvider>().user.id;
       if (userId == null) return;
 
-      // 1. 获取钱包摘要
-      final walletResponse = await Supabase.instance.client
-          .from('wallets')
-          .select()
-          .eq('user_id', userId)
-          .maybeSingle();
-      
-      if (walletResponse != null) {
-        _walletData = walletResponse;
+      final response = await _api.get('/wallet', authToken: context.read<UserProvider>().accessToken);
+      final data = response['data'];
+      if (data is Map<String, dynamic>) {
+        _walletData = (data['wallet'] as Map?)?.cast<String, dynamic>() ?? _walletData;
+        _transactions = (data['transactions'] as List?) ?? [];
       }
-
-      // 2. 获取收支明细
-      final txResponse = await Supabase.instance.client
-          .from('transactions')
-          .select()
-          .eq('user_id', userId)
-          .order('created_at', ascending: false);
-      
-      _transactions = txResponse ?? [];
     } catch (e) {
       debugPrint('Load wallet error: $e');
     } finally {

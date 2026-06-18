@@ -3,14 +3,9 @@ class AppConfig {
 
   static const String appName = '伴一下';
 
-  static const String supabaseUrl = String.fromEnvironment(
-    'SUPABASE_URL',
-    defaultValue: 'https://npvqebjogjmvzkkgwtss.supabase.co',
-  );
-
-  static const String supabaseAnonKey = String.fromEnvironment(
-    'SUPABASE_ANON_KEY',
-    defaultValue: 'sb_publishable_S9-vRUc8U34sv5FhPHUElg_i67bEphP',
+  static const String apiBaseUrlOverride = String.fromEnvironment(
+    'API_BASE_URL',
+    defaultValue: '',
   );
 
   static const String amapWebServiceKey = String.fromEnvironment(
@@ -28,22 +23,25 @@ class AppConfig {
     defaultValue: false,
   );
 
+  static String get apiBaseUrl {
+    final override = apiBaseUrlOverride.trim();
+    if (override.isNotEmpty) {
+      return override;
+    }
+    return 'http://127.0.0.1:3000/api';
+  }
+
   static String get paymentBackendBaseUrl {
     final override = paymentBackendBaseUrlOverride.trim();
     if (override.isNotEmpty) {
       return override;
     }
-    return '$supabaseUrl/functions/v1';
-  }
-
-  static bool get isSupabaseConfigured {
-    return supabaseUrl.trim().isNotEmpty && supabaseAnonKey.trim().isNotEmpty;
+    return apiBaseUrl;
   }
 
   static List<String> get missingCoreValues {
     final missing = <String>[];
-    if (supabaseUrl.trim().isEmpty) missing.add('SUPABASE_URL');
-    if (supabaseAnonKey.trim().isEmpty) missing.add('SUPABASE_ANON_KEY');
+    if (apiBaseUrl.trim().isEmpty) missing.add('API_BASE_URL');
     return missing;
   }
 }

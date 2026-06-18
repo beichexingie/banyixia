@@ -5,9 +5,9 @@ import 'package:alipay_payment/alipay_payment.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart';
 import 'package:http/http.dart' as http;
-import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../config/payment_config.dart';
+import 'session_service.dart';
 
 enum PaymentOutcome {
   success,
@@ -171,14 +171,13 @@ class AlipayPaymentService implements PaymentService {
     final baseUrl = PaymentConfig.backendBaseUrl.trim().replaceAll(RegExp(r'/$'), '');
     final uri = Uri.parse('$baseUrl/alipay-create-order');
 
+    final headers = <String, String>{
+      'Content-Type': 'application/json',
+    };
+
     final response = await http.post(
       uri,
-      headers: {
-        'Content-Type': 'application/json',
-        'apikey': PaymentConfig.supabaseAnonKey,
-        'Authorization':
-            'Bearer ${Supabase.instance.client.auth.currentSession?.accessToken ?? PaymentConfig.supabaseAnonKey}',
-      },
+      headers: headers,
       body: jsonEncode({
         'order_id': request.orderId,
         'merchant_order_no': request.merchantOrderNo,

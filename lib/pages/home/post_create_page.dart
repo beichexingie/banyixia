@@ -1,3 +1,4 @@
+import 'dart:convert';
 import 'dart:io';
 
 import 'package:flutter/foundation.dart';
@@ -5,11 +6,11 @@ import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:provider/provider.dart';
-import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../../config/app_theme.dart';
 import '../../providers/post_provider.dart';
 import '../../providers/user_provider.dart';
+import '../../services/ecs_api_client.dart';
 
 class PostCreatePage extends StatefulWidget {
   final String mode;
@@ -59,24 +60,24 @@ class _PostCreatePageState extends State<PostCreatePage> {
 
   Future<List<String>> _uploadImages() async {
     final uploadedUrls = <String>[];
-    final supabase = Supabase.instance.client;
+    final api = EcsApiClient();
+    final token = context.read<UserProvider>().accessToken;
 
     for (final file in _selectedImages) {
       try {
-        final fileName =
-            '${DateTime.now().millisecondsSinceEpoch}_${file.path.split('/').last}';
-        final filePath = 'uploads/$fileName';
         final bytes = await file.readAsBytes();
-
-        await supabase.storage.from('post_images').uploadBinary(
-          filePath,
-          bytes,
-          fileOptions: const FileOptions(cacheControl: '3600', upsert: false),
+        final response = await api.post(
+          '/uploads/post-image',
+          authToken: token,
+          body: {
+            'filename': file.name,
+            'bytes_base64': base64Encode(bytes),
+          },
         );
-
-        uploadedUrls.add(
-          supabase.storage.from('post_images').getPublicUrl(filePath),
-        );
+        final data = response['data'];
+        if (data is Map<String, dynamic>) {
+          uploadedUrls.add(data['url']?.toString() ?? '');
+        }
       } catch (e) {
         debugPrint('Error uploading image: $e');
       }
