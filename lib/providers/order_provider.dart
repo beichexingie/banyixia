@@ -22,6 +22,10 @@ class OrderProvider extends ChangeNotifier {
   List<Order> get orders => _orders;
   bool get isLoading => _isLoading;
 
+  int getCountByStatus(OrderStatus status) {
+    return _orders.where((order) => order.status == status).length;
+  }
+
   String? _token() => _sessionService.currentSession?.accessToken;
 
   String _buildMerchantOrderNo(Order order) {
