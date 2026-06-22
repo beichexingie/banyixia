@@ -17,17 +17,24 @@ import { ensureChatRoom, findOrderByMerchantOrderNo } from '../repositories/orde
 
 export const appRouter = express.Router();
 
+function handleRoute(handler) {
+  return async (req, res, next) => {
+    try {
+      await handler(req, res, next);
+    } catch (error) {
+      console.error(`[appRouter] ${req.method} ${req.originalUrl}`, error);
+      if (res.headersSent) return;
+      return fail(res, 500, error.message || '服务器内部错误');
+    }
+  };
+}
+
 function getSessionUserId(req) {
   return req.sessionUserId || req.headers['x-user-id']?.toString().trim() || '';
 }
 
 function normalizePhone(phone) {
   return phone.replace(/\s+/g, '');
-}
-
-function buildStableUserId(phone) {
-  const hex = crypto.createHash('sha256').update(phone).digest('hex');
-  return `${hex.slice(0, 8)}-${hex.slice(8, 12)}-4${hex.slice(13, 16)}-a${hex.slice(17, 20)}-${hex.slice(20, 32)}`;
 }
 
 function readWhitelistCode(phone) {
@@ -72,7 +79,7 @@ async function hydrateUser(client, userId) {
   };
 }
 
-appRouter.post('/auth/send-code', async (req, res) => {
+appRouter.post('/auth/send-code', handleRoute(async (req, res) => {
   const phone = normalizePhone(req.body?.phone?.toString().trim() ?? '');
   if (!phone) return fail(res, 400, '手机号不能为空');
   if (config.authWhitelistEnabled) {
@@ -82,9 +89,9 @@ appRouter.post('/auth/send-code', async (req, res) => {
     }
   }
   return ok(res, { message: '验证码已发送', data: { phone } });
-});
+}));
 
-appRouter.post('/auth/verify-code', async (req, res) => {
+appRouter.post('/auth/verify-code', handleRoute(async (req, res) => {
   const phone = normalizePhone(req.body?.phone?.toString().trim() ?? '');
   const code = req.body?.code?.toString().trim() ?? '';
   if (!phone) return fail(res, 400, '手机号不能为空');
@@ -100,7 +107,7 @@ appRouter.post('/auth/verify-code', async (req, res) => {
     }
   }
 
-  const userId = buildStableUserId(phone);
+  const userId = crypto.randomUUID();
   const session = {
     access_token: userId,
     user_id: userId,
@@ -120,7 +127,7 @@ appRouter.post('/auth/verify-code', async (req, res) => {
     is_admin: false,
   });
   return ok(res, { message: '登录成功', session });
-});
+}));
 
 appRouter.post('/auth/logout', async (_req, res) => {
   return ok(res, { message: '已退出登录' });
