@@ -24,6 +24,20 @@ function parseList(value) {
       .filter((item) => item.length > 0);
 }
 
+function parsePhoneCodeMap(value) {
+  return (value ?? '')
+      .split(',')
+      .map((item) => item.trim())
+      .filter((item) => item.length > 0)
+      .reduce((accumulator, item) => {
+        const [phone, code] = item.split(':').map((part) => part?.trim() ?? '');
+        if (phone && code) {
+          accumulator[phone] = code;
+        }
+        return accumulator;
+      }, {});
+}
+
 export const config = {
   nodeEnv: process.env.NODE_ENV?.trim() || 'development',
   port: Number(process.env.PORT || 3000),
@@ -35,6 +49,8 @@ export const config = {
   alipayNotifyUrl: process.env.ALIPAY_NOTIFY_URL?.trim() || '',
   paymentDebugEnabled: parseBoolean(process.env.PAYMENT_DEBUG_ENABLED, false),
   corsOrigins: parseList(process.env.CORS_ORIGINS),
+  authWhitelistEnabled: parseBoolean(process.env.AUTH_WHITELIST_ENABLED, false),
+  authWhitelist: parsePhoneCodeMap(process.env.AUTH_WHITELIST),
 };
 
 export function hasAlipayConfig() {

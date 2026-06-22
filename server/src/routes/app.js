@@ -1,6 +1,7 @@
 import express from 'express';
 import crypto from 'crypto';
 
+import { config } from '../config.js';
 import { pool, withTransaction } from '../db.js';
 import { ok, fail } from '../utils/http.js';
 import { findUserById, listUsersByIds, upsertUser } from '../repositories/users.js';
@@ -18,6 +19,19 @@ export const appRouter = express.Router();
 
 function getSessionUserId(req) {
   return req.sessionUserId || req.headers['x-user-id']?.toString().trim() || '';
+}
+
+function normalizePhone(phone) {
+  return phone.replace(/\s+/g, '');
+}
+
+function buildStableUserId(phone) {
+  const hex = crypto.createHash('sha256').update(phone).digest('hex');
+  return `${hex.slice(0, 8)}-${hex.slice(8, 12)}-4${hex.slice(13, 16)}-a${hex.slice(17, 20)}-${hex.slice(20, 32)}`;
+}
+
+function readWhitelistCode(phone) {
+  return config.authWhitelist[phone] ?? '';
 }
 
 async function requireSessionUser(req, res) {
@@ -59,15 +73,34 @@ async function hydrateUser(client, userId) {
 }
 
 appRouter.post('/auth/send-code', async (req, res) => {
-  const phone = req.body?.phone?.toString().trim();
+  const phone = normalizePhone(req.body?.phone?.toString().trim() ?? '');
   if (!phone) return fail(res, 400, '手机号不能为空');
+  if (config.authWhitelistEnabled) {
+    const whitelistCode = readWhitelistCode(phone);
+    if (!whitelistCode) {
+      return fail(res, 403, '该手机号不在测试白名单中');
+    }
+  }
   return ok(res, { message: '验证码已发送', data: { phone } });
 });
 
 appRouter.post('/auth/verify-code', async (req, res) => {
-  const phone = req.body?.phone?.toString().trim();
+  const phone = normalizePhone(req.body?.phone?.toString().trim() ?? '');
+  const code = req.body?.code?.toString().trim() ?? '';
   if (!phone) return fail(res, 400, '手机号不能为空');
-  const userId = crypto.randomUUID();
+  if (!code) return fail(res, 400, '验证码不能为空');
+
+  if (config.authWhitelistEnabled) {
+    const whitelistCode = readWhitelistCode(phone);
+    if (!whitelistCode) {
+      return fail(res, 403, '该手机号不在测试白名单中');
+    }
+    if (code !== whitelistCode) {
+      return fail(res, 400, '验证码错误');
+    }
+  }
+
+  const userId = buildStableUserId(phone);
   const session = {
     access_token: userId,
     user_id: userId,
