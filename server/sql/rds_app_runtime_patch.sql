@@ -60,6 +60,21 @@ create unique index if not exists idx_users_phone
   on public.users (phone)
   where phone is not null and btrim(phone) <> '';
 
+with ranked as (
+  select
+    ctid,
+    row_number() over (
+      partition by phone
+      order by created_at nulls last, ctid
+    ) as rn
+  from public.users
+  where phone is not null and btrim(phone) <> ''
+)
+delete from public.users u
+using ranked r
+where u.ctid = r.ctid
+  and r.rn > 1;
+
 create table if not exists public.guides (
   id uuid primary key default gen_random_uuid(),
   name text not null default '',
@@ -143,6 +158,20 @@ alter table if exists public.follows
 create unique index if not exists idx_follows_follower_followed
   on public.follows (follower_id, followed_id);
 
+with ranked as (
+  select
+    ctid,
+    row_number() over (
+      partition by follower_id, followed_id
+      order by created_at nulls last, ctid
+    ) as rn
+  from public.follows
+)
+delete from public.follows f
+using ranked r
+where f.ctid = r.ctid
+  and r.rn > 1;
+
 -- ---------------------------------------------------------------------------
 -- Guide / post interaction tables
 -- ---------------------------------------------------------------------------
@@ -166,6 +195,20 @@ alter table if exists public.favorites
 create unique index if not exists idx_favorites_user_guide
   on public.favorites (user_id, guide_id);
 
+with ranked as (
+  select
+    ctid,
+    row_number() over (
+      partition by user_id, guide_id
+      order by created_at nulls last, ctid
+    ) as rn
+  from public.favorites
+)
+delete from public.favorites f
+using ranked r
+where f.ctid = r.ctid
+  and r.rn > 1;
+
 create table if not exists public.guide_likes (
   id uuid primary key default gen_random_uuid(),
   user_id uuid not null references public.users(id) on delete cascade,
@@ -184,6 +227,20 @@ alter table if exists public.guide_likes
 
 create unique index if not exists idx_guide_likes_user_guide
   on public.guide_likes (user_id, guide_id);
+
+with ranked as (
+  select
+    ctid,
+    row_number() over (
+      partition by user_id, guide_id
+      order by created_at nulls last, ctid
+    ) as rn
+  from public.guide_likes
+)
+delete from public.guide_likes g
+using ranked r
+where g.ctid = r.ctid
+  and r.rn > 1;
 
 create table if not exists public.footprints (
   id uuid primary key default gen_random_uuid(),
@@ -204,6 +261,20 @@ alter table if exists public.footprints
 create unique index if not exists idx_footprints_user_guide
   on public.footprints (user_id, guide_id);
 
+with ranked as (
+  select
+    ctid,
+    row_number() over (
+      partition by user_id, guide_id
+      order by last_visited_at nulls last, ctid
+    ) as rn
+  from public.footprints
+)
+delete from public.footprints f
+using ranked r
+where f.ctid = r.ctid
+  and r.rn > 1;
+
 create table if not exists public.post_likes (
   id uuid primary key default gen_random_uuid(),
   user_id uuid not null references public.users(id) on delete cascade,
@@ -222,6 +293,20 @@ alter table if exists public.post_likes
 
 create unique index if not exists idx_post_likes_user_post
   on public.post_likes (user_id, post_id);
+
+with ranked as (
+  select
+    ctid,
+    row_number() over (
+      partition by user_id, post_id
+      order by created_at nulls last, ctid
+    ) as rn
+  from public.post_likes
+)
+delete from public.post_likes p
+using ranked r
+where p.ctid = r.ctid
+  and r.rn > 1;
 
 create table if not exists public.post_favorites (
   id uuid primary key default gen_random_uuid(),
@@ -242,6 +327,20 @@ alter table if exists public.post_favorites
 create unique index if not exists idx_post_favorites_user_post
   on public.post_favorites (user_id, post_id);
 
+with ranked as (
+  select
+    ctid,
+    row_number() over (
+      partition by user_id, post_id
+      order by created_at nulls last, ctid
+    ) as rn
+  from public.post_favorites
+)
+delete from public.post_favorites p
+using ranked r
+where p.ctid = r.ctid
+  and r.rn > 1;
+
 create table if not exists public.post_footprints (
   id uuid primary key default gen_random_uuid(),
   user_id uuid not null references public.users(id) on delete cascade,
@@ -260,6 +359,20 @@ alter table if exists public.post_footprints
 
 create unique index if not exists idx_post_footprints_user_post
   on public.post_footprints (user_id, post_id);
+
+with ranked as (
+  select
+    ctid,
+    row_number() over (
+      partition by user_id, post_id
+      order by last_visited_at nulls last, ctid
+    ) as rn
+  from public.post_footprints
+)
+delete from public.post_footprints p
+using ranked r
+where p.ctid = r.ctid
+  and r.rn > 1;
 
 create table if not exists public.post_comments (
   id uuid primary key default gen_random_uuid(),
@@ -375,6 +488,20 @@ alter table if exists public.guide_applications
 create unique index if not exists idx_guide_applications_user_id
   on public.guide_applications (user_id);
 
+with ranked as (
+  select
+    ctid,
+    row_number() over (
+      partition by user_id
+      order by created_at nulls last, ctid
+    ) as rn
+  from public.guide_applications
+)
+delete from public.guide_applications g
+using ranked r
+where g.ctid = r.ctid
+  and r.rn > 1;
+
 create table if not exists public.orders (
   id uuid primary key default gen_random_uuid(),
   user_id uuid not null references public.users(id) on delete cascade,
@@ -418,6 +545,21 @@ alter table if exists public.orders
 create unique index if not exists idx_orders_merchant_order_no
   on public.orders (merchant_order_no)
   where merchant_order_no is not null;
+
+with ranked as (
+  select
+    ctid,
+    row_number() over (
+      partition by merchant_order_no
+      order by created_at desc nulls last, ctid
+    ) as rn
+  from public.orders
+  where merchant_order_no is not null
+)
+delete from public.orders o
+using ranked r
+where o.ctid = r.ctid
+  and r.rn > 1;
 
 -- ---------------------------------------------------------------------------
 -- Chat / wallet tables
