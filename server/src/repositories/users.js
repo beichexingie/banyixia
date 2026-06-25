@@ -11,9 +11,27 @@ export async function findUserById(client, userId) {
   return result.rows[0] ?? null;
 }
 
+export async function findUserByPhone(client, phone) {
+  const normalizedPhone = phone?.toString().trim() ?? '';
+  if (!normalizedPhone) return null;
+
+  const result = await client.query(
+    `
+      select *
+      from public.users
+      where phone = $1 or nickname = $1
+      order by case when phone = $1 then 0 else 1 end, created_at asc nulls last
+      limit 1
+    `,
+    [normalizedPhone],
+  );
+  return result.rows[0] ?? null;
+}
+
 export async function upsertUser(client, payload) {
   const fields = [
     'id',
+    'phone',
     'nickname',
     'avatar',
     'bio',
@@ -42,6 +60,7 @@ export async function upsertUser(client, payload) {
     insert into public.users (${fields.join(', ')})
     values (${placeholders})
     on conflict (id) do update set
+      phone = coalesce(excluded.phone, public.users.phone),
       nickname = excluded.nickname,
       avatar = excluded.avatar,
       bio = excluded.bio,
@@ -80,4 +99,3 @@ export async function listUsersByIds(client, ids) {
   );
   return result.rows;
 }
-

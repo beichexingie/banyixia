@@ -4,7 +4,7 @@ import crypto from 'crypto';
 import { config } from '../config.js';
 import { pool, withTransaction } from '../db.js';
 import { ok, fail } from '../utils/http.js';
-import { findUserById, listUsersByIds, upsertUser } from '../repositories/users.js';
+import { findUserById, findUserByPhone, listUsersByIds, upsertUser } from '../repositories/users.js';
 import { incrementFollowCount, incrementFanCount } from '../repositories/profiles.js';
 import {
   createPost,
@@ -13,7 +13,7 @@ import {
   listPostsByUser,
   updatePostLikes,
 } from '../repositories/posts.js';
-import { ensureChatRoom, findOrderByMerchantOrderNo } from '../repositories/orders.js';
+import { ensureChatRoom, findOrderById, findOrderByMerchantOrderNo } from '../repositories/orders.js';
 
 export const appRouter = express.Router();
 
@@ -107,13 +107,15 @@ appRouter.post('/auth/verify-code', handleRoute(async (req, res) => {
     }
   }
 
-  const userId = crypto.randomUUID();
+  const existingUser = await findUserByPhone(pool, phone);
+  const userId = existingUser?.id ?? crypto.randomUUID();
   const session = {
     access_token: userId,
     user_id: userId,
   };
   await upsertUser(pool, {
     id: userId,
+    phone,
     nickname: phone,
     avatar: 'https://picsum.photos/seed/user/100/100',
     vip_level: 1,
