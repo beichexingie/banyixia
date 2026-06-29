@@ -378,7 +378,7 @@ class _OrdersPageState extends State<OrdersPage>
               ],
             ),
           ),
-          const SafetyControlPanel(),
+          SafetyControlPanel(orderId: order.id),
         ],
       ),
     );
