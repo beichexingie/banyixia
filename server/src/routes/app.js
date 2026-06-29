@@ -656,7 +656,7 @@ appRouter.post('/chat/rooms/:id/read', async (req, res) => {
   return ok(res, { message: '已读' });
 });
 
-appRouter.get('/orders', async (req, res) => {
+appRouter.get('/orders', handleRoute(async (req, res) => {
   const userId = await requireSessionUser(req, res);
   if (!userId) return;
   const result = await pool.query(
@@ -669,12 +669,16 @@ appRouter.get('/orders', async (req, res) => {
     [userId],
   );
   return ok(res, { data: result.rows });
-});
+}));
 
-appRouter.post('/orders', async (req, res) => {
+appRouter.post('/orders', handleRoute(async (req, res) => {
   const userId = await requireSessionUser(req, res);
   if (!userId) return;
   const payload = req.body ?? {};
+  const guideId = payload.guideId ?? payload.guide_id;
+  if (!guideId?.toString().trim()) {
+    return fail(res, 400, 'missing guide_id');
+  }
   const result = await pool.query(
     `
       insert into public.orders (
@@ -686,7 +690,7 @@ appRouter.post('/orders', async (req, res) => {
     `,
     [
       userId,
-      payload.guideId ?? payload.guide_id,
+      guideId,
       payload.guideName ?? payload.guide_name ?? '',
       payload.guideAvatar ?? payload.guide_avatar ?? '',
       payload.status ?? 0,
@@ -698,9 +702,9 @@ appRouter.post('/orders', async (req, res) => {
     ],
   );
   return ok(res, { data: result.rows[0] });
-});
+}));
 
-appRouter.put('/orders/:id', async (req, res) => {
+appRouter.put('/orders/:id', handleRoute(async (req, res) => {
   const userId = await requireSessionUser(req, res);
   if (!userId) return;
   const payload = req.body ?? {};
@@ -722,9 +726,9 @@ appRouter.put('/orders/:id', async (req, res) => {
     [req.params.id, payload.payment_status, payload.merchant_order_no, payload.payment_request_id],
   );
   return ok(res, { data: result.rows[0] });
-});
+}));
 
-appRouter.post('/orders/:id/complete', async (req, res) => {
+appRouter.post('/orders/:id/complete', handleRoute(async (req, res) => {
   const userId = await requireSessionUser(req, res);
   if (!userId) return;
   const order = await findOrderById(pool, req.params.id);
@@ -734,9 +738,9 @@ appRouter.post('/orders/:id/complete', async (req, res) => {
   }
   await pool.query(`update public.orders set status = 3 where id = $1`, [req.params.id]);
   return ok(res, { message: '已完成' });
-});
+}));
 
-appRouter.post('/orders/:id/cancel', async (req, res) => {
+appRouter.post('/orders/:id/cancel', handleRoute(async (req, res) => {
   const userId = await requireSessionUser(req, res);
   if (!userId) return;
   const order = await findOrderById(pool, req.params.id);
@@ -746,7 +750,7 @@ appRouter.post('/orders/:id/cancel', async (req, res) => {
   }
   await pool.query(`update public.orders set status = 4 where id = $1`, [req.params.id]);
   return ok(res, { message: '已取消' });
-});
+}));
 
 appRouter.get('/wallet', async (req, res) => {
   const userId = await requireSessionUser(req, res);
