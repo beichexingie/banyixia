@@ -30,12 +30,17 @@ class Guide {
     this.city = '',
   });
 
+  static double _asDouble(dynamic value, {double fallback = 0}) {
+    if (value is num) return value.toDouble();
+    return double.tryParse(value?.toString() ?? '') ?? fallback;
+  }
+
   factory Guide.fromJson(Map<String, dynamic> json) {
     return Guide(
       id: json['id']?.toString() ?? '',
       name: json['name'] ?? '',
       avatar: json['avatar'] ?? '',
-      rating: (json['rating'] ?? 0).toDouble(),
+      rating: _asDouble(json['rating']),
       gender: json['gender'] ?? '',
       verified: json['verified'] ?? false,
       tags: List<String>.from(json['tags'] ?? []),

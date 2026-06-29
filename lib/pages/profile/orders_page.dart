@@ -80,13 +80,21 @@ class _OrdersPageState extends State<OrdersPage>
         title: const Text('我的订单'),
         centerTitle: true,
         actions: [
-          TextButton(
-            onPressed: _runDebugPayment,
-            child: const Text(
-              '0.01测试',
-              style: TextStyle(
+          Padding(
+            padding: const EdgeInsets.only(right: 12),
+            child: TextButton.icon(
+              onPressed: _runDebugPayment,
+              icon: const Icon(
+                Icons.science_outlined,
                 color: AppColors.primary,
-                fontWeight: FontWeight.w600,
+                size: 18,
+              ),
+              label: const Text(
+                '0.01测试',
+                style: TextStyle(
+                  color: AppColors.primary,
+                  fontWeight: FontWeight.w600,
+                ),
               ),
             ),
           ),

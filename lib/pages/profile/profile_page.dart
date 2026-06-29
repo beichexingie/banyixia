@@ -1,3 +1,4 @@
+import 'dart:convert';
 import 'dart:typed_data';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
@@ -781,6 +782,8 @@ class _EditProfileDialogState extends State<_EditProfileDialog> {
           authToken: _userProvider.accessToken,
           body: {
             'filename': '${user.id}_${DateTime.now().millisecondsSinceEpoch}.jpg',
+            'mime_type': _avatarMimeType,
+            'bytes_base64': base64Encode(_avatarBytes!),
           },
         );
         final data = response['data'];

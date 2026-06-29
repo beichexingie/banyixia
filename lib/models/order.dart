@@ -45,6 +45,11 @@ class Order {
     this.serviceDate,
   }) : createdAt = createdAt ?? DateTime.now();
 
+  static double _asDouble(dynamic value, {double fallback = 0}) {
+    if (value is num) return value.toDouble();
+    return double.tryParse(value?.toString() ?? '') ?? fallback;
+  }
+
   factory Order.fromJson(Map<String, dynamic> json) {
     return Order(
       id: json['id']?.toString() ?? '',
@@ -53,7 +58,7 @@ class Order {
       guideName: json['guide_name'] ?? '',
       guideAvatar: json['guide_avatar'] ?? '',
       status: OrderStatus.values[json['status'] ?? 0],
-      amount: (json['amount'] ?? 0).toDouble(),
+      amount: _asDouble(json['amount']),
       serviceName: json['service_name'] ?? '',
       paymentMethod: json['payment_method'] ?? '',
       paymentStatus: json['payment_status'] ?? '',

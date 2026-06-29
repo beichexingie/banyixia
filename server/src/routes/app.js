@@ -1,5 +1,8 @@
 import express from 'express';
 import crypto from 'crypto';
+import fs from 'fs/promises';
+import path from 'path';
+import { fileURLToPath } from 'url';
 
 import { config } from '../config.js';
 import { pool, withTransaction } from '../db.js';
@@ -16,6 +19,9 @@ import {
 import { ensureChatRoom, findOrderById, findOrderByMerchantOrderNo } from '../repositories/orders.js';
 
 export const appRouter = express.Router();
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
+const uploadsDir = path.resolve(__dirname, '../../uploads');
 
 function handleRoute(handler) {
   return async (req, res, next) => {
@@ -39,6 +45,63 @@ function normalizePhone(phone) {
 
 function readWhitelistCode(phone) {
   return config.authWhitelist[phone] ?? '';
+}
+
+function sanitizeFilenamePart(value, fallback = 'file') {
+  const normalized = value?.toString().trim() ?? '';
+  const safe = normalized.replace(/[^0-9A-Za-z._-]/g, '_');
+  return safe || fallback;
+}
+
+function detectExtension(filename, mimeType) {
+  const ext = path.extname(filename ?? '').toLowerCase();
+  if (ext) return ext;
+  switch ((mimeType ?? '').toLowerCase()) {
+    case 'image/png':
+      return '.png';
+    case 'image/webp':
+      return '.webp';
+    case 'image/gif':
+      return '.gif';
+    default:
+      return '.jpg';
+  }
+}
+
+async function persistBase64Upload({
+  category,
+  filename,
+  mimeType,
+  bytesBase64,
+}) {
+  if (!bytesBase64?.toString().trim()) {
+    throw new Error('缺少图片数据');
+  }
+
+  const categoryDir = path.join(uploadsDir, category);
+  await fs.mkdir(categoryDir, { recursive: true });
+
+  const safeName = sanitizeFilenamePart(
+    path.basename(filename ?? '', path.extname(filename ?? '')),
+    category,
+  );
+  const ext = detectExtension(filename, mimeType);
+  const finalName = `${Date.now()}_${safeName}${ext}`;
+  const absolutePath = path.join(categoryDir, finalName);
+  const buffer = Buffer.from(bytesBase64, 'base64');
+  await fs.writeFile(absolutePath, buffer);
+
+  return `/uploads/${category}/${finalName}`;
+}
+
+function buildPublicUrl(req, relativePath) {
+  const forwardedProto = req.headers['x-forwarded-proto']?.toString().trim();
+  const protocol = forwardedProto || req.protocol || 'http';
+  const host = req.headers.host?.toString().trim();
+  if (!host) {
+    return relativePath;
+  }
+  return `${protocol}://${host}${relativePath}`;
 }
 
 async function requireSessionUser(req, res) {
@@ -693,13 +756,31 @@ appRouter.get('/wallet', async (req, res) => {
   return ok(res, { data: { wallet: wallet.rows[0] ?? null, transactions: tx.rows } });
 });
 
-appRouter.post('/uploads/post-image', async (_req, res) => {
-  return ok(res, { data: { url: 'https://picsum.photos/seed/upload/800/600' } });
-});
+appRouter.post('/uploads/post-image', handleRoute(async (req, res) => {
+  const userId = await requireSessionUser(req, res);
+  if (!userId) return;
+  const payload = req.body ?? {};
+  const relativeUrl = await persistBase64Upload({
+    category: 'posts',
+    filename: payload.filename ?? `post_${userId}.jpg`,
+    mimeType: payload.mime_type ?? payload.mimeType ?? 'image/jpeg',
+    bytesBase64: payload.bytes_base64 ?? payload.bytesBase64,
+  });
+  return ok(res, { data: { url: buildPublicUrl(req, relativeUrl) } });
+}));
 
-appRouter.post('/uploads/avatar', async (_req, res) => {
-  return ok(res, { data: { url: 'https://picsum.photos/seed/avatar-upload/100/100' } });
-});
+appRouter.post('/uploads/avatar', handleRoute(async (req, res) => {
+  const userId = await requireSessionUser(req, res);
+  if (!userId) return;
+  const payload = req.body ?? {};
+  const relativeUrl = await persistBase64Upload({
+    category: 'avatars',
+    filename: payload.filename ?? `avatar_${userId}.jpg`,
+    mimeType: payload.mime_type ?? payload.mimeType ?? 'image/jpeg',
+    bytesBase64: payload.bytes_base64 ?? payload.bytesBase64,
+  });
+  return ok(res, { data: { url: buildPublicUrl(req, relativeUrl) } });
+}));
 
 appRouter.get('/guide-applications/me', async (req, res) => {
   const userId = await requireSessionUser(req, res);

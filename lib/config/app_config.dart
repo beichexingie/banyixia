@@ -13,6 +13,11 @@ class AppConfig {
     defaultValue: 'f365608ae7958031b8930c795f5d7329',
   );
 
+  static const String amapAndroidKey = String.fromEnvironment(
+    'AMAP_ANDROID_KEY',
+    defaultValue: '',
+  );
+
   static const String paymentBackendBaseUrlOverride = String.fromEnvironment(
     'PAYMENT_BACKEND_BASE_URL',
     defaultValue: '',
