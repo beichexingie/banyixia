@@ -56,9 +56,13 @@ class OrderProvider extends ChangeNotifier {
 
   Future<PaymentResult> payOrder(String orderId) async {
     try {
+      debugPrint('Pay order start: orderId=$orderId');
       final order = _orders.firstWhere((o) => o.id == orderId);
-      final merchantOrderNo =
-          order.merchantOrderNo ?? _buildMerchantOrderNo(order);
+      final merchantOrderNo = order.merchantOrderNo ?? _buildMerchantOrderNo(order);
+      debugPrint(
+        'Pay order request: merchantOrderNo=$merchantOrderNo, amount=${order.amount}',
+      );
+
       final result = await _paymentService.pay(
         PaymentRequest(
           orderId: order.id,
@@ -89,7 +93,7 @@ class OrderProvider extends ChangeNotifier {
       return result;
     } catch (e) {
       debugPrint('Pay order error: $e');
-      throw Exception('支付失败');
+      throw Exception('Pay order failed: $e');
     }
   }
 
@@ -100,6 +104,9 @@ class OrderProvider extends ChangeNotifier {
 
   Future<void> createOrder(Order order) async {
     try {
+      debugPrint(
+        'Create order start: userId=${order.userId}, guideId=${order.guideId}, amount=${order.amount}',
+      );
       final response = await _api.post(
         '/orders',
         authToken: _token(),
@@ -113,15 +120,17 @@ class OrderProvider extends ChangeNotifier {
       }
     } catch (e) {
       debugPrint('Create order error: $e');
-      throw Exception('下单失败: $e');
+      throw Exception('Create order failed: $e');
     }
   }
 
   Future<PaymentResult> createAndPayDebugOrder() async {
     final userId = _sessionService.currentSession?.userId;
     if (userId == null) {
-      throw Exception('请先登录后再进行支付联调');
+      throw Exception('Please log in before starting debug payment');
     }
+
+    debugPrint('Debug payment start: userId=$userId');
     final testOrder = Order(
       id: '',
       userId: userId,
@@ -139,7 +148,13 @@ class OrderProvider extends ChangeNotifier {
     );
 
     await createOrder(testOrder);
-    return payOrder(_orders.first.id);
+    if (_orders.isEmpty) {
+      throw Exception('Debug order was not inserted locally after creation');
+    }
+
+    final createdOrderId = _orders.first.id;
+    debugPrint('Debug payment order created: orderId=$createdOrderId');
+    return payOrder(createdOrderId);
   }
 
   Future<void> cancelOrder(String orderId) async {

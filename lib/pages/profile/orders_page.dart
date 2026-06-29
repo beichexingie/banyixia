@@ -21,6 +21,7 @@ class OrdersPage extends StatefulWidget {
 class _OrdersPageState extends State<OrdersPage>
     with SingleTickerProviderStateMixin {
   late TabController _tabController;
+  bool _isDebugPaying = false;
 
   @override
   void initState() {
@@ -57,18 +58,29 @@ class _OrdersPageState extends State<OrdersPage>
   }
 
   Future<void> _runDebugPayment() async {
+    if (_isDebugPaying) return;
+
+    setState(() => _isDebugPaying = true);
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(content: Text('0.01 test payment is starting...')),
+    );
+
     try {
-      final result =
-          await context.read<OrderProvider>().createAndPayDebugOrder();
+      debugPrint('OrdersPage: debug payment button pressed');
+      final result = await context.read<OrderProvider>().createAndPayDebugOrder();
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('0.01 元测试支付结果：${result.message}')),
+        SnackBar(content: Text('0.01 test payment result: ${result.message}')),
       );
     } catch (e) {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('测试支付失败：$e')),
+        SnackBar(content: Text('0.01 test payment failed: $e')),
       );
+    } finally {
+      if (mounted) {
+        setState(() => _isDebugPaying = false);
+      }
     }
   }
 
@@ -83,15 +95,15 @@ class _OrdersPageState extends State<OrdersPage>
           Padding(
             padding: const EdgeInsets.only(right: 12),
             child: TextButton.icon(
-              onPressed: _runDebugPayment,
+              onPressed: _isDebugPaying ? null : _runDebugPayment,
               icon: const Icon(
                 Icons.science_outlined,
                 color: AppColors.primary,
                 size: 18,
               ),
-              label: const Text(
-                '0.01测试',
-                style: TextStyle(
+              label: Text(
+                _isDebugPaying ? '处理中...' : '0.01测试',
+                style: const TextStyle(
                   color: AppColors.primary,
                   fontWeight: FontWeight.w600,
                 ),
@@ -183,306 +195,214 @@ class _OrdersPageState extends State<OrdersPage>
       );
     }
 
-    return ListView.builder(
-      padding: const EdgeInsets.all(16),
+    return ListView.separated(
+      padding: const EdgeInsets.fromLTRB(16, 16, 16, 24),
       itemCount: orders.length,
-      itemBuilder: (context, index) => _buildOrderCard(orders[index]),
+      separatorBuilder: (_, __) => const SizedBox(height: 12),
+      itemBuilder: (context, index) {
+        final order = orders[index];
+        return _buildOrderCard(context, order);
+      },
     );
   }
 
-  Widget _buildOrderCard(Order order) {
-    final (statusText, statusColor) = _statusMeta(order.status);
-    final isDebugOrder = order.serviceName.contains('0.01')
-        || (order.merchantOrderNo?.startsWith('DBG') ?? false);
+  Widget _buildOrderCard(BuildContext context, Order order) {
+    final statusMeta = _statusMeta(order.status);
+    final isDebugOrder = order.serviceName.contains('0.01');
 
     return Container(
-      margin: const EdgeInsets.only(bottom: 16),
-      padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
         color: Colors.white,
-        borderRadius: BorderRadius.circular(16),
+        borderRadius: BorderRadius.circular(20),
         boxShadow: [
           BoxShadow(
             color: Colors.black.withValues(alpha: 0.04),
-            blurRadius: 8,
-            offset: const Offset(0, 2),
+            blurRadius: 18,
+            offset: const Offset(0, 10),
           ),
         ],
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Row(
-            children: [
-              Expanded(
-                child: Text(
-                  '订单号 ${_shortId(order.id)}',
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  style: const TextStyle(
-                    fontSize: 12,
-                    color: AppColors.textHint,
-                  ),
-                ),
-              ),
-              if (isDebugOrder)
-                Container(
-                  margin: const EdgeInsets.only(right: 8),
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 8,
-                    vertical: 4,
-                  ),
-                  decoration: BoxDecoration(
-                    color: const Color(0xFFFFF4E8),
-                    borderRadius: BorderRadius.circular(999),
-                  ),
-                  child: const Text(
-                    '测试单',
-                    style: TextStyle(
-                      fontSize: 11,
-                      color: Color(0xFFE68A00),
-                      fontWeight: FontWeight.w600,
+          Padding(
+            padding: const EdgeInsets.fromLTRB(16, 16, 16, 12),
+            child: Row(
+              children: [
+                ClipRRect(
+                  borderRadius: BorderRadius.circular(16),
+                  child: CachedNetworkImage(
+                    imageUrl: order.guideAvatar,
+                    width: 56,
+                    height: 56,
+                    fit: BoxFit.cover,
+                    errorWidget: (_, __, ___) => Container(
+                      width: 56,
+                      height: 56,
+                      color: AppColors.background,
+                      child: const Icon(Icons.person, color: AppColors.textHint),
                     ),
                   ),
                 ),
-              Text(
-                statusText,
-                style: TextStyle(
-                  fontSize: 14,
-                  fontWeight: FontWeight.bold,
-                  color: statusColor,
-                ),
-              ),
-            ],
-          ),
-          if (order.status == OrderStatus.inProgress) ...[
-            const SizedBox(height: 12),
-            SafetyControlPanel(orderId: order.id),
-          ],
-          const Divider(height: 24),
-          Row(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              ClipRRect(
-                borderRadius: BorderRadius.circular(8),
-                child: CachedNetworkImage(
-                  imageUrl: order.guideAvatar,
-                  width: 60,
-                  height: 60,
-                  fit: BoxFit.cover,
-                  placeholder: (context, url) => Container(
-                    width: 60,
-                    height: 60,
-                    color: AppColors.tagBackground,
-                  ),
-                  errorWidget: (context, url, err) => Container(
-                    width: 60,
-                    height: 60,
-                    color: AppColors.tagBackground,
-                    child: const Icon(Icons.person),
-                  ),
-                ),
-              ),
-              const SizedBox(width: 12),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      isDebugOrder
-                          ? '支付联调测试订单'
-                          : '地陪服务 - ${order.guideName}',
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      style: const TextStyle(
-                        fontSize: 16,
-                        fontWeight: FontWeight.bold,
-                      ),
-                    ),
-                    const SizedBox(height: 4),
-                    Text(
-                      isDebugOrder
-                          ? '用于验证正式支付、异步回调、订单状态更新'
-                          : '服务时间：${_formatDateTime(order.serviceDate)}',
-                      maxLines: 2,
-                      overflow: TextOverflow.ellipsis,
-                      style: AppTextStyles.caption,
-                    ),
-                    if ((order.merchantOrderNo ?? '').isNotEmpty) ...[
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(order.guideName, style: AppTextStyles.subtitle),
                       const SizedBox(height: 6),
                       Text(
-                        '商户单号：${order.merchantOrderNo}',
-                        maxLines: 1,
+                        order.serviceName,
+                        maxLines: 2,
                         overflow: TextOverflow.ellipsis,
-                        style: const TextStyle(
-                          fontSize: 11,
-                          color: AppColors.textHint,
-                        ),
+                        style: AppTextStyles.caption.copyWith(height: 1.4),
                       ),
                     ],
-                    if ((order.paymentStatus).isNotEmpty) ...[
-                      const SizedBox(height: 4),
-                      Text(
-                        '支付状态：${order.paymentStatus}',
-                        style: const TextStyle(
-                          fontSize: 11,
-                          color: AppColors.textSecondary,
-                        ),
+                  ),
+                ),
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                  decoration: BoxDecoration(
+                    color: statusMeta.color.withValues(alpha: 0.12),
+                    borderRadius: BorderRadius.circular(999),
+                  ),
+                  child: Text(
+                    statusMeta.label,
+                    style: TextStyle(
+                      color: statusMeta.color,
+                      fontWeight: FontWeight.w600,
+                      fontSize: 12,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+          Container(
+            margin: const EdgeInsets.symmetric(horizontal: 16),
+            padding: const EdgeInsets.all(14),
+            decoration: BoxDecoration(
+              color: const Color(0xFFF7F8FC),
+              borderRadius: BorderRadius.circular(16),
+            ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    const Text('订单金额', style: AppTextStyles.caption),
+                    Text(
+                      '¥${order.amount.toStringAsFixed(2)}',
+                      style: AppTextStyles.subtitle.copyWith(
+                        color: AppColors.primary,
+                        fontWeight: FontWeight.w700,
                       ),
-                    ],
+                    ),
                   ],
                 ),
-              ),
-            ],
+                if ((order.paymentStatus).isNotEmpty) ...[
+                  const SizedBox(height: 8),
+                  Text(
+                    '支付状态：${order.paymentStatus}',
+                    style: AppTextStyles.caption,
+                  ),
+                ],
+                if ((order.merchantOrderNo ?? '').isNotEmpty) ...[
+                  const SizedBox(height: 8),
+                  Text(
+                    '商户单号：${order.merchantOrderNo}',
+                    style: AppTextStyles.caption,
+                  ),
+                ],
+              ],
+            ),
           ),
-          const SizedBox(height: 16),
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              const Text(
-                '总价',
-                style: TextStyle(
-                  fontSize: 14,
-                  color: AppColors.textSecondary,
+          if (isDebugOrder)
+            Padding(
+              padding: const EdgeInsets.fromLTRB(16, 12, 16, 0),
+              child: Container(
+                padding: const EdgeInsets.all(12),
+                decoration: BoxDecoration(
+                  color: const Color(0xFFFFF6E6),
+                  borderRadius: BorderRadius.circular(14),
                 ),
-              ),
-              Text(
-                '¥${order.amount.toStringAsFixed(2)}',
-                style: const TextStyle(
-                  fontSize: 18,
-                  fontWeight: FontWeight.bold,
-                  color: AppColors.textPrimary,
+                child: const Text(
+                  '说明：这笔 0.01 元测试单只验证“用户支付到平台”链路。',
+                  style: TextStyle(
+                    fontSize: 12,
+                    color: Color(0xFF9A6700),
+                    height: 1.5,
+                  ),
                 ),
-              ),
-            ],
-          ),
-          if (isDebugOrder) ...[
-            const SizedBox(height: 10),
-            const Text(
-              '说明：这笔 0.01 元测试单只验证“用户向平台发起支付”是否成功。地陪真实收款、分账或提现，不依赖这一笔测试。',
-              style: TextStyle(
-                fontSize: 12,
-                color: AppColors.textSecondary,
-                height: 1.5,
               ),
             ),
-          ],
-          if (order.status == OrderStatus.pendingPayment ||
-              order.status == OrderStatus.inProgress) ...[
-            const SizedBox(height: 16),
-            Row(
+          Padding(
+            padding: const EdgeInsets.fromLTRB(16, 12, 16, 16),
+            child: Row(
               mainAxisAlignment: MainAxisAlignment.end,
               children: [
-                if (!isDebugOrder) ...[
+                if (order.status == OrderStatus.pendingPayment) ...[
                   OutlinedButton(
-                    onPressed: () => _contactGuide(order),
-                    style: OutlinedButton.styleFrom(
-                      foregroundColor: AppColors.primary,
-                      side: const BorderSide(color: AppColors.primary),
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(12),
-                      ),
-                    ),
-                    child: const Text('联系地陪'),
-                  ),
-                  const SizedBox(width: 10),
-                ],
-                if (order.status == OrderStatus.pendingPayment)
-                  ElevatedButton(
                     onPressed: () async {
-                      try {
-                        final result =
-                            await context.read<OrderProvider>().payOrder(order.id);
-                        if (!context.mounted) return;
-                        ScaffoldMessenger.of(context).showSnackBar(
-                          SnackBar(content: Text(result.message)),
-                        );
-                      } catch (e) {
-                        if (!context.mounted) return;
-                        ScaffoldMessenger.of(context).showSnackBar(
-                          SnackBar(content: Text('支付失败：$e')),
-                        );
-                      }
+                      await context.read<OrderProvider>().cancelOrder(order.id);
                     },
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: AppColors.primary,
-                      foregroundColor: Colors.white,
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(12),
-                      ),
-                    ),
-                    child: Text(isDebugOrder ? '继续测试支付' : '立即支付'),
+                    child: const Text('取消'),
                   ),
-                if (order.status == OrderStatus.inProgress && !isDebugOrder)
-                  ElevatedButton(
-                    onPressed: () => _showConfirmComplete(context, order),
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: Colors.green,
-                      foregroundColor: Colors.white,
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(12),
-                      ),
-                    ),
+                  const SizedBox(width: 8),
+                ],
+                TextButton(
+                  onPressed: () => _contactGuide(order),
+                  child: const Text('联系地陪'),
+                ),
+                const SizedBox(width: 8),
+                if (order.status == OrderStatus.pendingPayment)
+                  FilledButton(
+                    onPressed: () async {
+                      final result =
+                          await context.read<OrderProvider>().payOrder(order.id);
+                      if (!context.mounted) return;
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        SnackBar(content: Text(result.message)),
+                      );
+                    },
+                    child: const Text('去支付'),
+                  ),
+                if (order.status == OrderStatus.inProgress)
+                  FilledButton(
+                    onPressed: () async {
+                      await context.read<OrderProvider>().completeOrder(order.id);
+                    },
                     child: const Text('确认完成'),
                   ),
               ],
             ),
-          ],
+          ),
+          const SafetyControlPanel(),
         ],
       ),
     );
   }
 
-  (String, Color) _statusMeta(OrderStatus status) {
+  _OrderStatusMeta _statusMeta(OrderStatus status) {
     switch (status) {
       case OrderStatus.pendingPayment:
-        return ('待付款', const Color(0xFFFF9800));
+        return const _OrderStatusMeta('待付款', Color(0xFFF59E0B));
       case OrderStatus.inProgress:
-        return ('进行中', AppColors.primary);
+        return const _OrderStatusMeta('进行中', Color(0xFF2563EB));
       case OrderStatus.pendingReview:
-        return ('待评价', const Color(0xFF4CAF50));
-      case OrderStatus.completed:
-        return ('已完成', AppColors.textSecondary);
+        return const _OrderStatusMeta('待评价', Color(0xFF7C3AED));
       case OrderStatus.cancelled:
-        return ('已取消', AppColors.textHint);
+        return const _OrderStatusMeta('已取消', Color(0xFF94A3B8));
+      case OrderStatus.completed:
+        return const _OrderStatusMeta('已完成', Color(0xFF10B981));
     }
   }
+}
 
-  void _showConfirmComplete(BuildContext context, Order order) {
-    showDialog(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('确认完成服务？'),
-        content: const Text('确认后资金将进入结算流程，通常不再支持退款。'),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: const Text('取消'),
-          ),
-          ElevatedButton(
-            onPressed: () async {
-              Navigator.pop(context);
-              await context.read<OrderProvider>().completeOrder(order.id);
-            },
-            child: const Text('确认完成'),
-          ),
-        ],
-      ),
-    );
-  }
+class _OrderStatusMeta {
+  final String label;
+  final Color color;
 
-  String _shortId(String id) {
-    if (id.length <= 12) return id;
-    return '${id.substring(0, 6)}...${id.substring(id.length - 4)}';
-  }
-
-  String _formatDateTime(DateTime? dateTime) {
-    if (dateTime == null) return '未知';
-    final y = dateTime.year.toString().padLeft(4, '0');
-    final m = dateTime.month.toString().padLeft(2, '0');
-    final d = dateTime.day.toString().padLeft(2, '0');
-    final h = dateTime.hour.toString().padLeft(2, '0');
-    final min = dateTime.minute.toString().padLeft(2, '0');
-    return '$y-$m-$d $h:$min';
-  }
+  const _OrderStatusMeta(this.label, this.color);
 }
