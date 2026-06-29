@@ -6,4 +6,6 @@ class AmapConfig {
   // Web Service key for geocode / reverse-geocode requests.
   static const String webServiceKey = AppConfig.amapWebServiceKey;
   static const String androidKey = AppConfig.amapAndroidKey;
+
+  static bool get hasAndroidKey => androidKey.trim().isNotEmpty;
 }

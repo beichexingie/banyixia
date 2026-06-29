@@ -1462,7 +1462,9 @@ class _LocationPickerPageState extends State<LocationPickerPage> {
         hasShow: true,
         hasAgree: true,
       ),
-      apiKey: const amap_base.AMapApiKey(androidKey: AmapConfig.androidKey),
+      apiKey: AmapConfig.hasAndroidKey
+          ? const amap_base.AMapApiKey(androidKey: AmapConfig.androidKey)
+          : null,
       initialCameraPosition: CameraPosition(
         target: amap_base.LatLng(_mapTarget.latitude, _mapTarget.longitude),
         zoom: _mapZoom,

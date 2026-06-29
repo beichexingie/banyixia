@@ -63,7 +63,12 @@ class AlipayPaymentService implements PaymentService {
   @override
   Future<PaymentResult> pay(PaymentRequest request) async {
     try {
-      debugPrint('Payment: creating order ${request.orderId}, amount=${request.amount}, sandbox=${PaymentConfig.useSandbox}');
+      debugPrint(
+        'Payment: creating order ${request.orderId}, '
+        'amount=${request.amount}, '
+        'baseUrl=${PaymentConfig.backendBaseUrl}, '
+        'sandbox=${PaymentConfig.useSandbox}',
+      );
       final data = await _createOrder(request).timeout(const Duration(seconds: 20));
 
       debugPrint('Payment: backend response data=$data');
@@ -72,7 +77,7 @@ class AlipayPaymentService implements PaymentService {
         return PaymentResult(
           outcome: PaymentOutcome.failed,
           success: false,
-          message: data['message']?.toString() ?? '支付后端返回失败',
+          message: data['message']?.toString() ?? 'Payment backend returned failure',
           transactionId: data['payment_request_id']?.toString() ??
               data['transaction_id']?.toString(),
           paymentUrl: data['payment_url']?.toString(),
@@ -85,7 +90,7 @@ class AlipayPaymentService implements PaymentService {
         return const PaymentResult(
           outcome: PaymentOutcome.failed,
           success: false,
-          message: '支付参数未生成',
+          message: 'Payment order string was not generated',
         );
       }
 
@@ -104,11 +109,13 @@ class AlipayPaymentService implements PaymentService {
         return const PaymentResult(
           outcome: PaymentOutcome.failed,
           success: false,
-          message: '请先安装支付宝客户端',
+          message: 'Please install Alipay first',
         );
       }
 
-      debugPrint('Payment: launching Alipay with order string length=${orderString.length}');
+      debugPrint(
+        'Payment: launching Alipay with order string length=${orderString.length}',
+      );
       final resultFuture = AlipayPaymentPlatform.instance.payResp().first;
       await AlipayPaymentPlatform.instance.pay(
         orderInfo: orderString,
@@ -119,15 +126,19 @@ class AlipayPaymentService implements PaymentService {
       );
       final payResult = await resultFuture.timeout(
         const Duration(minutes: 2),
-        onTimeout: () => AlipayResult.unknown('支付超时'),
+        onTimeout: () => AlipayResult.unknown('Payment timeout'),
       );
-      debugPrint('Payment: alipay result success=${payResult.isSuccess}, cancel=${payResult.isCancel}, memo=${payResult.memo}, status=${payResult.resultStatus}');
+      debugPrint(
+        'Payment: alipay result success=${payResult.isSuccess}, '
+        'cancel=${payResult.isCancel}, memo=${payResult.memo}, '
+        'status=${payResult.resultStatus}',
+      );
 
       if (payResult.isSuccess) {
         return PaymentResult(
           outcome: PaymentOutcome.success,
           success: true,
-          message: data['message']?.toString() ?? '支付成功',
+          message: data['message']?.toString() ?? 'Payment success',
           transactionId: data['payment_request_id']?.toString() ??
               data['transaction_id']?.toString(),
           paymentUrl: data['payment_url']?.toString(),
@@ -139,7 +150,7 @@ class AlipayPaymentService implements PaymentService {
         return PaymentResult(
           outcome: PaymentOutcome.cancelled,
           success: false,
-          message: '用户已取消支付',
+          message: 'User cancelled payment',
           transactionId: data['payment_request_id']?.toString() ??
               data['transaction_id']?.toString(),
           paymentUrl: data['payment_url']?.toString(),
@@ -150,7 +161,8 @@ class AlipayPaymentService implements PaymentService {
       return PaymentResult(
         outcome: PaymentOutcome.failed,
         success: false,
-        message: '支付失败: [${payResult.resultStatus}] ${payResult.memo ?? '未知错误'}',
+        message:
+            'Payment failed: [${payResult.resultStatus}] ${payResult.memo ?? 'Unknown error'}',
         transactionId: data['payment_request_id']?.toString() ??
             data['transaction_id']?.toString(),
         paymentUrl: data['payment_url']?.toString(),
@@ -161,8 +173,8 @@ class AlipayPaymentService implements PaymentService {
         outcome: PaymentOutcome.failed,
         success: false,
         message: e is TimeoutException
-            ? '支付参数请求超时，请检查函数返回和支付宝回跳配置'
-            : '支付请求失败: $e',
+            ? 'Payment parameter request timed out, please check backend callback and Alipay config'
+            : 'Payment request failed: $e',
       );
     }
   }
@@ -173,6 +185,7 @@ class AlipayPaymentService implements PaymentService {
 
     final headers = <String, String>{
       'Content-Type': 'application/json',
+      'Accept': 'application/json',
     };
 
     final response = await http.post(
@@ -188,11 +201,38 @@ class AlipayPaymentService implements PaymentService {
       }),
     );
 
-    final decoded = jsonDecode(response.body);
-    if (decoded is! Map<String, dynamic>) {
-      throw Exception('支付后端返回了不可解析的数据');
+    final body = response.body;
+    try {
+      final decoded = jsonDecode(body);
+      if (decoded is! Map<String, dynamic>) {
+        throw Exception(
+          'Payment backend returned non-object JSON. '
+          'url=$uri, status=${response.statusCode}',
+        );
+      }
+      return decoded;
+    } on FormatException {
+      final contentType = response.headers['content-type'] ?? '';
+      final preview = _bodyPreview(body);
+      debugPrint(
+        'Payment create order non-JSON response: '
+        'url=$uri, status=${response.statusCode}, contentType=$contentType, body=$preview',
+      );
+      throw Exception(
+        'Payment backend returned non-JSON content. '
+        'url=$uri, status=${response.statusCode}, contentType=$contentType, body=$preview',
+      );
     }
+  }
 
-    return decoded;
+  String _bodyPreview(String body) {
+    final normalized = body.replaceAll(RegExp(r'\s+'), ' ').trim();
+    if (normalized.isEmpty) {
+      return '<empty>';
+    }
+    if (normalized.length <= 200) {
+      return normalized;
+    }
+    return '${normalized.substring(0, 200)}...';
   }
 }
