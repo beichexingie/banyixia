@@ -29,6 +29,28 @@ function normalizePrivateKey(value) {
   return value.replace(/\\n/g, '\n').trim();
 }
 
+function wrapPemBlock(label, body) {
+  const normalizedBody = body.replace(/\s+/g, '');
+  const wrapped = normalizedBody.match(/.{1,64}/g)?.join('\n') ?? normalizedBody;
+  return `-----BEGIN ${label}-----\n${wrapped}\n-----END ${label}-----`;
+}
+
+function normalizePrivateKeyCandidates(value) {
+  const trimmed = normalizePrivateKey(value);
+  if (!trimmed) {
+    return [];
+  }
+
+  if (trimmed.includes('BEGIN PRIVATE KEY') || trimmed.includes('BEGIN RSA PRIVATE KEY')) {
+    return [trimmed];
+  }
+
+  return [
+    wrapPemBlock('PRIVATE KEY', trimmed),
+    wrapPemBlock('RSA PRIVATE KEY', trimmed),
+  ];
+}
+
 function normalizePublicKey(value) {
   const trimmed = value.replace(/\\n/g, '\n').trim();
   if (trimmed.includes('BEGIN PUBLIC KEY')) {
@@ -60,10 +82,23 @@ function buildSignContent(params) {
 }
 
 function signWithRsa2(message) {
-  const signer = crypto.createSign('RSA-SHA256');
-  signer.update(message, 'utf8');
-  signer.end();
-  return signer.sign(normalizePrivateKey(config.alipayPrivateKey), 'base64');
+  const candidates = normalizePrivateKeyCandidates(config.alipayPrivateKey);
+  const errors = [];
+
+  for (const candidate of candidates) {
+    try {
+      const signer = crypto.createSign('RSA-SHA256');
+      signer.update(message, 'utf8');
+      signer.end();
+      return signer.sign(candidate, 'base64');
+    } catch (error) {
+      errors.push(error.message);
+    }
+  }
+
+  throw new Error(
+    `ALIPAY_PRIVATE_KEY format is invalid or unsupported: ${errors.join(' | ') || 'empty key'}`,
+  );
 }
 
 export function buildOrderString({ orderId, merchantOrderNo, amount, subject }) {
