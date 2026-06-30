@@ -1,10 +1,11 @@
-import 'package:flutter/material.dart';
-import 'package:provider/provider.dart';
 import 'package:cached_network_image/cached_network_image.dart';
+import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
-import '../../config/app_theme.dart';
-import '../../models/travel_post.dart';
-import '../../providers/post_provider.dart';
+import 'package:provider/provider.dart';
+
+import '../config/app_theme.dart';
+import '../models/travel_post.dart';
+import '../providers/post_provider.dart';
 
 class TravelCard extends StatelessWidget {
   final TravelPost post;
@@ -16,138 +17,144 @@ class TravelCard extends StatelessWidget {
     context.push('/post/${post.id}');
   }
 
-  // Helper removed as it's no longer used in bottom sheet
-
   @override
   Widget build(BuildContext context) {
     final locationLabel = _resolveLocationLabel();
+    final authorAvatar = post.authorAvatar.trim();
 
     return GestureDetector(
       onTap: () => _showPostDetail(context),
       child: Container(
         decoration: BoxDecoration(
-          color: Colors.white, borderRadius: BorderRadius.circular(12),
-          boxShadow: [BoxShadow(color: Colors.black.withValues(alpha: 0.04), blurRadius: 8, offset: const Offset(0, 2))],
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(22),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withValues(alpha: 0.04),
+              blurRadius: 14,
+              offset: const Offset(0, 4),
+            ),
+          ],
         ),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            AspectRatio(
-              aspectRatio: 4 / 3,
+            Expanded(
+              flex: 8,
               child: ClipRRect(
-                borderRadius: const BorderRadius.vertical(top: Radius.circular(12)),
-                child: CachedNetworkImage(
-                  imageUrl: post.coverImage,
-                  width: double.infinity,
-                  height: double.infinity,
-                  fit: BoxFit.cover,
-                  placeholder: (context, url) => Container(
-                    color: AppColors.tagBackground,
-                    child: const Center(
-                      child: CircularProgressIndicator(
-                        strokeWidth: 2,
-                        color: AppColors.primary,
+                borderRadius: const BorderRadius.vertical(
+                  top: Radius.circular(22),
+                ),
+                child: Stack(
+                  fit: StackFit.expand,
+                  children: [
+                    CachedNetworkImage(
+                      imageUrl: post.coverImage,
+                      fit: BoxFit.cover,
+                      placeholder: (context, url) => Container(
+                        color: AppColors.tagBackground,
+                        child: const Center(
+                          child: CircularProgressIndicator(
+                            strokeWidth: 2,
+                            color: AppColors.primary,
+                          ),
+                        ),
+                      ),
+                      errorWidget: (context, url, error) => Container(
+                        color: AppColors.tagBackground,
+                        child: const Icon(
+                          Icons.image_outlined,
+                          color: AppColors.textHint,
+                          size: 36,
+                        ),
                       ),
                     ),
-                  ),
-                  errorWidget: (context, url, error) => Container(
-                    color: AppColors.tagBackground,
-                    child: const Icon(Icons.image, color: AppColors.primary),
-                  ),
+                    Positioned.fill(
+                      child: DecoratedBox(
+                        decoration: BoxDecoration(
+                          gradient: LinearGradient(
+                            begin: Alignment.topCenter,
+                            end: Alignment.bottomCenter,
+                            colors: [
+                              Colors.transparent,
+                              Colors.black.withValues(alpha: 0.05),
+                              Colors.black.withValues(alpha: 0.42),
+                            ],
+                          ),
+                        ),
+                      ),
+                    ),
+                    Positioned(
+                      left: 12,
+                      bottom: 12,
+                      child: _LocationPill(label: locationLabel),
+                    ),
+                  ],
                 ),
               ),
             ),
             Expanded(
+              flex: 3,
               child: Padding(
-                padding: const EdgeInsets.all(10),
+                padding: const EdgeInsets.fromLTRB(12, 10, 12, 10),
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
-                    Row(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Expanded(
-                          child: Text(
-                            post.title,
-                            maxLines: 2,
-                            overflow: TextOverflow.ellipsis,
-                            style: const TextStyle(
-                              fontSize: 13,
-                              fontWeight: FontWeight.w600,
-                              color: AppColors.textPrimary,
-                              height: 1.3,
-                            ),
-                          ),
-                        ),
-                        if (locationLabel.isNotEmpty) ...[
-                          const SizedBox(width: 6),
-                          ConstrainedBox(
-                            constraints: const BoxConstraints(maxWidth: 64),
-                            child: Container(
-                              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-                              decoration: BoxDecoration(
-                                color: AppColors.primary.withValues(alpha: 0.85),
-                                borderRadius: BorderRadius.circular(10),
-                              ),
-                              child: Text(
-                                locationLabel,
-                                maxLines: 1,
-                                overflow: TextOverflow.ellipsis,
-                                style: const TextStyle(
-                                  color: Colors.white,
-                                  fontSize: 10,
-                                  fontWeight: FontWeight.w500,
-                                ),
-                              ),
-                            ),
-                          ),
-                        ],
-                      ],
+                    Text(
+                      post.title,
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
+                      style: const TextStyle(
+                        fontSize: 15,
+                        height: 1.24,
+                        fontWeight: FontWeight.w700,
+                        color: AppColors.textPrimary,
+                      ),
                     ),
-                    const Spacer(),
                     Row(
                       children: [
-                        ClipOval(
-                          child: CachedNetworkImage(
-                            imageUrl: post.authorAvatar, width: 20, height: 20, fit: BoxFit.cover,
-                            placeholder: (context, url) => Container(width: 20, height: 20, color: AppColors.tagBackground),
-                            errorWidget: (context, url, error) => Container(
-                              width: 20, height: 20,
-                              decoration: const BoxDecoration(color: AppColors.tagBackground, shape: BoxShape.circle),
-                              child: const Icon(Icons.person, size: 12, color: AppColors.primary),
-                            ),
-                          ),
-                        ),
+                        _Avatar(url: authorAvatar),
                         const SizedBox(width: 6),
                         Expanded(
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            mainAxisSize: MainAxisSize.min,
-                            children: [
-                              Text(post.authorName, overflow: TextOverflow.ellipsis, style: AppTextStyles.caption),
-                              Text(post.timeLabel, style: const TextStyle(fontSize: 8, color: AppColors.textHint)),
-                            ],
+                          child: Text(
+                            post.authorName.isNotEmpty ? post.authorName : '用户昵称',
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: const TextStyle(
+                              fontSize: 12,
+                              color: AppColors.textHint,
+                              fontWeight: FontWeight.w500,
+                            ),
                           ),
                         ),
-                        // 点赞按钮 — 可点击
+                        const SizedBox(width: 8),
                         GestureDetector(
                           onTap: () {
                             context.read<PostProvider>().toggleLike(post);
                           },
+                          behavior: HitTestBehavior.opaque,
                           child: Row(
                             mainAxisSize: MainAxisSize.min,
                             children: [
                               Icon(
-                                post.isLiked ? Icons.favorite : Icons.favorite_border,
-                                size: 14,
-                                color: post.isLiked ? const Color(0xFFFF6B6B) : AppColors.textHint,
+                                post.isLiked
+                                    ? Icons.favorite
+                                    : Icons.favorite_border,
+                                size: 15,
+                                color: post.isLiked
+                                    ? const Color(0xFFFF6B6B)
+                                    : AppColors.textHint,
                               ),
-                              const SizedBox(width: 2),
-                              Text('${post.likes}', style: AppTextStyles.caption),
-                              const SizedBox(width: 8),
-                              const Icon(Icons.chat_bubble_outline, size: 14, color: AppColors.textHint),
-                              const SizedBox(width: 2),
-                              Text('${post.commentCount}', style: AppTextStyles.caption),
+                              const SizedBox(width: 4),
+                              Text(
+                                '${post.likes}',
+                                style: const TextStyle(
+                                  fontSize: 12,
+                                  color: AppColors.textHint,
+                                  fontWeight: FontWeight.w500,
+                                ),
+                              ),
                             ],
                           ),
                         ),
@@ -172,5 +179,85 @@ class TravelCard extends StatelessWidget {
       return '城市';
     }
     return fallback;
+  }
+}
+
+class _LocationPill extends StatelessWidget {
+  final String label;
+
+  const _LocationPill({required this.label});
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+      decoration: BoxDecoration(
+        color: Colors.black.withValues(alpha: 0.34),
+        borderRadius: BorderRadius.circular(999),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          const Icon(
+            Icons.location_on_outlined,
+            size: 14,
+            color: Colors.white,
+          ),
+          const SizedBox(width: 2),
+          Text(
+            label,
+            style: const TextStyle(
+              fontSize: 12,
+              fontWeight: FontWeight.w600,
+              color: Colors.white,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _Avatar extends StatelessWidget {
+  final String url;
+
+  const _Avatar({required this.url});
+
+  @override
+  Widget build(BuildContext context) {
+    if (url.isEmpty) {
+      return Container(
+        width: 22,
+        height: 22,
+        decoration: const BoxDecoration(
+          shape: BoxShape.circle,
+          color: AppColors.tagBackground,
+        ),
+        child: const Icon(
+          Icons.person,
+          size: 12,
+          color: AppColors.textHint,
+        ),
+      );
+    }
+
+    return ClipOval(
+      child: CachedNetworkImage(
+        imageUrl: url,
+        width: 22,
+        height: 22,
+        fit: BoxFit.cover,
+        errorWidget: (context, url, error) => Container(
+          width: 22,
+          height: 22,
+          color: AppColors.tagBackground,
+          child: const Icon(
+            Icons.person,
+            size: 12,
+            color: AppColors.textHint,
+          ),
+        ),
+      ),
+    );
   }
 }
