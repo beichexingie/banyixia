@@ -793,10 +793,12 @@ class _ProfilePostCard extends StatelessWidget {
                           ),
                         ),
                       ),
-                      const Icon(
-                        Icons.favorite_border,
+                      Icon(
+                        post.isLiked ? Icons.favorite : Icons.favorite_border,
                         size: 15,
-                        color: AppColors.textHint,
+                        color: post.isLiked
+                            ? const Color(0xFFFF6F7A)
+                            : AppColors.textHint,
                       ),
                       const SizedBox(width: 2),
                       Text(

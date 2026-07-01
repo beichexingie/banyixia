@@ -710,7 +710,7 @@ appRouter.get('/posts/liked', async (req, res) => {
 appRouter.get('/posts/:id/comments', async (req, res) => {
   const viewerId = getSessionUserId(req);
   const normalizedViewerIdForComments = viewerId.trim();
-  const safeCommentsResult = await pool.query(
+  const result = await pool.query(
     `
       select
         pc.*,
@@ -725,7 +725,7 @@ appRouter.get('/posts/:id/comments', async (req, res) => {
           where pcl.comment_id = pc.id
         )::int as like_count,
         ${
-          normalizedViewerIdForComments.isNotEmpty
+          normalizedViewerIdForComments !== ''
             ? `
         exists(
           select 1
@@ -744,45 +744,9 @@ appRouter.get('/posts/:id/comments', async (req, res) => {
       where pc.post_id = $1
       order by coalesce(pc.parent_comment_id, pc.id), pc.parent_comment_id nulls first, pc.created_at asc
     `,
-    normalizedViewerIdForComments.isNotEmpty
+    normalizedViewerIdForComments !== ''
       ? [req.params.id, normalizedViewerIdForComments]
       : [req.params.id],
-  );
-  return ok(res, { data: safeCommentsResult.rows });
-  const result = await pool.query(
-    `
-      select
-        pc.*,
-        u.nickname as user_name,
-        u.avatar as user_avatar,
-        reply_to_user.nickname as reply_to_user_name,
-        reply_to_user.avatar as reply_to_user_avatar,
-        (
-          select count(*)
-          from public.post_comment_likes pcl
-          where pcl.comment_id = pc.id
-        )::int as like_count,
-        ${
-          viewerId
-            ? `
-        exists(
-          select 1
-          from public.post_comment_likes viewer_pcl
-          where viewer_pcl.comment_id = pc.id and viewer_pcl.user_id = $2
-        ) as is_liked
-        `
-            : `
-        false as is_liked
-        `
-        }
-      from public.post_comments pc
-      join public.users u on u.id = pc.user_id
-      left join public.post_comments reply_to_comment on reply_to_comment.id = pc.reply_to_comment_id
-      left join public.users reply_to_user on reply_to_user.id = reply_to_comment.user_id
-      where pc.post_id = $1
-      order by pc.created_at asc
-    `,
-    viewerId ? [req.params.id, viewerId] : [req.params.id],
   );
   return ok(res, { data: result.rows });
 });
@@ -801,9 +765,9 @@ appRouter.post('/posts/:id/comments', async (req, res) => {
     req.body?.reply_to_comment_id?.toString().trim() ?? '';
 
   let normalizedParentCommentId =
-    parentCommentIdRaw.isEmpty ? null : parentCommentIdRaw;
+    parentCommentIdRaw === '' ? null : parentCommentIdRaw;
   let normalizedReplyToCommentId =
-    replyToCommentIdRaw.isEmpty ? null : replyToCommentIdRaw;
+    replyToCommentIdRaw === '' ? null : replyToCommentIdRaw;
 
   if (normalizedParentCommentId != null) {
     const parentLookupResult = await pool.query(

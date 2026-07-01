@@ -1203,10 +1203,14 @@ class _PostCard extends StatelessWidget {
                           ),
                         ),
                       ),
-                      const Icon(
-                        Icons.favorite_border_rounded,
+                      Icon(
+                        post.isLiked
+                            ? Icons.favorite_rounded
+                            : Icons.favorite_border_rounded,
                         size: 20,
-                        color: AppColors.textHint,
+                        color: post.isLiked
+                            ? const Color(0xFFFF6F7A)
+                            : AppColors.textHint,
                       ),
                       const SizedBox(width: 4),
                       Text(
