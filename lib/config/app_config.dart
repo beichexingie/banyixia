@@ -10,6 +10,11 @@ class AppConfig {
 
   static const String amapWebServiceKey = String.fromEnvironment(
     'AMAP_WEB_SERVICE_KEY',
+    defaultValue: '0aed32a4629254c3ae2eaf3f36868391',
+  );
+
+  static const String amapAndroidKey = String.fromEnvironment(
+    'AMAP_ANDROID_KEY',
     defaultValue: 'f365608ae7958031b8930c795f5d7329',
   );
 

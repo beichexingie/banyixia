@@ -2,22 +2,23 @@ import 'package:flutter/material.dart';
 
 /// 应用颜色常量
 class AppColors {
-  static const Color primary = Color(0xFF3D6CF5);
-  static const Color primaryLight = Color(0xFF6C8EFF);
-  static const Color primaryDark = Color(0xFF2C56D6);
-  static const Color accent = Color(0xFF86A8FF);
-  static const Color gradientStart = Color(0xFF3D6CF5);
-  static const Color gradientEnd = Color(0xFF6C8EFF);
-  static const Color background = Color(0xFFF5F5F5);
+  static const Color primary = Color(0xFFC8FF28);
+  static const Color primaryLight = Color(0xFFE7FF9B);
+  static const Color primaryDark = Color(0xFF9FD900);
+  static const Color accent = Color(0xFFFF6938);
+  static const Color gradientStart = Color(0xFFC8FF28);
+  static const Color gradientEnd = Color(0xFFE8FFBE);
+  static const Color background = Color(0xFFF4F5F7);
   static const Color cardBackground = Colors.white;
-  static const Color textPrimary = Color(0xFF333333);
-  static const Color textSecondary = Color(0xFF666666);
-  static const Color textHint = Color(0xFF999999);
-  static const Color divider = Color(0xFFEEEEEE);
-  static const Color tagBackground = Color(0xFFEAF1FF);
-  static const Color tagText = Color(0xFF3D6CF5);
-  static const Color starColor = Color(0xFFFFD700);
-  static const Color vipGold = Color(0xFFDAA520);
+  static const Color textPrimary = Color(0xFF171717);
+  static const Color textSecondary = Color(0xFF555555);
+  static const Color textHint = Color(0xFFA0A0A8);
+  static const Color divider = Color(0xFFEAEAF0);
+  static const Color tagBackground = Color(0xFFF0F1F5);
+  static const Color tagText = Color(0xFF171717);
+  static const Color starColor = Color(0xFFFFA33C);
+  static const Color vipGold = Color(0xFFF5B34F);
+  static const Color darkSurface = Color(0xFF171717);
 
   static const LinearGradient primaryGradient = LinearGradient(
     colors: [gradientStart, gradientEnd],
@@ -26,8 +27,8 @@ class AppColors {
   );
 
   static const LinearGradient headerGradient = LinearGradient(
-    colors: [Color(0xFF3D6CF5), Color(0xFF6C8EFF)],
-    begin: Alignment.topCenter,
+    colors: [Color(0xFFC8FF28), Color(0xFFE8FFBE), Color(0xFFFFFFFF)],
+    begin: Alignment.topLeft,
     end: Alignment.bottomCenter,
   );
 }
@@ -84,7 +85,7 @@ class AppTheme {
         backgroundColor: Colors.white,
         foregroundColor: AppColors.textPrimary,
         elevation: 0,
-        centerTitle: false,
+        centerTitle: true,
       ),
       bottomNavigationBarTheme: const BottomNavigationBarThemeData(
         backgroundColor: Colors.white,

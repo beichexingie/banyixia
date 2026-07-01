@@ -23,7 +23,12 @@ class AppBootstrap {
     await sessionService.initialize();
 
     debugPrint(
-      'AppBootstrap: ECS session initialized, sandbox=${AppConfig.alipayUseSandbox}',
+      'AppBootstrap: ECS session initialized, '
+      'apiBaseUrl=${AppConfig.apiBaseUrl}, '
+      'paymentBaseUrl=${AppConfig.paymentBackendBaseUrl}, '
+      'sandbox=${AppConfig.alipayUseSandbox}, '
+      'amapWebKeySet=${AppConfig.amapWebServiceKey.trim().isNotEmpty}, '
+      'amapAndroidKeySet=${AppConfig.amapAndroidKey.trim().isNotEmpty}',
     );
   }
 }

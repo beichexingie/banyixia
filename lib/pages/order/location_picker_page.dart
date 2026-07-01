@@ -479,7 +479,7 @@ class _LocationPickerPageState extends State<LocationPickerPage> {
       });
     } on AmapApiException catch (e) {
       if (!mounted) return;
-      _showMessage('高德错误 ${e.code}: ${e.info}');
+      _showMessage(_describeAmapError(e, fallback: '地点搜索失败'));
     } catch (e) {
       if (!mounted) return;
       _showMessage('搜索失败：$e');
@@ -507,7 +507,7 @@ class _LocationPickerPageState extends State<LocationPickerPage> {
       } else if (e.code == 'LOCATION_PERMISSION_DENIED') {
         _showMessage('请先授予定位权限');
       } else {
-        _showMessage('高德错误 ${e.code}: ${e.info}');
+        _showMessage(_describeAmapError(e, fallback: '定位失败'));
       }
     } catch (e) {
       if (!mounted) return;
@@ -573,7 +573,7 @@ class _LocationPickerPageState extends State<LocationPickerPage> {
       await _moveMapToResolvedPosition(resolved);
     } on AmapApiException catch (e) {
       if (!mounted) return;
-      _showMessage('高德错误 ${e.code}: ${e.info}');
+      _showMessage(_describeAmapError(e, fallback: '地点解析失败'));
     } catch (_) {
       if (!mounted) return;
       _showMessage('地点解析失败');
@@ -692,7 +692,7 @@ class _LocationPickerPageState extends State<LocationPickerPage> {
       _applyResolvedPosition(result);
     } on AmapApiException catch (e) {
       if (!mounted || token != _reverseGeocodeToken) return;
-      _showMessage('逆地理编码失败 ${e.code}: ${e.info}');
+      _showMessage(_describeAmapError(e, fallback: '逆地理编码失败'));
     } catch (e) {
       if (!mounted || token != _reverseGeocodeToken) return;
       _showMessage('逆地理编码失败：$e');
@@ -1462,7 +1462,9 @@ class _LocationPickerPageState extends State<LocationPickerPage> {
         hasShow: true,
         hasAgree: true,
       ),
-      apiKey: const amap_base.AMapApiKey(androidKey: ''),
+      apiKey: AmapConfig.hasAndroidKey
+          ? const amap_base.AMapApiKey(androidKey: AmapConfig.androidKey)
+          : null,
       initialCameraPosition: CameraPosition(
         target: amap_base.LatLng(_mapTarget.latitude, _mapTarget.longitude),
         zoom: _mapZoom,
@@ -2073,6 +2075,13 @@ class _LocationPickerPageState extends State<LocationPickerPage> {
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(content: Text(message)),
     );
+  }
+
+  String _describeAmapError(AmapApiException error, {String fallback = '高德服务调用失败'}) {
+    if (error.code == '10009') {
+      return '高德 Key 与当前平台不匹配。Web 请检查 AMAP_WEB_SERVICE_KEY，Android 请检查 AMAP_ANDROID_KEY、包名和 SHA1。';
+    }
+    return '$fallback：${error.code} ${error.info}';
   }
 }
 

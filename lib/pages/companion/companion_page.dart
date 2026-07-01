@@ -22,12 +22,37 @@ class _CompanionPageState extends State<CompanionPage> {
   String _selectedCity = '苏州';
   int _activeCategory = -1;
 
+  final List<_TopServiceCard> _topCards = const [
+    _TopServiceCard(
+      title: '休闲游玩',
+      subtitle: '这是一段文案哦\n这是文案哦',
+      icon: Icons.deck_outlined,
+    ),
+    _TopServiceCard(
+      title: '户外运动',
+      subtitle: '这是文案哦\n这是文案哦',
+      icon: Icons.landscape_outlined,
+    ),
+    _TopServiceCard(
+      title: '公务随行',
+      subtitle: '这是文案哦\n这是文案哦',
+      icon: Icons.luggage_outlined,
+    ),
+  ];
+
   final List<_CategoryItem> _categories = const [
-    _CategoryItem(Icons.menu_book_outlined, '文化讲解', '讲解'),
-    _CategoryItem(Icons.self_improvement_outlined, '情绪充电宝', '陪聊'),
-    _CategoryItem(Icons.mic_none_outlined, '文娱活动', '活动'),
-    _CategoryItem(Icons.terrain_outlined, '爬山户外', '户外'),
-    _CategoryItem(Icons.work_outline, '商务活动', '商务'),
+    _CategoryItem(Icons.restaurant_outlined, '老吃家', '美食'),
+    _CategoryItem(Icons.hiking_outlined, '城市漫步', '陪游'),
+    _CategoryItem(Icons.storefront_outlined, '打卡探店', '探店'),
+    _CategoryItem(Icons.map_outlined, '本地陪玩', '地陪'),
+    _CategoryItem(Icons.movie_filter_outlined, '观影赏剧', '观影'),
+    _CategoryItem(Icons.directions_car_outlined, '露营自驾', '露营'),
+    _CategoryItem(Icons.roller_skating_outlined, '游乐园', '游乐'),
+    _CategoryItem(Icons.style_outlined, '桌游娱乐', '桌游'),
+    _CategoryItem(Icons.theater_comedy_outlined, '剧本密室', '剧本'),
+    _CategoryItem(Icons.sports_baseball_outlined, '桌球陪练', '桌球'),
+    _CategoryItem(Icons.sports_esports_outlined, '开黑搭子', '开黑'),
+    _CategoryItem(Icons.shopping_bag_outlined, '代排购物', '购物'),
   ];
 
   @override
@@ -64,7 +89,7 @@ class _CompanionPageState extends State<CompanionPage> {
             final recruitPosts = _filteredRecruitPosts(postProvider);
 
             return RefreshIndicator(
-              color: AppColors.primary,
+              color: AppColors.primaryDark,
               onRefresh: () async {
                 await Future.wait([
                   guideProvider.loadGuides(),
@@ -73,39 +98,41 @@ class _CompanionPageState extends State<CompanionPage> {
               },
               child: ListView(
                 physics: const AlwaysScrollableScrollPhysics(),
-                padding: const EdgeInsets.fromLTRB(16, 12, 16, 96),
+                padding: const EdgeInsets.fromLTRB(20, 12, 20, 110),
                 children: [
-                  _buildTopActions(),
+                  _buildSearchBar(),
+                  const SizedBox(height: 16),
+                  _buildTopServiceCards(),
                   const SizedBox(height: 18),
-                  _buildCategoryRow(),
+                  _buildCategoryGrid(),
                   const SizedBox(height: 18),
-                  _buildSearchCityRow(),
-                  const SizedBox(height: 14),
-                  if (guideProvider.isLoading && postProvider.isLoading)
+                  _buildSortHeader(),
+                  const SizedBox(height: 12),
+                  if (guideProvider.isLoading && guides.isEmpty)
                     const Padding(
-                      padding: EdgeInsets.only(top: 80),
+                      padding: EdgeInsets.only(top: 100),
                       child: Center(
                         child: CircularProgressIndicator(
-                          color: AppColors.primary,
+                          color: AppColors.primaryDark,
                         ),
                       ),
                     )
-                  else ...[
-                    if (guides.isNotEmpty) ...[
-                      ...guides.asMap().entries.map(
-                        (entry) => Padding(
-                          padding: const EdgeInsets.only(bottom: 12),
-                          child: ServiceGuideCard(
-                            guide: entry.value,
-                            statusLabel: _statusLabel(entry.key),
-                          ),
+                  else if (guides.isNotEmpty)
+                    ...guides.asMap().entries.map(
+                      (entry) => Padding(
+                        padding: const EdgeInsets.only(bottom: 16),
+                        child: ServiceGuideCard(
+                          guide: entry.value,
+                          statusLabel: _statusLabel(entry.key),
+                          compact: true,
                         ),
                       ),
-                    ] else if (recruitPosts.isEmpty)
-                      _buildGuideEmptyHint(),
-                    const SizedBox(height: 14),
+                    )
+                  else
+                    _buildGuideEmptyHint(),
+                  if (recruitPosts.isNotEmpty) ...[
+                    const SizedBox(height: 12),
                     _buildRecruitSection(recruitPosts),
-                    if (guides.isEmpty && recruitPosts.isEmpty) _buildEmptyState(),
                   ],
                 ],
               ),
@@ -116,132 +143,206 @@ class _CompanionPageState extends State<CompanionPage> {
     );
   }
 
-  Widget _buildTopActions() {
+  Widget _buildSearchBar() {
+    return Container(
+      height: 58,
+      padding: const EdgeInsets.symmetric(horizontal: 18),
+      decoration: BoxDecoration(
+        gradient: const LinearGradient(
+          colors: [Color(0xFFE4FFD0), Color(0xFFF7F9F2)],
+          begin: Alignment.topCenter,
+          end: Alignment.bottomCenter,
+        ),
+        borderRadius: BorderRadius.circular(29),
+      ),
+      child: Row(
+        children: [
+          const Icon(Icons.search, size: 26, color: AppColors.textHint),
+          const SizedBox(width: 10),
+          Expanded(
+            child: TextField(
+              controller: _searchController,
+              decoration: const InputDecoration(
+                border: InputBorder.none,
+                hintText: '搜索内容',
+                hintStyle: TextStyle(
+                  fontSize: 16,
+                  color: AppColors.textHint,
+                ),
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildTopServiceCards() {
     return Row(
       children: [
-        Expanded(child: _topButton('入驻', () => context.push('/apply/guide'))),
-        const SizedBox(width: 12),
         Expanded(
-          child: _topButton('需求定制', () => context.push('/demand/create')),
+          child: _buildFeatureCard(_topCards[0], large: true),
         ),
         const SizedBox(width: 12),
-        Expanded(child: _topButton('需求列表', () => context.push('/demands'))),
+        Expanded(
+          child: Column(
+            children: [
+              _buildFeatureCard(_topCards[1]),
+              const SizedBox(height: 12),
+              _buildFeatureCard(_topCards[2]),
+            ],
+          ),
+        ),
       ],
     );
   }
 
-  Widget _topButton(String text, VoidCallback onTap) {
+  Widget _buildFeatureCard(_TopServiceCard card, {bool large = false}) {
     return GestureDetector(
-      onTap: onTap,
+      onTap: () {
+        final index = _topCards.indexOf(card);
+        setState(() {
+          _activeCategory = index == 0 ? 0 : index == 1 ? 6 : 2;
+        });
+      },
       child: Container(
-        height: 54,
-        alignment: Alignment.center,
+        height: large ? 168 : 78,
+        padding: const EdgeInsets.fromLTRB(16, 16, 16, 14),
         decoration: BoxDecoration(
-          color: const Color(0xFFE1E1E1),
-          borderRadius: BorderRadius.circular(14),
-        ),
-        child: Text(
-          text,
-          style: const TextStyle(
-            color: AppColors.primary,
-            fontSize: 16,
-            fontWeight: FontWeight.w700,
+          gradient: const LinearGradient(
+            colors: [Color(0xFFDAFF6A), Color(0xFFF5F9E9)],
+            begin: Alignment.topLeft,
+            end: Alignment.bottomRight,
           ),
+          borderRadius: BorderRadius.circular(24),
         ),
-      ),
-    );
-  }
-
-  Widget _buildCategoryRow() {
-    return SizedBox(
-      height: 58,
-      child: ListView.separated(
-        scrollDirection: Axis.horizontal,
-        itemBuilder: (context, index) {
-          final item = _categories[index];
-          return GestureDetector(
-            onTap: () => setState(() => _activeCategory = index),
-            child: SizedBox(
-              width: 84,
-              child: Column(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  Icon(item.icon, size: 24, color: AppColors.textHint),
-                  const SizedBox(height: 5),
-                  Text(
-                    item.label,
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                    style: const TextStyle(
-                      fontSize: 12,
-                      color: AppColors.primary,
-                      fontWeight: FontWeight.w600,
-                    ),
+        child: Stack(
+          children: [
+            Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  card.title,
+                  style: TextStyle(
+                    fontSize: large ? 28 : 22,
+                    fontWeight: FontWeight.w900,
+                    color: AppColors.textPrimary,
                   ),
-                ],
+                ),
+                const SizedBox(height: 8),
+                Text(
+                  card.subtitle,
+                  style: const TextStyle(
+                    fontSize: 14,
+                    color: AppColors.textSecondary,
+                    height: 1.35,
+                  ),
+                ),
+              ],
+            ),
+            Positioned(
+              right: 0,
+              bottom: 0,
+              child: Icon(
+                card.icon,
+                size: large ? 72 : 48,
+                color: AppColors.textPrimary.withValues(alpha: 0.82),
               ),
             ),
-          );
-        },
-        separatorBuilder: (_, __) => const SizedBox(width: 2),
-        itemCount: _categories.length,
+          ],
+        ),
       ),
     );
   }
 
-  Widget _buildSearchCityRow() {
+  Widget _buildCategoryGrid() {
+    return GridView.builder(
+      shrinkWrap: true,
+      physics: const NeverScrollableScrollPhysics(),
+      itemCount: _categories.length,
+      gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+        crossAxisCount: 6,
+        mainAxisSpacing: 18,
+        childAspectRatio: 0.68,
+      ),
+      itemBuilder: (context, index) {
+        final item = _categories[index];
+        final isActive = _activeCategory == index;
+        return GestureDetector(
+          onTap: () => setState(() => _activeCategory = index),
+          child: Column(
+            children: [
+              Container(
+                width: 48,
+                height: 48,
+                decoration: BoxDecoration(
+                  color: isActive ? AppColors.primaryLight : Colors.transparent,
+                  borderRadius: BorderRadius.circular(16),
+                ),
+                child: Icon(
+                  item.icon,
+                  color: AppColors.textPrimary,
+                  size: 30,
+                ),
+              ),
+              const SizedBox(height: 8),
+              Text(
+                item.label,
+                maxLines: 2,
+                textAlign: TextAlign.center,
+                overflow: TextOverflow.ellipsis,
+                style: const TextStyle(
+                  fontSize: 12,
+                  color: AppColors.textSecondary,
+                  height: 1.2,
+                ),
+              ),
+            ],
+          ),
+        );
+      },
+    );
+  }
+
+  Widget _buildSortHeader() {
     return Row(
       children: [
         GestureDetector(
           onTap: _pickCityWithLocationPicker,
           child: Row(
-            mainAxisSize: MainAxisSize.min,
             children: [
               Text(
                 _selectedCity,
                 style: const TextStyle(
-                  fontSize: 15,
+                  fontSize: 20,
+                  fontWeight: FontWeight.w900,
                   color: AppColors.textPrimary,
-                  fontWeight: FontWeight.w500,
                 ),
               ),
-              const SizedBox(width: 2),
-              const Icon(
-                Icons.keyboard_arrow_down,
-                size: 18,
-                color: AppColors.textHint,
-              ),
+              const SizedBox(width: 4),
+              const Icon(Icons.arrow_drop_down),
             ],
           ),
         ),
-        const SizedBox(width: 12),
-        Expanded(
-          child: Container(
-            height: 34,
-            padding: const EdgeInsets.symmetric(horizontal: 12),
-            decoration: BoxDecoration(
-              color: Colors.white,
-              borderRadius: BorderRadius.circular(18),
-            ),
-            child: Row(
-              children: [
-                Expanded(
-                  child: TextField(
-                    controller: _searchController,
-                    decoration: const InputDecoration(
-                      hintText: '请输入内容',
-                      hintStyle: TextStyle(
-                        fontSize: 12,
-                        color: AppColors.textHint,
-                      ),
-                      border: InputBorder.none,
-                      isDense: true,
-                    ),
-                  ),
+        const Spacer(),
+        Container(
+          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+          decoration: BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.circular(18),
+          ),
+          child: const Row(
+            children: [
+              Text(
+                '时间升序',
+                style: TextStyle(
+                  fontSize: 14,
+                  fontWeight: FontWeight.w600,
                 ),
-                const Icon(Icons.search, size: 18, color: AppColors.textHint),
-              ],
-            ),
+              ),
+              SizedBox(width: 4),
+              Icon(Icons.unfold_more, size: 18, color: AppColors.textHint),
+            ],
           ),
         ),
       ],
@@ -262,7 +363,7 @@ class _CompanionPageState extends State<CompanionPage> {
   }
 
   String _statusLabel(int index) {
-    const labels = ['最早可约今晚14:00', '正在服务中', '最早可约今晚14:00', '待约中'];
+    const labels = ['最早可约 今14:00', '在线接单', '最早可约 今14:00', '极速回复'];
     return labels[index % labels.length];
   }
 
@@ -328,53 +429,18 @@ class _CompanionPageState extends State<CompanionPage> {
     return city;
   }
 
-  Widget _buildEmptyState() {
-    return Padding(
-      padding: const EdgeInsets.only(top: 64),
-      child: Center(
-        child: Column(
-          children: [
-            Container(
-              width: 72,
-              height: 72,
-              decoration: BoxDecoration(
-                color: AppColors.tagBackground,
-                borderRadius: BorderRadius.circular(22),
-              ),
-              child: const Icon(
-                Icons.search_off_outlined,
-                color: AppColors.primary,
-                size: 34,
-              ),
-            ),
-            const SizedBox(height: 14),
-            const Text(
-              '暂无匹配服务',
-              style: TextStyle(fontSize: 16, fontWeight: FontWeight.w700),
-            ),
-            const SizedBox(height: 6),
-            const Text(
-              '换个城市或关键词试试，也可以先看看下方招募/自荐内容',
-              style: TextStyle(color: AppColors.textHint),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-
   Widget _buildGuideEmptyHint() {
     return Container(
       width: double.infinity,
-      padding: const EdgeInsets.all(16),
+      padding: const EdgeInsets.all(20),
       decoration: BoxDecoration(
         color: Colors.white,
-        borderRadius: BorderRadius.circular(16),
+        borderRadius: BorderRadius.circular(24),
       ),
       child: const Text(
-        '当前城市暂时没有匹配到地陪服务，先看看地陪招募/自荐内容，或者切换城市再试。',
+        '当前城市暂时没有匹配到地陪服务，先看看地陪招募和自荐内容，或者切换城市再试。',
         style: TextStyle(
-          fontSize: 13,
+          fontSize: 14,
           color: AppColors.textSecondary,
           height: 1.6,
         ),
@@ -392,7 +458,7 @@ class _CompanionPageState extends State<CompanionPage> {
               '地陪招募 / 自荐',
               style: TextStyle(
                 fontSize: 18,
-                fontWeight: FontWeight.w700,
+                fontWeight: FontWeight.w900,
                 color: AppColors.textPrimary,
               ),
             ),
@@ -403,46 +469,40 @@ class _CompanionPageState extends State<CompanionPage> {
             ),
           ],
         ),
-        const SizedBox(height: 8),
-        if (recruitPosts.isEmpty)
-          Container(
-            width: double.infinity,
-            padding: const EdgeInsets.all(16),
-            decoration: BoxDecoration(
-              color: Colors.white,
-              borderRadius: BorderRadius.circular(16),
-            ),
-            child: const Text(
-              '当前还没有匹配到招募/自荐内容。你可以点击右上方“去发布”，发布招募贴或地陪自荐贴。',
-              style: TextStyle(
-                fontSize: 13,
-                color: AppColors.textSecondary,
-                height: 1.6,
-              ),
-            ),
-          )
-        else
-          GridView.builder(
-            shrinkWrap: true,
-            physics: const NeverScrollableScrollPhysics(),
-            itemCount: recruitPosts.length > 4 ? 4 : recruitPosts.length,
-            gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-              crossAxisCount: 2,
-              mainAxisSpacing: 12,
-              crossAxisSpacing: 12,
-              childAspectRatio: 0.72,
-            ),
-            itemBuilder: (context, index) {
-              final post = recruitPosts[index];
-              return TravelCard(
-                post: post,
-                cityLabel: _selectedCity == '全国' ? null : _selectedCity,
-              );
-            },
+        const SizedBox(height: 10),
+        GridView.builder(
+          shrinkWrap: true,
+          physics: const NeverScrollableScrollPhysics(),
+          itemCount: recruitPosts.length > 4 ? 4 : recruitPosts.length,
+          gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+            crossAxisCount: 2,
+            mainAxisSpacing: 12,
+            crossAxisSpacing: 12,
+            childAspectRatio: 0.72,
           ),
+          itemBuilder: (context, index) {
+            final post = recruitPosts[index];
+            return TravelCard(
+              post: post,
+              cityLabel: _selectedCity == '全国' ? null : _selectedCity,
+            );
+          },
+        ),
       ],
     );
   }
+}
+
+class _TopServiceCard {
+  final String title;
+  final String subtitle;
+  final IconData icon;
+
+  const _TopServiceCard({
+    required this.title,
+    required this.subtitle,
+    required this.icon,
+  });
 }
 
 class _CategoryItem {

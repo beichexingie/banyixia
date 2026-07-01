@@ -1,12 +1,13 @@
-import 'package:flutter/material.dart';
 import 'package:cached_network_image/cached_network_image.dart';
+import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
-import '../../models/guide.dart';
+import 'package:provider/provider.dart';
+
 import '../../config/app_theme.dart';
+import '../../models/guide.dart';
 import '../../providers/guide_provider.dart';
 import '../../providers/message_provider.dart';
 import '../../providers/user_provider.dart';
-import 'package:provider/provider.dart';
 
 class GuideDetailPage extends StatefulWidget {
   final Guide? guide;
@@ -23,7 +24,6 @@ class _GuideDetailPageState extends State<GuideDetailPage> {
   bool _isLoading = false;
   bool _isFollowing = false;
   bool _isFollowLoading = false;
-
 
   @override
   void initState() {
@@ -49,21 +49,17 @@ class _GuideDetailPageState extends State<GuideDetailPage> {
     setState(() => _isLoading = true);
     try {
       final data = await context.read<GuideProvider>().getGuideById(widget.guideId!);
-
-      if (data != null && mounted) {
-        setState(() {
-          _guide = data;
-          _isLoading = false;
-        });
-        _initData();
-      } else {
-        throw Exception('未找到该地陪信息');
-      }
+      if (!mounted) return;
+      if (data == null) throw Exception('未找到该地陪信息');
+      setState(() {
+        _guide = data;
+        _isLoading = false;
+      });
+      _initData();
     } catch (e) {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(e.toString())));
-        context.pop();
-      }
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(e.toString())));
+      context.pop();
     }
   }
 
@@ -76,11 +72,10 @@ class _GuideDetailPageState extends State<GuideDetailPage> {
   }
 
   Future<void> _toggleFollow() async {
-    if (_isFollowLoading) return;
+    if (_guide == null || _isFollowLoading) return;
     setState(() => _isFollowLoading = true);
     try {
       final userProvider = context.read<UserProvider>();
-      if (_guide == null) return;
       if (_isFollowing) {
         await userProvider.unfollowUser(_guide!.id);
       } else {
@@ -98,47 +93,16 @@ class _GuideDetailPageState extends State<GuideDetailPage> {
     }
   }
 
-
-  void _showShareModal() {
-    showModalBottomSheet(
-      context: context,
-      shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(16))),
-      builder: (ctx) {
-        return Container(
-          padding: const EdgeInsets.all(20),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              const Text('分享这位向导', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
-              const SizedBox(height: 20),
-              Row(
-                mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-                children: [
-                  _shareIcon(Icons.chat_bubble_outline, '微信好友', Colors.green),
-                  _shareIcon(Icons.camera, '朋友圈', Colors.greenAccent),
-                  _shareIcon(Icons.link, '复制主页链接', Colors.blue),
-                ],
-              ),
-              const SizedBox(height: 20),
-            ],
-          ),
-        );
-      },
-    );
-  }
-
-  Widget _shareIcon(IconData icon, String label, Color color) {
-    return Column(
-      children: [
-        Container(
-          width: 50, height: 50,
-          decoration: BoxDecoration(color: color.withValues(alpha: 0.1), shape: BoxShape.circle),
-          child: Icon(icon, color: color, size: 28),
-        ),
-        const SizedBox(height: 8),
-        Text(label, style: const TextStyle(fontSize: 12)),
-      ],
-    );
+  Future<void> _contactGuide() async {
+    if (_guide == null) return;
+    try {
+      final roomId = await context.read<MessageProvider>().getOrCreateRoom(_guide!.id);
+      if (!mounted) return;
+      context.push('/chat/$roomId?name=${Uri.encodeComponent(_guide!.name)}&avatar=${Uri.encodeComponent(_guide!.avatar)}');
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(e.toString())));
+    }
   }
 
   @override
@@ -149,61 +113,51 @@ class _GuideDetailPageState extends State<GuideDetailPage> {
       );
     }
 
+    final guide = _guide!;
+    final isSelfGuide = context.read<UserProvider>().user.id == guide.id;
+
     return Scaffold(
-      backgroundColor: Colors.white,
+      backgroundColor: AppColors.background,
       body: DefaultTabController(
         length: 2,
         child: NestedScrollView(
           headerSliverBuilder: (context, innerBoxIsScrolled) {
             return [
               SliverAppBar(
-                expandedHeight: 380, // 调整为合适的高度
                 pinned: true,
-                floating: false,
-                backgroundColor: Colors.white,
+                expandedHeight: 420,
+                backgroundColor: Colors.transparent,
                 elevation: 0,
-                leading: IconButton(
-                  icon: Container(
-                    padding: const EdgeInsets.all(6),
-                    decoration: BoxDecoration(color: Colors.black.withValues(alpha: 0.3), shape: BoxShape.circle),
-                    child: const Icon(Icons.arrow_back_ios_new, color: Colors.white, size: 18),
-                  ),
-                  onPressed: () => context.pop(),
+                leading: _CircleIconButton(
+                  icon: Icons.arrow_back_ios_new,
+                  onTap: () => context.pop(),
                 ),
                 actions: [
-                  IconButton(
-                    icon: Container(
-                      padding: const EdgeInsets.all(6),
-                      decoration: BoxDecoration(color: Colors.black.withValues(alpha: 0.3), shape: BoxShape.circle),
-                      child: const Icon(Icons.more_horiz, color: Colors.white, size: 18),
-                    ),
-                    onPressed: _showShareModal,
+                  _CircleIconButton(
+                    icon: Icons.more_horiz,
+                    onTap: _showShareModal,
                   ),
+                  const SizedBox(width: 8),
                 ],
                 flexibleSpace: FlexibleSpaceBar(
-                  collapseMode: CollapseMode.pin,
-                  background: _buildTopProfileArea(),
+                  background: _buildHero(guide, isSelfGuide),
                 ),
                 bottom: PreferredSize(
-                  preferredSize: const Size.fromHeight(50),
+                  preferredSize: const Size.fromHeight(56),
                   child: Container(
                     decoration: const BoxDecoration(
                       color: Colors.white,
-                      borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
-                      boxShadow: [
-                        BoxShadow(color: Colors.black12, blurRadius: 4, offset: Offset(0, -2))
-                      ],
+                      borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
                     ),
                     child: const TabBar(
                       labelColor: AppColors.textPrimary,
                       unselectedLabelColor: AppColors.textHint,
-                      indicatorColor: AppColors.textPrimary,
+                      indicatorColor: AppColors.primaryDark,
                       indicatorWeight: 3,
-                      indicatorSize: TabBarIndicatorSize.label,
-                        tabs: [
-                          Tab(text: '服务'),
-                          Tab(text: '动态'),
-                        ],
+                      tabs: [
+                        Tab(text: '服务'),
+                        Tab(text: '动态'),
+                      ],
                     ),
                   ),
                 ),
@@ -212,368 +166,596 @@ class _GuideDetailPageState extends State<GuideDetailPage> {
           },
           body: TabBarView(
             children: [
-              _buildServiceTab(),
-              _buildNoteTab(),
+              _buildServiceTab(guide),
+              _buildNoteTab(guide),
             ],
           ),
         ),
       ),
-      bottomNavigationBar: _buildBottomBar(),
+      bottomNavigationBar: _buildBottomBar(guide),
     );
   }
 
-  Future<void> _contactGuide() async {
-    if (_guide == null) return;
-    try {
-      final roomId = await context.read<MessageProvider>().getOrCreateRoom(
-        _guide!.id,
-      );
-      if (!mounted) return;
-      context.push(
-        '/chat/$roomId?name=${Uri.encodeComponent(_guide!.name)}&avatar=${Uri.encodeComponent(_guide!.avatar)}',
-      );
-    } catch (e) {
-      if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(e.toString())),
-      );
-    }
-  }
-
-  Widget _buildTopProfileArea() {
-    final isSelfGuide = context.read<UserProvider>().user.id == _guide!.id;
-    return Column(
+  Widget _buildHero(Guide guide, bool isSelfGuide) {
+    final bg = guide.images.isNotEmpty ? guide.images.first : guide.avatar;
+    return Stack(
+      fit: StackFit.expand,
       children: [
-        // 顶部背景
-        Stack(
-          clipBehavior: Clip.none,
-          children: [
-            Container(
-              height: 200,
-              color: Colors.grey[300], // 背景图占位
-              alignment: Alignment.center,
-              child: const Text('个人背景图', style: TextStyle(color: Colors.grey, fontSize: 18)),
-            ),
-            // 头像
-            Positioned(
-              left: 20,
-              bottom: -40,
-              child: Container(
-                width: 90, height: 90,
-                decoration: BoxDecoration(
-                  shape: BoxShape.circle, 
-                  border: Border.all(color: Colors.white, width: 4),
-                  boxShadow: [BoxShadow(color: Colors.black.withValues(alpha: 0.1), blurRadius: 8, offset: const Offset(0, 2))],
-                ),
-                child: ClipOval(
-                  child: CachedNetworkImage(
-                    imageUrl: _guide!.avatar, fit: BoxFit.cover,
-                    placeholder: (context, url) => const ColoredBox(color: Colors.grey),
-                    errorWidget: (context, url, error) => const ColoredBox(color: AppColors.tagBackground, child: Icon(Icons.person, size: 40)),
-                  ),
-                ),
-              ),
-            ),
-          ],
+        CachedNetworkImage(
+          imageUrl: bg,
+          fit: BoxFit.cover,
+          errorWidget: (context, url, error) => Container(color: AppColors.tagBackground),
         ),
-        const SizedBox(height: 50), // 留出头像偏移的空间
-        // 个人信息
-        Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 20),
+        Container(
+          decoration: BoxDecoration(
+            gradient: LinearGradient(
+              begin: Alignment.topCenter,
+              end: Alignment.bottomCenter,
+              colors: [
+                Colors.black.withValues(alpha: 0.08),
+                Colors.black.withValues(alpha: 0.45),
+              ],
+            ),
+          ),
+        ),
+        Positioned(
+          left: 20,
+          right: 20,
+          bottom: 28,
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Row(
+                crossAxisAlignment: CrossAxisAlignment.end,
                 children: [
-                  Text(_guide!.name, style: const TextStyle(fontSize: 22, fontWeight: FontWeight.bold)),
-                  const SizedBox(width: 8),
-                  if (_guide!.verified)
-                    Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                      decoration: BoxDecoration(color: AppColors.primary.withValues(alpha: 0.1), borderRadius: BorderRadius.circular(4)),
-                      child: const Text('已认证', style: TextStyle(color: AppColors.primary, fontSize: 10, fontWeight: FontWeight.bold)),
-                    ),
-                  const Spacer(),
-                  if (!isSelfGuide)
-                    OutlinedButton(
-                      onPressed: _toggleFollow,
-                      style: OutlinedButton.styleFrom(
-                        foregroundColor: _isFollowing ? AppColors.textSecondary : AppColors.primary,
-                        side: BorderSide(color: _isFollowing ? AppColors.divider : AppColors.primary),
-                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-                        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 0),
-                        minimumSize: const Size(0, 32),
-                      ),
-                      child: _isFollowLoading
-                          ? const SizedBox(
-                              width: 14,
-                              height: 14,
-                              child: CircularProgressIndicator(
-                                strokeWidth: 2,
-                                color: AppColors.primary,
-                              ),
-                            )
-                          : Text(
-                              _isFollowing ? '已关注' : '关注',
-                              style: const TextStyle(
-                                fontSize: 12,
-                                fontWeight: FontWeight.bold,
+                  _Avatar(url: guide.avatar),
+                  const SizedBox(width: 14),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Row(
+                          children: [
+                            Flexible(
+                              child: Text(
+                                guide.name,
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                                style: const TextStyle(
+                                  fontSize: 28,
+                                  fontWeight: FontWeight.w900,
+                                  color: Colors.white,
+                                ),
                               ),
                             ),
-                    ),
-                ],
-              ),
-              const SizedBox(height: 6),
-              Text('ID: ${_guide!.id.length > 8 ? _guide!.id.substring(0,8) : _guide!.id}', style: const TextStyle(color: AppColors.textHint, fontSize: 13)),
-              const SizedBox(height: 12),
-              // Tags
-              if (_guide!.tags.isNotEmpty)
-                Wrap(
-                  spacing: 8, runSpacing: 6,
-                  children: _guide!.tags.map((t) => Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-                    decoration: BoxDecoration(color: Colors.grey[200], borderRadius: BorderRadius.circular(4)),
-                    child: Text(t, style: const TextStyle(fontSize: 12, color: AppColors.textSecondary)),
-                  )).toList(),
-                ),
-              const SizedBox(height: 16),
-              // 地区与接单统计
-              Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: [
-                  Row(
-                    children: [
-                      const Icon(Icons.location_on, size: 14, color: AppColors.textHint),
-                      const SizedBox(width: 4),
-                      Text('常驻: ${_guide!.city}', style: const TextStyle(fontSize: 12, color: AppColors.textSecondary)),
-                    ],
-                  ),
-                  const Text('接单 23 · 好评率 100%', style: TextStyle(fontSize: 12, color: AppColors.textSecondary)),
-                ],
-              ),
-              const SizedBox(height: 20),
-            ],
-          ),
-        ),
-      ],
-    );
-  }
-
-  Widget _buildServiceTab() {
-    return ListView(
-      padding: const EdgeInsets.all(20),
-      children: [
-        // 八维属性图 (Mock)
-        Container(
-          padding: const EdgeInsets.symmetric(vertical: 20, horizontal: 10),
-          decoration: BoxDecoration(color: const Color(0xFFF9F9F9), borderRadius: BorderRadius.circular(12)),
-          child: const Row(
-            mainAxisAlignment: MainAxisAlignment.spaceAround,
-            children: [
-              _AttrStat('人品', '极好'), _AttrStat('靠谱', '极高'), _AttrStat('阅历', '丰富'), _AttrStat('品味', '较佳'),
-            ],
-          ),
-        ),
-        const SizedBox(height: 10),
-        Container(
-          padding: const EdgeInsets.symmetric(vertical: 20, horizontal: 10),
-          decoration: BoxDecoration(color: const Color(0xFFF9F9F9), borderRadius: BorderRadius.circular(12)),
-          child: const Row(
-            mainAxisAlignment: MainAxisAlignment.spaceAround,
-            children: [
-              _AttrStat('颜值', '出众'), _AttrStat('身材', '匀称'), _AttrStat('才艺', '多样'), _AttrStat('体能', '充沛'),
-            ],
-          ),
-        ),
-        const SizedBox(height: 24),
-        
-        const Text('个性介绍:', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
-        const SizedBox(height: 10),
-        Container(
-          width: double.infinity,
-          padding: const EdgeInsets.all(16),
-          decoration: BoxDecoration(
-            color: const Color(0xFFF9F9F9), 
-            borderRadius: BorderRadius.circular(12),
-            border: Border.all(color: AppColors.divider.withValues(alpha: 0.3)),
-          ),
-          child: Text(_guide!.description, style: const TextStyle(color: AppColors.textPrimary, height: 1.6, fontSize: 14)),
-        ),
-        const SizedBox(height: 24),
-
-        const Text('服务类型说明:', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
-        const SizedBox(height: 10),
-        Container(
-          width: double.infinity,
-          padding: const EdgeInsets.all(16),
-          decoration: BoxDecoration(
-            color: const Color(0xFFF9F9F9), 
-            borderRadius: BorderRadius.circular(12),
-            border: Border.all(color: AppColors.divider.withValues(alpha: 0.3)),
-          ),
-          child: const Text('提供本地导游、代驾打卡、包车解说等多项旅行服务。', style: TextStyle(color: AppColors.textPrimary, height: 1.6, fontSize: 14)),
-        ),
-        const SizedBox(height: 24),
-
-        const Text('额外费用说明:', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
-        const SizedBox(height: 10),
-        Container(
-          width: double.infinity,
-          padding: const EdgeInsets.all(16),
-          decoration: BoxDecoration(
-            color: const Color(0xFFF9F9F9), 
-            borderRadius: BorderRadius.circular(12),
-            border: Border.all(color: AppColors.divider.withValues(alpha: 0.3)),
-          ),
-          child: const Text('餐饮门票需由雇主承担（协商）。', style: TextStyle(color: AppColors.textPrimary, height: 1.6, fontSize: 14)),
-        ),
-        const SizedBox(height: 24),
-
-        const Text('服务范围:', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
-        const SizedBox(height: 10),
-        Container(
-          width: double.infinity,
-          padding: const EdgeInsets.all(16),
-          decoration: BoxDecoration(
-            color: const Color(0xFFF9F9F9), 
-            borderRadius: BorderRadius.circular(12),
-            border: Border.all(color: AppColors.divider.withValues(alpha: 0.3)),
-          ),
-          child: Text(_guide!.city, style: const TextStyle(color: AppColors.textPrimary, height: 1.6, fontSize: 14)),
-        ),
-        const SizedBox(height: 30),
-
-        // 用户评价
-        const Row(
-          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-          crossAxisAlignment: CrossAxisAlignment.end,
-          children: [
-            Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text('用户评价(29)', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
-                SizedBox(height: 4),
-                Text('来自29位真实用户参与评分', style: TextStyle(fontSize: 12, color: AppColors.textHint)),
-              ],
-            ),
-            Text('5.0', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 32, color: AppColors.primary)),
-          ],
-        ),
-        const SizedBox(height: 80), 
-      ],
-    );
-  }
-
-  Widget _buildNoteTab() {
-    return ListView(
-      padding: const EdgeInsets.all(20),
-      children: [
-        if (_guide!.images.isNotEmpty) ...[
-          const Text('服务案例与照片', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
-          const SizedBox(height: 16),
-          Wrap(
-            spacing: 10, runSpacing: 10,
-            children: _guide!.images.map((img) => ClipRRect(
-              borderRadius: BorderRadius.circular(8),
-              child: CachedNetworkImage(
-                imageUrl: img, width: (MediaQuery.of(context).size.width - 60) / 3, height: (MediaQuery.of(context).size.width - 60) / 3, fit: BoxFit.cover, 
-                placeholder: (context, url) => Container(width: (MediaQuery.of(context).size.width - 60) / 3, height: (MediaQuery.of(context).size.width - 60) / 3, color: AppColors.tagBackground),
-                errorWidget: (context, url, err) => Container(width: (MediaQuery.of(context).size.width - 60) / 3, height: (MediaQuery.of(context).size.width - 60) / 3, color: AppColors.tagBackground),
-              ),
-            )).toList()
-          ),
-        ] else
-          const Center(child: Padding(
-            padding: EdgeInsets.only(top: 40.0),
-            child: Text('该向导很懒，还没有发布任何笔记照片哦～', style: TextStyle(color: AppColors.textHint, fontSize: 13)),
-          )),
-        const SizedBox(height: 80),
-      ],
-    );
-  }
-
-  Widget _buildBottomBar() {
-    return Consumer<GuideProvider>(
-      builder: (context, provider, child) {
-        final isFavorited = provider.favoriteIds.contains(_guide!.id);
-        
-        return Container(
-          padding: EdgeInsets.fromLTRB(20, 10, 20, MediaQuery.of(context).padding.bottom + 10),
-          decoration: BoxDecoration(
-            color: Colors.white,
-            border: Border(top: BorderSide(color: AppColors.divider.withValues(alpha: 0.5))),
-          ),
-          child: Row(
-            children: [
-              GestureDetector(
-                onTap: _contactGuide,
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    const Icon(Icons.chat_bubble_outline, size: 26, color: AppColors.textHint),
-                    const SizedBox(height: 2),
-                    const Text('咨询', style: TextStyle(fontSize: 10, color: AppColors.textHint)),
-                  ],
-                ),
-              ),
-              const SizedBox(width: 24),
-              GestureDetector(
-                onTap: () => provider.toggleFavorite(_guide!.id),
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Icon(
-                      isFavorited ? Icons.star : Icons.star_border, 
-                      size: 26, 
-                      color: isFavorited ? AppColors.primary : AppColors.textHint
-                    ),
-                    const SizedBox(height: 2),
-                    const Text('收藏', style: TextStyle(fontSize: 10, color: AppColors.textHint)),
-                  ],
-                ),
-              ),
-              const SizedBox(width: 24),
-              Expanded(
-                child: GestureDetector(
-                  onTap: () {
-                    if (!mounted) return;
-                    context.push('/order/create?guideId=${_guide!.id}&name=${Uri.encodeComponent(_guide!.name)}&avatar=${Uri.encodeComponent(_guide!.avatar)}');
-                  },
-                  child: Container(
-                    height: 48,
-                    decoration: BoxDecoration(
-                      color: AppColors.primary,
-                      borderRadius: BorderRadius.circular(24),
-                      boxShadow: [
-                        BoxShadow(color: AppColors.primary.withValues(alpha: 0.3), blurRadius: 8, offset: const Offset(0, 4))
+                            const SizedBox(width: 8),
+                            Container(
+                              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                              decoration: BoxDecoration(
+                                color: AppColors.primary,
+                                borderRadius: BorderRadius.circular(999),
+                              ),
+                              child: Text(
+                                guide.rating.toStringAsFixed(1),
+                                style: const TextStyle(
+                                  fontSize: 13,
+                                  fontWeight: FontWeight.w800,
+                                  color: AppColors.textPrimary,
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: 6),
+                        Text(
+                          '编号：${guide.id.length > 8 ? guide.id.substring(0, 8) : guide.id}',
+                          style: const TextStyle(
+                            fontSize: 14,
+                            color: Colors.white70,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
                       ],
                     ),
-                    alignment: Alignment.center,
-                        child: const Text('找TA下单', style: TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.bold)),
+                  ),
+                  if (!isSelfGuide)
+                    ElevatedButton.icon(
+                      onPressed: _isFollowLoading ? null : _toggleFollow,
+                      icon: Icon(_isFollowing ? Icons.check : Icons.add),
+                      label: Text(_isFollowing ? '已关注' : '关注'),
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: AppColors.primary,
+                        foregroundColor: AppColors.textPrimary,
+                        elevation: 0,
+                        padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 14),
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(999)),
+                      ),
+                    ),
+                ],
+              ),
+              const SizedBox(height: 18),
+              Row(
+                children: [
+                  _StatBox(value: '${guide.likes}', label: '粉丝'),
+                  _StatBox(value: '${guide.fans}', label: '收藏'),
+                  _StatBox(value: '${guide.views}', label: '接单'),
+                ],
+              ),
+              const SizedBox(height: 14),
+              Wrap(
+                spacing: 10,
+                runSpacing: 10,
+                children: [
+                  _Pill(text: 'IP：${guide.city.isEmpty ? '苏州' : guide.city}'),
+                  _Pill(text: guide.gender.isEmpty ? '女·26' : guide.gender),
+                  const _Pill(text: '已实名'),
+                ],
+              ),
+            ],
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildServiceTab(Guide guide) {
+    return ListView(
+      padding: const EdgeInsets.fromLTRB(20, 16, 20, 110),
+      children: [
+        Container(
+          padding: const EdgeInsets.all(16),
+          decoration: BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.circular(24),
+          ),
+          child: GridView.count(
+            shrinkWrap: true,
+            physics: const NeverScrollableScrollPhysics(),
+            crossAxisCount: 4,
+            childAspectRatio: 1.1,
+            mainAxisSpacing: 10,
+            crossAxisSpacing: 10,
+            children: const [
+              _InfoTile(value: '123', label: '入驻'),
+              _InfoTile(value: '99.8%', label: '好评率'),
+              _InfoTile(value: '80%', label: '回购率'),
+              _InfoTile(value: '汉', label: '民族'),
+              _InfoTile(value: '水瓶座', label: '星座'),
+              _InfoTile(value: '本科', label: '学历'),
+              _InfoTile(value: '183', label: '身高'),
+              _InfoTile(value: '80kg', label: '体重'),
+            ],
+          ),
+        ),
+        const SizedBox(height: 14),
+        _SectionCard(
+          title: '个人介绍',
+          child: Text(
+            guide.description.isNotEmpty ? guide.description : '这里是个人介绍，展示服务风格与经历。'
+            ,
+            style: const TextStyle(
+              fontSize: 14,
+              height: 1.6,
+              color: AppColors.textPrimary,
+            ),
+          ),
+        ),
+        const SizedBox(height: 14),
+        _SectionCard(
+          title: '服务类型说明',
+          child: Wrap(
+            spacing: 10,
+            runSpacing: 10,
+            children: guide.tags.isEmpty
+                ? const [
+                    _Tag(text: '休闲游玩'),
+                    _Tag(text: '商务陪同'),
+                  ]
+                : guide.tags.map((t) => _Tag(text: t)).toList(),
+          ),
+        ),
+        const SizedBox(height: 14),
+        _SectionCard(
+          title: '额外费用说明',
+          child: Text(
+            '餐饮、门票、交通等费用按实际情况协商，服务前确认清楚更安心。',
+            style: const TextStyle(fontSize: 14, height: 1.6, color: AppColors.textPrimary),
+          ),
+        ),
+        const SizedBox(height: 14),
+        _SectionCard(
+          title: '用户评价（10）',
+          trailing: const Text('查看更多 >', style: TextStyle(color: AppColors.textHint)),
+          child: const Column(
+            children: [
+              _ReviewItem(),
+              SizedBox(height: 18),
+              _ReviewItem(withImages: true),
+              SizedBox(height: 18),
+              _ReviewItem(),
+            ],
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildNoteTab(Guide guide) {
+    return ListView(
+      padding: const EdgeInsets.fromLTRB(20, 16, 20, 110),
+      children: [
+        if (guide.images.isEmpty)
+          const Padding(
+            padding: EdgeInsets.only(top: 40),
+            child: Center(
+              child: Text('暂时还没有动态内容', style: TextStyle(color: AppColors.textHint)),
+            ),
+          )
+        else
+          Wrap(
+            spacing: 10,
+            runSpacing: 10,
+            children: guide.images
+                .map(
+                  (img) => ClipRRect(
+                    borderRadius: BorderRadius.circular(16),
+                    child: CachedNetworkImage(
+                      imageUrl: img,
+                      width: (MediaQuery.of(context).size.width - 60) / 3,
+                      height: (MediaQuery.of(context).size.width - 60) / 3,
+                      fit: BoxFit.cover,
+                      errorWidget: (context, url, error) => Container(
+                        width: (MediaQuery.of(context).size.width - 60) / 3,
+                        height: (MediaQuery.of(context).size.width - 60) / 3,
+                        color: AppColors.tagBackground,
                       ),
                     ),
                   ),
-            ],
+                )
+                .toList(),
           ),
+      ],
+    );
+  }
+
+  Widget _buildBottomBar(Guide guide) {
+    return Container(
+      padding: EdgeInsets.fromLTRB(20, 10, 20, MediaQuery.of(context).padding.bottom + 10),
+      decoration: const BoxDecoration(
+        color: Colors.white,
+        border: Border(top: BorderSide(color: Color(0xFFEDEDED))),
+      ),
+      child: Row(
+        children: [
+          _BottomAction(
+            icon: Icons.chat_bubble_outline,
+            label: '咨询',
+            onTap: _contactGuide,
+          ),
+          const SizedBox(width: 20),
+          Consumer<GuideProvider>(
+            builder: (context, provider, child) {
+              final isFavorited = provider.favoriteIds.contains(guide.id);
+              return _BottomAction(
+                icon: isFavorited ? Icons.star : Icons.star_border,
+                label: isFavorited ? '收藏' : '收藏',
+                active: isFavorited,
+                onTap: () => provider.toggleFavorite(guide.id),
+              );
+            },
+          ),
+          const SizedBox(width: 18),
+          Expanded(
+            child: ElevatedButton(
+              onPressed: () {
+                context.push('/order/create?guideId=${guide.id}&name=${Uri.encodeComponent(guide.name)}&avatar=${Uri.encodeComponent(guide.avatar)}');
+              },
+              style: ElevatedButton.styleFrom(
+                backgroundColor: AppColors.primary,
+                foregroundColor: AppColors.textPrimary,
+                elevation: 0,
+                padding: const EdgeInsets.symmetric(vertical: 16),
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(999)),
+              ),
+              child: const Text('找TA下单', style: TextStyle(fontSize: 16, fontWeight: FontWeight.w800)),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  void _showShareModal() {
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: Colors.transparent,
+      builder: (ctx) {
+        return Container(
+          padding: const EdgeInsets.all(20),
+          decoration: const BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+          ),
+          child: const Text('分享功能暂留，后续可继续接入。', style: TextStyle(fontSize: 14)),
         );
       },
     );
   }
 }
 
-class _AttrStat extends StatelessWidget {
-  final String title;
+class _CircleIconButton extends StatelessWidget {
+  final IconData icon;
+  final VoidCallback onTap;
+
+  const _CircleIconButton({required this.icon, required this.onTap});
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.only(left: 10),
+      child: GestureDetector(
+        onTap: onTap,
+        child: Container(
+          width: 42,
+          height: 42,
+          decoration: BoxDecoration(
+            color: Colors.black.withValues(alpha: 0.3),
+            shape: BoxShape.circle,
+          ),
+          child: Icon(icon, color: Colors.white, size: 20),
+        ),
+      ),
+    );
+  }
+}
+
+class _Avatar extends StatelessWidget {
+  final String url;
+
+  const _Avatar({required this.url});
+
+  @override
+  Widget build(BuildContext context) {
+    return ClipOval(
+      child: CachedNetworkImage(
+        imageUrl: url,
+        width: 72,
+        height: 72,
+        fit: BoxFit.cover,
+        errorWidget: (context, url, error) => Container(
+          width: 72,
+          height: 72,
+          color: AppColors.tagBackground,
+          child: const Icon(Icons.person, color: AppColors.textHint),
+        ),
+      ),
+    );
+  }
+}
+
+class _StatBox extends StatelessWidget {
   final String value;
-  const _AttrStat(this.title, this.value);
+  final String label;
+
+  const _StatBox({required this.value, required this.label});
+
+  @override
+  Widget build(BuildContext context) {
+    return Expanded(
+      child: Column(
+        children: [
+          Text(
+            value,
+            style: const TextStyle(
+              fontSize: 22,
+              fontWeight: FontWeight.w900,
+              color: Colors.white,
+            ),
+          ),
+          const SizedBox(height: 4),
+          Text(
+            label,
+            style: const TextStyle(fontSize: 13, color: Colors.white70),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _Pill extends StatelessWidget {
+  final String text;
+
+  const _Pill({required this.text});
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+      decoration: BoxDecoration(
+        color: Colors.black.withValues(alpha: 0.26),
+        borderRadius: BorderRadius.circular(999),
+      ),
+      child: Text(
+        text,
+        style: const TextStyle(
+          color: Colors.white,
+          fontSize: 12,
+          fontWeight: FontWeight.w600,
+        ),
+      ),
+    );
+  }
+}
+
+class _SectionCard extends StatelessWidget {
+  final String title;
+  final Widget child;
+  final Widget? trailing;
+
+  const _SectionCard({
+    required this.title,
+    required this.child,
+    this.trailing,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(22),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Text(
+                title,
+                style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w800, color: AppColors.textPrimary),
+              ),
+              const Spacer(),
+              if (trailing != null) trailing!,
+            ],
+          ),
+          const SizedBox(height: 14),
+          child,
+        ],
+      ),
+    );
+  }
+}
+
+class _InfoTile extends StatelessWidget {
+  final String value;
+  final String label;
+
+  const _InfoTile({required this.value, required this.label});
 
   @override
   Widget build(BuildContext context) {
     return Column(
+      mainAxisAlignment: MainAxisAlignment.center,
       children: [
-        Text(value, style: const TextStyle(fontSize: 14, fontWeight: FontWeight.bold, color: AppColors.textPrimary)),
+        Text(
+          value,
+          style: const TextStyle(fontSize: 22, fontWeight: FontWeight.w900, color: AppColors.textPrimary),
+        ),
         const SizedBox(height: 4),
-        Text(title, style: const TextStyle(fontSize: 12, color: AppColors.textHint)),
+        Text(label, style: const TextStyle(fontSize: 12, color: AppColors.textHint)),
       ],
+    );
+  }
+}
+
+class _Tag extends StatelessWidget {
+  final String text;
+
+  const _Tag({required this.text});
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+      decoration: BoxDecoration(
+        color: AppColors.primary,
+        borderRadius: BorderRadius.circular(999),
+      ),
+      child: Text(
+        text,
+        style: const TextStyle(
+          fontSize: 13,
+          fontWeight: FontWeight.w800,
+          color: AppColors.textPrimary,
+        ),
+      ),
+    );
+  }
+}
+
+class _ReviewItem extends StatelessWidget {
+  final bool withImages;
+
+  const _ReviewItem({this.withImages = false});
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Row(
+          children: [
+            const CircleAvatar(radius: 16, backgroundColor: AppColors.tagBackground, child: Icon(Icons.person, size: 18)),
+            const SizedBox(width: 10),
+            const Text('用户1028er', style: TextStyle(fontSize: 14, fontWeight: FontWeight.w700)),
+          ],
+        ),
+        const SizedBox(height: 8),
+        const Text(
+          '这是评论内容，这是评论内容。这里展示真实用户体验与反馈。',
+          style: TextStyle(fontSize: 14, height: 1.6, color: AppColors.textPrimary),
+        ),
+        if (withImages) ...[
+          const SizedBox(height: 10),
+          Row(
+            children: List.generate(
+              3,
+              (index) => Expanded(
+                child: Padding(
+                  padding: const EdgeInsets.only(right: 8),
+                  child: AspectRatio(
+                    aspectRatio: 1,
+                    child: Container(
+                      decoration: BoxDecoration(
+                        color: AppColors.tagBackground,
+                        borderRadius: BorderRadius.circular(14),
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+            ),
+          ),
+        ],
+      ],
+    );
+  }
+}
+
+class _BottomAction extends StatelessWidget {
+  final IconData icon;
+  final String label;
+  final bool active;
+  final VoidCallback onTap;
+
+  const _BottomAction({
+    required this.icon,
+    required this.label,
+    required this.onTap,
+    this.active = false,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return GestureDetector(
+      onTap: onTap,
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(icon, size: 26, color: active ? AppColors.primaryDark : AppColors.textHint),
+          const SizedBox(height: 2),
+          Text(
+            label,
+            style: TextStyle(
+              fontSize: 10,
+              color: active ? AppColors.primaryDark : AppColors.textHint,
+              fontWeight: FontWeight.w600,
+            ),
+          ),
+        ],
+      ),
     );
   }
 }

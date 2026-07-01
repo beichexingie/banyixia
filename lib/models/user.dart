@@ -52,6 +52,11 @@ class User {
     return User(id: '', nickname: '未登录');
   }
 
+  static double _asDouble(dynamic value, {double fallback = 0}) {
+    if (value is num) return value.toDouble();
+    return double.tryParse(value?.toString() ?? '') ?? fallback;
+  }
+
   factory User.fromJson(Map<String, dynamic> json) {
     return User(
       id: json['id']?.toString() ?? '',
@@ -70,7 +75,7 @@ class User {
       ),
       vipLevel: json['vipLevel'] ?? json['vip_level'] ?? 0,
       title: json['title'] ?? '',
-      balance: (json['balance'] ?? 0).toDouble(),
+      balance: _asDouble(json['balance']),
       couponCount: json['couponCount'] ?? json['coupon_count'] ?? 0,
       followCount: json['followCount'] ?? json['follow_count'] ?? 0,
       fansCount: json['fansCount'] ?? json['fans_count'] ?? 0,

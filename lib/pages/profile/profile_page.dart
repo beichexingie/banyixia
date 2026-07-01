@@ -1,1036 +1,820 @@
-import 'dart:typed_data';
+import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
+import 'package:go_router/go_router.dart';
 import 'package:provider/provider.dart';
-import 'package:image_picker/image_picker.dart';
+
 import '../../config/app_theme.dart';
 import '../../models/order.dart';
-import '../../models/user.dart' as app_model;
-import '../../providers/user_provider.dart';
+import '../../models/travel_post.dart';
+import '../../models/user.dart';
 import '../../providers/order_provider.dart';
-import 'package:go_router/go_router.dart';
-import '../main_scaffold.dart';
-import 'favorite_posts_page.dart';
-import 'footprint_posts_page.dart';
-import 'following_page.dart';
-import '../../services/ecs_api_client.dart';
+import '../../providers/post_provider.dart';
+import '../../providers/user_provider.dart';
+import '../../widgets/travel_card.dart';
 
-class ProfilePage extends StatelessWidget {
+class ProfilePage extends StatefulWidget {
   const ProfilePage({super.key});
 
   @override
-  Widget build(BuildContext context) {
-    final user = context.watch<UserProvider>().user;
-    final isGuide = user.isGuideApproved;
-
-    return Scaffold(
-      backgroundColor: AppColors.background,
-      body: SingleChildScrollView(
-        child: Column(
-          children: [
-            _buildHeader(context, isGuide),
-            _buildFunctionGrid(context),
-            _buildOrderSection(context),
-            _buildEmptyOrderTip(context),
-            _buildBottomActions(context),
-            _buildGuidePanel(context, isGuide),
-            const SizedBox(height: 20),
-          ],
-        ),
-      ),
-    );
-  }
-
-  // ==================== 设置面板 ====================
-  // Bottom sheet logic moved to SettingsPage
-
-  // ==================== 编辑资料 ====================
-  void _showEditProfile(BuildContext context) {
-    showDialog(
-      context: context,
-      builder: (ctx) => const _EditProfileDialog(),
-    );
-  }
-
-
-
-  // ==================== 评头衔与福利 ====================
-  void _showTitleModal(BuildContext context) {
-    showModalBottomSheet(
-      context: context,
-      shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(16))),
-      builder: (ctx) {
-        return Container(
-          padding: const EdgeInsets.all(20),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              const Text('玩家头衔 (Demo)', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
-              const SizedBox(height: 16),
-              ListTile(
-                leading: const Icon(Icons.military_tech, color: Color(0xFFCD7F32), size: 36),
-                title: const Text('青铜搭子'),
-                subtitle: const Text('完成 1 次出行可得'),
-              ),
-              ListTile(
-                leading: const Icon(Icons.military_tech, color: Color(0xFFC0C0C0), size: 36),
-                title: const Text('白银搭子'),
-                subtitle: const Text('完成 5 次出行可得'),
-              ),
-              ListTile(
-                leading: const Icon(Icons.military_tech, color: Color(0xFFFFD700), size: 36),
-                title: const Text('黄金搭子'),
-                subtitle: const Text('完成 20 次出行可得'),
-              ),
-              const SizedBox(height: 16),
-              ElevatedButton(
-                onPressed: () => Navigator.pop(ctx),
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: AppColors.primary,
-                  foregroundColor: Colors.white,
-                  minimumSize: const Size(double.infinity, 44),
-                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                ),
-                child: const Text('了解详情'),
-              ),
-            ],
-          ),
-        );
-      },
-    );
-  }
-
-  void _showBenefitsModal(BuildContext context) {
-    showModalBottomSheet(
-      context: context,
-      shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(16))),
-      builder: (ctx) {
-        return Container(
-          padding: const EdgeInsets.all(20),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              const Text('进阶福利 (Demo)', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
-              const SizedBox(height: 16),
-              ListTile(
-                leading: const Icon(Icons.stars, color: AppColors.primary, size: 36),
-                title: const Text('免费帖子置顶 1 次'),
-                subtitle: const Text('等级达到 LV.3 可解锁'),
-              ),
-              ListTile(
-                leading: const Icon(Icons.color_lens, color: Colors.purple, size: 36),
-                title: const Text('专属彩色昵称'),
-                subtitle: const Text('等级达到 LV.5 可解锁'),
-              ),
-              const SizedBox(height: 16),
-              ElevatedButton(
-                onPressed: () => Navigator.pop(ctx),
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: AppColors.primary,
-                  foregroundColor: Colors.white,
-                  minimumSize: const Size(double.infinity, 44),
-                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                ),
-                child: const Text('去升级'),
-              ),
-            ],
-          ),
-        );
-      },
-    );
-  }
-
-  // ==================== 关于对话框 ====================
-  // _showAboutDialog removed, moved to SettingsPage
-
-  // ==================== 收藏/足迹/投诉 ====================
-  void _showListPage(BuildContext context, String title, IconData icon) {
-    Navigator.of(context).push(
-      MaterialPageRoute(
-        builder: (ctx) => Scaffold(
-          appBar: AppBar(
-            title: Text(title),
-            centerTitle: true,
-            leading: IconButton(
-              icon: const Icon(Icons.arrow_back_ios),
-              onPressed: () => Navigator.pop(ctx),
-            ),
-          ),
-          body: Center(
-            child: Column(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                Icon(icon, size: 64, color: AppColors.textHint.withValues(alpha: 0.5)),
-                const SizedBox(height: 16),
-                Text('暂无$title内容', style: AppTextStyles.subtitle),
-                const SizedBox(height: 24),
-                ElevatedButton(
-                  onPressed: () {
-                    Navigator.pop(ctx);
-                    MainScaffold.switchTo(0);
-                  },
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: AppColors.primary,
-                    foregroundColor: Colors.white,
-                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                    padding: const EdgeInsets.symmetric(horizontal: 32, vertical: 12),
-                  ),
-                  child: const Text('去首页逛逛'),
-                ),
-              ],
-            ),
-          ),
-        ),
-      ),
-    );
-  }
-
-  void _showSnack(BuildContext context, String msg) {
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text(msg),
-        backgroundColor: AppColors.primary,
-        behavior: SnackBarBehavior.floating,
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-      ),
-    );
-  }
-
-  // ==================== 构建界面 ====================
-  Widget _buildHeader(BuildContext context, bool isGuide) {
-    return Consumer<UserProvider>(
-      builder: (context, userProvider, child) {
-        final user = userProvider.user;
-        final cityLabel = user.city.trim().isEmpty ? '未填写' : user.city.trim();
-
-        return Container(
-          decoration: const BoxDecoration(
-            gradient: LinearGradient(
-              colors: [Color(0xFF3D6CF5), Color(0xFF6C8EFF)],
-              begin: Alignment.topLeft, end: Alignment.bottomRight,
-            ),
-          ),
-          child: SafeArea(
-            bottom: false,
-            child: Padding(
-              padding: const EdgeInsets.fromLTRB(20, 16, 20, 24),
-              child: Column(
-                children: [
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.end,
-                    children: [
-                      GestureDetector(
-                        onTap: () => _showSnack(context, '客服入口已保留，后续可接入在线客服 API'),
-                        child: const Row(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            Icon(Icons.support_agent_outlined, size: 20, color: Colors.white),
-                            SizedBox(width: 4),
-                            Text('客服', style: TextStyle(color: Colors.white, fontSize: 13)),
-                          ],
-                        ),
-                      ),
-                      const SizedBox(width: 16),
-                      if (user.isAdmin)
-                        GestureDetector(
-                          onTap: () => context.push('/admin/audit'),
-                          child: const Row(
-                            mainAxisSize: MainAxisSize.min,
-                            children: [
-                              Icon(Icons.admin_panel_settings_outlined, size: 20, color: Colors.white),
-                              SizedBox(width: 4),
-                              Text('管理', style: TextStyle(color: Colors.white, fontSize: 13)),
-                            ],
-                          ),
-                        ),
-                      if (user.isAdmin) const SizedBox(width: 16),
-                      GestureDetector(
-                        onTap: () => context.push('/settings'),
-                        child: const Row(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            Icon(Icons.settings_outlined, size: 20, color: Colors.white),
-                            SizedBox(width: 4),
-                            Text('设置', style: TextStyle(color: Colors.white, fontSize: 13)),
-                          ],
-                        ),
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 12),
-                  GestureDetector(
-                    onTap: () => _showEditProfile(context),
-                    child: Row(
-                      children: [
-                        Container(
-                          width: 68, height: 68,
-                          decoration: BoxDecoration(
-                            shape: BoxShape.circle,
-                            border: Border.all(color: Colors.white, width: 3),
-                            color: Colors.white.withValues(alpha: 0.3),
-                          ),
-                          child: CircleAvatar(
-                            radius: 31, 
-                            backgroundColor: const Color(0xFFE0E0E0),
-                            backgroundImage: user.avatar.isNotEmpty ? NetworkImage(user.avatar) : null,
-                            child: user.avatar.isEmpty ? const Icon(Icons.person, size: 36, color: Colors.white) : null,
-                          ),
-                        ),
-                        const SizedBox(width: 16),
-                        Expanded(
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Row(
-                                children: [
-                                  Flexible(
-                                    child: Text(
-                                      user.nickname, 
-                                      style: const TextStyle(fontSize: 20, fontWeight: FontWeight.bold, color: Colors.white),
-                                      overflow: TextOverflow.ellipsis,
-                                    ),
-                                  ),
-                                  const SizedBox(width: 8),
-                                  if (user.vipLabel.isNotEmpty)
-                                    Container(
-                                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
-                                      decoration: BoxDecoration(
-                                        color: Colors.white.withValues(alpha: 0.3),
-                                        borderRadius: BorderRadius.circular(10),
-                                        border: Border.all(color: Colors.white.withValues(alpha: 0.5)),
-                                      ),
-                                      child: Text(user.vipLabel, style: const TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: Colors.white)),
-                                    ),
-                                  if (isGuide) ...[
-                                    const SizedBox(width: 8),
-                                    Container(
-                                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 3),
-                                      decoration: BoxDecoration(
-                                        gradient: const LinearGradient(
-                                          colors: [Color(0xFFFF6B6B), Color(0xFFFF8E53)],
-                                        ),
-                                        borderRadius: BorderRadius.circular(20),
-                                        boxShadow: [
-                                          BoxShadow(
-                                            color: Colors.black.withValues(alpha: 0.1),
-                                            blurRadius: 4, offset: const Offset(0, 2),
-                                          )
-                                        ],
-                                      ),
-                                      child: Row(
-                                        mainAxisSize: MainAxisSize.min,
-                                        children: [
-                                          const Icon(Icons.verified, size: 10, color: Colors.white),
-                                          const SizedBox(width: 4),
-                                          const Text('认证地陪', style: TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: Colors.white)),
-                                        ],
-                                      ),
-                                    ),
-                                  ],
-                                ],
-
-                              ),
-                              const SizedBox(height: 6),
-                              Row(
-                                children: [
-                                  Expanded(
-                                    child: Text(
-                                      'ID: ${user.id}', 
-                                      style: TextStyle(fontSize: 13, color: Colors.white.withValues(alpha: 0.85)),
-                                      overflow: TextOverflow.ellipsis,
-                                    ),
-                                  ),
-                                ],
-                              ),
-                              const SizedBox(height: 2),
-                              Text(
-                                '身份: ${user.identityLabel}',
-                                style: TextStyle(fontSize: 12, color: Colors.white.withValues(alpha: 0.85)),
-                              ),
-                              const SizedBox(height: 2),
-                              Text(
-                                '城市: $cityLabel',
-                                style: TextStyle(fontSize: 12, color: Colors.white.withValues(alpha: 0.85)),
-                              ),
-                              if (user.bio.trim().isNotEmpty) ...[
-                                const SizedBox(height: 4),
-                                Text(
-                                  user.bio.trim(),
-                                  maxLines: 2,
-                                  overflow: TextOverflow.ellipsis,
-                                  style: TextStyle(fontSize: 12, color: Colors.white.withValues(alpha: 0.8)),
-                                ),
-                              ],
-                              if (user.title.isNotEmpty) ...[
-                                const SizedBox(height: 4),
-                                Text(
-                                  '解锁【${user.title}】身份', 
-                                  style: TextStyle(fontSize: 12, color: Colors.white.withValues(alpha: 0.75)),
-                                  overflow: TextOverflow.ellipsis,
-                                ),
-                              ],
-                            ],
-                          ),
-                        ),
-                        const Icon(Icons.chevron_right, color: Colors.white70, size: 24),
-                      ],
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          ),
-        );
-      },
-    );
-  }
-
-  Widget _buildFunctionGrid(BuildContext context) {
-    return Consumer<UserProvider>(
-      builder: (context, userProvider, child) {
-        final user = userProvider.user;
-        final items = [
-          {'icon': Icons.emoji_events_outlined, 'title': '会员中心', 'subtitle': '查看会员权益', 'action': () => _showBenefitsModal(context)},
-          {'icon': Icons.local_offer_outlined, 'title': '优惠券', 'subtitle': '${user.couponCount}张可用', 'action': () => context.push('/profile/coupons')},
-          {'icon': Icons.account_balance_wallet_outlined, 'title': '账户余额', 'subtitle': '¥${user.balance.toStringAsFixed(1)}', 'action': () => context.push('/profile/balance')},
-          {'icon': Icons.directions_walk, 'title': '足迹', 'subtitle': '看过的地陪', 'action': () => Navigator.push(context, MaterialPageRoute(builder: (_) => const FootprintPostsPage()))},
-        ];
-
-        return Container(
-          margin: const EdgeInsets.fromLTRB(16, 0, 16, 0),
-          transform: Matrix4.translationValues(0, -16, 0),
-          padding: const EdgeInsets.symmetric(vertical: 16),
-          decoration: BoxDecoration(
-            color: Colors.white, borderRadius: BorderRadius.circular(14),
-            boxShadow: [
-            BoxShadow(color: Colors.black.withValues(alpha: 0.05), blurRadius: 10, offset: const Offset(0, 4)),
-          ],
-        ),
-          child: Row(
-            mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-            children: items.map((item) {
-              return Expanded(
-                child: GestureDetector(
-                  onTap: item['action'] as VoidCallback,
-                  child: Column(
-                    children: [
-                      Container(
-                        width: 44, height: 44,
-                        decoration: BoxDecoration(gradient: AppColors.primaryGradient, borderRadius: BorderRadius.circular(12)),
-                        child: Icon(item['icon'] as IconData, color: Colors.white, size: 22),
-                      ),
-                      const SizedBox(height: 8),
-                      Text(item['title'] as String, style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: AppColors.textPrimary)),
-                      const SizedBox(height: 2),
-                      Text(item['subtitle'] as String, style: const TextStyle(fontSize: 10, color: AppColors.textHint), overflow: TextOverflow.ellipsis),
-                    ],
-                  ),
-                ),
-              );
-            }).toList(),
-          ),
-        );
-      },
-    );
-  }
-
-  Widget _buildOrderSection(BuildContext context) {
-    return Consumer<OrderProvider>(
-      builder: (context, orderProvider, child) {
-        return Container(
-          margin: const EdgeInsets.fromLTRB(16, 0, 16, 12),
-          padding: const EdgeInsets.all(16),
-          decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(14)),
-          child: Column(
-            children: [
-              Row(
-                children: [
-                  const Text('我的订单', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: AppColors.textPrimary)),
-                  const Spacer(),
-                  GestureDetector(
-                    onTap: () => context.push('/profile/orders'),
-                    child: Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        Text('更多', style: AppTextStyles.caption),
-                        const Icon(Icons.chevron_right, size: 16, color: AppColors.textHint),
-                      ],
-                    ),
-                  ),
-                ],
-              ),
-              const SizedBox(height: 16),
-              Row(
-                mainAxisAlignment: MainAxisAlignment.spaceAround,
-                children: [
-                  _buildOrderItem(context, Icons.payment, '待付款', orderProvider.getCountByStatus(OrderStatus.pendingPayment), 1),
-                  _buildOrderItem(context, Icons.access_time, '进行中', orderProvider.getCountByStatus(OrderStatus.inProgress), 2),
-                  _buildOrderItem(context, Icons.rate_review_outlined, '待评价', orderProvider.getCountByStatus(OrderStatus.pendingReview), 3),
-                  _buildOrderItem(context, Icons.cancel_outlined, '已取消', orderProvider.getCountByStatus(OrderStatus.cancelled), 4),
-                ],
-              ),
-            ],
-          ),
-        );
-      },
-    );
-  }
-
-  Widget _buildOrderItem(BuildContext context, IconData icon, String label, int count, int tabIndex) {
-    return GestureDetector(
-      onTap: () => context.push('/profile/orders?tab=$tabIndex'),
-      child: Column(
-        children: [
-          Stack(
-            clipBehavior: Clip.none,
-            children: [
-              Container(
-                width: 48, height: 48,
-                decoration: BoxDecoration(color: AppColors.tagBackground, borderRadius: BorderRadius.circular(14)),
-                child: Icon(icon, color: AppColors.primary, size: 24),
-              ),
-              if (count > 0)
-                Positioned(
-                  top: -4, right: -4,
-                  child: Container(
-                    padding: const EdgeInsets.all(4),
-                    decoration: const BoxDecoration(color: AppColors.primary, shape: BoxShape.circle),
-                    constraints: const BoxConstraints(minWidth: 18, minHeight: 18),
-                    child: Text('$count', textAlign: TextAlign.center,
-                      style: const TextStyle(color: Colors.white, fontSize: 10, fontWeight: FontWeight.bold)),
-                  ),
-                ),
-            ],
-          ),
-          const SizedBox(height: 6),
-          Text(label, style: const TextStyle(fontSize: 12, color: AppColors.textSecondary)),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildEmptyOrderTip(BuildContext context) {
-    return Consumer<OrderProvider>(
-      builder: (context, orderProvider, child) {
-        if (orderProvider.orders.isNotEmpty) return const SizedBox.shrink();
-        return GestureDetector(
-          onTap: () => MainScaffold.switchTo(0),
-          child: Container(
-            margin: const EdgeInsets.symmetric(horizontal: 16),
-            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
-            decoration: BoxDecoration(
-              color: const Color(0xFFFFF8F0), borderRadius: BorderRadius.circular(14),
-              border: Border.all(color: AppColors.primary.withValues(alpha: 0.15)),
-            ),
-            child: Row(
-              children: [
-                Container(
-                  width: 36, height: 36,
-                  decoration: BoxDecoration(
-                    color: AppColors.primary.withValues(alpha: 0.12),
-                    borderRadius: BorderRadius.circular(10),
-                  ),
-                  child: const Icon(Icons.receipt_long, size: 20, color: AppColors.primary),
-                ),
-                const SizedBox(width: 12),
-                const Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text('你暂无服务中订单哦~', style: TextStyle(fontSize: 14, fontWeight: FontWeight.w600, color: AppColors.textPrimary)),
-                      SizedBox(height: 2),
-                      Text('快去首页下单吧', style: TextStyle(fontSize: 12, color: AppColors.textHint)),
-                    ],
-                  ),
-                ),
-                Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
-                  decoration: BoxDecoration(gradient: AppColors.primaryGradient, borderRadius: BorderRadius.circular(16)),
-                  child: const Text('去下单 >', style: TextStyle(fontSize: 12, color: Colors.white, fontWeight: FontWeight.w600)),
-                ),
-              ],
-            ),
-          ),
-        );
-      },
-    );
-  }
-
-  Widget _buildBottomActions(BuildContext context) {
-    return Container(
-      margin: const EdgeInsets.fromLTRB(16, 16, 16, 0),
-      padding: const EdgeInsets.symmetric(vertical: 16),
-      decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(14)),
-      child: Row(
-        mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-        children: [
-          GestureDetector(
-            behavior: HitTestBehavior.opaque,
-            onTap: () {
-              Navigator.push(
-                context,
-                MaterialPageRoute(builder: (_) => const FollowingPage()),
-              );
-            },
-            child: _buildActionItem(Icons.people_outline, '关注'),
-          ),
-          GestureDetector(
-            behavior: HitTestBehavior.opaque,
-            onTap: () {
-              Navigator.push(
-                context,
-                MaterialPageRoute(builder: (_) => const FavoritePostsPage()),
-              );
-            },
-            child: _buildActionItem(Icons.favorite_outline, '收藏'),
-          ),
-          GestureDetector(
-            behavior: HitTestBehavior.opaque,
-            onTap: () {
-              Navigator.push(
-                context,
-                MaterialPageRoute(builder: (_) => const FootprintPostsPage()),
-              );
-            },
-            child: _buildActionItem(Icons.directions_walk, '足迹'),
-          ),
-          GestureDetector(
-            behavior: HitTestBehavior.opaque,
-            onTap: () => _showListPage(context, '投诉', Icons.report_outlined),
-            child: _buildActionItem(Icons.report_outlined, '投诉'),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildGuidePanel(BuildContext context, bool isGuide) {
-    if (!isGuide) return const SizedBox.shrink();
-    return Container(
-      margin: const EdgeInsets.fromLTRB(16, 16, 16, 0),
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(16),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withValues(alpha: 0.03),
-            blurRadius: 10,
-            offset: const Offset(0, 4),
-          ),
-        ],
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            children: [
-               Container(
-                width: 32, height: 32,
-                decoration: BoxDecoration(
-                  color: Colors.orange.withValues(alpha: 0.1),
-                  borderRadius: BorderRadius.circular(8),
-                ),
-                child: const Icon(Icons.stars, color: Colors.orange, size: 18),
-              ),
-              const SizedBox(width: 12),
-              const Text('地陪专属权益', style: TextStyle(fontSize: 15, fontWeight: FontWeight.bold, color: AppColors.textPrimary)),
-              const Spacer(),
-              TextButton(
-                onPressed: () {
-                  final userId = context.read<UserProvider>().user.id;
-                  context.push('/guide/$userId');
-                },
-                child: const Text('查看主页 >', style: TextStyle(fontSize: 13, color: AppColors.primary)),
-              ),
-            ],
-          ),
-          const SizedBox(height: 12),
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceAround,
-            children: [
-              _buildGuideStatItem('4.9', '综合评分'),
-              _buildGuideStatItem('12', '服务人次'),
-              _buildGuideStatItem('98%', '好评率'),
-            ],
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildGuideStatItem(String value, String label) {
-    return Column(
-      children: [
-        Text(value, style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: AppColors.textPrimary)),
-        const SizedBox(height: 4),
-        Text(label, style: const TextStyle(fontSize: 11, color: AppColors.textHint)),
-      ],
-    );
-  }
-
-  Widget _buildActionItem(IconData icon, String label) {
-    return Column(
-      children: [
-        Icon(icon, size: 24, color: AppColors.textSecondary),
-        const SizedBox(height: 6),
-        Text(label, style: const TextStyle(fontSize: 13, color: AppColors.textSecondary)),
-      ],
-    );
-  }
-
-  Widget _buildEmptyContent() {
-    return Container(
-      margin: const EdgeInsets.fromLTRB(16, 16, 16, 0),
-      padding: const EdgeInsets.all(24),
-      decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(14)),
-      child: Column(
-        children: [
-          Icon(Icons.description_outlined, size: 48, color: AppColors.textHint.withValues(alpha: 0.5)),
-          const SizedBox(height: 12),
-          const Text('暂无数据', style: TextStyle(fontSize: 14, color: AppColors.textHint)),
-        ],
-      ),
-    );
-  }
+  State<ProfilePage> createState() => _ProfilePageState();
 }
 
-class _EditProfileDialog extends StatefulWidget {
-  const _EditProfileDialog();
-
-  @override
-  State<_EditProfileDialog> createState() => _EditProfileDialogState();
-}
-
-class _EditProfileDialogState extends State<_EditProfileDialog> {
-  late TextEditingController _nicknameController;
-  late TextEditingController _cityController;
-  late TextEditingController _birthdayController;
-  late TextEditingController _wechatController;
-  late TextEditingController _occupationController;
-  late TextEditingController _bioController;
-  late TextEditingController _guideIntroductionController;
-  late TextEditingController _guideTagsController;
-  late UserProvider _userProvider;
-  Uint8List? _avatarBytes;
-  String? _avatarMimeType;
-  String _selectedGender = '';
-  bool _isUploading = false;
+class _ProfilePageState extends State<ProfilePage>
+    with SingleTickerProviderStateMixin {
+  late final TabController _tabController;
+  late Future<List<TravelPost>> _followingFuture;
+  late Future<List<TravelPost>> _favoriteFuture;
+  late Future<List<TravelPost>> _footprintFuture;
+  bool _contentInitialized = false;
 
   @override
   void initState() {
     super.initState();
-    _userProvider = context.read<UserProvider>();
-    final user = _userProvider.user;
-    _nicknameController = TextEditingController(text: user.nickname);
-    _cityController = TextEditingController(text: user.city);
-    _birthdayController = TextEditingController(text: user.birthday);
-    _wechatController = TextEditingController(text: user.wechat);
-    _occupationController = TextEditingController(text: user.occupation);
-    _bioController = TextEditingController(text: user.bio);
-    _guideIntroductionController = TextEditingController(text: user.guideIntroduction);
-    _guideTagsController = TextEditingController(text: user.guideTags.join('，'));
-    _selectedGender = user.gender;
+    _tabController = TabController(length: 3, vsync: this);
+  }
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    if (_contentInitialized) return;
+    _contentInitialized = true;
+    final postProvider = context.read<PostProvider>();
+    _followingFuture = postProvider.fetchFollowingPosts();
+    _favoriteFuture = postProvider.fetchFavoritedPosts();
+    _footprintFuture = postProvider.fetchFootprints();
   }
 
   @override
   void dispose() {
-    _nicknameController.dispose();
-    _cityController.dispose();
-    _birthdayController.dispose();
-    _wechatController.dispose();
-    _occupationController.dispose();
-    _bioController.dispose();
-    _guideIntroductionController.dispose();
-    _guideTagsController.dispose();
+    _tabController.dispose();
     super.dispose();
   }
 
-  Future<void> _pickAndUploadAvatar() async {
-    final picker = ImagePicker();
-    try {
-      final XFile? image = await picker.pickImage(source: ImageSource.gallery);
-      if (image != null) {
-        final bytes = await image.readAsBytes();
-        setState(() {
-          _avatarBytes = bytes;
-          _avatarMimeType = image.mimeType ?? 'image/jpeg';
-        });
-      }
-    } catch (e) {
-      debugPrint('Error picking avatar: $e');
-    }
-  }
-
-  Future<void> _saveProfile() async {
-    final newName = _nicknameController.text.trim();
-    if (newName.isEmpty) return;
-
-    final user = _userProvider.user;
-    String finalAvatarUrl = user.avatar;
-
+  Future<void> _reloadContent() async {
+    final postProvider = context.read<PostProvider>();
     setState(() {
-      _isUploading = true;
+      _followingFuture = postProvider.fetchFollowingPosts();
+      _favoriteFuture = postProvider.fetchFavoritedPosts();
+      _footprintFuture = postProvider.fetchFootprints();
     });
-
-    try {
-      // Mock user bypasses real upload
-      if (user.id != '00000000-0000-0000-0000-000000000000' && _avatarBytes != null) {
-        final api = EcsApiClient();
-        final response = await api.post(
-          '/uploads/avatar',
-          authToken: _userProvider.accessToken,
-          body: {
-            'filename': '${user.id}_${DateTime.now().millisecondsSinceEpoch}.jpg',
-          },
-        );
-        final data = response['data'];
-        if (data is Map<String, dynamic>) {
-          finalAvatarUrl = data['url']?.toString() ?? finalAvatarUrl;
-        }
-      } else if (_avatarBytes != null) {
-        // Mock user local preview URL (won't persist across restarts but updates UI)
-         finalAvatarUrl = 'https://picsum.photos/seed/${DateTime.now().millisecondsSinceEpoch}/100/100';
-      }
-
-      await _userProvider.updateUser(
-        app_model.User(
-          id: user.id,
-          nickname: newName,
-          avatar: finalAvatarUrl,
-          bio: _bioController.text.trim(),
-          gender: _selectedGender.trim(),
-          city: _cityController.text.trim(),
-          birthday: _birthdayController.text.trim(),
-          wechat: _wechatController.text.trim(),
-          occupation: _occupationController.text.trim(),
-          guideIntroduction: _guideIntroductionController.text.trim(),
-          guideTags: _guideTagsController.text
-              .split(RegExp(r'[,，/\s]+'))
-              .map((item) => item.trim())
-              .where((item) => item.isNotEmpty)
-              .toList(),
-          vipLevel: user.vipLevel,
-          title: user.title,
-          balance: user.balance,
-          couponCount: user.couponCount,
-          followCount: user.followCount,
-          fansCount: user.fansCount,
-          isBanned: user.isBanned,
-          cancelCount: user.cancelCount,
-          isAdmin: user.isAdmin,
-          isGuide: user.isGuide,
-          guideApplicationStatus: user.guideApplicationStatus,
-        ),
-      );
-
-      if (mounted) {
-        Navigator.pop(context);
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: const Text('资料已更新'),
-            backgroundColor: AppColors.primary,
-            behavior: SnackBarBehavior.floating,
-            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-          ),
-        );
-      }
-    } catch (e) {
-      debugPrint('Error saving profile: $e');
-      if (mounted) {
-        // Extract inner exception message if available
-        String errorMsg = '保存失败';
-        if (e is Exception) {
-          errorMsg = e.toString().replaceAll('Exception: ', '');
-        }
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text(errorMsg), backgroundColor: Colors.red),
-        );
-      }
-    } finally {
-      if (mounted) {
-        setState(() {
-          _isUploading = false;
-        });
-      }
-    }
-  }
-
-  Future<void> _pickBirthday() async {
-    final now = DateTime.now();
-    final initial = DateTime.tryParse(_birthdayController.text.trim()) ??
-        DateTime(now.year - 20, now.month, now.day);
-    final picked = await showDatePicker(
-      context: context,
-      initialDate: initial,
-      firstDate: DateTime(1950),
-      lastDate: now,
-    );
-    if (picked == null || !mounted) return;
-    setState(() {
-      _birthdayController.text =
-          '${picked.year.toString().padLeft(4, '0')}-${picked.month.toString().padLeft(2, '0')}-${picked.day.toString().padLeft(2, '0')}';
-    });
-  }
-
-  Widget _buildInput(
-    String label,
-    TextEditingController controller, {
-    int maxLines = 1,
-    String? hintText,
-    Widget? suffixIcon,
-    TextInputType? keyboardType,
-    bool readOnly = false,
-    VoidCallback? onTap,
-  }) {
-    return Padding(
-      padding: const EdgeInsets.only(bottom: 12),
-      child: TextField(
-        controller: controller,
-        enabled: !_isUploading,
-        maxLines: maxLines,
-        keyboardType: keyboardType,
-        readOnly: readOnly,
-        onTap: onTap,
-        decoration: InputDecoration(
-          labelText: label,
-          hintText: hintText,
-          suffixIcon: suffixIcon,
-          border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
-          focusedBorder: OutlineInputBorder(
-            borderRadius: BorderRadius.circular(12),
-            borderSide: const BorderSide(color: AppColors.primary),
-          ),
-        ),
-      ),
-    );
+    await Future.wait([_followingFuture, _favoriteFuture, _footprintFuture]);
   }
 
   @override
   Widget build(BuildContext context) {
-    final user = _userProvider.user;
-    final ImageProvider<Object>? previewImage = _avatarBytes != null
-        ? MemoryImage(_avatarBytes!)
-        : (user.avatar.isNotEmpty ? NetworkImage(user.avatar) : null);
+    return Scaffold(
+      backgroundColor: AppColors.background,
+      body: SafeArea(
+        bottom: false,
+        child: Consumer2<UserProvider, OrderProvider>(
+          builder: (context, userProvider, orderProvider, _) {
+            final user = userProvider.user;
+            return RefreshIndicator(
+              color: AppColors.primaryDark,
+              onRefresh: _reloadContent,
+              child: CustomScrollView(
+                physics: const AlwaysScrollableScrollPhysics(),
+                slivers: [
+                  SliverToBoxAdapter(
+                    child: _ProfileHeader(
+                      user: user,
+                      onSettingsTap: () => context.push('/settings'),
+                      onSupportTap: () => context.push('/settings/help'),
+                    ),
+                  ),
+                  SliverToBoxAdapter(
+                    child: _VipBanner(
+                      isGuide: user.isGuideApproved,
+                      onTap: () => context.push('/settings'),
+                    ),
+                  ),
+                  SliverToBoxAdapter(
+                    child: _OrderPanel(
+                      orderProvider: orderProvider,
+                      onTapTab: (index) =>
+                          context.push('/profile/orders?tab=$index'),
+                      onDebugPay: () => context.push('/profile/orders?tab=1'),
+                    ),
+                  ),
+                  SliverToBoxAdapter(
+                    child: _CouponBanner(
+                      count: user.couponCount,
+                      onTap: () => context.push('/profile/coupons'),
+                    ),
+                  ),
+                  SliverToBoxAdapter(
+                    child: _QuickActions(
+                      onSecurityTap: () => context.push('/settings/security'),
+                      onFeedbackTap: () => context.push('/settings/help'),
+                    ),
+                  ),
+                  SliverToBoxAdapter(
+                    child: _ContentTabs(
+                      controller: _tabController,
+                      onSwitch: (index) => _tabController.animateTo(index),
+                    ),
+                  ),
+                  SliverFillRemaining(
+                    child: TabBarView(
+                      controller: _tabController,
+                      children: [
+                        _buildPostFuture(_followingFuture, '暂无关注内容'),
+                        _buildPostFuture(_favoriteFuture, '暂无收藏内容'),
+                        _buildPostFuture(_footprintFuture, '暂无足迹内容'),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+            );
+          },
+        ),
+      ),
+    );
+  }
 
-    return AlertDialog(
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-      title: const Text('编辑资料'),
-      content: SizedBox(
-        width: double.maxFinite,
-        child: ConstrainedBox(
-          constraints: BoxConstraints(
-            maxHeight: MediaQuery.of(context).size.height * 0.7,
+  Widget _buildPostFuture(Future<List<TravelPost>> future, String emptyText) {
+    return FutureBuilder<List<TravelPost>>(
+      future: future,
+      builder: (context, snapshot) {
+        if (snapshot.connectionState == ConnectionState.waiting) {
+          return const Center(
+            child: CircularProgressIndicator(color: AppColors.primaryDark),
+          );
+        }
+        final posts = snapshot.data ?? [];
+        if (posts.isEmpty) {
+          return Center(
+            child: Text(
+              emptyText,
+              style: const TextStyle(
+                fontSize: 15,
+                color: AppColors.textHint,
+              ),
+            ),
+          );
+        }
+        return GridView.builder(
+          padding: const EdgeInsets.fromLTRB(20, 18, 20, 120),
+          itemCount: posts.length,
+          gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+            crossAxisCount: 2,
+            mainAxisSpacing: 14,
+            crossAxisSpacing: 14,
+            childAspectRatio: 0.72,
           ),
-          child: SingleChildScrollView(
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                GestureDetector(
-                  onTap: _isUploading ? null : _pickAndUploadAvatar,
-                  child: Stack(
-                    children: [
-                      CircleAvatar(
-                        radius: 40,
-                        backgroundColor: const Color(0xFFE0E0E0),
-                        backgroundImage: previewImage,
-                        child: previewImage == null
-                            ? const Icon(Icons.person, size: 40, color: Colors.white)
-                            : null,
-                      ),
-                      Positioned(
-                        bottom: 0,
-                        right: 0,
-                        child: Container(
-                          width: 28,
-                          height: 28,
-                          decoration: BoxDecoration(
-                            color: AppColors.primary,
-                            shape: BoxShape.circle,
-                            border: Border.all(color: Colors.white, width: 2),
-                          ),
-                          child: const Icon(Icons.camera_alt, size: 14, color: Colors.white),
-                        ),
-                      ),
-                      if (_isUploading)
-                        Positioned.fill(
-                          child: Container(
-                            decoration: const BoxDecoration(
-                              color: Colors.black45,
-                              shape: BoxShape.circle,
+          itemBuilder: (context, index) => TravelCard(post: posts[index]),
+        );
+      },
+    );
+  }
+}
+
+class _ProfileHeader extends StatelessWidget {
+  final User user;
+  final VoidCallback onSettingsTap;
+  final VoidCallback onSupportTap;
+
+  const _ProfileHeader({
+    required this.user,
+    required this.onSettingsTap,
+    required this.onSupportTap,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      decoration: const BoxDecoration(gradient: AppColors.headerGradient),
+      padding: const EdgeInsets.fromLTRB(20, 8, 20, 20),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const SizedBox(height: 10),
+          Row(
+            children: [
+              _Avatar(url: user.avatar),
+              const SizedBox(width: 14),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      children: [
+                        Flexible(
+                          child: Text(
+                            user.nickname.isNotEmpty
+                                ? user.nickname
+                                : '未登录用户',
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: const TextStyle(
+                              fontSize: 28,
+                              fontWeight: FontWeight.w900,
+                              color: AppColors.textPrimary,
                             ),
-                            child: const Center(
-                              child: CircularProgressIndicator(color: Colors.white),
-                            ),
                           ),
                         ),
-                    ],
+                        if (user.vipLabel.isNotEmpty) ...[
+                          const SizedBox(width: 8),
+                          _InlineBadge(text: user.vipLabel),
+                        ],
+                        if (user.isGuideApproved) ...[
+                          const SizedBox(width: 8),
+                          const _InlineBadge(text: '认证'),
+                        ],
+                      ],
+                    ),
+                    const SizedBox(height: 10),
+                    Text(
+                      'IP：${user.city.isEmpty ? '未知' : user.city}',
+                      style: const TextStyle(
+                        fontSize: 16,
+                        fontWeight: FontWeight.w700,
+                        color: AppColors.textPrimary,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(width: 12),
+              _TopIconAction(
+                icon: Icons.headset_mic_outlined,
+                label: '客服',
+                onTap: onSupportTap,
+              ),
+              const SizedBox(width: 12),
+              _TopIconAction(
+                icon: Icons.settings_outlined,
+                label: '设置',
+                onTap: onSettingsTap,
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _VipBanner extends StatelessWidget {
+  final bool isGuide;
+  final VoidCallback onTap;
+
+  const _VipBanner({required this.isGuide, required this.onTap});
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(20, 0, 20, 18),
+      child: GestureDetector(
+        onTap: onTap,
+        child: Container(
+          height: 132,
+          padding: const EdgeInsets.fromLTRB(18, 18, 18, 18),
+          decoration: BoxDecoration(
+            gradient: const LinearGradient(
+              colors: [Color(0xFFFFE65B), Color(0xFFFFF0BF)],
+              begin: Alignment.centerLeft,
+              end: Alignment.centerRight,
+            ),
+            borderRadius: BorderRadius.circular(28),
+          ),
+          child: Stack(
+            children: [
+              Positioned(
+                left: 0,
+                top: 0,
+                child: Text(
+                  isGuide ? 'VIP会员 · 地陪专属' : 'VIP会员',
+                  style: const TextStyle(
+                    fontSize: 28,
+                    fontWeight: FontWeight.w900,
+                    color: Color(0xFF8A5A12),
                   ),
                 ),
-                const SizedBox(height: 20),
-                _buildInput('昵称', _nicknameController),
-                _buildInput('所在城市', _cityController, hintText: '例如：苏州'),
-                Padding(
-                  padding: const EdgeInsets.only(bottom: 12),
-                  child: DropdownButtonFormField<String>(
-                    value: _selectedGender.isEmpty ? null : _selectedGender,
-                    items: const [
-                      DropdownMenuItem(value: '男', child: Text('男')),
-                      DropdownMenuItem(value: '女', child: Text('女')),
-                      DropdownMenuItem(value: '不限', child: Text('不限')),
-                    ],
-                    onChanged: _isUploading
-                        ? null
-                        : (value) => setState(() => _selectedGender = value ?? ''),
-                    decoration: InputDecoration(
-                      labelText: '性别',
-                      border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
-                      focusedBorder: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(12),
-                        borderSide: const BorderSide(color: AppColors.primary),
-                      ),
+              ),
+              const Positioned(
+                left: 2,
+                bottom: 26,
+                child: Text(
+                  '开通会员轻松畅聊，享VIP权益',
+                  style: TextStyle(
+                    fontSize: 16,
+                    color: Color(0xFF9A6B1A),
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+              ),
+              Positioned(
+                right: 0,
+                bottom: 6,
+                child: Container(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 18,
+                    vertical: 12,
+                  ),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFFFFF1B7),
+                    borderRadius: BorderRadius.circular(999),
+                  ),
+                  child: const Text(
+                    '开通会员',
+                    style: TextStyle(
+                      fontSize: 18,
+                      fontWeight: FontWeight.w800,
+                      color: Color(0xFF8A5A12),
                     ),
                   ),
                 ),
-                _buildInput(
-                  '生日',
-                  _birthdayController,
-                  readOnly: true,
-                  onTap: _pickBirthday,
-                  suffixIcon: const Icon(Icons.calendar_today_outlined),
+              ),
+              Positioned(
+                right: -6,
+                bottom: -6,
+                child: Icon(
+                  Icons.workspace_premium_rounded,
+                  size: 92,
+                  color: Colors.orange.withValues(alpha: 0.88),
                 ),
-                _buildInput('微信号', _wechatController),
-                _buildInput('职业', _occupationController),
-                _buildInput('个人简介', _bioController, maxLines: 3),
-                if (user.isGuideApproved) ...[
-                  _buildInput('地陪介绍', _guideIntroductionController, maxLines: 4),
-                  _buildInput(
-                    '地陪标签',
-                    _guideTagsController,
-                    hintText: '多个标签用逗号分隔',
-                  ),
-                ],
-              ],
-            ),
+              ),
+            ],
           ),
         ),
       ),
-      actions: [
-        TextButton(
-          onPressed: _isUploading ? null : () => Navigator.pop(context),
-          child: const Text('取消', style: TextStyle(color: AppColors.textHint)),
+    );
+  }
+}
+
+class _OrderPanel extends StatelessWidget {
+  final OrderProvider orderProvider;
+  final ValueChanged<int> onTapTab;
+  final VoidCallback onDebugPay;
+
+  const _OrderPanel({
+    required this.orderProvider,
+    required this.onTapTab,
+    required this.onDebugPay,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 20),
+      child: Container(
+        padding: const EdgeInsets.fromLTRB(18, 18, 18, 16),
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(24),
         ),
-        ElevatedButton(
-          onPressed: _isUploading ? null : _saveProfile,
-          style: ElevatedButton.styleFrom(
-            backgroundColor: AppColors.primary,
-            foregroundColor: Colors.white,
-            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                const Text(
+                  '我的订单',
+                  style: TextStyle(
+                    fontSize: 22,
+                    fontWeight: FontWeight.w900,
+                    color: AppColors.textPrimary,
+                  ),
+                ),
+                const Spacer(),
+                TextButton(
+                  onPressed: () => onTapTab(0),
+                  child: const Text('更多 >'),
+                ),
+              ],
+            ),
+            const SizedBox(height: 10),
+            Row(
+              children: [
+                _OrderShortcut(
+                  icon: Icons.credit_card_outlined,
+                  label: '待付款',
+                  count: orderProvider.getCountByStatus(
+                    OrderStatus.pendingPayment,
+                  ),
+                  onTap: () => onTapTab(1),
+                ),
+                _OrderShortcut(
+                  icon: Icons.hourglass_bottom_outlined,
+                  label: '进行中',
+                  count: orderProvider.getCountByStatus(
+                    OrderStatus.inProgress,
+                  ),
+                  onTap: () => onTapTab(2),
+                ),
+                _OrderShortcut(
+                  icon: Icons.rate_review_outlined,
+                  label: '待评价',
+                  count: orderProvider.getCountByStatus(
+                    OrderStatus.pendingReview,
+                  ),
+                  onTap: () => onTapTab(3),
+                ),
+                _OrderShortcut(
+                  icon: Icons.cancel_outlined,
+                  label: '已取消',
+                  count: orderProvider.getCountByStatus(
+                    OrderStatus.cancelled,
+                  ),
+                  onTap: () => onTapTab(4),
+                ),
+              ],
+            ),
+            const SizedBox(height: 12),
+            GestureDetector(
+              onTap: onDebugPay,
+              child: Container(
+                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+                decoration: BoxDecoration(
+                  color: const Color(0xFFF7F8FC),
+                  borderRadius: BorderRadius.circular(18),
+                ),
+                child: Row(
+                  children: [
+                    Container(
+                      width: 40,
+                      height: 40,
+                      decoration: BoxDecoration(
+                        color: AppColors.primary.withValues(alpha: 0.14),
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      child: const Icon(
+                        Icons.receipt_long,
+                        color: AppColors.primaryDark,
+                      ),
+                    ),
+                    const SizedBox(width: 12),
+                    const Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            '0.01元测试付款',
+                            style: TextStyle(
+                              fontSize: 14,
+                              fontWeight: FontWeight.w700,
+                              color: AppColors.textPrimary,
+                            ),
+                          ),
+                          SizedBox(height: 2),
+                          Text(
+                            '点击后可验证支付宝支付链路',
+                            style: TextStyle(
+                              fontSize: 12,
+                              color: AppColors.textHint,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                    Container(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 14,
+                        vertical: 8,
+                      ),
+                      decoration: BoxDecoration(
+                        gradient: AppColors.primaryGradient,
+                        borderRadius: BorderRadius.circular(18),
+                      ),
+                      child: const Text(
+                        '去测试',
+                        style: TextStyle(
+                          fontSize: 12,
+                          fontWeight: FontWeight.w700,
+                          color: Colors.white,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _CouponBanner extends StatelessWidget {
+  final int count;
+  final VoidCallback onTap;
+
+  const _CouponBanner({required this.count, required this.onTap});
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(20, 16, 20, 16),
+      child: GestureDetector(
+        onTap: onTap,
+        child: Container(
+          padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 16),
+          decoration: BoxDecoration(
+            color: const Color(0xFFFFF3EE),
+            borderRadius: BorderRadius.circular(20),
           ),
-          child: _isUploading 
-              ? const SizedBox(width: 16, height: 16, child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2))
-              : const Text('保存'),
+          child: Row(
+            children: [
+              const Text(
+                '优惠券',
+                style: TextStyle(
+                  fontSize: 22,
+                  fontWeight: FontWeight.w900,
+                  color: AppColors.textPrimary,
+                ),
+              ),
+              const SizedBox(width: 10),
+              Text(
+                '$count张可用',
+                style: const TextStyle(
+                  fontSize: 16,
+                  fontWeight: FontWeight.w700,
+                  color: AppColors.accent,
+                ),
+              ),
+              const Spacer(),
+              const Text(
+                '更多 >',
+                style: TextStyle(
+                  fontSize: 14,
+                  color: AppColors.textHint,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+            ],
+          ),
         ),
-      ],
+      ),
+    );
+  }
+}
+
+class _QuickActions extends StatelessWidget {
+  final VoidCallback onSecurityTap;
+  final VoidCallback onFeedbackTap;
+
+  const _QuickActions({
+    required this.onSecurityTap,
+    required this.onFeedbackTap,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 20),
+      child: Container(
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(22),
+        ),
+        child: Column(
+          children: [
+            ListTile(
+              leading:
+                  const Icon(Icons.shield_outlined, color: AppColors.textPrimary),
+              title: const Text(
+                '安全中心',
+                style: TextStyle(
+                  fontSize: 20,
+                  fontWeight: FontWeight.w800,
+                  color: AppColors.textPrimary,
+                ),
+              ),
+              trailing: const Icon(Icons.chevron_right, color: AppColors.textHint),
+              onTap: onSecurityTap,
+            ),
+            const Divider(height: 1, indent: 20, endIndent: 20),
+            ListTile(
+              leading:
+                  const Icon(Icons.edit_note_outlined, color: AppColors.textPrimary),
+              title: const Text(
+                '建议反馈',
+                style: TextStyle(
+                  fontSize: 20,
+                  fontWeight: FontWeight.w800,
+                  color: AppColors.textPrimary,
+                ),
+              ),
+              trailing: const Icon(Icons.chevron_right, color: AppColors.textHint),
+              onTap: onFeedbackTap,
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _ContentTabs extends StatelessWidget {
+  final TabController controller;
+  final ValueChanged<int> onSwitch;
+
+  const _ContentTabs({
+    required this.controller,
+    required this.onSwitch,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(20, 18, 20, 12),
+      child: Container(
+        padding: const EdgeInsets.all(4),
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(999),
+        ),
+        child: TabBar(
+          controller: controller,
+          onTap: onSwitch,
+          isScrollable: true,
+          tabAlignment: TabAlignment.start,
+          indicator: BoxDecoration(
+            color: AppColors.primary,
+            borderRadius: BorderRadius.circular(999),
+          ),
+          dividerColor: Colors.transparent,
+          labelColor: AppColors.textPrimary,
+          unselectedLabelColor: AppColors.textSecondary,
+          indicatorSize: TabBarIndicatorSize.tab,
+          labelPadding: const EdgeInsets.symmetric(horizontal: 18),
+          tabs: const [
+            Tab(text: '关注'),
+            Tab(text: '喜欢'),
+            Tab(text: '足迹'),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _TopIconAction extends StatelessWidget {
+  final IconData icon;
+  final String label;
+  final VoidCallback onTap;
+
+  const _TopIconAction({
+    required this.icon,
+    required this.label,
+    required this.onTap,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return GestureDetector(
+      onTap: onTap,
+      child: Column(
+        children: [
+          Icon(icon, size: 34, color: AppColors.textPrimary),
+          const SizedBox(height: 6),
+          Text(
+            label,
+            style: const TextStyle(
+              fontSize: 14,
+              fontWeight: FontWeight.w800,
+              color: AppColors.textPrimary,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _InlineBadge extends StatelessWidget {
+  final String text;
+
+  const _InlineBadge({required this.text});
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+      decoration: BoxDecoration(
+        color: Colors.black.withValues(alpha: 0.1),
+        borderRadius: BorderRadius.circular(999),
+      ),
+      child: Text(
+        text,
+        style: const TextStyle(
+          fontSize: 12,
+          fontWeight: FontWeight.w700,
+          color: AppColors.textPrimary,
+        ),
+      ),
+    );
+  }
+}
+
+class _Avatar extends StatelessWidget {
+  final String url;
+
+  const _Avatar({required this.url});
+
+  @override
+  Widget build(BuildContext context) {
+    final imageUrl = url.trim();
+    if (imageUrl.isEmpty) {
+      return Container(
+        width: 76,
+        height: 76,
+        decoration: const BoxDecoration(
+          shape: BoxShape.circle,
+          color: Colors.white,
+        ),
+        child: const Icon(Icons.person, size: 40, color: AppColors.textHint),
+      );
+    }
+
+    return ClipOval(
+      child: CachedNetworkImage(
+        imageUrl: imageUrl,
+        width: 76,
+        height: 76,
+        fit: BoxFit.cover,
+        errorWidget: (context, url, error) => Container(
+          width: 76,
+          height: 76,
+          color: Colors.white,
+          child: const Icon(Icons.person, size: 40, color: AppColors.textHint),
+        ),
+      ),
+    );
+  }
+}
+
+class _OrderShortcut extends StatelessWidget {
+  final IconData icon;
+  final String label;
+  final int count;
+  final VoidCallback onTap;
+
+  const _OrderShortcut({
+    required this.icon,
+    required this.label,
+    required this.count,
+    required this.onTap,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Expanded(
+      child: GestureDetector(
+        onTap: onTap,
+        child: Column(
+          children: [
+            Stack(
+              clipBehavior: Clip.none,
+              children: [
+                Container(
+                  width: 46,
+                  height: 46,
+                  decoration: BoxDecoration(
+                    color: AppColors.primaryLight,
+                    borderRadius: BorderRadius.circular(14),
+                  ),
+                  child: Icon(icon, color: AppColors.textPrimary, size: 24),
+                ),
+                if (count > 0)
+                  Positioned(
+                    right: -4,
+                    top: -4,
+                    child: Container(
+                      width: 18,
+                      height: 18,
+                      decoration: const BoxDecoration(
+                        color: Color(0xFFFF6A3A),
+                        shape: BoxShape.circle,
+                      ),
+                      alignment: Alignment.center,
+                      child: Text(
+                        count > 9 ? '9+' : '$count',
+                        style: const TextStyle(
+                          fontSize: 9,
+                          fontWeight: FontWeight.w800,
+                          color: Colors.white,
+                        ),
+                      ),
+                    ),
+                  ),
+              ],
+            ),
+            const SizedBox(height: 10),
+            Text(
+              label,
+              style: const TextStyle(
+                fontSize: 16,
+                fontWeight: FontWeight.w700,
+                color: AppColors.textPrimary,
+              ),
+            ),
+          ],
+        ),
+      ),
     );
   }
 }

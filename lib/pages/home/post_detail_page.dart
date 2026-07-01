@@ -1,14 +1,15 @@
-import 'package:flutter/material.dart';
-import 'package:provider/provider.dart';
 import 'package:cached_network_image/cached_network_image.dart';
+import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
-import '../../models/travel_post.dart';
+import 'package:provider/provider.dart';
+
+import '../../config/app_theme.dart';
 import '../../models/post_comment.dart';
-import '../../providers/post_provider.dart';
-import '../../providers/user_provider.dart';
+import '../../models/travel_post.dart';
 import '../../providers/guide_provider.dart';
 import '../../providers/message_provider.dart';
-import '../../config/app_theme.dart';
+import '../../providers/post_provider.dart';
+import '../../providers/user_provider.dart';
 
 class PostDetailPage extends StatefulWidget {
   final TravelPost post;
@@ -31,8 +32,13 @@ class _PostDetailPageState extends State<PostDetailPage> {
     super.initState();
     _loadComments();
     _checkFollowStatus();
-    // Record footprint when viewing post
     context.read<PostProvider>().recordFootprint(widget.post.id);
+  }
+
+  @override
+  void dispose() {
+    _commentController.dispose();
+    super.dispose();
   }
 
   Future<void> _checkFollowStatus() async {
@@ -58,9 +64,7 @@ class _PostDetailPageState extends State<PostDetailPage> {
         ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(e.toString())));
       }
     } finally {
-      if (mounted) {
-        setState(() => _isFollowLoading = false);
-      }
+      if (mounted) setState(() => _isFollowLoading = false);
     }
   }
 
@@ -77,67 +81,13 @@ class _PostDetailPageState extends State<PostDetailPage> {
 
   Future<void> _contactGuide() async {
     try {
-      final roomId = await context.read<MessageProvider>().getOrCreateRoom(
-        widget.post.authorId,
-      );
+      final roomId = await context.read<MessageProvider>().getOrCreateRoom(widget.post.authorId);
       if (!mounted) return;
-      context.push(
-        '/chat/$roomId?name=${Uri.encodeComponent(widget.post.authorName)}&avatar=${Uri.encodeComponent(widget.post.authorAvatar)}',
-      );
+      context.push('/chat/$roomId?name=${Uri.encodeComponent(widget.post.authorName)}&avatar=${Uri.encodeComponent(widget.post.authorAvatar)}');
     } catch (e) {
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(e.toString())),
-      );
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(e.toString())));
     }
-  }
-
-  @override
-  void dispose() {
-    _commentController.dispose();
-    super.dispose();
-  }
-
-  void _showShareModal() {
-    showModalBottomSheet(
-      context: context,
-      shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(16))),
-      builder: (ctx) {
-        return Container(
-          padding: const EdgeInsets.all(20),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              const Text('分享到', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
-              const SizedBox(height: 20),
-              Row(
-                mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-                children: [
-                  _shareIcon(Icons.chat_bubble_outline, '微信好友', Colors.green),
-                  _shareIcon(Icons.camera, '朋友圈', Colors.greenAccent),
-                  _shareIcon(Icons.link, '复制链接', Colors.blue),
-                ],
-              ),
-              const SizedBox(height: 20),
-            ],
-          ),
-        );
-      },
-    );
-  }
-
-  Widget _shareIcon(IconData icon, String label, Color color) {
-    return Column(
-      children: [
-        Container(
-          width: 50, height: 50,
-          decoration: BoxDecoration(color: color.withValues(alpha: 0.1), shape: BoxShape.circle),
-          child: Icon(icon, color: color, size: 28),
-        ),
-        const SizedBox(height: 8),
-        Text(label, style: const TextStyle(fontSize: 12)),
-      ],
-    );
   }
 
   void _showCommentModal() {
@@ -152,7 +102,7 @@ class _PostDetailPageState extends State<PostDetailPage> {
             padding: const EdgeInsets.all(16),
             decoration: const BoxDecoration(
               color: Colors.white,
-              borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
+              borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
             ),
             child: Row(
               children: [
@@ -162,39 +112,31 @@ class _PostDetailPageState extends State<PostDetailPage> {
                     autofocus: true,
                     decoration: InputDecoration(
                       hintText: '写下你的评论...',
-                      border: OutlineInputBorder(borderRadius: BorderRadius.circular(20), borderSide: BorderSide.none),
+                      border: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(20),
+                        borderSide: BorderSide.none,
+                      ),
                       filled: true,
                       fillColor: AppColors.tagBackground,
-                      contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
                     ),
                   ),
                 ),
                 const SizedBox(width: 12),
-                TextButton(
+                ElevatedButton(
                   onPressed: () async {
-                    if (_commentController.text.trim().isEmpty) return;
-                    
                     final content = _commentController.text.trim();
-                    Navigator.pop(ctx); // Close modal first
+                    if (content.isEmpty) return;
+                    Navigator.pop(ctx);
                     _commentController.clear();
-                    
-                    try {
-                      await context.read<PostProvider>().addComment(widget.post.id, content);
-                      _loadComments(); // Refresh list
-                      if (mounted) {
-                        ScaffoldMessenger.of(context).showSnackBar(
-                          const SnackBar(content: Text('评论成功'), backgroundColor: AppColors.primary, behavior: SnackBarBehavior.floating),
-                        );
-                      }
-                    } catch (e) {
-                      if (mounted) {
-                        ScaffoldMessenger.of(context).showSnackBar(
-                          SnackBar(content: Text(e.toString()), backgroundColor: Colors.red, behavior: SnackBarBehavior.floating),
-                        );
-                      }
-                    }
+                    await context.read<PostProvider>().addComment(widget.post.id, content);
+                    _loadComments();
                   },
-                  child: const Text('发送', style: TextStyle(color: AppColors.primary, fontWeight: FontWeight.bold)),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: AppColors.primary,
+                    foregroundColor: AppColors.textPrimary,
+                    elevation: 0,
+                  ),
+                  child: const Text('发送'),
                 ),
               ],
             ),
@@ -204,328 +146,427 @@ class _PostDetailPageState extends State<PostDetailPage> {
     );
   }
 
-  Widget _buildCommentList() {
-    if (_isLoadingComments) {
-      return const SliverToBoxAdapter(
-        child: Padding(padding: EdgeInsets.all(20), child: Center(child: CircularProgressIndicator(color: AppColors.primary))),
-      );
-    }
-    
-    if (_comments.isEmpty) {
-      return const SliverToBoxAdapter(
-        child: Padding(padding: EdgeInsets.all(40), child: Center(child: Text('暂无评论，快来抢沙发吧~', style: TextStyle(color: AppColors.textHint)))),
-      );
-    }
-
-    return SliverList(
-      delegate: SliverChildBuilderDelegate(
-        (context, index) {
-          final comment = _comments[index];
-          return Container(
-            padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
-            child: Row(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                ClipOval(
-                  child: CachedNetworkImage(
-                    imageUrl: comment.userAvatar, width: 32, height: 32, fit: BoxFit.cover,
-                    errorWidget: (context, url, error) => const Icon(Icons.person, size: 32),
-                  ),
-                ),
-                const SizedBox(width: 12),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Row(
-                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                        children: [
-                          Text(comment.userName, style: const TextStyle(fontSize: 13, fontWeight: FontWeight.bold, color: AppColors.textPrimary)),
-                          Text(comment.timeLabel, style: AppTextStyles.caption),
-                        ],
-                      ),
-                      const SizedBox(height: 4),
-                      Text(comment.content, style: const TextStyle(fontSize: 14, color: AppColors.textPrimary, height: 1.4)),
-                    ],
-                  ),
-                ),
-              ],
-            ),
-          );
-        },
-        childCount: _comments.length,
-      ),
+  void _showShareModal() {
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: Colors.transparent,
+      builder: (ctx) {
+        return Container(
+          padding: const EdgeInsets.all(20),
+          decoration: const BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+          ),
+          child: const Text('分享功能后续补充。', style: TextStyle(fontSize: 14)),
+        );
+      },
     );
   }
 
   @override
   Widget build(BuildContext context) {
     final isSelfPost = context.read<UserProvider>().user.id == widget.post.authorId;
+    final latestPost = context.watch<PostProvider>().posts.firstWhere(
+          (p) => p.id == widget.post.id,
+          orElse: () => widget.post,
+        );
 
     return Scaffold(
-      backgroundColor: Colors.white,
+      backgroundColor: AppColors.background,
       body: CustomScrollView(
         slivers: [
-          // 顶部全屏图片带返回按钮
           SliverAppBar(
-            expandedHeight: 300.0,
+            expandedHeight: 360,
             pinned: true,
-            flexibleSpace: FlexibleSpaceBar(
-              background: CachedNetworkImage(
-                imageUrl: widget.post.coverImage,
-                fit: BoxFit.cover,
-                placeholder: (context, url) => Container(color: AppColors.tagBackground),
-                errorWidget: (context, url, error) => Container(
-                  color: AppColors.tagBackground,
-                  child: const Icon(Icons.image, size: 48, color: AppColors.primary),
-                ),
-              ),
-            ),
             backgroundColor: Colors.white,
-            iconTheme: const IconThemeData(color: Colors.white),
+            leading: _CircleBtn(icon: Icons.arrow_back_ios_new, onTap: () => context.pop()),
             actions: [
-              IconButton(
-                icon: const Icon(Icons.share, color: Colors.white),
-                onPressed: _showShareModal,
-              ),
+              _CircleBtn(icon: Icons.share, onTap: _showShareModal),
+              const SizedBox(width: 8),
             ],
-          ),
-          // 内容区域
-          SliverToBoxAdapter(
-            child: Padding(
-              padding: const EdgeInsets.all(20),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
+            flexibleSpace: FlexibleSpaceBar(
+              background: Stack(
+                fit: StackFit.expand,
                 children: [
-                  // 标题
-                  Text(widget.post.title, style: const TextStyle(fontSize: 22, fontWeight: FontWeight.bold, color: AppColors.textPrimary)),
-                  const SizedBox(height: 16),
-                  // 作者信息
-                  GestureDetector(
-                    behavior: HitTestBehavior.opaque,
-                    onTap: () {
-                      context.push('/user/${widget.post.authorId}');
-                    },
-                    child: Row(
+                  CachedNetworkImage(
+                    imageUrl: widget.post.coverImage,
+                    fit: BoxFit.cover,
+                    errorWidget: (context, url, error) => Container(color: AppColors.tagBackground),
+                  ),
+                  Container(
+                    decoration: BoxDecoration(
+                      gradient: LinearGradient(
+                        begin: Alignment.topCenter,
+                        end: Alignment.bottomCenter,
+                        colors: [
+                          Colors.transparent,
+                          Colors.black.withValues(alpha: 0.55),
+                        ],
+                      ),
+                    ),
+                  ),
+                  Positioned(
+                    left: 20,
+                    right: 20,
+                    bottom: 20,
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        ClipOval(
-                          child: CachedNetworkImage(
-                            imageUrl: widget.post.authorAvatar, width: 40, height: 40, fit: BoxFit.cover,
-                            placeholder: (context, url) => Container(width: 40, height: 40, color: AppColors.tagBackground),
-                            errorWidget: (context, url, error) => const CircleAvatar(radius: 20, child: Icon(Icons.person, size: 20)),
+                        Text(
+                          widget.post.title,
+                          style: const TextStyle(
+                            fontSize: 28,
+                            fontWeight: FontWeight.w900,
+                            color: Colors.white,
                           ),
                         ),
-                        const SizedBox(width: 12),
-                        Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
+                        const SizedBox(height: 12),
+                        Row(
                           children: [
-                            Text(widget.post.authorName, style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w600)),
-                            Text(widget.post.timeLabel, style: AppTextStyles.caption),
-                          ],
-                        ),
-                        const Spacer(),
-                        if (!isSelfPost)
-                          OutlinedButton(
-                            onPressed: _toggleFollow,
-                            style: OutlinedButton.styleFrom(
-                              foregroundColor: _isFollowing ? AppColors.textSecondary : AppColors.primary,
-                              side: BorderSide(color: _isFollowing ? AppColors.divider : AppColors.primary),
-                              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-                              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 0),
+                            ClipOval(
+                              child: CachedNetworkImage(
+                                imageUrl: widget.post.authorAvatar,
+                                width: 42,
+                                height: 42,
+                                fit: BoxFit.cover,
+                                errorWidget: (context, url, error) => const CircleAvatar(radius: 21, child: Icon(Icons.person)),
+                              ),
                             ),
-                            child: _isFollowLoading
-                                ? const SizedBox(
-                                    width: 14,
-                                    height: 14,
-                                    child: CircularProgressIndicator(
-                                      strokeWidth: 2,
-                                      color: AppColors.primary,
-                                    ),
-                                  )
-                                : Text(
-                                    _isFollowing ? '已关注' : '关注',
+                            const SizedBox(width: 12),
+                            Expanded(
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Text(
+                                    widget.post.authorName,
                                     style: const TextStyle(
-                                      fontSize: 13,
-                                      fontWeight: FontWeight.bold,
+                                      fontSize: 16,
+                                      fontWeight: FontWeight.w800,
+                                      color: Colors.white,
                                     ),
                                   ),
-                          ),
+                                  const SizedBox(height: 2),
+                                  Text(
+                                    widget.post.timeLabel,
+                                    style: const TextStyle(color: Colors.white70),
+                                  ),
+                                ],
+                              ),
+                            ),
+                            if (!isSelfPost)
+                              ElevatedButton(
+                                onPressed: _isFollowLoading ? null : _toggleFollow,
+                                style: ElevatedButton.styleFrom(
+                                  backgroundColor: AppColors.primary,
+                                  foregroundColor: AppColors.textPrimary,
+                                  elevation: 0,
+                                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(999)),
+                                ),
+                                child: Text(_isFollowing ? '已关注' : '关注'),
+                              ),
+                          ],
+                        ),
                       ],
                     ),
                   ),
-                  const SizedBox(height: 20),
-                  const Divider(),
-                  const SizedBox(height: 16),
-                  // 详细内容
-                  Text(
-                    widget.post.content ?? '这是一段旅行笔记的详细内容。在这里可以看到完整的旅行攻略、行程安排、美食推荐等信息。\n\n'
-                    '📍 第一天：抵达目的地，入住酒店，逛周边老街。老街有很多特色小吃，建议空腹前往！\n\n'
-                    '📍 第二天：打卡网红景点，品尝当地美食。记得提前在网上买好门票，避免排长队。\n\n'
-                    '📍 第三天：深度体验当地文化，购买纪念品。如果要买特产，建议去当地的大超市而不是旅游街。\n\n'
-                    '💡 小贴士：当地早晚温差较大，哪怕是夏天也要带一件薄外套~ 还有防晒霜一定不能忘！',
-                    style: const TextStyle(fontSize: 16, color: AppColors.textPrimary, height: 1.8),
-                  ),
-                  const SizedBox(height: 30),
-                  if (widget.post.tag.isNotEmpty)
-                    Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-                      decoration: BoxDecoration(color: AppColors.tagBackground, borderRadius: BorderRadius.circular(12)),
-                      child: Text('# ${widget.post.tag}', style: AppTextStyles.tag),
-                    ),
-                  const SizedBox(height: 32),
-                  const Divider(),
-                  const SizedBox(height: 20),
-                  const Text('全部评论', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
                 ],
               ),
             ),
           ),
-          _buildCommentList(),
-          // 关联向导卡片（引流逻辑）
-          Consumer<GuideProvider>(
-            builder: (context, guideProvider, child) {
-              final isGuide = guideProvider.guides.any((g) => g.id == widget.post.authorId);
-              if (!isGuide) {
-                return const SliverToBoxAdapter(child: SizedBox(height: 100)); // 底部留白
-              }
-
-              return SliverToBoxAdapter(
-                child: Padding(
-                  padding: const EdgeInsets.all(20),
-                  child: Column(
-                    children: [
-                      const SizedBox(height: 20),
-                      Container(
-                        padding: const EdgeInsets.all(16),
-                        decoration: BoxDecoration(
-                          color: AppColors.primary.withValues(alpha: 0.05),
-                          borderRadius: BorderRadius.circular(16),
-                          border: Border.all(color: AppColors.primary.withValues(alpha: 0.1)),
-                        ),
-                        child: Column(
-                          children: [
-                          Row(
-                            children: [
-                              const Text('想和作者一起出发？', style: TextStyle(fontSize: 15, fontWeight: FontWeight.bold)),
-                              const Spacer(),
-                              OutlinedButton(
-                                onPressed: () {
-                                  context.push('/order/create?guideId=${widget.post.authorId}&name=${Uri.encodeComponent(widget.post.authorName)}&avatar=${Uri.encodeComponent(widget.post.authorAvatar)}');
-                                },
-                                style: OutlinedButton.styleFrom(
-                                  foregroundColor: AppColors.primary,
-                                  side: const BorderSide(color: AppColors.primary),
-                                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-                                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 0),
-                                ),
-                                child: const Text('立即下单', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold)),
-                              ),
-                              const SizedBox(width: 8),
-                              ElevatedButton(
-                                onPressed: _contactGuide,
-                                style: ElevatedButton.styleFrom(
-                                  backgroundColor: AppColors.primary,
-                                  foregroundColor: Colors.white,
-                                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-                                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 0),
-                                ),
-                                child: const Text('立即咨询', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold)),
-                              ),
-                            ],
-                          ),
-                             const SizedBox(height: 12),
-                             const Text('该作者同时也是平台认证地陪，下单创建订单后即可联系沟通。', style: TextStyle(fontSize: 13, color: AppColors.textSecondary)),
-                           ],
-                         ),
-                       ),
-                       const SizedBox(height: 100),
-                    ],
-                  ),
-                ),
-              );
-            },
-          ),
-        ],
-      ),
-      // 底部悬浮条
-      bottomSheet: Container(
-        height: 60,
-        decoration: BoxDecoration(
-          color: Colors.white,
-          boxShadow: [BoxShadow(color: Colors.black.withValues(alpha: 0.05), blurRadius: 10, offset: const Offset(0, -2))],
-        ),
-        child: SafeArea(
-          child: Row(
-            children: [
-              const SizedBox(width: 16),
-              Expanded(
-                child: GestureDetector(
-                  onTap: _showCommentModal,
-                  child: Container(
-                    height: 36,
-                    padding: const EdgeInsets.symmetric(horizontal: 16),
-                    decoration: BoxDecoration(color: AppColors.tagBackground, borderRadius: BorderRadius.circular(18)),
-                    alignment: Alignment.centerLeft,
-                    child: const Text('说点什么...', style: TextStyle(color: AppColors.textHint, fontSize: 13)),
-                  ),
-                ),
-              ),
-              const SizedBox(width: 16),
-              Consumer<PostProvider>(
-                builder: (context, provider, _) {
-                  // Find the post in the provider to get the latest state
-                  final latestPost = provider.posts.firstWhere(
-                    (p) => p.id == widget.post.id,
-                    orElse: () => widget.post,
-                  );
-                  final isLiked = latestPost.isLiked;
-                  return GestureDetector(
-                    onTap: () => provider.toggleLike(latestPost),
-                    child: Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        Icon(isLiked ? Icons.favorite : Icons.favorite_border,
-                            color: isLiked ? const Color(0xFFFF6B6B) : AppColors.textSecondary, size: 24),
-                        const SizedBox(width: 4),
-                        Text('${latestPost.likes}', style: const TextStyle(fontWeight: FontWeight.w600, color: AppColors.textSecondary)),
-                      ],
-                    ),
-                  );
-                },
-              ),
-              const SizedBox(width: 20),
-              Consumer<PostProvider>(
-                builder: (context, provider, _) {
-                  // Find the post in the provider to get the latest state
-                  final latestPost = provider.posts.firstWhere(
-                    (p) => p.id == widget.post.id,
-                    orElse: () => widget.post,
-                  );
-                  final isFavorited = latestPost.isFavorited;
-                  return GestureDetector(
-                    behavior: HitTestBehavior.opaque,
-                    onTap: () {
-                      provider.toggleFavorite(latestPost);
-                    },
-                    child: Padding(
-                      padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 8),
-                      child: Row(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          Icon(isFavorited ? Icons.star : Icons.star_border, color: isFavorited ? const Color(0xFFFFB300) : AppColors.textSecondary, size: 24),
-                          const SizedBox(width: 4),
-                          Text(isFavorited ? '已收藏' : '收藏', style: TextStyle(fontWeight: FontWeight.w600, color: isFavorited ? const Color(0xFFFFB300) : AppColors.textSecondary)),
-                        ],
+          SliverToBoxAdapter(
+            child: Padding(
+              padding: const EdgeInsets.fromLTRB(20, 16, 20, 12),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  _PostStatRow(post: latestPost),
+                  const SizedBox(height: 14),
+                  _SectionCard(
+                    title: '正文',
+                    child: Text(
+                      widget.post.content ?? '暂无正文内容',
+                      style: const TextStyle(
+                        fontSize: 15,
+                        height: 1.7,
+                        color: AppColors.textPrimary,
                       ),
                     ),
-                  );
-                },
+                  ),
+                  const SizedBox(height: 14),
+                  _SectionCard(
+                    title: '标签',
+                    child: Wrap(
+                      spacing: 10,
+                      runSpacing: 10,
+                      children: [
+                        if (widget.post.tag.isNotEmpty) _Tag(text: widget.post.tag),
+                        _Tag(text: widget.post.cityLabelOrDefault),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(height: 18),
+                  const Text(
+                    '全部评论',
+                    style: TextStyle(fontSize: 18, fontWeight: FontWeight.w900, color: AppColors.textPrimary),
+                  ),
+                ],
               ),
-              const SizedBox(width: 16),
+            ),
+          ),
+          if (_isLoadingComments)
+            const SliverToBoxAdapter(
+              child: Padding(
+                padding: EdgeInsets.all(24),
+                child: Center(child: CircularProgressIndicator(color: AppColors.primaryDark)),
+              ),
+            )
+          else if (_comments.isEmpty)
+            const SliverToBoxAdapter(
+              child: Padding(
+                padding: EdgeInsets.all(24),
+                child: Center(
+                  child: Text('暂无评论，快来抢沙发吧~', style: TextStyle(color: AppColors.textHint)),
+                ),
+              ),
+            )
+          else
+            SliverPadding(
+              padding: const EdgeInsets.symmetric(horizontal: 20),
+              sliver: SliverList(
+                delegate: SliverChildBuilderDelegate(
+                  (context, index) {
+                    final comment = _comments[index];
+                    return Padding(
+                      padding: const EdgeInsets.only(bottom: 14),
+                      child: _CommentCard(comment: comment),
+                    );
+                  },
+                  childCount: _comments.length,
+                ),
+              ),
+            ),
+          const SliverToBoxAdapter(child: SizedBox(height: 120)),
+        ],
+      ),
+      bottomSheet: Container(
+        height: 68,
+        decoration: BoxDecoration(
+          color: Colors.white,
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withValues(alpha: 0.05),
+              blurRadius: 10,
+              offset: const Offset(0, -2),
+            ),
+          ],
+        ),
+        child: SafeArea(
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 16),
+            child: Row(
+              children: [
+                Expanded(
+                  child: GestureDetector(
+                    onTap: _showCommentModal,
+                    child: Container(
+                      height: 42,
+                      padding: const EdgeInsets.symmetric(horizontal: 16),
+                      decoration: BoxDecoration(
+                        color: AppColors.tagBackground,
+                        borderRadius: BorderRadius.circular(21),
+                      ),
+                      alignment: Alignment.centerLeft,
+                      child: const Text('说点什么...', style: TextStyle(color: AppColors.textHint)),
+                    ),
+                  ),
+                ),
+                const SizedBox(width: 12),
+                IconButton(
+                  onPressed: () => context.read<PostProvider>().toggleLike(latestPost),
+                  icon: Icon(
+                    latestPost.isLiked ? Icons.favorite : Icons.favorite_border,
+                    color: latestPost.isLiked ? const Color(0xFFFF6B6B) : AppColors.textSecondary,
+                  ),
+                ),
+                IconButton(
+                  onPressed: () => context.read<PostProvider>().toggleFavorite(latestPost),
+                  icon: Icon(
+                    latestPost.isFavorited ? Icons.star : Icons.star_border,
+                    color: latestPost.isFavorited ? const Color(0xFFFFB300) : AppColors.textSecondary,
+                  ),
+                ),
+                ElevatedButton(
+                  onPressed: _contactGuide,
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: AppColors.primary,
+                    foregroundColor: AppColors.textPrimary,
+                    elevation: 0,
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(999)),
+                  ),
+                  child: const Text('找TA下单'),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+extension on TravelPost {
+  String get cityLabelOrDefault {
+    final tag = this.tag.trim();
+    if (tag.isNotEmpty) return tag;
+    return '苏州';
+  }
+}
+
+class _CircleBtn extends StatelessWidget {
+  final IconData icon;
+  final VoidCallback onTap;
+
+  const _CircleBtn({required this.icon, required this.onTap});
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.only(left: 12),
+      child: GestureDetector(
+        onTap: onTap,
+        child: Container(
+          width: 42,
+          height: 42,
+          decoration: BoxDecoration(
+            color: Colors.black.withValues(alpha: 0.18),
+            shape: BoxShape.circle,
+          ),
+          child: Icon(icon, color: Colors.white, size: 20),
+        ),
+      ),
+    );
+  }
+}
+
+class _PostStatRow extends StatelessWidget {
+  final TravelPost post;
+
+  const _PostStatRow({required this.post});
+
+  @override
+  Widget build(BuildContext context) {
+    return Row(
+      children: [
+        _StatItem(value: '${post.likes}', label: '点赞'),
+        _StatItem(value: '${post.commentCount}', label: '评论'),
+        _StatItem(value: '${post.timeLabel}', label: '发布'),
+      ],
+    );
+  }
+}
+
+class _StatItem extends StatelessWidget {
+  final String value;
+  final String label;
+
+  const _StatItem({required this.value, required this.label});
+
+  @override
+  Widget build(BuildContext context) {
+    return Expanded(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(value, style: const TextStyle(fontSize: 20, fontWeight: FontWeight.w900, color: AppColors.textPrimary)),
+          const SizedBox(height: 2),
+          Text(label, style: const TextStyle(fontSize: 12, color: AppColors.textHint)),
+        ],
+      ),
+    );
+  }
+}
+
+class _SectionCard extends StatelessWidget {
+  final String title;
+  final Widget child;
+
+  const _SectionCard({required this.title, required this.child});
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(20),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(title, style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w800, color: AppColors.textPrimary)),
+          const SizedBox(height: 12),
+          child,
+        ],
+      ),
+    );
+  }
+}
+
+class _Tag extends StatelessWidget {
+  final String text;
+
+  const _Tag({required this.text});
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+      decoration: BoxDecoration(
+        color: AppColors.primary,
+        borderRadius: BorderRadius.circular(999),
+      ),
+      child: Text(text, style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w800, color: AppColors.textPrimary)),
+    );
+  }
+}
+
+class _CommentCard extends StatelessWidget {
+  final PostComment comment;
+
+  const _CommentCard({required this.comment});
+
+  @override
+  Widget build(BuildContext context) {
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        ClipOval(
+          child: CachedNetworkImage(
+            imageUrl: comment.userAvatar,
+            width: 32,
+            height: 32,
+            fit: BoxFit.cover,
+            errorWidget: (context, url, error) => const CircleAvatar(radius: 16, child: Icon(Icons.person, size: 16)),
+          ),
+        ),
+        const SizedBox(width: 10),
+        Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                children: [
+                  Text(comment.userName, style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w700)),
+                  const Spacer(),
+                  Text(comment.timeLabel, style: const TextStyle(fontSize: 12, color: AppColors.textHint)),
+                ],
+              ),
+              const SizedBox(height: 6),
+              Text(comment.content, style: const TextStyle(fontSize: 14, height: 1.6, color: AppColors.textPrimary)),
             ],
           ),
         ),
-      ),
+      ],
     );
   }
 }

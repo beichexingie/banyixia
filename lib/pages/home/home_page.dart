@@ -18,16 +18,46 @@ class HomePage extends StatefulWidget {
 
 class _HomePageState extends State<HomePage>
     with SingleTickerProviderStateMixin {
-  late TabController _tabController;
-  late TextEditingController _searchController;
+  late final TabController _tabController;
+  late final TextEditingController _searchController;
+  late final PageController _bannerController;
   String _selectedCity = '苏州';
-  bool _hasSignedIn = false;
+  int _bannerIndex = 0;
+
+  final List<String> _banners = const [
+    'https://images.unsplash.com/photo-1500530855697-b586d89ba3ee?auto=format&fit=crop&w=1200&q=80',
+    'https://images.unsplash.com/photo-1506744038136-46273834b3fb?auto=format&fit=crop&w=1200&q=80',
+    'https://images.unsplash.com/photo-1519046904884-53103b34b206?auto=format&fit=crop&w=1200&q=80',
+  ];
+
+  final List<_EntryCardData> _entries = const [
+    _EntryCardData(
+      title: '需求定制',
+      subtitle: '根据你的需求定制~',
+      icon: Icons.map_outlined,
+      route: '/demand/create',
+      large: true,
+    ),
+    _EntryCardData(
+      title: '入驻',
+      subtitle: '成为地陪',
+      icon: Icons.store_mall_directory_outlined,
+      route: '/apply/guide',
+    ),
+    _EntryCardData(
+      title: '联系我们',
+      subtitle: '快速咨询',
+      icon: Icons.support_agent_outlined,
+      route: '/profile/help-feedback',
+    ),
+  ];
 
   @override
   void initState() {
     super.initState();
     _tabController = TabController(length: 3, vsync: this);
     _searchController = TextEditingController();
+    _bannerController = PageController(viewportFraction: 1);
     _searchController.addListener(() => setState(() {}));
   }
 
@@ -35,103 +65,8 @@ class _HomePageState extends State<HomePage>
   void dispose() {
     _tabController.dispose();
     _searchController.dispose();
+    _bannerController.dispose();
     super.dispose();
-  }
-
-  void _showSignInDialog() {
-    if (_hasSignedIn) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: const Text('今天已经签到过了哦~'),
-          backgroundColor: AppColors.primary,
-          behavior: SnackBarBehavior.floating,
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(10),
-          ),
-        ),
-      );
-      return;
-    }
-
-    showDialog(
-      context: context,
-      builder: (context) {
-        return AlertDialog(
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(20),
-          ),
-          content: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Container(
-                width: 80,
-                height: 80,
-                decoration: BoxDecoration(
-                  gradient: AppColors.primaryGradient,
-                  borderRadius: BorderRadius.circular(20),
-                ),
-                child: const Icon(
-                  Icons.check_circle,
-                  color: Colors.white,
-                  size: 48,
-                ),
-              ),
-              const SizedBox(height: 16),
-              const Text(
-                '签到成功！',
-                style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
-              ),
-              const SizedBox(height: 8),
-              const Text(
-                '连续签到可获得更多奖励哦~',
-                style: TextStyle(color: AppColors.textHint, fontSize: 14),
-              ),
-              const SizedBox(height: 8),
-              Container(
-                padding: const EdgeInsets.symmetric(
-                  horizontal: 16,
-                  vertical: 8,
-                ),
-                decoration: BoxDecoration(
-                  color: AppColors.tagBackground,
-                  borderRadius: BorderRadius.circular(12),
-                ),
-                child: const Text(
-                  '+10 积分',
-                  style: TextStyle(
-                    color: AppColors.primary,
-                    fontSize: 16,
-                    fontWeight: FontWeight.bold,
-                  ),
-                ),
-              ),
-            ],
-          ),
-          actions: [
-            SizedBox(
-              width: double.infinity,
-              child: ElevatedButton(
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: AppColors.primary,
-                  foregroundColor: Colors.white,
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(12),
-                  ),
-                  padding: const EdgeInsets.symmetric(vertical: 12),
-                ),
-                onPressed: () => Navigator.pop(context),
-                child: const Text('太棒了'),
-              ),
-            ),
-          ],
-        );
-      },
-    );
-    setState(() => _hasSignedIn = true);
-  }
-
-  void _showCityPicker() {
-    _pickCityWithLocationPicker();
   }
 
   Future<void> _pickCityWithLocationPicker() async {
@@ -169,175 +104,316 @@ class _HomePageState extends State<HomePage>
     return Scaffold(
       backgroundColor: AppColors.background,
       body: SafeArea(
-        child: NestedScrollView(
-          headerSliverBuilder: (context, innerBoxIsScrolled) {
-            return [
-              SliverToBoxAdapter(child: _buildTopBar()),
-              SliverToBoxAdapter(child: _buildCalendarCard()),
-              SliverToBoxAdapter(child: _buildActionButtons()),
-              SliverPersistentHeader(
-                pinned: true,
-                delegate: _TabBarDelegate(
-                  TabBar(
-                    controller: _tabController,
-                    tabs: const [
-                      Tab(text: '推荐'),
-                      Tab(text: '最新'),
-                      Tab(text: '关注'),
-                    ],
-                    indicatorSize: TabBarIndicatorSize.label,
-                    dividerColor: Colors.transparent,
-                  ),
+        child: Consumer<PostProvider>(
+          builder: (context, postProvider, child) {
+            return RefreshIndicator(
+              color: AppColors.primaryDark,
+              onRefresh: () => postProvider.loadPosts(),
+              child: NestedScrollView(
+                headerSliverBuilder: (context, _) {
+                  return [
+                    SliverToBoxAdapter(child: _buildHeroHeader()),
+                    SliverToBoxAdapter(child: _buildSearchRow()),
+                    SliverToBoxAdapter(child: _buildBanner()),
+                    SliverToBoxAdapter(child: _buildEntryPanel()),
+                    SliverPersistentHeader(
+                      pinned: true,
+                      delegate: _HomeTabBarDelegate(
+                        child: Container(
+                          color: AppColors.background,
+                          padding: const EdgeInsets.fromLTRB(20, 12, 20, 8),
+                          child: Align(
+                            alignment: Alignment.centerLeft,
+                            child: Container(
+                              padding: const EdgeInsets.all(4),
+                              decoration: BoxDecoration(
+                                color: Colors.white,
+                                borderRadius: BorderRadius.circular(18),
+                              ),
+                              child: TabBar(
+                                controller: _tabController,
+                                isScrollable: true,
+                                tabAlignment: TabAlignment.start,
+                                indicator: BoxDecoration(
+                                  color: AppColors.primary,
+                                  borderRadius: BorderRadius.circular(14),
+                                ),
+                                dividerColor: Colors.transparent,
+                                labelColor: AppColors.textPrimary,
+                                unselectedLabelColor: AppColors.textSecondary,
+                                indicatorSize: TabBarIndicatorSize.tab,
+                                padding: EdgeInsets.zero,
+                                labelPadding: const EdgeInsets.symmetric(
+                                  horizontal: 18,
+                                ),
+                                tabs: const [
+                                  Tab(text: '推荐'),
+                                  Tab(text: '最新'),
+                                  Tab(text: '关注'),
+                                ],
+                              ),
+                            ),
+                          ),
+                        ),
+                      ),
+                    ),
+                  ];
+                },
+                body: TabBarView(
+                  controller: _tabController,
+                  children: [
+                    _buildPostGrid(postProvider.posts),
+                    _buildPostGrid(postProvider.posts.reversed.toList()),
+                    _buildFollowingContent(postProvider),
+                  ],
                 ),
               ),
-            ];
+            );
           },
-          body: TabBarView(
-            controller: _tabController,
-            children: [
-              _buildContentGrid(),
-              _buildContentGrid(),
-              _buildFollowingContent(),
-            ],
-          ),
         ),
-      ),
-      floatingActionButton: FloatingActionButton(
-        onPressed: () => context.push('/post/create'),
-        backgroundColor: AppColors.primary,
-        child: const Icon(Icons.add, color: Colors.white, size: 28),
       ),
     );
   }
 
-  Widget _buildTopBar() {
+  Widget _buildHeroHeader() {
     return Container(
-      color: Colors.white,
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+      decoration: const BoxDecoration(gradient: AppColors.headerGradient),
+      padding: const EdgeInsets.fromLTRB(20, 12, 20, 18),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const SizedBox(height: 12),
+                Row(
+                  children: [
+                    Container(
+                      width: 26,
+                      height: 26,
+                      decoration: BoxDecoration(
+                        color: AppColors.darkSurface,
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                      child: const Icon(
+                        Icons.emoji_symbols_outlined,
+                        size: 16,
+                        color: AppColors.primary,
+                      ),
+                    ),
+                    const SizedBox(width: 8),
+                    const Text(
+                      '一点就陪',
+                      style: TextStyle(
+                        fontSize: 14,
+                        fontWeight: FontWeight.w600,
+                        color: Color(0xFF7FA23D),
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 6),
+                const Text(
+                  '一点伴',
+                  style: TextStyle(
+                    fontSize: 32,
+                    height: 1,
+                    fontWeight: FontWeight.w900,
+                    color: AppColors.textPrimary,
+                  ),
+                ),
+              ],
+            ),
+          ),
+          Expanded(
+            child: SizedBox(
+              height: 110,
+              child: Stack(
+                children: [
+                  Positioned.fill(
+                    child: Opacity(
+                      opacity: 0.22,
+                      child: CustomPaint(painter: _HeroSketchPainter()),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildSearchRow() {
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(20, 0, 20, 12),
+      child: Row(
+        children: [
+          Expanded(
+            child: Container(
+              height: 56,
+              padding: const EdgeInsets.symmetric(horizontal: 18),
+              decoration: BoxDecoration(
+                color: Colors.white,
+                borderRadius: BorderRadius.circular(28),
+              ),
+              child: Row(
+                children: [
+                  const Icon(
+                    Icons.search,
+                    size: 26,
+                    color: AppColors.textHint,
+                  ),
+                  const SizedBox(width: 10),
+                  Expanded(
+                    child: TextField(
+                      controller: _searchController,
+                      onChanged: (value) =>
+                          context.read<PostProvider>().setSearchQuery(value),
+                      onSubmitted: (value) =>
+                          context.read<PostProvider>().loadPosts(query: value),
+                      decoration: const InputDecoration(
+                        border: InputBorder.none,
+                        hintText: '搜索内容',
+                        hintStyle: TextStyle(
+                          fontSize: 16,
+                          color: AppColors.textHint,
+                        ),
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+          const SizedBox(width: 12),
+          GestureDetector(
+            onTap: _pickCityWithLocationPicker,
+            child: Container(
+              height: 56,
+              padding: const EdgeInsets.symmetric(horizontal: 18),
+              decoration: BoxDecoration(
+                color: Colors.white,
+                borderRadius: BorderRadius.circular(28),
+              ),
+              child: Row(
+                children: [
+                  Text(
+                    _selectedCity,
+                    style: const TextStyle(
+                      fontSize: 16,
+                      fontWeight: FontWeight.w700,
+                      color: AppColors.textPrimary,
+                    ),
+                  ),
+                  const SizedBox(width: 4),
+                  const Icon(Icons.keyboard_arrow_down),
+                ],
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildBanner() {
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(20, 8, 20, 18),
       child: Column(
         children: [
-          Row(
-            children: [
-              Container(
-                width: 32,
-                height: 32,
-                decoration: BoxDecoration(
-                  gradient: AppColors.primaryGradient,
-                  borderRadius: BorderRadius.circular(8),
-                ),
-                child: const Icon(
-                  Icons.diamond_outlined,
-                  color: Colors.white,
-                  size: 18,
-                ),
-              ),
-              const SizedBox(width: 8),
-              const Text(
-                '伴一下',
-                style: TextStyle(
-                  fontSize: 20,
-                  fontWeight: FontWeight.bold,
-                  color: AppColors.primary,
-                ),
-              ),
-              const Spacer(),
-              GestureDetector(
-                onTap: _showSignInDialog,
-                child: Container(
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 12,
-                    vertical: 6,
-                  ),
-                  decoration: BoxDecoration(
-                    color: _hasSignedIn
-                        ? AppColors.divider
-                        : AppColors.tagBackground,
-                    borderRadius: BorderRadius.circular(16),
-                  ),
-                  child: Row(
-                    mainAxisSize: MainAxisSize.min,
+          SizedBox(
+            height: 214,
+            child: PageView.builder(
+              controller: _bannerController,
+              itemCount: _banners.length,
+              onPageChanged: (index) {
+                setState(() {
+                  _bannerIndex = index;
+                });
+              },
+              itemBuilder: (context, index) {
+                return ClipRRect(
+                  borderRadius: BorderRadius.circular(26),
+                  child: Stack(
+                    fit: StackFit.expand,
                     children: [
-                      Icon(
-                        Icons.calendar_today,
-                        size: 14,
-                        color: _hasSignedIn
-                            ? AppColors.textHint
-                            : AppColors.primary,
+                      CachedNetworkImage(
+                        imageUrl: _banners[index],
+                        fit: BoxFit.cover,
                       ),
-                      const SizedBox(width: 4),
-                      Text(
-                        _hasSignedIn ? '已签到' : '签到',
-                        style: TextStyle(
-                          fontSize: 12,
-                          fontWeight: FontWeight.w500,
-                          color: _hasSignedIn
-                              ? AppColors.textHint
-                              : AppColors.primary,
+                      Container(
+                        decoration: BoxDecoration(
+                          gradient: LinearGradient(
+                            begin: Alignment.bottomCenter,
+                            end: Alignment.topCenter,
+                            colors: [
+                              Colors.black.withValues(alpha: 0.32),
+                              Colors.transparent,
+                            ],
+                          ),
+                        ),
+                      ),
+                      const Positioned(
+                        left: 24,
+                        bottom: 28,
+                        child: Text(
+                          '在野生活.',
+                          style: TextStyle(
+                            fontSize: 38,
+                            fontWeight: FontWeight.w900,
+                            color: Colors.white,
+                          ),
                         ),
                       ),
                     ],
                   ),
-                ),
-              ),
-              const SizedBox(width: 12),
-              GestureDetector(
-                onTap: _showCityPicker,
-                child: Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Text(_selectedCity, style: AppTextStyles.subtitle),
-                    const Icon(
-                      Icons.arrow_drop_down,
-                      size: 20,
-                      color: AppColors.textSecondary,
-                    ),
-                  ],
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 12),
-          Container(
-            height: 38,
-            padding: const EdgeInsets.symmetric(horizontal: 16),
-            decoration: BoxDecoration(
-              color: AppColors.tagBackground,
-              borderRadius: BorderRadius.circular(19),
+                );
+              },
             ),
-            child: Row(
-              children: [
-                const Icon(Icons.search, size: 18, color: AppColors.textHint),
-                const SizedBox(width: 8),
-                Expanded(
-                  child: TextField(
-                    controller: _searchController,
-                    onChanged: (value) =>
-                        context.read<PostProvider>().setSearchQuery(value),
-                    onSubmitted: (value) =>
-                        context.read<PostProvider>().loadPosts(query: value),
-                    decoration: const InputDecoration(
-                      hintText: '搜你感兴趣的目的地、景点、玩法',
-                      hintStyle: TextStyle(
-                        color: AppColors.textHint,
-                        fontSize: 13,
-                      ),
-                      border: InputBorder.none,
-                      isDense: true,
-                    ),
-                  ),
+          ),
+          const SizedBox(height: 10),
+          Row(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: List.generate(_banners.length, (index) {
+              final isActive = index == _bannerIndex;
+              return AnimatedContainer(
+                duration: const Duration(milliseconds: 220),
+                margin: const EdgeInsets.symmetric(horizontal: 3),
+                width: isActive ? 16 : 6,
+                height: 6,
+                decoration: BoxDecoration(
+                  color: isActive
+                      ? AppColors.textPrimary
+                      : AppColors.textHint.withValues(alpha: 0.45),
+                  borderRadius: BorderRadius.circular(3),
                 ),
-                if (_searchController.text.isNotEmpty)
-                  GestureDetector(
-                    onTap: () {
-                      _searchController.clear();
-                      context.read<PostProvider>().loadPosts(query: '');
-                    },
-                    child: const Icon(
-                      Icons.clear,
-                      size: 16,
-                      color: AppColors.textHint,
-                    ),
-                  ),
+              );
+            }),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildEntryPanel() {
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(20, 0, 20, 12),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Expanded(
+            child: _buildEntryCard(_entries[0]),
+          ),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Column(
+              children: [
+                _buildEntryCard(_entries[1]),
+                const SizedBox(height: 12),
+                _buildEntryCard(_entries[2]),
               ],
             ),
           ),
@@ -346,178 +422,63 @@ class _HomePageState extends State<HomePage>
     );
   }
 
-  Widget _buildCalendarCard() {
-    final now = DateTime.now();
-    const weekdays = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
+  Widget _buildEntryCard(_EntryCardData data) {
     return GestureDetector(
-      onTap: () => context.push('/demand/create'),
+      onTap: () => context.push(data.route),
       child: Container(
-        margin: const EdgeInsets.all(16),
+        height: data.large ? 188 : 88,
+        padding: const EdgeInsets.fromLTRB(18, 18, 18, 14),
         decoration: BoxDecoration(
-          borderRadius: BorderRadius.circular(16),
-          gradient: const LinearGradient(
-            colors: [Color(0xFF3D6CF5), Color(0xFF86A8FF)],
-            begin: Alignment.topLeft,
-            end: Alignment.bottomRight,
-          ),
-          boxShadow: [
-            BoxShadow(
-              color: AppColors.primary.withValues(alpha: 0.12),
-              blurRadius: 12,
-              offset: const Offset(0, 4),
-            ),
-          ],
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(24),
         ),
-        child: Row(
+        child: Stack(
           children: [
-            ClipRRect(
-              borderRadius: const BorderRadius.only(
-                topLeft: Radius.circular(16),
-                bottomLeft: Radius.circular(16),
-              ),
-              child: CachedNetworkImage(
-                imageUrl: 'https://picsum.photos/seed/calendar/150/150',
-                width: 120,
-                height: 130,
-                fit: BoxFit.cover,
-                placeholder: (context, url) => Container(
-                  width: 120,
-                  height: 130,
-                  color: AppColors.tagBackground,
-                ),
-                errorWidget: (context, url, error) => Container(
-                  width: 120,
-                  height: 130,
-                  color: AppColors.tagBackground,
-                  child: const Icon(Icons.image, color: AppColors.primary),
-                ),
+            Align(
+              alignment: Alignment.topLeft,
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    data.title,
+                    style: const TextStyle(
+                      fontSize: 22,
+                      fontWeight: FontWeight.w900,
+                      color: AppColors.textPrimary,
+                    ),
+                  ),
+                  const SizedBox(height: 6),
+                  Text(
+                    data.subtitle,
+                    style: const TextStyle(
+                      fontSize: 14,
+                      color: AppColors.textHint,
+                    ),
+                  ),
+                  const Spacer(),
+                  Container(
+                    width: 44,
+                    height: 28,
+                    decoration: BoxDecoration(
+                      color: AppColors.darkSurface,
+                      borderRadius: BorderRadius.circular(14),
+                    ),
+                    child: const Icon(
+                      Icons.arrow_outward,
+                      color: AppColors.primary,
+                      size: 18,
+                    ),
+                  ),
+                ],
               ),
             ),
-            Expanded(
-              child: Padding(
-                padding: const EdgeInsets.all(14),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Row(
-                      children: [
-                        const Expanded(
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Text(
-                                '浅伴行程',
-                                style: TextStyle(
-                                  fontSize: 14,
-                                  color: Colors.white70,
-                                ),
-                              ),
-                              SizedBox(height: 2),
-                              Text(
-                                'Fun',
-                                style: TextStyle(
-                                  fontSize: 20,
-                                  fontWeight: FontWeight.bold,
-                                  color: Colors.white,
-                                ),
-                              ),
-                              Text(
-                                'Calendar.',
-                                style: TextStyle(
-                                  fontSize: 16,
-                                  fontWeight: FontWeight.w600,
-                                  color: Colors.white,
-                                ),
-                              ),
-                            ],
-                          ),
-                        ),
-                        Container(
-                          padding: const EdgeInsets.symmetric(
-                            horizontal: 10,
-                            vertical: 6,
-                          ),
-                          decoration: BoxDecoration(
-                            color: Colors.white.withValues(alpha: 0.18),
-                            borderRadius: BorderRadius.circular(12),
-                          ),
-                          child: Column(
-                            children: [
-                              Text(
-                                '${now.month}月',
-                                style: TextStyle(
-                                  fontSize: 11,
-                                  color: Colors.white,
-                                ),
-                              ),
-                              Text(
-                                '${now.day}',
-                                style: TextStyle(
-                                  fontSize: 20,
-                                  fontWeight: FontWeight.bold,
-                                  color: Colors.white,
-                                ),
-                              ),
-                              Text(
-                                weekdays[now.weekday - 1],
-                                style: TextStyle(
-                                  fontSize: 10,
-                                  color: Colors.white70,
-                                ),
-                              ),
-                            ],
-                          ),
-                        ),
-                      ],
-                    ),
-                    const SizedBox(height: 8),
-                    Row(
-                      children: [
-                        const Icon(
-                          Icons.people,
-                          size: 14,
-                          color: Colors.white70,
-                        ),
-                        const SizedBox(width: 4),
-                        Text(
-                          '需求定制',
-                          style: AppTextStyles.caption.copyWith(
-                            color: Colors.white70,
-                          ),
-                        ),
-                        const SizedBox(width: 12),
-                        const Icon(
-                          Icons.location_on,
-                          size: 14,
-                          color: Colors.white70,
-                        ),
-                        const SizedBox(width: 4),
-                        Text(
-                          _selectedCity,
-                          style: AppTextStyles.caption.copyWith(
-                            color: Colors.white70,
-                          ),
-                        ),
-                      ],
-                    ),
-                  ],
-                ),
-              ),
-            ),
-            Padding(
-              padding: const EdgeInsets.only(right: 12, bottom: 60),
-              child: Container(
-                width: 30,
-                height: 30,
-                decoration: BoxDecoration(
-                  color: Colors.white,
-                  borderRadius: BorderRadius.circular(8),
-                ),
-                child: const Icon(
-                  Icons.arrow_outward,
-                  color: AppColors.primary,
-                  size: 16,
-                ),
+            Positioned(
+              right: 4,
+              bottom: data.large ? 8 : 12,
+              child: Icon(
+                data.icon,
+                size: data.large ? 78 : 52,
+                color: AppColors.textPrimary.withValues(alpha: 0.86),
               ),
             ),
           ],
@@ -526,198 +487,108 @@ class _HomePageState extends State<HomePage>
     );
   }
 
-  Widget _buildActionButtons() {
+  Widget _buildPostGrid(List<TravelPost> posts) {
+    if (posts.isEmpty) {
+      return const Center(
+        child: Text(
+          '还没有内容，先去发布第一条动态吧',
+          style: TextStyle(color: AppColors.textSecondary),
+        ),
+      );
+    }
+
     return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 16),
-      child: Row(
-        children: [
-          Expanded(
-            child: GestureDetector(
-              onTap: () => context.push('/apply/guide'),
-              child: _buildActionCard('去入驻', Icons.flag_outlined, '成为地陪'),
-            ),
-          ),
-          const SizedBox(width: 12),
-          Expanded(
-            child: GestureDetector(
-              onTap: () => MainScaffold.switchTo(1),
-              child: _buildActionCard('伴一下', Icons.chat_bubble_outline, '找个搭子'),
-            ),
-          ),
-        ],
+      padding: const EdgeInsets.fromLTRB(20, 6, 20, 110),
+      child: GridView.builder(
+        itemCount: posts.length,
+        gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+          crossAxisCount: 2,
+          crossAxisSpacing: 14,
+          mainAxisSpacing: 14,
+          childAspectRatio: 0.67,
+        ),
+        itemBuilder: (context, index) {
+          return TravelCard(
+            post: posts[index],
+            cityLabel: _selectedCity,
+          );
+        },
       ),
     );
   }
 
-  Widget _buildActionCard(String title, IconData icon, String subtitle) {
-    return Container(
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(14),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withValues(alpha: 0.04),
-            blurRadius: 8,
-            offset: const Offset(0, 2),
-          ),
-        ],
-      ),
-      child: Row(
-        children: [
-          Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(title, style: AppTextStyles.title),
-              const SizedBox(height: 2),
-              Text(subtitle, style: AppTextStyles.caption),
-            ],
-          ),
-          const Spacer(),
-          Container(
-            width: 40,
-            height: 40,
-            decoration: BoxDecoration(
-              color: AppColors.tagBackground,
-              borderRadius: BorderRadius.circular(10),
-            ),
-            child: Icon(icon, color: AppColors.primary, size: 22),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildContentGrid() {
-    return Consumer<PostProvider>(
-      builder: (context, postProvider, child) {
-        if (postProvider.isLoading) {
+  Widget _buildFollowingContent(PostProvider postProvider) {
+    return FutureBuilder<List<TravelPost>>(
+      future: postProvider.fetchFollowingPosts(),
+      builder: (context, snapshot) {
+        if (snapshot.connectionState == ConnectionState.waiting) {
           return const Center(
-            child: CircularProgressIndicator(color: AppColors.primary),
+            child: CircularProgressIndicator(color: AppColors.primaryDark),
           );
         }
-        final posts = postProvider.posts;
+        final posts = snapshot.data ?? [];
         if (posts.isEmpty) {
           return Center(
             child: Column(
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
-                Icon(
-                  Icons.article_outlined,
-                  size: 64,
-                  color: AppColors.textHint.withValues(alpha: 0.5),
+                const Text(
+                  '暂无关注内容',
+                  style: TextStyle(
+                    fontSize: 18,
+                    fontWeight: FontWeight.w700,
+                    color: AppColors.textPrimary,
+                  ),
                 ),
-                const SizedBox(height: 16),
-                const Text('暂无内容', style: AppTextStyles.subtitle),
+                const SizedBox(height: 8),
+                const Text(
+                  '先去服务页或广场关注感兴趣的人吧',
+                  style: TextStyle(color: AppColors.textHint),
+                ),
+                const SizedBox(height: 18),
+                ElevatedButton(
+                  onPressed: () => MainScaffold.switchTo(1),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: AppColors.primary,
+                    foregroundColor: AppColors.textPrimary,
+                    elevation: 0,
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 22,
+                      vertical: 12,
+                    ),
+                  ),
+                  child: const Text('去看看'),
+                ),
               ],
             ),
           );
         }
-        return RefreshIndicator(
-          color: AppColors.primary,
-          onRefresh: () => postProvider.loadPosts(),
-          child: Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 12),
-            child: GridView.builder(
-              padding: const EdgeInsets.only(top: 8),
-              gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-                crossAxisCount: 2,
-                mainAxisSpacing: 10,
-                crossAxisSpacing: 10,
-                childAspectRatio: 0.7,
-              ),
-              itemCount: posts.length,
-              itemBuilder: (context, index) => TravelCard(
-                post: posts[index],
-                cityLabel: _selectedCity,
-              ),
-            ),
-          ),
-        );
-      },
-    );
-  }
-
-  Widget _buildFollowingContent() {
-    return Consumer<PostProvider>(
-      builder: (context, postProvider, child) {
-        return FutureBuilder<List<TravelPost>>(
-          future: postProvider.fetchFollowingPosts(),
-          builder: (context, snapshot) {
-            if (snapshot.connectionState == ConnectionState.waiting) {
-              return const Center(
-                child: CircularProgressIndicator(color: AppColors.primary),
-              );
-            }
-            final posts = snapshot.data ?? [];
-            if (posts.isEmpty) {
-              return Center(
-                child: Column(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    Icon(
-                      Icons.people_outline,
-                      size: 64,
-                      color: AppColors.textHint.withValues(alpha: 0.5),
-                    ),
-                    const SizedBox(height: 16),
-                    const Text('暂无关注内容', style: AppTextStyles.subtitle),
-                    const SizedBox(height: 8),
-                    Text('去发现感兴趣的人吧', style: AppTextStyles.caption),
-                    const SizedBox(height: 24),
-                    ElevatedButton(
-                      onPressed: () => MainScaffold.switchTo(1),
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: AppColors.primary,
-                        foregroundColor: Colors.white,
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(20),
-                        ),
-                      ),
-                      child: const Text('去看看'),
-                    ),
-                  ],
-                ),
-              );
-            }
-            return RefreshIndicator(
-              color: AppColors.primary,
-              onRefresh: () async => setState(() {}),
-              child: Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 12),
-                child: GridView.builder(
-                  padding: const EdgeInsets.only(top: 8),
-                  gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-                    crossAxisCount: 2,
-                    mainAxisSpacing: 10,
-                    crossAxisSpacing: 10,
-                    childAspectRatio: 0.7,
-                  ),
-                  itemCount: posts.length,
-                  itemBuilder: (context, index) =>
-                      TravelCard(
-                        post: posts[index],
-                        cityLabel: _selectedCity,
-                      ),
-                ),
-              ),
-            );
-          },
-        );
+        return _buildPostGrid(posts);
       },
     );
   }
 }
 
-class _TabBarDelegate extends SliverPersistentHeaderDelegate {
-  final TabBar tabBar;
-  _TabBarDelegate(this.tabBar);
+class _EntryCardData {
+  final String title;
+  final String subtitle;
+  final IconData icon;
+  final String route;
+  final bool large;
 
-  @override
-  double get minExtent => tabBar.preferredSize.height;
+  const _EntryCardData({
+    required this.title,
+    required this.subtitle,
+    required this.icon,
+    required this.route,
+    this.large = false,
+  });
+}
 
-  @override
-  double get maxExtent => tabBar.preferredSize.height;
+class _HomeTabBarDelegate extends SliverPersistentHeaderDelegate {
+  final Widget child;
+
+  const _HomeTabBarDelegate({required this.child});
 
   @override
   Widget build(
@@ -725,9 +596,68 @@ class _TabBarDelegate extends SliverPersistentHeaderDelegate {
     double shrinkOffset,
     bool overlapsContent,
   ) {
-    return Container(color: Colors.white, child: tabBar);
+    return child;
   }
 
   @override
-  bool shouldRebuild(covariant _TabBarDelegate oldDelegate) => false;
+  double get maxExtent => 74;
+
+  @override
+  double get minExtent => 74;
+
+  @override
+  bool shouldRebuild(covariant _HomeTabBarDelegate oldDelegate) =>
+      oldDelegate.child != child;
+}
+
+class _HeroSketchPainter extends CustomPainter {
+  @override
+  void paint(Canvas canvas, Size size) {
+    final paint = Paint()
+      ..color = const Color(0xFF7FA23D)
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = 2.2;
+
+    final path = Path()
+      ..moveTo(size.width * 0.1, size.height * 0.8)
+      ..quadraticBezierTo(
+        size.width * 0.28,
+        size.height * 0.28,
+        size.width * 0.56,
+        size.height * 0.18,
+      )
+      ..quadraticBezierTo(
+        size.width * 0.78,
+        size.height * 0.12,
+        size.width * 0.94,
+        size.height * 0.38,
+      )
+      ..quadraticBezierTo(
+        size.width * 0.78,
+        size.height * 0.36,
+        size.width * 0.62,
+        size.height * 0.7,
+      );
+    canvas.drawPath(path, paint);
+
+    canvas.drawCircle(
+      Offset(size.width * 0.82, size.height * 0.22),
+      8,
+      paint..style = PaintingStyle.fill,
+    );
+    paint.style = PaintingStyle.stroke;
+    canvas.drawCircle(
+      Offset(size.width * 0.38, size.height * 0.6),
+      12,
+      paint,
+    );
+    canvas.drawCircle(
+      Offset(size.width * 0.56, size.height * 0.72),
+      10,
+      paint,
+    );
+  }
+
+  @override
+  bool shouldRepaint(covariant CustomPainter oldDelegate) => false;
 }

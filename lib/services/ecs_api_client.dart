@@ -1,5 +1,6 @@
 import 'dart:convert';
 
+import 'package:flutter/foundation.dart';
 import 'package:http/http.dart' as http;
 
 import '../config/app_config.dart';
@@ -26,7 +27,9 @@ class EcsApiClient {
     String? userId,
     bool jsonBody = true,
   }) {
-    final headers = <String, String>{};
+    final headers = <String, String>{
+      'Accept': 'application/json',
+    };
     if (jsonBody) {
       headers['Content-Type'] = 'application/json';
     }
@@ -53,7 +56,7 @@ class EcsApiClient {
       uri,
       headers: _buildHeaders(authToken: authToken, userId: userId, jsonBody: false),
     );
-    return _decode(response);
+    return _decode(response, uri);
   }
 
   Future<Map<String, dynamic>> post(
@@ -68,7 +71,7 @@ class EcsApiClient {
       headers: _buildHeaders(authToken: authToken, userId: userId),
       body: jsonEncode(body ?? const <String, dynamic>{}),
     );
-    return _decode(response);
+    return _decode(response, uri);
   }
 
   Future<Map<String, dynamic>> put(
@@ -83,7 +86,7 @@ class EcsApiClient {
       headers: _buildHeaders(authToken: authToken, userId: userId),
       body: jsonEncode(body ?? const <String, dynamic>{}),
     );
-    return _decode(response);
+    return _decode(response, uri);
   }
 
   Future<Map<String, dynamic>> delete(
@@ -99,20 +102,53 @@ class EcsApiClient {
         ..body = jsonEncode(body ?? const <String, dynamic>{}),
     );
     final streamed = await http.Response.fromStream(response);
-    return _decode(streamed);
+    return _decode(streamed, uri);
   }
 
-  Map<String, dynamic> _decode(http.Response response) {
-    final decoded = jsonDecode(response.body);
-    if (decoded is! Map<String, dynamic>) {
-      throw EcsApiException(response.statusCode, '后端返回了无效数据');
-    }
-    if (response.statusCode < 200 || response.statusCode >= 300 || decoded['success'] == false) {
+  Map<String, dynamic> _decode(http.Response response, Uri uri) {
+    final body = response.body;
+    final contentType = response.headers['content-type'] ?? '';
+
+    try {
+      final decoded = jsonDecode(body);
+      if (decoded is! Map<String, dynamic>) {
+        throw EcsApiException(
+          response.statusCode,
+          'Backend returned non-object JSON. url=$uri, status=${response.statusCode}',
+        );
+      }
+      if (response.statusCode < 200 ||
+          response.statusCode >= 300 ||
+          decoded['success'] == false) {
+        throw EcsApiException(
+          response.statusCode,
+          decoded['message']?.toString() ??
+              'Request failed. url=$uri, status=${response.statusCode}',
+        );
+      }
+      return decoded;
+    } on FormatException {
+      final preview = _bodyPreview(body);
+      debugPrint(
+        'EcsApiClient non-JSON response: url=$uri, '
+        'status=${response.statusCode}, contentType=$contentType, body=$preview',
+      );
       throw EcsApiException(
         response.statusCode,
-        decoded['message']?.toString() ?? '请求失败',
+        'API returned non-JSON content. '
+        'url=$uri, status=${response.statusCode}, contentType=$contentType, body=$preview',
       );
     }
-    return decoded;
+  }
+
+  String _bodyPreview(String body) {
+    final normalized = body.replaceAll(RegExp(r'\s+'), ' ').trim();
+    if (normalized.isEmpty) {
+      return '<empty>';
+    }
+    if (normalized.length <= 200) {
+      return normalized;
+    }
+    return '${normalized.substring(0, 200)}...';
   }
 }

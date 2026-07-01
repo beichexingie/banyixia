@@ -1,20 +1,19 @@
 import 'package:flutter/material.dart';
-import '../config/app_theme.dart';
-import 'home/home_page.dart';
-import 'companion/companion_page.dart';
-import 'messages/messages_page.dart';
-import 'profile/profile_page.dart';
 import 'package:go_router/go_router.dart';
 import 'package:provider/provider.dart';
-import '../providers/message_provider.dart';
 
-/// 全局状态控制器用于安全的跨页面 Tab 切换
+import '../config/app_theme.dart';
+import '../providers/message_provider.dart';
+import 'companion/companion_page.dart';
+import 'home/home_page.dart';
+import 'messages/messages_page.dart';
+import 'profile/profile_page.dart';
+
 final ValueNotifier<int> appTabNotifier = ValueNotifier<int>(0);
 
 class MainScaffold extends StatefulWidget {
   const MainScaffold({super.key});
 
-  /// 从外部切换到指定 Tab
   static void switchTo(int index) {
     appTabNotifier.value = index;
   }
@@ -25,6 +24,14 @@ class MainScaffold extends StatefulWidget {
 
 class _MainScaffoldState extends State<MainScaffold> {
   int _currentIndex = 0;
+
+  final List<Widget> _pages = const [
+    HomePage(),
+    CompanionPage(),
+    SizedBox(),
+    MessagesPage(),
+    ProfilePage(),
+  ];
 
   @override
   void initState() {
@@ -47,19 +54,6 @@ class _MainScaffoldState extends State<MainScaffold> {
     }
   }
 
-  void switchToTab(int index) {
-    if (index == 2) return; // + 号不是真正的 tab
-    appTabNotifier.value = index;
-  }
-
-  final List<Widget> _pages = const [
-    HomePage(),
-    CompanionPage(),
-    SizedBox(),
-    MessagesPage(),
-    ProfilePage(),
-  ];
-
   void _onTabTapped(int index) {
     if (index == 2) {
       _showPublishSheet();
@@ -71,92 +65,114 @@ class _MainScaffoldState extends State<MainScaffold> {
   void _showPublishSheet() {
     showModalBottomSheet(
       context: context,
-      shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
-      ),
+      backgroundColor: Colors.transparent,
+      isScrollControlled: true,
       builder: (context) {
-        return Container(
-          padding: const EdgeInsets.all(24),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              const Center(
-                child: Text(
-                  '发布内容',
-                  style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+        return SafeArea(
+          child: Container(
+            margin: const EdgeInsets.fromLTRB(12, 0, 12, 12),
+            padding: const EdgeInsets.fromLTRB(20, 18, 20, 20),
+            decoration: BoxDecoration(
+              color: Colors.white,
+              borderRadius: BorderRadius.circular(28),
+            ),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Row(
+                  children: [
+                    const SizedBox(width: 40),
+                    const Expanded(
+                      child: Text(
+                        '发布内容',
+                        textAlign: TextAlign.center,
+                        style: TextStyle(
+                          fontSize: 20,
+                          fontWeight: FontWeight.w800,
+                          color: AppColors.textPrimary,
+                        ),
+                      ),
+                    ),
+                    GestureDetector(
+                      onTap: () => Navigator.pop(context),
+                      child: Container(
+                        width: 40,
+                        height: 40,
+                        decoration: BoxDecoration(
+                          color: AppColors.darkSurface,
+                          borderRadius: BorderRadius.circular(20),
+                        ),
+                        child: const Icon(Icons.close, color: Colors.white),
+                      ),
+                    ),
+                  ],
                 ),
-              ),
-              const SizedBox(height: 24),
-              _buildPublishOption(
-                Icons.article_outlined,
-                '分享游玩瞬间',
-                '发布旅行笔记和攻略',
-                route: '/post/create',
-              ),
-              const Divider(),
-              _buildPublishOption(
-                Icons.campaign_outlined,
-                '发布招募/自荐',
-                '发起招募帖或自荐贴，展示自己的同行计划或地陪服务',
-                route: '/post/create?mode=recruit',
-              ),
-              const Divider(),
-              _buildPublishOption(
-                Icons.event_note_outlined,
-                '发布需求',
-                '发起地陪体验需求',
-                route: '/demand/create',
-              ),
-              const Divider(),
-              _buildPublishOption(
-                Icons.person_add_outlined,
-                '申请成为地陪',
-                '入驻成为本地向导',
-                route: '/apply/guide',
-              ),
-            ],
+                const SizedBox(height: 18),
+                _buildPublishOption(
+                  icon: Icons.image_outlined,
+                  title: '发布动态',
+                  subtitle: '记录图片、活动和旅行灵感',
+                  route: '/post/create',
+                ),
+                const Divider(height: 18),
+                _buildPublishOption(
+                  icon: Icons.campaign_outlined,
+                  title: '发布招募/自荐',
+                  subtitle: '发起招募帖或展示自己的地陪服务',
+                  route: '/post/create?mode=recruit',
+                ),
+                const Divider(height: 18),
+                _buildPublishOption(
+                  icon: Icons.edit_note_outlined,
+                  title: '发布需求',
+                  subtitle: '快速发起地陪体验和定制需求',
+                  route: '/demand/create',
+                ),
+                const Divider(height: 18),
+                _buildPublishOption(
+                  icon: Icons.storefront_outlined,
+                  title: '申请成为地陪',
+                  subtitle: '入驻成为本地服务提供者',
+                  route: '/apply/guide',
+                ),
+              ],
+            ),
           ),
         );
       },
     );
   }
 
-  Widget _buildPublishOption(
-    IconData icon,
-    String title,
-    String subtitle, {
+  Widget _buildPublishOption({
+    required IconData icon,
+    required String title,
+    required String subtitle,
     String? route,
   }) {
     return ListTile(
+      contentPadding: EdgeInsets.zero,
       leading: Container(
-        width: 44,
-        height: 44,
+        width: 48,
+        height: 48,
         decoration: BoxDecoration(
           color: AppColors.tagBackground,
-          borderRadius: BorderRadius.circular(12),
+          borderRadius: BorderRadius.circular(16),
         ),
-        child: Icon(icon, color: AppColors.primary),
+        child: Icon(icon, color: AppColors.textPrimary),
       ),
-      title: Text(title, style: const TextStyle(fontWeight: FontWeight.w600)),
+      title: Text(
+        title,
+        style: const TextStyle(
+          fontWeight: FontWeight.w700,
+          color: AppColors.textPrimary,
+        ),
+      ),
       subtitle: Text(subtitle, style: AppTextStyles.caption),
       trailing: const Icon(Icons.chevron_right, color: AppColors.textHint),
-      contentPadding: EdgeInsets.zero,
       onTap: () {
-        Navigator.pop(context); // close the bottom sheet
+        Navigator.pop(context);
         if (route != null) {
           context.push(route);
-        } else {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: Text('「$title」功能即将上线'),
-              backgroundColor: AppColors.primary,
-              behavior: SnackBarBehavior.floating,
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(10),
-              ),
-            ),
-          );
         }
       },
     );
@@ -169,45 +185,41 @@ class _MainScaffoldState extends State<MainScaffold> {
         index: _currentIndex > 2 ? _currentIndex - 1 : _currentIndex,
         children: [_pages[0], _pages[1], _pages[3], _pages[4]],
       ),
-      bottomNavigationBar: Container(
-        decoration: BoxDecoration(
-          color: Colors.white,
-          boxShadow: [
-            BoxShadow(
-              color: Colors.black.withValues(alpha: 0.05),
-              blurRadius: 10,
-              offset: const Offset(0, -2),
-            ),
-          ],
-        ),
-        child: SafeArea(
-          child: SizedBox(
-            height: 60,
-            child: Row(
-              mainAxisAlignment: MainAxisAlignment.spaceAround,
-              children: [
-                _buildNavItem(0, Icons.home_outlined, Icons.home, '广场'),
-                _buildNavItem(
-                  1,
-                  Icons.auto_awesome_mosaic_outlined,
-                  Icons.auto_awesome_mosaic,
-                  '服务',
-                ),
-                _buildCenterButton(),
-                Consumer<MessageProvider>(
-                  builder: (context, msgProvider, _) {
-                    return _buildNavItem(
-                      3,
-                      Icons.chat_bubble_outline,
-                      Icons.chat_bubble,
-                      '消息',
-                      badge: msgProvider.totalUnread,
-                    );
-                  },
-                ),
-                _buildNavItem(4, Icons.person_outline, Icons.person, '我的'),
-              ],
-            ),
+      bottomNavigationBar: SafeArea(
+        minimum: const EdgeInsets.fromLTRB(10, 0, 10, 10),
+        child: Container(
+          height: 86,
+          padding: const EdgeInsets.fromLTRB(6, 6, 6, 0),
+          decoration: BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.circular(28),
+            boxShadow: [
+              BoxShadow(
+                color: Colors.black.withValues(alpha: 0.06),
+                blurRadius: 20,
+                offset: const Offset(0, -4),
+              ),
+            ],
+          ),
+          child: Row(
+            mainAxisAlignment: MainAxisAlignment.spaceAround,
+            children: [
+              _buildNavItem(0, Icons.public_outlined, Icons.public, '广场'),
+              _buildNavItem(1, Icons.favorite_border, Icons.favorite, '服务'),
+              _buildCenterButton(),
+              Consumer<MessageProvider>(
+                builder: (context, msgProvider, _) {
+                  return _buildNavItem(
+                    3,
+                    Icons.chat_bubble_outline,
+                    Icons.chat_bubble,
+                    '消息',
+                    badge: msgProvider.totalUnread,
+                  );
+                },
+              ),
+              _buildNavItem(4, Icons.person_outline, Icons.person, '我的'),
+            ],
           ),
         ),
       ),
@@ -235,8 +247,8 @@ class _MainScaffoldState extends State<MainScaffold> {
               children: [
                 Icon(
                   isActive ? activeIcon : icon,
-                  color: isActive ? AppColors.primary : AppColors.textHint,
-                  size: 24,
+                  color: isActive ? AppColors.textPrimary : AppColors.textHint,
+                  size: 28,
                 ),
                 if (badge > 0)
                   Positioned(
@@ -265,13 +277,13 @@ class _MainScaffoldState extends State<MainScaffold> {
                   ),
               ],
             ),
-            const SizedBox(height: 2),
+            const SizedBox(height: 4),
             Text(
               label,
               style: TextStyle(
-                fontSize: 11,
-                color: isActive ? AppColors.primary : AppColors.textHint,
-                fontWeight: isActive ? FontWeight.w600 : FontWeight.normal,
+                fontSize: 13,
+                color: isActive ? AppColors.textPrimary : AppColors.textHint,
+                fontWeight: isActive ? FontWeight.w700 : FontWeight.w500,
               ),
             ),
           ],
@@ -284,28 +296,24 @@ class _MainScaffoldState extends State<MainScaffold> {
     return GestureDetector(
       onTap: () => _onTabTapped(2),
       child: Container(
-        width: 52,
-        height: 52,
+        width: 74,
+        height: 74,
         decoration: BoxDecoration(
           gradient: AppColors.primaryGradient,
-          borderRadius: BorderRadius.circular(18),
+          borderRadius: BorderRadius.circular(26),
+          border: Border.all(color: Colors.white, width: 6),
           boxShadow: [
             BoxShadow(
-              color: AppColors.primary.withValues(alpha: 0.4),
-              blurRadius: 8,
-              offset: const Offset(0, 2),
+              color: AppColors.primaryDark.withValues(alpha: 0.18),
+              blurRadius: 14,
+              offset: const Offset(0, 4),
             ),
           ],
         ),
-        child: const Center(
-          child: Text(
-            '伴',
-            style: TextStyle(
-              color: Colors.white,
-              fontSize: 18,
-              fontWeight: FontWeight.bold,
-            ),
-          ),
+        child: const Icon(
+          Icons.add,
+          size: 34,
+          color: AppColors.textPrimary,
         ),
       ),
     );

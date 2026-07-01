@@ -1,5 +1,8 @@
 import express from 'express';
 import crypto from 'crypto';
+import fs from 'fs/promises';
+import path from 'path';
+import { fileURLToPath } from 'url';
 
 import { config } from '../config.js';
 import { pool, withTransaction } from '../db.js';
@@ -16,6 +19,9 @@ import {
 import { ensureChatRoom, findOrderById, findOrderByMerchantOrderNo } from '../repositories/orders.js';
 
 export const appRouter = express.Router();
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
+const uploadsDir = path.resolve(__dirname, '../../uploads');
 
 function handleRoute(handler) {
   return async (req, res, next) => {
@@ -39,6 +45,63 @@ function normalizePhone(phone) {
 
 function readWhitelistCode(phone) {
   return config.authWhitelist[phone] ?? '';
+}
+
+function sanitizeFilenamePart(value, fallback = 'file') {
+  const normalized = value?.toString().trim() ?? '';
+  const safe = normalized.replace(/[^0-9A-Za-z._-]/g, '_');
+  return safe || fallback;
+}
+
+function detectExtension(filename, mimeType) {
+  const ext = path.extname(filename ?? '').toLowerCase();
+  if (ext) return ext;
+  switch ((mimeType ?? '').toLowerCase()) {
+    case 'image/png':
+      return '.png';
+    case 'image/webp':
+      return '.webp';
+    case 'image/gif':
+      return '.gif';
+    default:
+      return '.jpg';
+  }
+}
+
+async function persistBase64Upload({
+  category,
+  filename,
+  mimeType,
+  bytesBase64,
+}) {
+  if (!bytesBase64?.toString().trim()) {
+    throw new Error('缺少图片数据');
+  }
+
+  const categoryDir = path.join(uploadsDir, category);
+  await fs.mkdir(categoryDir, { recursive: true });
+
+  const safeName = sanitizeFilenamePart(
+    path.basename(filename ?? '', path.extname(filename ?? '')),
+    category,
+  );
+  const ext = detectExtension(filename, mimeType);
+  const finalName = `${Date.now()}_${safeName}${ext}`;
+  const absolutePath = path.join(categoryDir, finalName);
+  const buffer = Buffer.from(bytesBase64, 'base64');
+  await fs.writeFile(absolutePath, buffer);
+
+  return `/uploads/${category}/${finalName}`;
+}
+
+function buildPublicUrl(req, relativePath) {
+  const forwardedProto = req.headers['x-forwarded-proto']?.toString().trim();
+  const protocol = forwardedProto || req.protocol || 'http';
+  const host = req.headers.host?.toString().trim();
+  if (!host) {
+    return relativePath;
+  }
+  return `${protocol}://${host}${relativePath}`;
 }
 
 async function requireSessionUser(req, res) {
@@ -593,7 +656,7 @@ appRouter.post('/chat/rooms/:id/read', async (req, res) => {
   return ok(res, { message: '已读' });
 });
 
-appRouter.get('/orders', async (req, res) => {
+appRouter.get('/orders', handleRoute(async (req, res) => {
   const userId = await requireSessionUser(req, res);
   if (!userId) return;
   const result = await pool.query(
@@ -606,12 +669,16 @@ appRouter.get('/orders', async (req, res) => {
     [userId],
   );
   return ok(res, { data: result.rows });
-});
+}));
 
-appRouter.post('/orders', async (req, res) => {
+appRouter.post('/orders', handleRoute(async (req, res) => {
   const userId = await requireSessionUser(req, res);
   if (!userId) return;
   const payload = req.body ?? {};
+  const guideId = payload.guideId ?? payload.guide_id;
+  if (!guideId?.toString().trim()) {
+    return fail(res, 400, 'missing guide_id');
+  }
   const result = await pool.query(
     `
       insert into public.orders (
@@ -623,7 +690,7 @@ appRouter.post('/orders', async (req, res) => {
     `,
     [
       userId,
-      payload.guideId ?? payload.guide_id,
+      guideId,
       payload.guideName ?? payload.guide_name ?? '',
       payload.guideAvatar ?? payload.guide_avatar ?? '',
       payload.status ?? 0,
@@ -635,9 +702,9 @@ appRouter.post('/orders', async (req, res) => {
     ],
   );
   return ok(res, { data: result.rows[0] });
-});
+}));
 
-appRouter.put('/orders/:id', async (req, res) => {
+appRouter.put('/orders/:id', handleRoute(async (req, res) => {
   const userId = await requireSessionUser(req, res);
   if (!userId) return;
   const payload = req.body ?? {};
@@ -659,9 +726,9 @@ appRouter.put('/orders/:id', async (req, res) => {
     [req.params.id, payload.payment_status, payload.merchant_order_no, payload.payment_request_id],
   );
   return ok(res, { data: result.rows[0] });
-});
+}));
 
-appRouter.post('/orders/:id/complete', async (req, res) => {
+appRouter.post('/orders/:id/complete', handleRoute(async (req, res) => {
   const userId = await requireSessionUser(req, res);
   if (!userId) return;
   const order = await findOrderById(pool, req.params.id);
@@ -671,9 +738,9 @@ appRouter.post('/orders/:id/complete', async (req, res) => {
   }
   await pool.query(`update public.orders set status = 3 where id = $1`, [req.params.id]);
   return ok(res, { message: '已完成' });
-});
+}));
 
-appRouter.post('/orders/:id/cancel', async (req, res) => {
+appRouter.post('/orders/:id/cancel', handleRoute(async (req, res) => {
   const userId = await requireSessionUser(req, res);
   if (!userId) return;
   const order = await findOrderById(pool, req.params.id);
@@ -683,7 +750,7 @@ appRouter.post('/orders/:id/cancel', async (req, res) => {
   }
   await pool.query(`update public.orders set status = 4 where id = $1`, [req.params.id]);
   return ok(res, { message: '已取消' });
-});
+}));
 
 appRouter.get('/wallet', async (req, res) => {
   const userId = await requireSessionUser(req, res);
@@ -693,13 +760,31 @@ appRouter.get('/wallet', async (req, res) => {
   return ok(res, { data: { wallet: wallet.rows[0] ?? null, transactions: tx.rows } });
 });
 
-appRouter.post('/uploads/post-image', async (_req, res) => {
-  return ok(res, { data: { url: 'https://picsum.photos/seed/upload/800/600' } });
-});
+appRouter.post('/uploads/post-image', handleRoute(async (req, res) => {
+  const userId = await requireSessionUser(req, res);
+  if (!userId) return;
+  const payload = req.body ?? {};
+  const relativeUrl = await persistBase64Upload({
+    category: 'posts',
+    filename: payload.filename ?? `post_${userId}.jpg`,
+    mimeType: payload.mime_type ?? payload.mimeType ?? 'image/jpeg',
+    bytesBase64: payload.bytes_base64 ?? payload.bytesBase64,
+  });
+  return ok(res, { data: { url: buildPublicUrl(req, relativeUrl) } });
+}));
 
-appRouter.post('/uploads/avatar', async (_req, res) => {
-  return ok(res, { data: { url: 'https://picsum.photos/seed/avatar-upload/100/100' } });
-});
+appRouter.post('/uploads/avatar', handleRoute(async (req, res) => {
+  const userId = await requireSessionUser(req, res);
+  if (!userId) return;
+  const payload = req.body ?? {};
+  const relativeUrl = await persistBase64Upload({
+    category: 'avatars',
+    filename: payload.filename ?? `avatar_${userId}.jpg`,
+    mimeType: payload.mime_type ?? payload.mimeType ?? 'image/jpeg',
+    bytesBase64: payload.bytes_base64 ?? payload.bytesBase64,
+  });
+  return ok(res, { data: { url: buildPublicUrl(req, relativeUrl) } });
+}));
 
 appRouter.get('/guide-applications/me', async (req, res) => {
   const userId = await requireSessionUser(req, res);

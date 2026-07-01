@@ -1,5 +1,7 @@
 import cors from 'cors';
 import express from 'express';
+import path from 'path';
+import { fileURLToPath } from 'url';
 
 import { config } from './config.js';
 import { healthRouter } from './routes/health.js';
@@ -7,6 +9,9 @@ import { appRouter } from './routes/app.js';
 import { paymentsRouter } from './routes/payments.js';
 
 const app = express();
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
+const uploadsDir = path.resolve(__dirname, '../uploads');
 
 app.use(
   cors({
@@ -14,7 +19,8 @@ app.use(
     credentials: true,
   }),
 );
-app.use(express.json({ limit: '2mb' }));
+app.use(express.json({ limit: '12mb' }));
+app.use('/uploads', express.static(uploadsDir));
 app.use((req, _res, next) => {
   const headerUserId = req.headers['x-user-id']?.toString().trim();
   const authHeader = req.headers.authorization?.toString().trim() ?? '';
