@@ -57,8 +57,8 @@ class Order {
       guideId: json['guide_id']?.toString() ?? '',
       guideName: json['guide_name'] ?? '',
       guideAvatar: json['guide_avatar'] ?? '',
-      status: OrderStatus.values[json['status'] ?? 0],
-      amount: _asDouble(json['amount']),
+      status: _parseStatus(json['status']),
+      amount: _parseDouble(json['amount']) ?? 0,
       serviceName: json['service_name'] ?? '',
       paymentMethod: json['payment_method'] ?? '',
       paymentStatus: json['payment_status'] ?? '',
@@ -139,6 +139,52 @@ class Order {
       createdAt: createdAt ?? this.createdAt,
       serviceDate: serviceDate ?? this.serviceDate,
     );
+  }
+
+  static OrderStatus _parseStatus(dynamic value) {
+    if (value is int && value >= 0 && value < OrderStatus.values.length) {
+      return OrderStatus.values[value];
+    }
+    final normalized = value?.toString().trim().toLowerCase() ?? '';
+    switch (normalized) {
+      case 'pendingpayment':
+      case 'pending_payment':
+      case 'pending':
+      case '0':
+        return OrderStatus.pendingPayment;
+      case 'inprogress':
+      case 'in_progress':
+      case 'processing':
+      case '1':
+        return OrderStatus.inProgress;
+      case 'pendingreview':
+      case 'pending_review':
+      case '2':
+        return OrderStatus.pendingReview;
+      case 'completed':
+      case 'complete':
+      case '3':
+        return OrderStatus.completed;
+      case 'cancelled':
+      case 'canceled':
+      case '4':
+        return OrderStatus.cancelled;
+      default:
+        final parsedIndex = int.tryParse(normalized);
+        if (parsedIndex != null &&
+            parsedIndex >= 0 &&
+            parsedIndex < OrderStatus.values.length) {
+          return OrderStatus.values[parsedIndex];
+        }
+        return OrderStatus.pendingPayment;
+    }
+  }
+
+  static double? _parseDouble(dynamic value) {
+    if (value is double) return value;
+    if (value is int) return value.toDouble();
+    if (value is num) return value.toDouble();
+    return double.tryParse(value?.toString() ?? '');
   }
 
   String get statusLabel {

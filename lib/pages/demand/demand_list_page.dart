@@ -4,6 +4,7 @@ import 'package:provider/provider.dart';
 
 import '../../config/app_theme.dart';
 import '../../models/demand_request.dart';
+import '../main_scaffold.dart';
 import '../../providers/demand_provider.dart';
 import '../../widgets/demand_card.dart';
 
@@ -16,104 +17,373 @@ class DemandListPage extends StatefulWidget {
 
 class _DemandListPageState extends State<DemandListPage> {
   int _activeChip = 0;
-  late final TextEditingController _searchController;
 
   @override
   void initState() {
     super.initState();
-    _searchController = TextEditingController();
-    _searchController.addListener(() => setState(() {}));
     WidgetsBinding.instance.addPostFrameCallback((_) {
       context.read<DemandProvider>().loadDemands();
     });
   }
 
   @override
-  void dispose() {
-    _searchController.dispose();
-    super.dispose();
-  }
-
-  @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: AppColors.background,
-      appBar: AppBar(
-        title: const Text('需求列表'),
-        actions: [
-          IconButton(
-            onPressed: () => context.push('/demand/create'),
-            icon: const Icon(Icons.edit_square),
-          ),
-        ],
+      backgroundColor: const Color(0xFFF7F7F2),
+      floatingActionButton: Padding(
+        padding: const EdgeInsets.only(bottom: 6),
+        child: FloatingActionButton(
+          onPressed: () => context.push('/demand/create'),
+          backgroundColor: const Color(0xFF181818),
+          foregroundColor: AppColors.primary,
+          elevation: 0,
+          shape: const CircleBorder(),
+          child: const Icon(Icons.add, size: 30),
+        ),
       ),
-      body: Column(
-        children: [
-          Container(
-            color: Colors.white,
-            padding: const EdgeInsets.fromLTRB(16, 4, 16, 16),
-            child: Column(
-              children: [
-                Row(
-                  children: [
-                    Expanded(child: _buildSearchBar()),
-                    const SizedBox(width: 10),
-                    _buildCitySelector(),
-                  ],
-                ),
-                const SizedBox(height: 12),
-                Row(
-                  children: [
-                    _buildChip('推荐', 0),
-                    const SizedBox(width: 10),
-                    _buildChip('最新', 1),
-                    const SizedBox(width: 10),
-                    _buildChip('附近', 2),
-                  ],
-                ),
+      bottomNavigationBar: _buildBottomNav(),
+      body: Consumer<DemandProvider>(
+        builder: (context, provider, _) {
+          final demands = _filteredDemands(provider.filteredDemands);
+
+          return RefreshIndicator(
+            color: AppColors.primary,
+            onRefresh: () => provider.loadDemands(),
+            child: CustomScrollView(
+              physics: const AlwaysScrollableScrollPhysics(
+                parent: BouncingScrollPhysics(),
+              ),
+              slivers: [
+                SliverToBoxAdapter(child: _buildHeader()),
+                if (provider.isLoading && demands.isEmpty)
+                  const SliverFillRemaining(
+                    hasScrollBody: false,
+                    child: Center(
+                      child: CircularProgressIndicator(
+                        color: AppColors.primary,
+                      ),
+                    ),
+                  )
+                else if (demands.isEmpty)
+                  SliverFillRemaining(
+                    hasScrollBody: false,
+                    child: _buildEmptyState(),
+                  )
+                else
+                  SliverPadding(
+                    padding: const EdgeInsets.fromLTRB(16, 10, 16, 126),
+                    sliver: SliverList(
+                      delegate: SliverChildBuilderDelegate((context, index) {
+                        return Padding(
+                          padding: EdgeInsets.only(
+                            bottom: index == demands.length - 1 ? 0 : 14,
+                          ),
+                          child: DemandCard(
+                            demand: demands[index],
+                            compact: false,
+                          ),
+                        );
+                      }, childCount: demands.length),
+                    ),
+                  ),
               ],
             ),
+          );
+        },
+      ),
+    );
+  }
+
+  Widget _buildHeader() {
+    return Container(
+      decoration: const BoxDecoration(
+        gradient: LinearGradient(
+          colors: [Color(0xFFE9FFA0), Color(0xFFF2FFD0), Color(0xFFF7F7F2)],
+          begin: Alignment.topCenter,
+          end: Alignment.bottomCenter,
+          stops: [0.0, 0.72, 1.0],
+        ),
+      ),
+      child: SafeArea(
+        bottom: false,
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(14, 10, 14, 16),
+          child: Column(
+            children: [
+              Row(
+                children: [
+                  IconButton(
+                    padding: EdgeInsets.zero,
+                    constraints: const BoxConstraints(
+                      minWidth: 36,
+                      minHeight: 36,
+                    ),
+                    onPressed: () => context.pop(),
+                    icon: const Icon(
+                      Icons.arrow_back_ios_new,
+                      size: 18,
+                      color: AppColors.textPrimary,
+                    ),
+                  ),
+                  const Expanded(
+                    child: Text(
+                      '需求列表',
+                      textAlign: TextAlign.center,
+                      style: TextStyle(
+                        fontSize: 22,
+                        fontWeight: FontWeight.w900,
+                        color: AppColors.textPrimary,
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: 36),
+                ],
+              ),
+              const SizedBox(height: 16),
+              Container(
+                margin: const EdgeInsets.symmetric(horizontal: 4),
+                padding: const EdgeInsets.all(16),
+                decoration: BoxDecoration(
+                  color: Colors.white,
+                  borderRadius: BorderRadius.circular(24),
+                ),
+                child: Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Expanded(
+                      flex: 2,
+                      child: _buildTopCard(
+                        title: '需求定制',
+                        subtitle: '根据你的需求定制~',
+                        image: 'assets/home/feature_settle/Frame 5.png',
+                        big: true,
+                        onTap: () => context.push('/demand/create'),
+                      ),
+                    ),
+                    const SizedBox(width: 10),
+                    Expanded(
+                      flex: 1,
+                      child: Column(
+                        children: [
+                          _buildTopCard(
+                            title: '入驻',
+                            subtitle: '',
+                            image: 'assets/home/feature_map/Frame 6.png',
+                            big: false,
+                            onTap: () => context.push('/apply/guide'),
+                          ),
+                          const SizedBox(height: 10),
+                          _buildTopCard(
+                            title: '联系我们',
+                            subtitle: '',
+                            image: 'assets/home/feature_contact/Frame 5.png',
+                            big: false,
+                            onTap: () =>
+                                ScaffoldMessenger.of(context).showSnackBar(
+                                  const SnackBar(content: Text('联系客服入口稍后接入')),
+                                ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
           ),
-          Expanded(
-            child: Consumer<DemandProvider>(
-              builder: (context, provider, child) {
-                if (provider.isLoading) {
-                  return const Center(
-                    child: CircularProgressIndicator(color: AppColors.primary),
-                  );
-                }
+        ),
+      ),
+    );
+  }
 
-                final demands = _filteredDemands(provider.filteredDemands);
-                if (demands.isEmpty) {
-                  return _buildEmptyState();
-                }
+  Widget _buildTopCard({
+    required String title,
+    required String subtitle,
+    required String image,
+    required bool big,
+    required VoidCallback onTap,
+  }) {
+    final height = big ? 142.0 : 72.0;
 
-                return RefreshIndicator(
-                  color: AppColors.primary,
-                  onRefresh: () => provider.loadDemands(
-                    query: _searchController.text.trim(),
+    return InkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(20),
+      child: Container(
+        height: height,
+        padding: EdgeInsets.fromLTRB(big ? 16 : 14, big ? 14 : 12, 14, 12),
+        decoration: BoxDecoration(
+          color: const Color(0xFFF2F2EC),
+          borderRadius: BorderRadius.circular(20),
+        ),
+        child: Stack(
+          children: [
+            Positioned(
+              left: 0,
+              top: 0,
+              right: big ? 120 : 56,
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Text(
+                    title,
+                    style: TextStyle(
+                      fontSize: big ? 20 : 17,
+                      fontWeight: FontWeight.w900,
+                      color: AppColors.textPrimary,
+                    ),
                   ),
-                  child: ListView.separated(
-                    padding: const EdgeInsets.fromLTRB(16, 16, 16, 96),
-                    itemBuilder: (context, index) =>
-                        DemandCard(demand: demands[index]),
-                    separatorBuilder: (context, index) =>
-                        const SizedBox(height: 16),
-                    itemCount: demands.length,
+                  if (subtitle.isNotEmpty) ...[
+                    const SizedBox(height: 6),
+                    Text(
+                      subtitle,
+                      style: const TextStyle(
+                        fontSize: 12,
+                        color: AppColors.textSecondary,
+                      ),
+                    ),
+                  ],
+                  const SizedBox(height: 10),
+                  Container(
+                    width: 52,
+                    height: 24,
+                    decoration: BoxDecoration(
+                      color: AppColors.textPrimary,
+                      borderRadius: BorderRadius.circular(999),
+                    ),
+                    alignment: Alignment.center,
+                    child: const Icon(
+                      Icons.arrow_forward_rounded,
+                      size: 16,
+                      color: AppColors.primary,
+                    ),
                   ),
-                );
+                ],
+              ),
+            ),
+            Positioned(
+              right: big ? 8 : 0,
+              bottom: big ? 0 : -4,
+              child: Image.asset(
+                image,
+                width: big ? 112 : 62,
+                height: big ? 112 : 62,
+                fit: BoxFit.contain,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildBottomNav() {
+    return Container(
+      decoration: const BoxDecoration(
+        color: Colors.white,
+        border: Border(top: BorderSide(color: Color(0xFFF0F0F0))),
+      ),
+      padding: EdgeInsets.only(bottom: MediaQuery.paddingOf(context).bottom),
+      child: SizedBox(
+        height: 74,
+        child: Row(
+          mainAxisAlignment: MainAxisAlignment.spaceAround,
+          children: [
+            _navItem(
+              label: '广场',
+              icon: Icons.public_outlined,
+              onTap: () {
+                MainScaffold.switchTo(0);
+                context.go('/');
               },
             ),
-          ),
-        ],
+            _navItem(
+              label: '服务',
+              icon: Icons.favorite_border,
+              onTap: () {
+                MainScaffold.switchTo(1);
+                context.go('/');
+              },
+            ),
+            GestureDetector(
+              onTap: () {},
+              child: SizedBox(
+                width: 66,
+                child: Column(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    Container(
+                      width: 56,
+                      height: 56,
+                      decoration: BoxDecoration(
+                        color: AppColors.primary,
+                        shape: BoxShape.circle,
+                        boxShadow: [
+                          BoxShadow(
+                            color: AppColors.primary.withValues(alpha: 0.32),
+                            blurRadius: 18,
+                            offset: const Offset(0, 6),
+                          ),
+                        ],
+                      ),
+                      alignment: Alignment.center,
+                      child: Image.asset(
+                        'assets/login/Group.png',
+                        width: 34,
+                        height: 34,
+                        fit: BoxFit.contain,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+            _navItem(
+              label: '消息',
+              icon: Icons.chat_bubble_outline,
+              onTap: () {
+                MainScaffold.switchTo(3);
+                context.go('/');
+              },
+            ),
+            _navItem(
+              label: '我的',
+              icon: Icons.person_outline,
+              onTap: () {
+                MainScaffold.switchTo(4);
+                context.go('/');
+              },
+            ),
+          ],
+        ),
       ),
-      floatingActionButton: FloatingActionButton.extended(
-        onPressed: () => context.push('/demand/create'),
-        backgroundColor: AppColors.primary,
-        icon: const Icon(Icons.edit_outlined, color: Colors.white),
-        label: const Text(
-          '发布',
-          style: TextStyle(color: Colors.white, fontWeight: FontWeight.w700),
+    );
+  }
+
+  Widget _navItem({
+    required String label,
+    required IconData icon,
+    required VoidCallback onTap,
+  }) {
+    return InkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(18),
+      child: SizedBox(
+        width: 62,
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Icon(icon, size: 24, color: const Color(0xFFD0D5E2)),
+            const SizedBox(height: 6),
+            Text(
+              label,
+              style: const TextStyle(
+                fontSize: 10.5,
+                fontWeight: FontWeight.w500,
+                color: Color(0xFFD0D5E2),
+              ),
+            ),
+          ],
         ),
       ),
     );
@@ -129,182 +399,45 @@ class _DemandListPageState extends State<DemandListPage> {
     return demands;
   }
 
-  Future<void> _pickCity() async {
-    final currentCity = context.read<DemandProvider>().selectedCity;
-    final seedCity = currentCity == '全国' ? '苏州' : currentCity;
-
-    final result = await context.push<Map<String, dynamic>>(
-      '/demand/location',
-      extra: {
-        'city': seedCity,
-        'address': seedCity,
-      },
-    );
-    if (result == null || !mounted) return;
-
-    final city = _normalizeCityName(result['city']?.toString());
-    if (city.isEmpty) return;
-
-    context.read<DemandProvider>().setCity(city);
-  }
-
-  Widget _buildSearchBar() {
-    return Container(
-      height: 42,
-      padding: const EdgeInsets.symmetric(horizontal: 14),
-      decoration: BoxDecoration(
-        color: AppColors.tagBackground,
-        borderRadius: BorderRadius.circular(21),
-      ),
-      child: Row(
-        children: [
-          const Icon(Icons.search, size: 18, color: AppColors.textHint),
-          const SizedBox(width: 8),
-          Expanded(
-            child: TextField(
-              controller: _searchController,
-              textInputAction: TextInputAction.search,
-              onChanged: (value) =>
-                  context.read<DemandProvider>().setSearchQuery(value),
-              decoration: const InputDecoration(
-                hintText: '搜索地点、时间或需求内容',
-                border: InputBorder.none,
-                isDense: true,
+  Widget _buildEmptyState() {
+    return Center(
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 30),
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Container(
+              width: 82,
+              height: 82,
+              decoration: BoxDecoration(
+                color: Colors.white,
+                borderRadius: BorderRadius.circular(28),
               ),
-            ),
-          ),
-          if (_searchController.text.isNotEmpty)
-            GestureDetector(
-              onTap: () {
-                _searchController.clear();
-                context.read<DemandProvider>().setSearchQuery('');
-                setState(() {});
-              },
+              alignment: Alignment.center,
               child: const Icon(
-                Icons.close,
-                size: 16,
+                Icons.explore_outlined,
+                size: 40,
                 color: AppColors.textHint,
               ),
             ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildCitySelector() {
-    final selectedCity = context.watch<DemandProvider>().selectedCity;
-    return GestureDetector(
-      onTap: selectedCity == '全国' ? _pickCity : null,
-      child: Container(
-        height: 42,
-        padding: const EdgeInsets.symmetric(horizontal: 12),
-        decoration: BoxDecoration(
-          color: AppColors.tagBackground,
-          borderRadius: BorderRadius.circular(21),
-        ),
-        child: Row(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            const Icon(
-              Icons.location_on_outlined,
-              size: 16,
-              color: AppColors.primary,
-            ),
-            const SizedBox(width: 4),
-            Text(
-              selectedCity,
-              style: const TextStyle(fontWeight: FontWeight.w600),
-            ),
-            const SizedBox(width: 4),
-            if (selectedCity == '全国')
-              const Icon(
-                Icons.arrow_drop_down,
-                size: 18,
-                color: AppColors.primary,
-              )
-            else
-              GestureDetector(
-                onTap: () => context.read<DemandProvider>().setCity('全国'),
-                child: const Icon(
-                  Icons.close,
-                  size: 16,
-                  color: AppColors.primary,
-                ),
+            const SizedBox(height: 16),
+            const Text(
+              '暂无需求内容',
+              style: TextStyle(
+                fontSize: 18,
+                fontWeight: FontWeight.w800,
+                color: AppColors.textPrimary,
               ),
+            ),
+            const SizedBox(height: 8),
+            const Text(
+              '可以先发布自己的需求，等合适的人来接单。',
+              textAlign: TextAlign.center,
+              style: TextStyle(fontSize: 13, color: AppColors.textSecondary),
+            ),
           ],
         ),
       ),
     );
-  }
-
-  Widget _buildChip(String label, int index) {
-    final selected = _activeChip == index;
-    return GestureDetector(
-      onTap: () => setState(() => _activeChip = index),
-      child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 9),
-        decoration: BoxDecoration(
-          color: selected ? AppColors.primary : Colors.white,
-          border: Border.all(
-            color: AppColors.primary.withValues(alpha: selected ? 0 : 0.2),
-          ),
-          borderRadius: BorderRadius.circular(999),
-        ),
-        child: Text(
-          label,
-          style: TextStyle(
-            fontSize: 13,
-            fontWeight: FontWeight.w700,
-            color: selected ? Colors.white : AppColors.primary,
-          ),
-        ),
-      ),
-    );
-  }
-
-  Widget _buildEmptyState() {
-    return Center(
-      child: Column(
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          Container(
-            width: 72,
-            height: 72,
-            decoration: BoxDecoration(
-              color: AppColors.tagBackground,
-              borderRadius: BorderRadius.circular(24),
-            ),
-            child: const Icon(
-              Icons.inbox_outlined,
-              size: 36,
-              color: AppColors.primary,
-            ),
-          ),
-          const SizedBox(height: 16),
-          const Text(
-            '还没有匹配到需求',
-            style: TextStyle(fontSize: 17, fontWeight: FontWeight.w700),
-          ),
-          const SizedBox(height: 8),
-          const Text(
-            '可以先去发布自己的需求试试',
-            style: TextStyle(color: AppColors.textHint),
-          ),
-        ],
-      ),
-    );
-  }
-
-  String _normalizeCityName(String? raw) {
-    final city = (raw ?? '').trim();
-    if (city.isEmpty) return '';
-
-    const suffixes = ['特别行政区', '自治州', '自治区', '地区', '盟', '市'];
-    for (final suffix in suffixes) {
-      if (city.endsWith(suffix) && city.length > suffix.length) {
-        return city.substring(0, city.length - suffix.length);
-      }
-    }
-    return city;
   }
 }

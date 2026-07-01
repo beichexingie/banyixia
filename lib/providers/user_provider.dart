@@ -139,6 +139,24 @@ class UserProvider extends ChangeNotifier {
     }
   }
 
+  Future<void> verifySmsCodeForPhone(String phoneNumber, String smsCode) async {
+    _isLoading = true;
+    notifyListeners();
+    try {
+      await _sessionService.verifySmsCode(phoneNumber, smsCode);
+      final session = _sessionService.currentSession;
+      if (session != null) {
+        await _loadCurrentUser(session);
+      }
+    } catch (e) {
+      debugPrint('verifySmsCodeForPhone error: $e');
+      rethrow;
+    } finally {
+      _isLoading = false;
+      notifyListeners();
+    }
+  }
+
   Future<void> logout() async {
     await _sessionService.logout();
     _user = User.guest();

@@ -32,26 +32,72 @@ class PostProvider extends ChangeNotifier {
     return items
         .whereType<Map<String, dynamic>>()
         .map((data) {
-          final contentStr = data['content']?.toString() ?? '分享动态';
-          final postId = data['id'].toString();
-          final lines = contentStr.split('\n');
-          final parsedTitle = lines.isNotEmpty ? lines.first : '分享动态';
-          final parsedContent = lines.length > 1 ? lines.sublist(1).join('\n') : contentStr;
-          final images = List<String>.from(data['images'] ?? []);
+          final contentText = _firstNonEmptyString([
+                data['content'],
+                data['title'],
+                data['subtitle'],
+              ]) ??
+              '';
+          final lines = contentText
+              .split('\n')
+              .map((line) => line.trim())
+              .where((line) => line.isNotEmpty)
+              .toList();
+          final parsedTitle = _firstNonEmptyString([
+                data['title'],
+                lines.isNotEmpty ? lines.first : null,
+              ]) ??
+              '';
+          final parsedContent = _firstNonEmptyString([
+                data['body'],
+                data['description'],
+                lines.length > 1 ? lines.sublist(1).join('\n') : null,
+                contentText,
+              ]) ??
+              '';
+          final images = _asStringList(data['images']);
+          final nestedAuthor =
+              _asMap(data['author']) ??
+              _asMap(data['user']) ??
+              _asMap(data['users']);
+
           return TravelPost(
-            id: postId,
+            id: data['id']?.toString() ?? '',
             title: parsedTitle,
-            subtitle: parsedContent.length > 20 ? '${parsedContent.substring(0, 20)}...' : parsedContent,
+            subtitle: parsedContent.length > 20
+                ? '${parsedContent.substring(0, 20)}...'
+                : parsedContent,
             content: parsedContent,
-            coverImage: images.isNotEmpty ? images.first : 'https://images.unsplash.com/photo-1476514525535-07fb3b4ae5f1?auto=format&fit=crop&q=80&w=800&h=600',
+            coverImage: images.isNotEmpty
+                ? images.first
+                : 'https://images.unsplash.com/photo-1476514525535-07fb3b4ae5f1?auto=format&fit=crop&q=80&w=800&h=600',
             images: images,
             authorId: data['user_id']?.toString() ?? '',
-            authorName: data['author_name']?.toString() ?? '匿名用户',
-            authorAvatar: data['author_avatar']?.toString() ?? '',
-            likes: data['likes'] ?? 0,
-            commentCount: data['comments'] ?? 0,
+            authorName:
+                _firstNonEmptyString([
+                  data['author_name'],
+                  data['authorName'],
+                  nestedAuthor?['nickname'],
+                  nestedAuthor?['name'],
+                ]) ??
+                '匿名用户',
+            authorAvatar:
+                _firstNonEmptyString([
+                  data['author_avatar'],
+                  data['authorAvatar'],
+                  nestedAuthor?['avatar'],
+                  nestedAuthor?['avatar_url'],
+                ]) ??
+                '',
+            likes: _parseInt(data['likes']) ?? 0,
+            commentCount: _parseInt(data['comments']) ?? 0,
             tag: data['location']?.toString() ?? '',
-            createdAt: data['created_at'] != null ? DateTime.parse(data['created_at'].toString()) : DateTime.now(),
+            createdAt: _parseDateTime(data['created_at']) ?? DateTime.now(),
+            isLiked: _parseBool(data['is_liked']) ?? _parseBool(data['isLiked']) ?? false,
+            isFavorited:
+                _parseBool(data['is_favorited']) ??
+                _parseBool(data['isFavorited']) ??
+                false,
           );
         })
         .toList();
@@ -59,7 +105,9 @@ class PostProvider extends ChangeNotifier {
 
   Future<void> loadPosts({String? query}) async {
     _isLoading = true;
-    if (query != null) _searchQuery = query;
+    if (query != null) {
+      _searchQuery = query;
+    }
     notifyListeners();
 
     try {
@@ -71,15 +119,12 @@ class PostProvider extends ChangeNotifier {
       final data = response['data'];
       if (data is List) {
         _posts = _decodePosts(data);
-      }
-      if (_posts.isEmpty && _searchQuery.isEmpty) {
-        _loadMockPosts();
+      } else {
+        _posts = [];
       }
     } catch (e) {
       debugPrint('Load posts error: $e');
-      if (_searchQuery.isEmpty) {
-        _loadMockPosts();
-      }
+      _posts = [];
     } finally {
       _isLoading = false;
       notifyListeners();
@@ -112,32 +157,22 @@ class PostProvider extends ChangeNotifier {
     return [];
   }
 
-  void _loadMockPosts() {
-    _posts = [
-      TravelPost(
-        id: '1',
-        title: '云端暂无数据，这是本地占位 1',
-        subtitle: '去发布第一篇帖子吧！',
-        content: '这是本地的一条Mock测试帖子',
-        coverImage: 'https://picsum.photos/seed/chongqing/400/300',
-        authorId: 'u1',
-        authorName: '伴一下官方',
-        authorAvatar: 'https://picsum.photos/seed/avatar1/100/100',
-        likes: 16,
-        tag: '官方',
-        createdAt: DateTime.now().subtract(const Duration(days: 2)),
-      ),
-    ];
-  }
-
   Future<void> toggleLike(TravelPost post) async {
     final token = _token();
-    if (token == null || post.id == '1') return;
+    if (token == null || post.id == '1') {
+      return;
+    }
+
     post.isLiked = !post.isLiked;
     post.likes += post.isLiked ? 1 : -1;
     notifyListeners();
+
     try {
-      await _api.post('/posts/${post.id}/like', authToken: token);
+      if (post.isLiked) {
+        await _api.post('/posts/${post.id}/like', authToken: token);
+      } else {
+        await _api.delete('/posts/${post.id}/like', authToken: token);
+      }
     } catch (e) {
       post.isLiked = !post.isLiked;
       post.likes += post.isLiked ? 1 : -1;
@@ -157,6 +192,7 @@ class PostProvider extends ChangeNotifier {
   }) async {
     _isLoading = true;
     notifyListeners();
+
     try {
       final response = await _api.post(
         '/posts',
@@ -189,9 +225,13 @@ class PostProvider extends ChangeNotifier {
 
   Future<void> toggleFavorite(TravelPost post) async {
     final token = _token();
-    if (token == null || post.id == '1') return;
+    if (token == null || post.id == '1') {
+      return;
+    }
+
     post.isFavorited = !post.isFavorited;
     notifyListeners();
+
     try {
       if (post.isFavorited) {
         await _api.post('/posts/${post.id}/favorite', authToken: token);
@@ -209,9 +249,30 @@ class PostProvider extends ChangeNotifier {
     try {
       final response = await _api.get('/posts/favorites', authToken: _token());
       final data = response['data'];
-      if (data is List) return _decodePosts(data);
+      if (data is List) {
+        return _decodePosts(data);
+      }
     } catch (e) {
       debugPrint('fetchFavoritedPosts error: $e');
+    }
+    return [];
+  }
+
+  Future<List<TravelPost>> fetchLikedPosts() async {
+    try {
+      final response = await _api.get('/posts/liked', authToken: _token());
+      final data = response['data'];
+      if (data is List) {
+        return _decodePosts(data);
+      }
+    } on EcsApiException catch (e) {
+      if (e.statusCode == 404) {
+        debugPrint('fetchLikedPosts fallback: backend /posts/liked not deployed yet');
+        return [];
+      }
+      debugPrint('fetchLikedPosts error: $e');
+    } catch (e) {
+      debugPrint('fetchLikedPosts error: $e');
     }
     return [];
   }
@@ -221,15 +282,75 @@ class PostProvider extends ChangeNotifier {
       final response = await _api.get('/posts/$postId/comments', authToken: _token());
       final data = response['data'];
       if (data is List) {
-        return data
+        final comments = data
             .whereType<Map<String, dynamic>>()
             .map(PostComment.fromJson)
             .toList();
+        return _hydrateCommentAuthors(comments);
       }
     } catch (e) {
       debugPrint('Load comments error: $e');
     }
     return [];
+  }
+
+  Future<List<PostComment>> _hydrateCommentAuthors(
+    List<PostComment> comments,
+  ) async {
+    final idsToFetch = comments
+        .where((comment) {
+          final missingName =
+              comment.userName.trim().isEmpty || comment.userName == '匿名用户';
+          final missingAvatar = comment.userAvatar.trim().isEmpty;
+          return comment.userId.trim().isNotEmpty && (missingName || missingAvatar);
+        })
+        .map((comment) => comment.userId.trim())
+        .toSet()
+        .toList();
+
+    if (idsToFetch.isEmpty) {
+      return comments;
+    }
+
+    final profileFutures = <String, Future<User?>>{};
+    for (final userId in idsToFetch) {
+      profileFutures[userId] = _fetchUserById(userId);
+    }
+
+    final profiles = <String, User?>{};
+    for (final entry in profileFutures.entries) {
+      profiles[entry.key] = await entry.value;
+    }
+
+    return comments.map((comment) {
+      final profile = profiles[comment.userId.trim()];
+      final resolvedName =
+          comment.userName.trim().isNotEmpty && comment.userName != '匿名用户'
+          ? comment.userName
+          : (profile?.nickname.trim().isNotEmpty == true
+                ? profile!.nickname.trim()
+                : '匿名用户');
+      final resolvedAvatar = comment.userAvatar.trim().isNotEmpty
+          ? comment.userAvatar
+          : (profile?.avatar.trim() ?? '');
+      return comment.copyWith(
+        userName: resolvedName,
+        userAvatar: resolvedAvatar,
+      );
+    }).toList();
+  }
+
+  Future<User?> _fetchUserById(String userId) async {
+    try {
+      final response = await _api.get('/users/$userId', authToken: _token());
+      final data = response['data'];
+      if (data is Map<String, dynamic>) {
+        return User.fromJson(data);
+      }
+    } catch (e) {
+      debugPrint('fetchUserById error: $e');
+    }
+    return null;
   }
 
   Future<void> addComment(String postId, String content) async {
@@ -238,10 +359,13 @@ class PostProvider extends ChangeNotifier {
       authToken: _token(),
       body: {'content': content},
     );
+    notifyListeners();
   }
 
   Future<void> recordFootprint(String postId) async {
-    if (postId == '1') return;
+    if (postId == '1') {
+      return;
+    }
     try {
       await _api.post('/posts/$postId/footprint', authToken: _token());
     } catch (e) {
@@ -253,14 +377,65 @@ class PostProvider extends ChangeNotifier {
     try {
       final response = await _api.get('/posts/footprints', authToken: _token());
       final data = response['data'];
-      if (data is List) return _decodePosts(data);
+      if (data is List) {
+        return _decodePosts(data);
+      }
     } catch (e) {
       debugPrint('Fetch footprints error: $e');
     }
     return [];
   }
 
-  Future<Map<String, dynamic>> _fetchAuthorProfiles(Iterable<String?> userIds) async {
-    return {};
+  static Map<String, dynamic>? _asMap(dynamic value) {
+    return value is Map<String, dynamic> ? value : null;
+  }
+
+  static List<String> _asStringList(dynamic value) {
+    if (value is List) {
+      return value
+          .map((item) => item?.toString().trim() ?? '')
+          .where((item) => item.isNotEmpty)
+          .toList();
+    }
+    return const [];
+  }
+
+  static String? _firstNonEmptyString(List<dynamic> values) {
+    for (final value in values) {
+      final text = value?.toString().trim() ?? '';
+      if (text.isNotEmpty) {
+        return text;
+      }
+    }
+    return null;
+  }
+
+  static int? _parseInt(dynamic value) {
+    if (value is int) return value;
+    if (value is num) return value.toInt();
+    return int.tryParse(value?.toString() ?? '');
+  }
+
+  static bool? _parseBool(dynamic value) {
+    if (value is bool) return value;
+    final text = value?.toString().trim().toLowerCase();
+    switch (text) {
+      case 'true':
+      case '1':
+        return true;
+      case 'false':
+      case '0':
+        return false;
+      default:
+        return null;
+    }
+  }
+
+  static DateTime? _parseDateTime(dynamic value) {
+    final text = value?.toString().trim() ?? '';
+    if (text.isEmpty) {
+      return null;
+    }
+    return DateTime.tryParse(text);
   }
 }

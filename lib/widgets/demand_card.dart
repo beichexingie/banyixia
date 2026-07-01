@@ -13,14 +13,18 @@ class DemandCard extends StatelessWidget {
   List<String> get _previewImages {
     if (demand.images.isEmpty) {
       return const [
-        'https://picsum.photos/seed/demand-a/400/300',
-        'https://picsum.photos/seed/demand-b/400/300',
+        'https://picsum.photos/seed/demand-card-a/400/300',
+        'https://picsum.photos/seed/demand-card-b/400/300',
+        'https://picsum.photos/seed/demand-card-c/400/300',
       ];
     }
     if (demand.images.length == 1) {
-      return [demand.images.first, demand.images.first];
+      return [demand.images.first, demand.images.first, demand.images.first];
     }
-    return demand.images.take(2).toList();
+    if (demand.images.length == 2) {
+      return [demand.images[0], demand.images[1], demand.images[1]];
+    }
+    return demand.images.take(3).toList();
   }
 
   @override
@@ -30,17 +34,10 @@ class DemandCard extends StatelessWidget {
     return GestureDetector(
       onTap: () => _showDetailSheet(context),
       child: Container(
-        padding: const EdgeInsets.all(16),
+        padding: const EdgeInsets.fromLTRB(14, 14, 14, 12),
         decoration: BoxDecoration(
           color: Colors.white,
-          borderRadius: BorderRadius.circular(24),
-          boxShadow: [
-            BoxShadow(
-              color: Colors.black.withValues(alpha: 0.05),
-              blurRadius: 18,
-              offset: const Offset(0, 10),
-            ),
-          ],
+          borderRadius: BorderRadius.circular(22),
         ),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
@@ -50,92 +47,140 @@ class DemandCard extends StatelessWidget {
                 ClipOval(
                   child: CachedNetworkImage(
                     imageUrl: demand.authorAvatar,
-                    width: 32,
-                    height: 32,
+                    width: 50,
+                    height: 50,
                     fit: BoxFit.cover,
                     errorWidget: (context, url, error) => Container(
-                      width: 32,
-                      height: 32,
-                      decoration: const BoxDecoration(
-                        color: AppColors.tagBackground,
-                        shape: BoxShape.circle,
-                      ),
+                      width: 50,
+                      height: 50,
+                      color: AppColors.surfaceMuted,
+                      alignment: Alignment.center,
                       child: const Icon(
                         Icons.person,
-                        size: 18,
-                        color: AppColors.primary,
+                        size: 24,
+                        color: AppColors.textHint,
                       ),
                     ),
                   ),
                 ),
                 const SizedBox(width: 10),
                 Expanded(
-                  child: Text(
-                    demand.authorName,
-                    style: const TextStyle(
-                      fontSize: 15,
-                      fontWeight: FontWeight.w700,
-                      color: AppColors.primary,
-                    ),
+                  child: Row(
+                    children: [
+                      Flexible(
+                        child: Text(
+                          demand.authorName,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: const TextStyle(
+                            fontSize: 20,
+                            fontWeight: FontWeight.w600,
+                            color: AppColors.textPrimary,
+                          ),
+                        ),
+                      ),
+                      const SizedBox(width: 8),
+                      Container(
+                        width: 22,
+                        height: 22,
+                        decoration: const BoxDecoration(
+                          color: AppColors.primary,
+                          shape: BoxShape.circle,
+                        ),
+                        alignment: Alignment.center,
+                        child: const Text(
+                          '3',
+                          style: TextStyle(
+                            fontSize: 11,
+                            fontWeight: FontWeight.w800,
+                            color: AppColors.textPrimary,
+                          ),
+                        ),
+                      ),
+                    ],
                   ),
                 ),
+              ],
+            ),
+            const SizedBox(height: 14),
+            Row(
+              children: [
                 Container(
                   padding: const EdgeInsets.symmetric(
-                    horizontal: 8,
-                    vertical: 4,
+                    horizontal: 9,
+                    vertical: 5,
                   ),
                   decoration: BoxDecoration(
-                    color: AppColors.tagBackground,
+                    color: AppColors.primary,
                     borderRadius: BorderRadius.circular(999),
                   ),
+                  child: const Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Icon(
+                        Icons.check_circle,
+                        size: 15,
+                        color: AppColors.textPrimary,
+                      ),
+                      SizedBox(width: 3),
+                      Text(
+                        '报名中',
+                        style: TextStyle(
+                          fontSize: 15,
+                          fontWeight: FontWeight.w800,
+                          color: AppColors.textPrimary,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                const SizedBox(width: 10),
+                Expanded(
                   child: Text(
-                    demand.status == 'applying' ? '报名中' : '需求中',
+                    demand.title,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
                     style: const TextStyle(
-                      fontSize: 11,
-                      fontWeight: FontWeight.w600,
-                      color: AppColors.primary,
+                      fontSize: 20,
+                      fontWeight: FontWeight.w900,
+                      color: AppColors.textPrimary,
+                      height: 1.05,
                     ),
                   ),
                 ),
               ],
             ),
-            const SizedBox(height: 12),
-            Text(
-              demand.title,
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
-              style: const TextStyle(
-                fontSize: 24,
-                height: 1.1,
-                fontWeight: FontWeight.w800,
-                color: AppColors.primary,
-              ),
-            ),
-            const SizedBox(height: 8),
+            const SizedBox(height: 10),
             Text(
               demand.content,
               maxLines: compact ? 2 : 3,
               overflow: TextOverflow.ellipsis,
               style: const TextStyle(
-                fontSize: 13,
-                height: 1.6,
+                fontSize: 12.5,
+                height: 1.45,
                 color: AppColors.textSecondary,
               ),
             ),
             const SizedBox(height: 14),
             Row(
-              children: [
-                Expanded(child: _buildImage(images[0])),
-                const SizedBox(width: 12),
-                Expanded(child: _buildImage(images[1])),
-              ],
+              children: List.generate(
+                images.length,
+                (index) => Expanded(
+                  child: Padding(
+                    padding: EdgeInsets.only(
+                      right: index == images.length - 1 ? 0 : 10,
+                    ),
+                    child: _buildImage(images[index]),
+                  ),
+                ),
+              ),
             ),
             const SizedBox(height: 14),
             Container(
-              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+              padding: const EdgeInsets.fromLTRB(14, 12, 14, 12),
               decoration: BoxDecoration(
-                color: const Color(0xFF667085),
-                borderRadius: BorderRadius.circular(18),
+                color: const Color(0xFFF7F7F2),
+                borderRadius: BorderRadius.circular(20),
               ),
               child: Row(
                 children: [
@@ -143,72 +188,122 @@ class DemandCard extends StatelessWidget {
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        Text(
-                          demand.location,
-                          style: const TextStyle(
-                            fontSize: 13,
-                            color: Colors.white,
-                            fontWeight: FontWeight.w600,
-                          ),
+                        _metaLine(
+                          Icons.place_outlined,
+                          '${demand.city}·${demand.location}',
                         ),
-                        const SizedBox(height: 4),
-                        Text(
-                          demand.timeLabel,
-                          style: const TextStyle(
-                            fontSize: 12,
-                            color: Colors.white70,
-                          ),
-                        ),
+                        const SizedBox(height: 10),
+                        _metaLine(Icons.schedule_outlined, _compactTimeLabel()),
                       ],
                     ),
                   ),
-                  Container(width: 1, height: 28, color: Colors.white24),
-                  const SizedBox(width: 14),
+                  Container(
+                    width: 1,
+                    height: 54,
+                    color: const Color(0xFFDCDCDC),
+                  ),
+                  const SizedBox(width: 16),
                   Column(
                     crossAxisAlignment: CrossAxisAlignment.end,
                     children: [
-                      Container(
-                        padding: const EdgeInsets.symmetric(
-                          horizontal: 8,
-                          vertical: 4,
-                        ),
-                        decoration: BoxDecoration(
-                          color: Colors.white,
-                          borderRadius: BorderRadius.circular(999),
-                        ),
-                        child: Text(
-                          demand.city,
-                          style: const TextStyle(
-                            fontSize: 11,
-                            fontWeight: FontWeight.w700,
-                            color: AppColors.primary,
-                          ),
+                      const Text(
+                        '已报名',
+                        style: TextStyle(
+                          fontSize: 13,
+                          color: AppColors.textHint,
+                          fontWeight: FontWeight.w600,
                         ),
                       ),
                       const SizedBox(height: 6),
-                      Text(
-                        '${demand.peopleCount}人',
-                        style: const TextStyle(
-                          fontSize: 14,
-                          fontWeight: FontWeight.w700,
-                          color: Colors.white,
-                        ),
-                      ),
-                      Text(
-                        '${demand.gender} / ${demand.budget}',
-                        style: const TextStyle(
-                          fontSize: 12,
-                          color: Colors.white70,
-                        ),
+                      Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          ...List.generate(
+                            demand.applicantCount > 3
+                                ? 3
+                                : demand.applicantCount,
+                            (index) => Transform.translate(
+                              offset: Offset(index == 0 ? 0 : -6.0 * index, 0),
+                              child: Container(
+                                width: 18,
+                                height: 18,
+                                decoration: BoxDecoration(
+                                  shape: BoxShape.circle,
+                                  border: Border.all(
+                                    color: Colors.white,
+                                    width: 1.5,
+                                  ),
+                                  image: DecorationImage(
+                                    image: NetworkImage(
+                                      'https://picsum.photos/seed/demand-avatar-$index/40/40',
+                                    ),
+                                    fit: BoxFit.cover,
+                                  ),
+                                ),
+                              ),
+                            ),
+                          ),
+                          const SizedBox(width: 6),
+                          Text(
+                            '${demand.applicantCount}人',
+                            style: const TextStyle(
+                              fontSize: 16,
+                              fontWeight: FontWeight.w700,
+                              color: AppColors.textPrimary,
+                            ),
+                          ),
+                        ],
                       ),
                     ],
                   ),
-                  const SizedBox(width: 8),
-                  const Icon(Icons.chevron_right, color: Colors.white),
                 ],
               ),
             ),
           ],
+        ),
+      ),
+    );
+  }
+
+  Widget _metaLine(IconData icon, String text) {
+    return Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Icon(icon, size: 18, color: AppColors.primaryDeep),
+        const SizedBox(width: 6),
+        Text(
+          text,
+          style: const TextStyle(
+            fontSize: 14,
+            fontWeight: FontWeight.w700,
+            color: AppColors.textPrimary,
+          ),
+        ),
+      ],
+    );
+  }
+
+  String _compactTimeLabel() {
+    final start = demand.serviceStartAt;
+    final end = demand.serviceEndAt;
+    final days = end.difference(start).inDays + 1;
+    return '${start.month}月${start.day}日-${end.month}月${end.day}日 | ${days}天';
+  }
+
+  Widget _buildImage(String imageUrl) {
+    return ClipRRect(
+      borderRadius: BorderRadius.circular(18),
+      child: AspectRatio(
+        aspectRatio: 1,
+        child: CachedNetworkImage(
+          imageUrl: imageUrl,
+          fit: BoxFit.cover,
+          placeholder: (context, url) =>
+              Container(color: AppColors.surfaceMuted),
+          errorWidget: (context, url, error) => Container(
+            color: AppColors.surfaceMuted,
+            child: const Icon(Icons.image_outlined, color: AppColors.textHint),
+          ),
         ),
       ),
     );
@@ -244,85 +339,10 @@ class DemandCard extends StatelessWidget {
                   height: 1.5,
                 ),
               ),
-              const SizedBox(height: 16),
-              _buildDetailRow('城市', demand.city),
-              _buildDetailRow('地点', demand.location),
-              _buildDetailRow('时间', demand.timeLabel),
-              _buildDetailRow('人数', '${demand.peopleCount}人'),
-              _buildDetailRow('性别要求', demand.gender),
-              _buildDetailRow('预算', demand.budget),
-              const SizedBox(height: 18),
-              SizedBox(
-                width: double.infinity,
-                height: 48,
-                child: ElevatedButton(
-                  onPressed: () {
-                    Navigator.pop(context);
-                    ScaffoldMessenger.of(
-                      context,
-                    ).showSnackBar(const SnackBar(content: Text('已发送报名意向')));
-                  },
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: AppColors.primary,
-                    foregroundColor: Colors.white,
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(14),
-                    ),
-                  ),
-                  child: const Text('报名 / 联系'),
-                ),
-              ),
             ],
           ),
         );
       },
-    );
-  }
-
-  Widget _buildDetailRow(String label, String value) {
-    return Padding(
-      padding: const EdgeInsets.only(bottom: 10),
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          SizedBox(
-            width: 72,
-            child: Text(
-              label,
-              style: const TextStyle(color: AppColors.textHint, fontSize: 13),
-            ),
-          ),
-          Expanded(
-            child: Text(
-              value,
-              style: const TextStyle(
-                color: AppColors.textPrimary,
-                fontSize: 13,
-                fontWeight: FontWeight.w600,
-              ),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildImage(String imageUrl) {
-    return ClipRRect(
-      borderRadius: BorderRadius.circular(20),
-      child: AspectRatio(
-        aspectRatio: 1,
-        child: CachedNetworkImage(
-          imageUrl: imageUrl,
-          fit: BoxFit.cover,
-          placeholder: (context, url) =>
-              Container(color: AppColors.tagBackground),
-          errorWidget: (context, url, error) => Container(
-            color: AppColors.tagBackground,
-            child: const Icon(Icons.image_outlined, color: AppColors.primary),
-          ),
-        ),
-      ),
     );
   }
 }

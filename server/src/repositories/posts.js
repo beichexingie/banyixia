@@ -1,17 +1,36 @@
+const POST_SELECT = `
+  select
+    p.id,
+    p.user_id,
+    p.author_name,
+    p.author_avatar,
+    p.content,
+    p.images,
+    p.location,
+    coalesce(p.likes, 0) as likes,
+    (
+      select count(*)
+      from public.post_comments pc
+      where pc.post_id = p.id
+    )::int as comments,
+    p.created_at
+  from public.posts p
+`;
+
 export async function listPosts(client, { query }) {
   const params = [];
   let where = '';
   if (query) {
     params.push(`%${query}%`);
-    where = `where content ilike $1 or author_name ilike $1 or location ilike $1`;
+    where =
+      `where p.content ilike $1 or p.author_name ilike $1 or p.location ilike $1`;
   }
 
   const result = await client.query(
     `
-      select *
-      from public.posts
+      ${POST_SELECT}
       ${where}
-      order by created_at desc
+      order by p.created_at desc
     `,
     params,
   );
@@ -21,10 +40,9 @@ export async function listPosts(client, { query }) {
 export async function listPostsByUser(client, userId) {
   const result = await client.query(
     `
-      select *
-      from public.posts
-      where user_id = $1
-      order by created_at desc
+      ${POST_SELECT}
+      where p.user_id = $1
+      order by p.created_at desc
     `,
     [userId],
   );
@@ -66,13 +84,11 @@ export async function updatePostLikes(client, postId, likes) {
 export async function findPostById(client, postId) {
   const result = await client.query(
     `
-      select *
-      from public.posts
-      where id = $1
+      ${POST_SELECT}
+      where p.id = $1
       limit 1
     `,
     [postId],
   );
   return result.rows[0] ?? null;
 }
-

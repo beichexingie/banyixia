@@ -525,13 +525,15 @@ class _LocationPickerPageState extends State<LocationPickerPage> {
     double? latitude,
     double? longitude,
   }) async {
-    final normalizedCity =
-        _normalizeCityName(
-          city?.trim().isNotEmpty == true ? city!.trim() : _selectedCity,
-        );
+    final normalizedCity = _normalizeCityName(
+      city?.trim().isNotEmpty == true ? city!.trim() : _selectedCity,
+    );
     final summary = normalizedCity.isEmpty || address.contains(normalizedCity)
         ? address
-        : [normalizedCity, address].where((value) => value.isNotEmpty).join(' ');
+        : [
+            normalizedCity,
+            address,
+          ].where((value) => value.isNotEmpty).join(' ');
 
     setState(() {
       _selectedAddress = address;
@@ -720,8 +722,7 @@ class _LocationPickerPageState extends State<LocationPickerPage> {
   double _latitudeToPixelY(double latitude, double zoom) {
     final clamped = latitude.clamp(-85.05112878, 85.05112878).toDouble();
     final radian = clamped * math.pi / 180.0;
-    return (1 -
-            math.log(math.tan(radian) + 1 / math.cos(radian)) / math.pi) /
+    return (1 - math.log(math.tan(radian) + 1 / math.cos(radian)) / math.pi) /
         2 *
         _worldSize(zoom);
   }
@@ -910,7 +911,10 @@ class _LocationPickerPageState extends State<LocationPickerPage> {
                           children: [
                             IconButton(
                               onPressed: () => Navigator.of(context).pop(),
-                              icon: const Icon(Icons.arrow_back_ios_new, size: 18),
+                              icon: const Icon(
+                                Icons.arrow_back_ios_new,
+                                size: 18,
+                              ),
                             ),
                             const Expanded(
                               child: Text(
@@ -924,7 +928,10 @@ class _LocationPickerPageState extends State<LocationPickerPage> {
                             ),
                             TextButton.icon(
                               onPressed: _useCurrentLocation,
-                              icon: const Icon(Icons.my_location_outlined, size: 18),
+                              icon: const Icon(
+                                Icons.my_location_outlined,
+                                size: 18,
+                              ),
                               label: const Text('定位'),
                               style: TextButton.styleFrom(
                                 foregroundColor: AppColors.textSecondary,
@@ -950,14 +957,6 @@ class _LocationPickerPageState extends State<LocationPickerPage> {
     );
   }
 
-
-
-
-
-
-
-
-
   Widget _buildStaticMapFallback() {
     return Container(
       color: const Color(0xFFEAF1FF),
@@ -965,18 +964,11 @@ class _LocationPickerPageState extends State<LocationPickerPage> {
       child: const Column(
         mainAxisSize: MainAxisSize.min,
         children: [
-          Icon(
-            Icons.map_outlined,
-            size: 42,
-            color: AppColors.primary,
-          ),
+          Icon(Icons.map_outlined, size: 42, color: AppColors.primary),
           SizedBox(height: 10),
           Text(
             '地图暂时加载失败',
-            style: TextStyle(
-              fontSize: 13,
-              color: AppColors.textSecondary,
-            ),
+            style: TextStyle(fontSize: 13, color: AppColors.textSecondary),
           ),
         ],
       ),
@@ -1028,63 +1020,14 @@ class _LocationPickerPageState extends State<LocationPickerPage> {
                   ),
                   Expanded(child: _buildSearchField()),
                   const SizedBox(width: 8),
-                  TextButton.icon(
-                    onPressed: _useCurrentLocation,
-                    icon: const Icon(Icons.my_location_outlined, size: 18),
-                    label: const Text('定位'),
-                    style: TextButton.styleFrom(
-                      foregroundColor: AppColors.textSecondary,
-                    ),
-                  ),
+                  _buildMapEntryButton(),
                 ],
               ),
-            ),
-            Padding(
-              padding: const EdgeInsets.fromLTRB(18, 6, 18, 0),
-              child: _buildCurrentLocationCard(),
             ),
             Padding(
               padding: const EdgeInsets.fromLTRB(18, 10, 18, 0),
-              child: _buildMapArea(),
+              child: _buildLocationOverview(),
             ),
-            const SizedBox(height: 14),
-            Padding(
-              padding: const EdgeInsets.fromLTRB(18, 0, 18, 0),
-              child: Row(
-                children: [
-                  const Text(
-                    'A-Z',
-                    style: TextStyle(
-                      fontSize: 22,
-                      fontWeight: FontWeight.w700,
-                      color: AppColors.textPrimary,
-                    ),
-                  ),
-                  const SizedBox(width: 10),
-                  const Text(
-                    '城市列表',
-                    style: TextStyle(
-                      fontSize: 14,
-                      color: AppColors.textSecondary,
-                    ),
-                  ),
-                  const Spacer(),
-                  TextButton(
-                    onPressed: _useCurrentLocation,
-                    style: TextButton.styleFrom(
-                      padding: EdgeInsets.zero,
-                      minimumSize: Size.zero,
-                      tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                    ),
-                    child: const Text(
-                      '地图定位',
-                      style: TextStyle(color: AppColors.primary),
-                    ),
-                  ),
-                ],
-              ),
-            ),
-            const SizedBox(height: 8),
             Expanded(
               child: Stack(
                 children: [
@@ -1125,30 +1068,34 @@ class _LocationPickerPageState extends State<LocationPickerPage> {
                               ),
                             ),
                           ),
-                          ...'ABCDEFGHIJKLMNOPQRSTUVWXYZ'.split('').map(
-                            (letter) => Padding(
-                              padding: const EdgeInsets.symmetric(vertical: 1),
-                              child: GestureDetector(
-                                onTap: () => _jumpToLetter(letter, grouped),
-                                child: SizedBox(
-                                  width: 18,
-                                  height: 18,
-                                  child: Center(
-                                    child: Text(
-                                      letter,
-                                      style: TextStyle(
-                                        fontSize: 9,
-                                        color: grouped.containsKey(letter)
-                                            ? AppColors.textSecondary
-                                            : AppColors.textHint,
-                                        fontWeight: FontWeight.w600,
+                          ...'ABCDEFGHIJKLMNOPQRSTUVWXYZ'
+                              .split('')
+                              .map(
+                                (letter) => Padding(
+                                  padding: const EdgeInsets.symmetric(
+                                    vertical: 1,
+                                  ),
+                                  child: GestureDetector(
+                                    onTap: () => _jumpToLetter(letter, grouped),
+                                    child: SizedBox(
+                                      width: 18,
+                                      height: 18,
+                                      child: Center(
+                                        child: Text(
+                                          letter,
+                                          style: TextStyle(
+                                            fontSize: 9,
+                                            color: grouped.containsKey(letter)
+                                                ? AppColors.textSecondary
+                                                : AppColors.textHint,
+                                            fontWeight: FontWeight.w600,
+                                          ),
+                                        ),
                                       ),
                                     ),
                                   ),
                                 ),
                               ),
-                            ),
-                          ),
                         ],
                       ),
                     ),
@@ -1160,8 +1107,8 @@ class _LocationPickerPageState extends State<LocationPickerPage> {
         ),
       ),
       bottomNavigationBar: SafeArea(
-      top: false,
-      child: Padding(
+        top: false,
+        child: Padding(
           padding: const EdgeInsets.fromLTRB(16, 0, 16, 20),
           child: SizedBox(
             width: double.infinity,
@@ -1183,12 +1130,164 @@ class _LocationPickerPageState extends State<LocationPickerPage> {
     );
   }
 
+  Widget _buildMapEntryButton() {
+    return InkWell(
+      onTap: _openFullscreenMap,
+      borderRadius: BorderRadius.circular(22),
+      child: Container(
+        height: 44,
+        padding: const EdgeInsets.symmetric(horizontal: 14),
+        decoration: BoxDecoration(
+          color: const Color(0xFFF7F7F7),
+          borderRadius: BorderRadius.circular(22),
+        ),
+        child: const Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(Icons.map_outlined, size: 18, color: AppColors.primary),
+            SizedBox(width: 6),
+            Text(
+              '地图选点',
+              style: TextStyle(
+                fontSize: 15,
+                fontWeight: FontWeight.w700,
+                color: AppColors.textPrimary,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildLocationOverview() {
+    final summary = _locationSummary ?? '正在获取当前位置';
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Row(
+          children: [
+            const Text(
+              '当前位置',
+              style: TextStyle(
+                fontSize: 18,
+                fontWeight: FontWeight.w800,
+                color: AppColors.textHint,
+              ),
+            ),
+            const Spacer(),
+            TextButton.icon(
+              onPressed: _useCurrentLocation,
+              icon: const Icon(Icons.my_location_outlined, size: 18),
+              label: const Text('重新定位'),
+              style: TextButton.styleFrom(
+                foregroundColor: AppColors.textPrimary,
+                padding: EdgeInsets.zero,
+                minimumSize: Size.zero,
+                tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+              ),
+            ),
+          ],
+        ),
+        const SizedBox(height: 12),
+        Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const Icon(
+              Icons.place_outlined,
+              size: 22,
+              color: AppColors.primary,
+            ),
+            const SizedBox(width: 8),
+            Expanded(
+              child: Text(
+                summary,
+                style: const TextStyle(
+                  fontSize: 15,
+                  height: 1.45,
+                  color: AppColors.textPrimary,
+                ),
+              ),
+            ),
+          ],
+        ),
+        const SizedBox(height: 12),
+        Wrap(
+          spacing: 12,
+          runSpacing: 12,
+          children: [
+            _cityPill(_selectedCity),
+            _cityPill('全国', muted: true),
+            _cityPill('苏州'),
+            _cityPill('北京'),
+            _cityPill('上海'),
+            _cityPill('深圳'),
+          ],
+        ),
+        const SizedBox(height: 16),
+        Row(
+          children: [
+            const Text(
+              '历史访问',
+              style: TextStyle(
+                fontSize: 16,
+                fontWeight: FontWeight.w700,
+                color: AppColors.textHint,
+              ),
+            ),
+            const Spacer(),
+            TextButton(
+              onPressed: () {},
+              style: TextButton.styleFrom(
+                padding: EdgeInsets.zero,
+                minimumSize: Size.zero,
+                tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+              ),
+              child: const Text(
+                '展开更多',
+                style: TextStyle(color: AppColors.textHint),
+              ),
+            ),
+          ],
+        ),
+      ],
+    );
+  }
+
+  Widget _cityPill(String label, {bool muted = false}) {
+    final selected = label == _selectedCity;
+    return InkWell(
+      onTap: () =>
+          _selectCity(_CityEntry(label.isEmpty ? 'S' : label[0], label)),
+      borderRadius: BorderRadius.circular(999),
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 12),
+        decoration: BoxDecoration(
+          color: selected
+              ? AppColors.primary
+              : muted
+              ? const Color(0xFFF4F4F4)
+              : const Color(0xFFF7F7F7),
+          borderRadius: BorderRadius.circular(999),
+        ),
+        child: Text(
+          label,
+          style: TextStyle(
+            fontSize: 16,
+            fontWeight: FontWeight.w700,
+            color: selected ? AppColors.textPrimary : AppColors.textPrimary,
+          ),
+        ),
+      ),
+    );
+  }
+
   Widget _buildSearchField() {
     return Container(
-      height: 42,
+      height: 44,
       decoration: BoxDecoration(
-        color: AppColors.tagBackground,
-        borderRadius: BorderRadius.circular(21),
+        color: const Color(0xFFF7F7F7),
+        borderRadius: BorderRadius.circular(22),
       ),
       child: TextField(
         controller: _searchController,
@@ -1202,7 +1301,7 @@ class _LocationPickerPageState extends State<LocationPickerPage> {
           }
         },
         decoration: const InputDecoration(
-          hintText: '城市/区县/商务等地点',
+          hintText: '城市/区县/商场等地点',
           prefixIcon: Icon(Icons.search, size: 20, color: AppColors.textHint),
           border: InputBorder.none,
           isDense: true,
@@ -1259,8 +1358,8 @@ class _LocationPickerPageState extends State<LocationPickerPage> {
       return _searching
           ? const Center(child: CircularProgressIndicator())
           : _apiSuggestions.isNotEmpty
-              ? _buildApiSearchResults(_apiSuggestions)
-              : _buildSearchResults(filtered);
+          ? _buildApiSearchResults(_apiSuggestions)
+          : _buildSearchResults(filtered);
     }
     return _buildGroupedList(grouped, letters);
   }
@@ -1295,9 +1394,10 @@ class _LocationPickerPageState extends State<LocationPickerPage> {
           const Divider(height: 1, color: Color(0xFFEAEAEA)),
       itemBuilder: (context, index) {
         final item = items[index];
-        final subtitle = [item.city, item.district]
-            .where((value) => value.isNotEmpty)
-            .join(' ');
+        final subtitle = [
+          item.city,
+          item.district,
+        ].where((value) => value.isNotEmpty).join(' ');
         return _buildSearchResultTile(
           title: item.name,
           subtitle: subtitle.isEmpty ? '高德搜索结果' : subtitle,
@@ -1344,16 +1444,16 @@ class _LocationPickerPageState extends State<LocationPickerPage> {
         final items = grouped[letter] ?? const [];
         return Container(
           key: _sectionKeys[letter],
-          margin: const EdgeInsets.only(bottom: 10),
+          margin: const EdgeInsets.only(bottom: 6),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Padding(
-                padding: const EdgeInsets.only(top: 8, bottom: 8),
+                padding: const EdgeInsets.only(top: 6, bottom: 4),
                 child: Text(
                   letter,
                   style: const TextStyle(
-                    fontSize: 20,
+                    fontSize: 18,
                     fontWeight: FontWeight.w700,
                     color: AppColors.textPrimary,
                   ),
@@ -1361,9 +1461,7 @@ class _LocationPickerPageState extends State<LocationPickerPage> {
               ),
               Container(
                 decoration: const BoxDecoration(
-                  border: Border(
-                    top: BorderSide(color: Color(0xFFDADADA)),
-                  ),
+                  border: Border(top: BorderSide(color: Color(0xFFDADADA))),
                 ),
                 child: Column(
                   children: items
@@ -1383,16 +1481,14 @@ class _LocationPickerPageState extends State<LocationPickerPage> {
     );
   }
 
-  Widget _buildCityTile(
-    _CityEntry item, {
-    required bool showBottomBorder,
-  }) {
-    final selected = item.name == _selectedAddress || item.name == _selectedCity;
+  Widget _buildCityTile(_CityEntry item, {required bool showBottomBorder}) {
+    final selected =
+        item.name == _selectedAddress || item.name == _selectedCity;
     return InkWell(
       onTap: () => _selectCity(item),
       child: Container(
         width: double.infinity,
-        padding: const EdgeInsets.symmetric(vertical: 14),
+        padding: const EdgeInsets.symmetric(vertical: 12),
         decoration: BoxDecoration(
           border: Border(
             bottom: BorderSide(
@@ -1408,7 +1504,7 @@ class _LocationPickerPageState extends State<LocationPickerPage> {
               child: Text(
                 item.name,
                 style: TextStyle(
-                  fontSize: 16,
+                  fontSize: 15,
                   color: selected ? AppColors.primary : AppColors.textPrimary,
                   fontWeight: selected ? FontWeight.w700 : FontWeight.w400,
                 ),
@@ -1442,10 +1538,7 @@ class _LocationPickerPageState extends State<LocationPickerPage> {
           onTap: _useCurrentLocation,
         ),
         const SizedBox(height: 8),
-        _buildMapZoomButton(
-          icon: Icons.add,
-          onTap: () => _changeMapZoom(1),
-        ),
+        _buildMapZoomButton(icon: Icons.add, onTap: () => _changeMapZoom(1)),
         const SizedBox(height: 8),
         _buildMapZoomButton(
           icon: Icons.remove,
@@ -1527,7 +1620,9 @@ class _LocationPickerPageState extends State<LocationPickerPage> {
             ),
           ],
         ),
-        child: _buildMapActionColumn(showFullscreenButton: showFullscreenButton),
+        child: _buildMapActionColumn(
+          showFullscreenButton: showFullscreenButton,
+        ),
       ),
     );
   }
@@ -1629,7 +1724,10 @@ class _LocationPickerPageState extends State<LocationPickerPage> {
                 child: ConstrainedBox(
                   constraints: const BoxConstraints(maxWidth: 620),
                   child: Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 14,
+                      vertical: 10,
+                    ),
                     decoration: BoxDecoration(
                       color: Colors.white.withValues(alpha: 0.94),
                       borderRadius: BorderRadius.circular(16),
@@ -1855,11 +1953,7 @@ class _LocationPickerPageState extends State<LocationPickerPage> {
       ),
       child: Row(
         children: [
-          const Icon(
-            Icons.place_outlined,
-            color: AppColors.primary,
-            size: 18,
-          ),
+          const Icon(Icons.place_outlined, color: AppColors.primary, size: 18),
           const SizedBox(width: 8),
           Expanded(
             child: Text(
@@ -1880,10 +1974,7 @@ class _LocationPickerPageState extends State<LocationPickerPage> {
               minimumSize: Size.zero,
               tapTargetSize: MaterialTapTargetSize.shrinkWrap,
             ),
-            child: const Text(
-              '定位',
-              style: TextStyle(color: AppColors.primary),
-            ),
+            child: const Text('定位', style: TextStyle(color: AppColors.primary)),
           ),
         ],
       ),
@@ -2072,9 +2163,9 @@ class _LocationPickerPageState extends State<LocationPickerPage> {
   }
 
   void _showMessage(String message) {
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(content: Text(message)),
-    );
+    ScaffoldMessenger.of(
+      context,
+    ).showSnackBar(SnackBar(content: Text(message)));
   }
 
   String _describeAmapError(AmapApiException error, {String fallback = '高德服务调用失败'}) {

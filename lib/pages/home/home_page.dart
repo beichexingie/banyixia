@@ -1,4 +1,5 @@
-import 'package:cached_network_image/cached_network_image.dart';
+import 'dart:ui';
+
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:provider/provider.dart';
@@ -20,53 +21,37 @@ class _HomePageState extends State<HomePage>
     with SingleTickerProviderStateMixin {
   late final TabController _tabController;
   late final TextEditingController _searchController;
-  late final PageController _bannerController;
+
   String _selectedCity = '苏州';
-  int _bannerIndex = 0;
-
-  final List<String> _banners = const [
-    'https://images.unsplash.com/photo-1500530855697-b586d89ba3ee?auto=format&fit=crop&w=1200&q=80',
-    'https://images.unsplash.com/photo-1506744038136-46273834b3fb?auto=format&fit=crop&w=1200&q=80',
-    'https://images.unsplash.com/photo-1519046904884-53103b34b206?auto=format&fit=crop&w=1200&q=80',
-  ];
-
-  final List<_EntryCardData> _entries = const [
-    _EntryCardData(
-      title: '需求定制',
-      subtitle: '根据你的需求定制~',
-      icon: Icons.map_outlined,
-      route: '/demand/create',
-      large: true,
-    ),
-    _EntryCardData(
-      title: '入驻',
-      subtitle: '成为地陪',
-      icon: Icons.store_mall_directory_outlined,
-      route: '/apply/guide',
-    ),
-    _EntryCardData(
-      title: '联系我们',
-      subtitle: '快速咨询',
-      icon: Icons.support_agent_outlined,
-      route: '/profile/help-feedback',
-    ),
-  ];
+  bool _signedToday = false;
+  int _currentTab = 0;
 
   @override
   void initState() {
     super.initState();
     _tabController = TabController(length: 3, vsync: this);
+    _tabController.addListener(_handleTabChanged);
     _searchController = TextEditingController();
-    _bannerController = PageController(viewportFraction: 1);
-    _searchController.addListener(() => setState(() {}));
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      context.read<PostProvider>().loadPosts();
+    });
   }
 
   @override
   void dispose() {
+    _tabController.removeListener(_handleTabChanged);
     _tabController.dispose();
     _searchController.dispose();
-    _bannerController.dispose();
     super.dispose();
+  }
+
+  void _handleTabChanged() {
+    if (_currentTab == _tabController.index) {
+      return;
+    }
+    setState(() {
+      _currentTab = _tabController.index;
+    });
   }
 
   Future<void> _pickCityWithLocationPicker() async {
@@ -77,10 +62,14 @@ class _HomePageState extends State<HomePage>
         'address': _selectedCity,
       },
     );
-    if (result == null || !mounted) return;
+    if (result == null || !mounted) {
+      return;
+    }
 
     final city = _normalizeCityName(result['city']?.toString());
-    if (city.isEmpty) return;
+    if (city.isEmpty) {
+      return;
+    }
 
     setState(() {
       _selectedCity = city;
@@ -89,8 +78,11 @@ class _HomePageState extends State<HomePage>
 
   String _normalizeCityName(String? raw) {
     final city = (raw ?? '').trim();
-    if (city.isEmpty) return '';
-    const suffixes = ['特别行政区', '自治州', '自治县', '自治区', '地区', '盟', '市'];
+    if (city.isEmpty) {
+      return '';
+    }
+
+    const suffixes = ['特别行政区', '自治州', '自治县', '自治旗', '地区', '盟', '市'];
     for (final suffix in suffixes) {
       if (city.endsWith(suffix) && city.length > suffix.length) {
         return city.substring(0, city.length - suffix.length);
@@ -99,145 +91,317 @@ class _HomePageState extends State<HomePage>
     return city;
   }
 
+  void _searchPosts() {
+    context.read<PostProvider>().loadPosts(
+          query: _searchController.text.trim(),
+        );
+  }
+
+  void _showSignInFeedback() {
+    if (_signedToday) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('今天已经签到过了')),
+      );
+      return;
+    }
+
+    setState(() {
+      _signedToday = true;
+    });
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(content: Text('签到成功，获得 10 积分')),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
+    final topInset = MediaQuery.paddingOf(context).top;
+
     return Scaffold(
-      backgroundColor: AppColors.background,
-      body: SafeArea(
-        child: Consumer<PostProvider>(
-          builder: (context, postProvider, child) {
-            return RefreshIndicator(
-              color: AppColors.primaryDark,
-              onRefresh: () => postProvider.loadPosts(),
-              child: NestedScrollView(
-                headerSliverBuilder: (context, _) {
-                  return [
-                    SliverToBoxAdapter(child: _buildHeroHeader()),
-                    SliverToBoxAdapter(child: _buildSearchRow()),
-                    SliverToBoxAdapter(child: _buildBanner()),
-                    SliverToBoxAdapter(child: _buildEntryPanel()),
-                    SliverPersistentHeader(
-                      pinned: true,
-                      delegate: _HomeTabBarDelegate(
-                        child: Container(
-                          color: AppColors.background,
-                          padding: const EdgeInsets.fromLTRB(20, 12, 20, 8),
-                          child: Align(
-                            alignment: Alignment.centerLeft,
-                            child: Container(
-                              padding: const EdgeInsets.all(4),
-                              decoration: BoxDecoration(
-                                color: Colors.white,
-                                borderRadius: BorderRadius.circular(18),
-                              ),
-                              child: TabBar(
-                                controller: _tabController,
-                                isScrollable: true,
-                                tabAlignment: TabAlignment.start,
-                                indicator: BoxDecoration(
-                                  color: AppColors.primary,
-                                  borderRadius: BorderRadius.circular(14),
-                                ),
-                                dividerColor: Colors.transparent,
-                                labelColor: AppColors.textPrimary,
-                                unselectedLabelColor: AppColors.textSecondary,
-                                indicatorSize: TabBarIndicatorSize.tab,
-                                padding: EdgeInsets.zero,
-                                labelPadding: const EdgeInsets.symmetric(
-                                  horizontal: 18,
-                                ),
-                                tabs: const [
-                                  Tab(text: '推荐'),
-                                  Tab(text: '最新'),
-                                  Tab(text: '关注'),
-                                ],
-                              ),
-                            ),
-                          ),
-                        ),
-                      ),
-                    ),
-                  ];
+      backgroundColor: const Color(0xFFF7F7F2),
+      body: NestedScrollView(
+        physics: const BouncingScrollPhysics(
+          parent: AlwaysScrollableScrollPhysics(),
+        ),
+        headerSliverBuilder: (context, innerBoxIsScrolled) {
+          return [
+            SliverPersistentHeader(
+              pinned: true,
+              delegate: _HomeHeaderDelegate(
+                minExtentHeight: topInset + 84,
+                maxExtentHeight: topInset + 608,
+                builder: (context, progress) {
+                  return _buildHeroSection(
+                    collapseProgress: progress,
+                    topInset: topInset,
+                  );
                 },
-                body: TabBarView(
-                  controller: _tabController,
-                  children: [
-                    _buildPostGrid(postProvider.posts),
-                    _buildPostGrid(postProvider.posts.reversed.toList()),
-                    _buildFollowingContent(postProvider),
-                  ],
-                ),
               ),
-            );
-          },
+            ),
+          ];
+        },
+        body: DecoratedBox(
+          decoration: const BoxDecoration(
+            color: Color(0xFFF7F7F2),
+          ),
+          child: TabBarView(
+            controller: _tabController,
+            children: [
+              _buildPostGrid(),
+              _buildPostGrid(sortLatest: true),
+              _buildFollowingGrid(),
+            ],
+          ),
         ),
       ),
     );
   }
 
-  Widget _buildHeroHeader() {
-    return Container(
-      decoration: const BoxDecoration(gradient: AppColors.headerGradient),
-      padding: const EdgeInsets.fromLTRB(20, 12, 20, 18),
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                const SizedBox(height: 12),
-                Row(
-                  children: [
-                    Container(
-                      width: 26,
-                      height: 26,
-                      decoration: BoxDecoration(
-                        color: AppColors.darkSurface,
-                        borderRadius: BorderRadius.circular(8),
+  Widget _buildHeroSection({
+    required double collapseProgress,
+    required double topInset,
+  }) {
+    final eased = Curves.easeOutCubic.transform(collapseProgress);
+    final searchTop = lerpDouble(topInset + 124, topInset + 10, eased)!;
+    final brandOpacity = (1 - eased * 1.2).clamp(0.0, 1.0);
+    final bannerOpacity = (1 - eased * 1.5).clamp(0.0, 1.0);
+    final featureOpacity = (1 - eased * 1.8).clamp(0.0, 1.0);
+    final tabOpacity = (1 - eased * 2.1).clamp(0.0, 1.0);
+    final contentOffset = 40 * eased;
+    final headerShadowOpacity = (eased - 0.72).clamp(0.0, 0.22);
+
+    return ClipRect(
+      child: DecoratedBox(
+        decoration: BoxDecoration(
+          gradient: LinearGradient(
+            colors: [
+              const Color(0xFFC7FF1B),
+              const Color(0xFFD8FF66),
+              Color.lerp(
+                const Color(0xFFF7F7F2),
+                const Color(0xFFEFF8CC),
+                eased * 0.45,
+              )!,
+            ],
+            begin: Alignment.topCenter,
+            end: Alignment.bottomCenter,
+            stops: const [0.0, 0.63, 1.0],
+          ),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withValues(alpha: headerShadowOpacity),
+              blurRadius: 18,
+              offset: const Offset(0, 4),
+            ),
+          ],
+        ),
+        child: Stack(
+          children: [
+            Positioned.fill(
+              child: Padding(
+                padding: EdgeInsets.fromLTRB(18, topInset + 10, 18, 10),
+                child: Transform.translate(
+                  offset: Offset(0, -contentOffset),
+                  child: Stack(
+                    fit: StackFit.expand,
+                    clipBehavior: Clip.none,
+                    children: [
+                      Positioned(
+                        top: -4,
+                        right: -22,
+                        child: IgnorePointer(
+                          child: Opacity(
+                            opacity: brandOpacity,
+                            child: Image.asset(
+                              'assets/home/top_sketch/插画 2.png',
+                              width: 232,
+                              fit: BoxFit.contain,
+                            ),
+                          ),
+                        ),
                       ),
-                      child: const Icon(
-                        Icons.emoji_symbols_outlined,
-                        size: 16,
-                        color: AppColors.primary,
+                      Positioned(
+                        top: 0,
+                        left: 0,
+                        right: 0,
+                        child: IgnorePointer(
+                          ignoring: brandOpacity <= 0.02,
+                          child: Opacity(
+                            opacity: brandOpacity,
+                            child: Row(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Expanded(child: _buildBrandBlock()),
+                                Padding(
+                                  padding:
+                                      const EdgeInsets.only(top: 4, right: 2),
+                                  child: IconButton(
+                                    onPressed: _showSignInFeedback,
+                                    iconSize: 22,
+                                    splashRadius: 20,
+                                    padding: EdgeInsets.zero,
+                                    constraints: const BoxConstraints(
+                                      minWidth: 28,
+                                      minHeight: 28,
+                                    ),
+                                    icon: Icon(
+                                      _signedToday
+                                          ? Icons.wb_sunny
+                                          : Icons.wb_sunny_outlined,
+                                      color: const Color(0xFF9AB246),
+                                    ),
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ),
                       ),
-                    ),
-                    const SizedBox(width: 8),
-                    const Text(
-                      '一点就陪',
-                      style: TextStyle(
-                        fontSize: 14,
-                        fontWeight: FontWeight.w600,
-                        color: Color(0xFF7FA23D),
+                      Positioned(
+                        top: 190,
+                        left: 0,
+                        right: 0,
+                        child: IgnorePointer(
+                          ignoring: bannerOpacity <= 0.02,
+                          child: Opacity(
+                            opacity: bannerOpacity,
+                            child: _buildBannerCard(),
+                          ),
+                        ),
                       ),
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 6),
-                const Text(
-                  '一点伴',
-                  style: TextStyle(
-                    fontSize: 32,
-                    height: 1,
-                    fontWeight: FontWeight.w900,
-                    color: AppColors.textPrimary,
+                      Positioned(
+                        top: 370,
+                        left: 0,
+                        right: 0,
+                        child: IgnorePointer(
+                          ignoring: featureOpacity <= 0.02,
+                          child: Opacity(
+                            opacity: featureOpacity,
+                            child: Row(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Expanded(
+                                  flex: 49,
+                                  child: _featureCard(
+                                    title: '需求定制',
+                                    subtitle: '根据你的需求定制～',
+                                    onTap: () => context.push('/demand/create'),
+                                    large: true,
+                                    illustration: _buildFeatureIllustration(
+                                      'assets/home/feature_settle/Frame 5.png',
+                                      width: 118,
+                                      height: 118,
+                                    ),
+                                  ),
+                                ),
+                                const SizedBox(width: 10),
+                                Expanded(
+                                  flex: 51,
+                                  child: Column(
+                                    mainAxisSize: MainAxisSize.min,
+                                    children: [
+                                      _featureCard(
+                                        title: '入驻',
+                                        subtitle: '',
+                                        onTap: () =>
+                                            context.push('/apply/guide'),
+                                        illustration: _buildFeatureIllustration(
+                                          'assets/home/feature_map/Frame 6.png',
+                                          width: 96,
+                                          height: 78,
+                                        ),
+                                      ),
+                                      const SizedBox(height: 10),
+                                      _featureCard(
+                                        title: '联系我们',
+                                        subtitle: '',
+                                        onTap: () => ScaffoldMessenger.of(
+                                          context,
+                                        ).showSnackBar(
+                                          const SnackBar(
+                                            content: Text('客服入口稍后接入'),
+                                          ),
+                                        ),
+                                        illustration:
+                                            _buildFeatureIllustration(
+                                          'assets/home/feature_contact/Frame 5.png',
+                                          width: 96,
+                                          height: 78,
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ),
+                      ),
+                      Positioned(
+                        top: 538,
+                        left: 0,
+                        right: 0,
+                        child: IgnorePointer(
+                          ignoring: tabOpacity <= 0.02,
+                          child: Opacity(
+                            opacity: tabOpacity,
+                            child: _buildTabSelector(),
+                          ),
+                        ),
+                      ),
+                    ],
                   ),
                 ),
-              ],
+              ),
+            ),
+            Positioned(
+              left: 18,
+              right: 18,
+              top: searchTop,
+              child: _buildSearchRow(),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildBrandBlock() {
+    return SizedBox(
+      width: 190,
+      height: 96,
+      child: Stack(
+        clipBehavior: Clip.none,
+        children: [
+          Positioned(
+            left: 0,
+            bottom: 0,
+            child: Image.asset(
+              'assets/home/logo 1.png',
+              width: 142,
+              fit: BoxFit.contain,
             ),
           ),
-          Expanded(
-            child: SizedBox(
-              height: 110,
-              child: Stack(
-                children: [
-                  Positioned.fill(
-                    child: Opacity(
-                      opacity: 0.22,
-                      child: CustomPaint(painter: _HeroSketchPainter()),
-                    ),
-                  ),
+          const Positioned(
+            left: 46,
+            top: 18,
+            child: Text(
+              '一点就陪伴',
+              style: TextStyle(
+                fontFamily: 'Wawati TC',
+                fontFamilyFallback: [
+                  'DFWaWaTC-W5',
+                  '华文彩云',
+                  '华文楷体',
+                  'STKaiti',
+                  'KaiTi',
+                  '楷体',
                 ],
+                fontSize: 15,
+                fontWeight: FontWeight.w600,
+                color: Color.fromRGBO(139, 196, 41, 1),
+                height: 1,
+                letterSpacing: 0.4,
               ),
             ),
           ),
@@ -247,239 +411,299 @@ class _HomePageState extends State<HomePage>
   }
 
   Widget _buildSearchRow() {
-    return Padding(
-      padding: const EdgeInsets.fromLTRB(20, 0, 20, 12),
-      child: Row(
-        children: [
-          Expanded(
-            child: Container(
-              height: 56,
-              padding: const EdgeInsets.symmetric(horizontal: 18),
-              decoration: BoxDecoration(
-                color: Colors.white,
-                borderRadius: BorderRadius.circular(28),
-              ),
-              child: Row(
-                children: [
-                  const Icon(
-                    Icons.search,
-                    size: 26,
-                    color: AppColors.textHint,
-                  ),
-                  const SizedBox(width: 10),
-                  Expanded(
-                    child: TextField(
-                      controller: _searchController,
-                      onChanged: (value) =>
-                          context.read<PostProvider>().setSearchQuery(value),
-                      onSubmitted: (value) =>
-                          context.read<PostProvider>().loadPosts(query: value),
-                      decoration: const InputDecoration(
-                        border: InputBorder.none,
-                        hintText: '搜索内容',
-                        hintStyle: TextStyle(
-                          fontSize: 16,
-                          color: AppColors.textHint,
-                        ),
-                      ),
-                    ),
-                  ),
-                ],
-              ),
+    return Row(
+      children: [
+        Expanded(
+          child: Container(
+            height: 58,
+            padding: const EdgeInsets.symmetric(horizontal: 18),
+            decoration: BoxDecoration(
+              color: Colors.white,
+              borderRadius: BorderRadius.circular(999),
+              boxShadow: [
+                BoxShadow(
+                  color: const Color(0xFFB7D640).withValues(alpha: 0.22),
+                  blurRadius: 24,
+                  offset: const Offset(0, 10),
+                ),
+              ],
             ),
-          ),
-          const SizedBox(width: 12),
-          GestureDetector(
-            onTap: _pickCityWithLocationPicker,
-            child: Container(
-              height: 56,
-              padding: const EdgeInsets.symmetric(horizontal: 18),
-              decoration: BoxDecoration(
-                color: Colors.white,
-                borderRadius: BorderRadius.circular(28),
-              ),
-              child: Row(
-                children: [
-                  Text(
-                    _selectedCity,
+            child: Row(
+              children: [
+                const Icon(
+                  Icons.search_rounded,
+                  size: 27,
+                  color: Color(0xFFD5D5D5),
+                ),
+                const SizedBox(width: 10),
+                Expanded(
+                  child: TextField(
+                    controller: _searchController,
+                    onSubmitted: (_) => _searchPosts(),
                     style: const TextStyle(
-                      fontSize: 16,
-                      fontWeight: FontWeight.w700,
+                      fontSize: 15,
+                      fontWeight: FontWeight.w500,
                       color: AppColors.textPrimary,
                     ),
+                    decoration: const InputDecoration(
+                      hintText: '搜索内容',
+                      hintStyle: TextStyle(
+                        fontSize: 15,
+                        fontWeight: FontWeight.w500,
+                        color: Color(0xFFD2D2D2),
+                      ),
+                      border: InputBorder.none,
+                    ),
                   ),
-                  const SizedBox(width: 4),
-                  const Icon(Icons.keyboard_arrow_down),
-                ],
-              ),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildBanner() {
-    return Padding(
-      padding: const EdgeInsets.fromLTRB(20, 8, 20, 18),
-      child: Column(
-        children: [
-          SizedBox(
-            height: 214,
-            child: PageView.builder(
-              controller: _bannerController,
-              itemCount: _banners.length,
-              onPageChanged: (index) {
-                setState(() {
-                  _bannerIndex = index;
-                });
-              },
-              itemBuilder: (context, index) {
-                return ClipRRect(
-                  borderRadius: BorderRadius.circular(26),
-                  child: Stack(
-                    fit: StackFit.expand,
-                    children: [
-                      CachedNetworkImage(
-                        imageUrl: _banners[index],
-                        fit: BoxFit.cover,
-                      ),
-                      Container(
-                        decoration: BoxDecoration(
-                          gradient: LinearGradient(
-                            begin: Alignment.bottomCenter,
-                            end: Alignment.topCenter,
-                            colors: [
-                              Colors.black.withValues(alpha: 0.32),
-                              Colors.transparent,
-                            ],
-                          ),
-                        ),
-                      ),
-                      const Positioned(
-                        left: 24,
-                        bottom: 28,
-                        child: Text(
-                          '在野生活.',
-                          style: TextStyle(
-                            fontSize: 38,
-                            fontWeight: FontWeight.w900,
-                            color: Colors.white,
-                          ),
-                        ),
-                      ),
-                    ],
-                  ),
-                );
-              },
-            ),
-          ),
-          const SizedBox(height: 10),
-          Row(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: List.generate(_banners.length, (index) {
-              final isActive = index == _bannerIndex;
-              return AnimatedContainer(
-                duration: const Duration(milliseconds: 220),
-                margin: const EdgeInsets.symmetric(horizontal: 3),
-                width: isActive ? 16 : 6,
-                height: 6,
-                decoration: BoxDecoration(
-                  color: isActive
-                      ? AppColors.textPrimary
-                      : AppColors.textHint.withValues(alpha: 0.45),
-                  borderRadius: BorderRadius.circular(3),
                 ),
-              );
-            }),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildEntryPanel() {
-    return Padding(
-      padding: const EdgeInsets.fromLTRB(20, 0, 20, 12),
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Expanded(
-            child: _buildEntryCard(_entries[0]),
-          ),
-          const SizedBox(width: 12),
-          Expanded(
-            child: Column(
-              children: [
-                _buildEntryCard(_entries[1]),
-                const SizedBox(height: 12),
-                _buildEntryCard(_entries[2]),
               ],
             ),
           ),
-        ],
-      ),
+        ),
+        const SizedBox(width: 10),
+        InkWell(
+          onTap: _pickCityWithLocationPicker,
+          borderRadius: BorderRadius.circular(999),
+          child: Container(
+            height: 58,
+            padding: const EdgeInsets.symmetric(horizontal: 24),
+            decoration: BoxDecoration(
+              color: Colors.white,
+              borderRadius: BorderRadius.circular(999),
+              boxShadow: [
+                BoxShadow(
+                  color: const Color(0xFFB7D640).withValues(alpha: 0.18),
+                  blurRadius: 24,
+                  offset: const Offset(0, 10),
+                ),
+              ],
+            ),
+            child: Row(
+              children: [
+                Text(
+                  _selectedCity,
+                  style: const TextStyle(
+                    fontSize: 18,
+                    fontWeight: FontWeight.w900,
+                    color: AppColors.textPrimary,
+                  ),
+                ),
+                const SizedBox(width: 7),
+                const Icon(
+                  Icons.keyboard_arrow_down_rounded,
+                  size: 20,
+                  color: AppColors.textPrimary,
+                ),
+              ],
+            ),
+          ),
+        ),
+      ],
     );
   }
 
-  Widget _buildEntryCard(_EntryCardData data) {
-    return GestureDetector(
-      onTap: () => context.push(data.route),
-      child: Container(
-        height: data.large ? 188 : 88,
-        padding: const EdgeInsets.fromLTRB(18, 18, 18, 14),
-        decoration: BoxDecoration(
-          color: Colors.white,
-          borderRadius: BorderRadius.circular(24),
+  Widget _buildBannerCard() {
+    return Column(
+      children: [
+        ClipRRect(
+          borderRadius: BorderRadius.circular(20),
+          child: SizedBox(
+            width: double.infinity,
+            height: 150,
+            child: Stack(
+              fit: StackFit.expand,
+              children: [
+                Image.asset(
+                  'assets/home/banner/Rectangle 8.png',
+                  fit: BoxFit.cover,
+                ),
+                Center(
+                  child: Image.asset(
+                    'assets/home/tab_mark/image 4.png',
+                    width: 226,
+                    fit: BoxFit.contain,
+                  ),
+                ),
+              ],
+            ),
+          ),
         ),
-        child: Stack(
+        const SizedBox(height: 10),
+        Row(
+          mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            Align(
-              alignment: Alignment.topLeft,
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
+            Container(
+              width: 22,
+              height: 6,
+              decoration: BoxDecoration(
+                color: AppColors.textPrimary,
+                borderRadius: BorderRadius.circular(999),
+              ),
+            ),
+            const SizedBox(width: 8),
+            Container(
+              width: 6,
+              height: 6,
+              decoration: BoxDecoration(
+                color: AppColors.textHint.withValues(alpha: 0.48),
+                shape: BoxShape.circle,
+              ),
+            ),
+            const SizedBox(width: 8),
+            Container(
+              width: 6,
+              height: 6,
+              decoration: BoxDecoration(
+                color: AppColors.textHint.withValues(alpha: 0.3),
+                shape: BoxShape.circle,
+              ),
+            ),
+          ],
+        ),
+      ],
+    );
+  }
+
+  Widget _buildTabSelector() {
+    const labels = ['推荐', '最新', '关注'];
+    return Row(
+      children: List.generate(labels.length, (index) {
+        final selected = _currentTab == index;
+        return Padding(
+          padding: EdgeInsets.only(right: index == labels.length - 1 ? 0 : 24),
+          child: GestureDetector(
+            onTap: () => _tabController.animateTo(index),
+            child: AnimatedContainer(
+              duration: const Duration(milliseconds: 180),
+              curve: Curves.easeOut,
+              height: 44,
+              padding: EdgeInsets.symmetric(
+                horizontal: selected ? 18 : 0,
+              ),
+              decoration: BoxDecoration(
+                color: selected ? AppColors.primary : Colors.transparent,
+                borderRadius: BorderRadius.circular(999),
+              ),
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
                 children: [
+                  if (selected && index == 0) ...[
+                    Image.asset(
+                      'assets/login/Group.png',
+                      width: 18,
+                      height: 34,
+                      fit: BoxFit.contain,
+                    ),
+                    const SizedBox(width: 8),
+                  ],
                   Text(
-                    data.title,
-                    style: const TextStyle(
-                      fontSize: 22,
-                      fontWeight: FontWeight.w900,
-                      color: AppColors.textPrimary,
-                    ),
-                  ),
-                  const SizedBox(height: 6),
-                  Text(
-                    data.subtitle,
-                    style: const TextStyle(
-                      fontSize: 14,
-                      color: AppColors.textHint,
-                    ),
-                  ),
-                  const Spacer(),
-                  Container(
-                    width: 44,
-                    height: 28,
-                    decoration: BoxDecoration(
-                      color: AppColors.darkSurface,
-                      borderRadius: BorderRadius.circular(14),
-                    ),
-                    child: const Icon(
-                      Icons.arrow_outward,
-                      color: AppColors.primary,
-                      size: 18,
+                    labels[index],
+                    style: TextStyle(
+                      fontSize: 17,
+                      fontWeight: selected ? FontWeight.w900 : FontWeight.w700,
+                      color: selected
+                          ? AppColors.textPrimary
+                          : AppColors.textSecondary,
                     ),
                   ),
                 ],
               ),
             ),
-            Positioned(
-              right: 4,
-              bottom: data.large ? 8 : 12,
-              child: Icon(
-                data.icon,
-                size: data.large ? 78 : 52,
-                color: AppColors.textPrimary.withValues(alpha: 0.86),
+          ),
+        );
+      }),
+    );
+  }
+
+  Widget _featureCard({
+    required String title,
+    required String subtitle,
+    required VoidCallback onTap,
+    required Widget illustration,
+    bool large = false,
+  }) {
+    final cardHeight = large ? 150.0 : 72.0;
+    final cardHorizontalPadding = large ? 18.0 : 14.0;
+    final cardVerticalPadding = large ? 18.0 : 12.0;
+    final titleSize = large ? 20.0 : 17.0;
+    final subtitleSize = large ? 14.0 : 12.0;
+    final arrowHeight = large ? 28.0 : 25.0;
+
+    return InkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(20),
+      child: Container(
+        height: cardHeight,
+        padding: EdgeInsets.symmetric(
+          horizontal: cardHorizontalPadding,
+          vertical: cardVerticalPadding,
+        ),
+        decoration: BoxDecoration(
+          color: const Color(0xFFF0F0EB),
+          borderRadius: BorderRadius.circular(20),
+        ),
+        child: Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                mainAxisAlignment: large
+                    ? MainAxisAlignment.spaceBetween
+                    : MainAxisAlignment.center,
+                children: [
+                  Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Text(
+                        title,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: TextStyle(
+                          fontSize: titleSize,
+                          fontWeight: FontWeight.w900,
+                          color: AppColors.textPrimary,
+                          height: 1.05,
+                        ),
+                      ),
+                      if (subtitle.isNotEmpty) ...[
+                        const SizedBox(height: 8),
+                        Text(
+                          subtitle,
+                          maxLines: 2,
+                          overflow: TextOverflow.ellipsis,
+                          style: TextStyle(
+                            fontSize: subtitleSize,
+                            fontWeight: FontWeight.w500,
+                            color: const Color(0xFFAFAFA7),
+                            height: 1.2,
+                          ),
+                        ),
+                      ],
+                    ],
+                  ),
+                  Container(
+                    width: 50,
+                    height: arrowHeight,
+                    decoration: BoxDecoration(
+                      color: AppColors.textPrimary,
+                      borderRadius: BorderRadius.circular(999),
+                    ),
+                    alignment: Alignment.center,
+                    child: const Icon(
+                      Icons.arrow_forward_rounded,
+                      size: 16,
+                      color: AppColors.primary,
+                    ),
+                  ),
+                ],
               ),
+            ),
+            const SizedBox(width: 8),
+            Align(
+              alignment: large ? Alignment.bottomRight : Alignment.centerRight,
+              child: illustration,
             ),
           ],
         ),
@@ -487,108 +711,192 @@ class _HomePageState extends State<HomePage>
     );
   }
 
-  Widget _buildPostGrid(List<TravelPost> posts) {
-    if (posts.isEmpty) {
-      return const Center(
-        child: Text(
-          '还没有内容，先去发布第一条动态吧',
-          style: TextStyle(color: AppColors.textSecondary),
-        ),
-      );
-    }
-
-    return Padding(
-      padding: const EdgeInsets.fromLTRB(20, 6, 20, 110),
-      child: GridView.builder(
-        itemCount: posts.length,
-        gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-          crossAxisCount: 2,
-          crossAxisSpacing: 14,
-          mainAxisSpacing: 14,
-          childAspectRatio: 0.67,
-        ),
-        itemBuilder: (context, index) {
-          return TravelCard(
-            post: posts[index],
-            cityLabel: _selectedCity,
-          );
-        },
-      ),
+  Widget _buildFeatureIllustration(
+    String assetPath, {
+    required double width,
+    required double height,
+  }) {
+    return Image.asset(
+      assetPath,
+      width: width,
+      height: height,
+      fit: BoxFit.contain,
     );
   }
 
-  Widget _buildFollowingContent(PostProvider postProvider) {
+  Widget _buildPostGrid({bool sortLatest = false}) {
+    return Consumer<PostProvider>(
+      builder: (context, provider, _) {
+        if (provider.isLoading && provider.posts.isEmpty) {
+          return const Center(
+            child: CircularProgressIndicator(color: AppColors.primary),
+          );
+        }
+
+        final posts = List<TravelPost>.from(provider.posts);
+        if (sortLatest) {
+          posts.sort((a, b) => b.createdAt.compareTo(a.createdAt));
+        }
+
+        if (posts.isEmpty) {
+          return _emptyState(
+            icon: Icons.article_outlined,
+            title: '还没有内容',
+            subtitle: '去发布第一条动态吧',
+          );
+        }
+
+        return RefreshIndicator(
+          color: AppColors.primary,
+          onRefresh: () => provider.loadPosts(),
+          child: GridView.builder(
+            physics: const AlwaysScrollableScrollPhysics(
+              parent: BouncingScrollPhysics(),
+            ),
+            padding: const EdgeInsets.fromLTRB(18, 2, 18, 100),
+            gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+              crossAxisCount: 2,
+              mainAxisSpacing: 14,
+              crossAxisSpacing: 14,
+              childAspectRatio: 0.61,
+            ),
+            itemCount: posts.length,
+            itemBuilder: (context, index) => TravelCard(
+              post: posts[index],
+              cityLabel: _selectedCity,
+            ),
+          ),
+        );
+      },
+    );
+  }
+
+  Widget _buildFollowingGrid() {
     return FutureBuilder<List<TravelPost>>(
-      future: postProvider.fetchFollowingPosts(),
+      future: context.read<PostProvider>().fetchFollowingPosts(),
       builder: (context, snapshot) {
         if (snapshot.connectionState == ConnectionState.waiting) {
           return const Center(
-            child: CircularProgressIndicator(color: AppColors.primaryDark),
+            child: CircularProgressIndicator(color: AppColors.primary),
           );
         }
-        final posts = snapshot.data ?? [];
+
+        final posts = snapshot.data ?? const <TravelPost>[];
         if (posts.isEmpty) {
-          return Center(
-            child: Column(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                const Text(
-                  '暂无关注内容',
-                  style: TextStyle(
-                    fontSize: 18,
-                    fontWeight: FontWeight.w700,
-                    color: AppColors.textPrimary,
-                  ),
-                ),
-                const SizedBox(height: 8),
-                const Text(
-                  '先去服务页或广场关注感兴趣的人吧',
-                  style: TextStyle(color: AppColors.textHint),
-                ),
-                const SizedBox(height: 18),
-                ElevatedButton(
-                  onPressed: () => MainScaffold.switchTo(1),
+          return _emptyState(
+            icon: Icons.people_outline,
+            title: '还没有关注内容',
+            subtitle: '去服务页看看感兴趣的人吧',
+            actionText: '去服务页',
+            onAction: () => MainScaffold.switchTo(1),
+          );
+        }
+
+        return GridView.builder(
+          physics: const BouncingScrollPhysics(),
+          padding: const EdgeInsets.fromLTRB(18, 2, 18, 100),
+          gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+            crossAxisCount: 2,
+            mainAxisSpacing: 14,
+            crossAxisSpacing: 14,
+            childAspectRatio: 0.61,
+          ),
+          itemCount: posts.length,
+          itemBuilder: (context, index) => TravelCard(
+            post: posts[index],
+            cityLabel: _selectedCity,
+          ),
+        );
+      },
+    );
+  }
+
+  Widget _emptyState({
+    required IconData icon,
+    required String title,
+    required String subtitle,
+    String? actionText,
+    VoidCallback? onAction,
+  }) {
+    return Center(
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 30),
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Container(
+              width: 72,
+              height: 72,
+              decoration: BoxDecoration(
+                color: Colors.white,
+                borderRadius: BorderRadius.circular(24),
+              ),
+              alignment: Alignment.center,
+              child: Icon(icon, size: 34, color: AppColors.textHint),
+            ),
+            const SizedBox(height: 14),
+            Text(
+              title,
+              style: const TextStyle(
+                fontSize: 17,
+                fontWeight: FontWeight.w800,
+                color: AppColors.textPrimary,
+              ),
+            ),
+            const SizedBox(height: 8),
+            Text(
+              subtitle,
+              textAlign: TextAlign.center,
+              style: const TextStyle(
+                fontSize: 13,
+                color: AppColors.textSecondary,
+              ),
+            ),
+            if (actionText != null && onAction != null) ...[
+              const SizedBox(height: 18),
+              SizedBox(
+                height: 44,
+                child: ElevatedButton(
+                  onPressed: onAction,
                   style: ElevatedButton.styleFrom(
                     backgroundColor: AppColors.primary,
                     foregroundColor: AppColors.textPrimary,
                     elevation: 0,
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 22,
-                      vertical: 12,
+                    padding: const EdgeInsets.symmetric(horizontal: 22),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(999),
                     ),
                   ),
-                  child: const Text('去看看'),
+                  child: Text(
+                    actionText,
+                    style: const TextStyle(fontWeight: FontWeight.w800),
+                  ),
                 ),
-              ],
-            ),
-          );
-        }
-        return _buildPostGrid(posts);
-      },
+              ),
+            ],
+          ],
+        ),
+      ),
     );
   }
 }
 
-class _EntryCardData {
-  final String title;
-  final String subtitle;
-  final IconData icon;
-  final String route;
-  final bool large;
+class _HomeHeaderDelegate extends SliverPersistentHeaderDelegate {
+  final double minExtentHeight;
+  final double maxExtentHeight;
+  final Widget Function(BuildContext context, double collapseProgress) builder;
 
-  const _EntryCardData({
-    required this.title,
-    required this.subtitle,
-    required this.icon,
-    required this.route,
-    this.large = false,
+  const _HomeHeaderDelegate({
+    required this.minExtentHeight,
+    required this.maxExtentHeight,
+    required this.builder,
   });
-}
 
-class _HomeTabBarDelegate extends SliverPersistentHeaderDelegate {
-  final Widget child;
+  @override
+  double get minExtent => minExtentHeight;
 
-  const _HomeTabBarDelegate({required this.child});
+  @override
+  double get maxExtent => maxExtentHeight;
 
   @override
   Widget build(
@@ -596,68 +904,15 @@ class _HomeTabBarDelegate extends SliverPersistentHeaderDelegate {
     double shrinkOffset,
     bool overlapsContent,
   ) {
-    return child;
+    final availableRange = (maxExtent - minExtent).clamp(1.0, double.infinity);
+    final collapseProgress = (shrinkOffset / availableRange).clamp(0.0, 1.0);
+    return builder(context, collapseProgress);
   }
 
   @override
-  double get maxExtent => 74;
-
-  @override
-  double get minExtent => 74;
-
-  @override
-  bool shouldRebuild(covariant _HomeTabBarDelegate oldDelegate) =>
-      oldDelegate.child != child;
-}
-
-class _HeroSketchPainter extends CustomPainter {
-  @override
-  void paint(Canvas canvas, Size size) {
-    final paint = Paint()
-      ..color = const Color(0xFF7FA23D)
-      ..style = PaintingStyle.stroke
-      ..strokeWidth = 2.2;
-
-    final path = Path()
-      ..moveTo(size.width * 0.1, size.height * 0.8)
-      ..quadraticBezierTo(
-        size.width * 0.28,
-        size.height * 0.28,
-        size.width * 0.56,
-        size.height * 0.18,
-      )
-      ..quadraticBezierTo(
-        size.width * 0.78,
-        size.height * 0.12,
-        size.width * 0.94,
-        size.height * 0.38,
-      )
-      ..quadraticBezierTo(
-        size.width * 0.78,
-        size.height * 0.36,
-        size.width * 0.62,
-        size.height * 0.7,
-      );
-    canvas.drawPath(path, paint);
-
-    canvas.drawCircle(
-      Offset(size.width * 0.82, size.height * 0.22),
-      8,
-      paint..style = PaintingStyle.fill,
-    );
-    paint.style = PaintingStyle.stroke;
-    canvas.drawCircle(
-      Offset(size.width * 0.38, size.height * 0.6),
-      12,
-      paint,
-    );
-    canvas.drawCircle(
-      Offset(size.width * 0.56, size.height * 0.72),
-      10,
-      paint,
-    );
+  bool shouldRebuild(covariant _HomeHeaderDelegate oldDelegate) {
+    return minExtentHeight != oldDelegate.minExtentHeight ||
+        maxExtentHeight != oldDelegate.maxExtentHeight ||
+        builder != oldDelegate.builder;
   }
-
-  @override
-  bool shouldRepaint(covariant CustomPainter oldDelegate) => false;
 }

@@ -395,7 +395,21 @@ appRouter.get('/posts/following', async (req, res) => {
   if (!userId) return;
   const result = await pool.query(
     `
-      select p.*
+      select
+        p.id,
+        p.user_id,
+        p.author_name,
+        p.author_avatar,
+        p.content,
+        p.images,
+        p.location,
+        coalesce(p.likes, 0) as likes,
+        (
+          select count(*)
+          from public.post_comments pc
+          where pc.post_id = p.id
+        )::int as comments,
+        p.created_at
       from public.posts p
       join public.follows f on f.followed_id = p.user_id
       where f.follower_id = $1
@@ -469,11 +483,60 @@ appRouter.get('/posts/favorites', async (req, res) => {
   if (!userId) return;
   const result = await pool.query(
     `
-      select p.*
+      select
+        p.id,
+        p.user_id,
+        p.author_name,
+        p.author_avatar,
+        p.content,
+        p.images,
+        p.location,
+        coalesce(p.likes, 0) as likes,
+        (
+          select count(*)
+          from public.post_comments pc
+          where pc.post_id = p.id
+        )::int as comments,
+        p.created_at
       from public.post_favorites pf
       join public.posts p on p.id = pf.post_id
       where pf.user_id = $1
       order by pf.created_at desc
+    `,
+    [userId],
+  );
+  return ok(res, { data: result.rows });
+});
+appRouter.get('/posts/liked', async (req, res) => {
+  const userId = await requireSessionUser(req, res);
+  if (!userId) return;
+  const result = await pool.query(
+    `
+      select
+        p.id,
+        p.user_id,
+        p.author_name,
+        p.author_avatar,
+        p.content,
+        p.images,
+        p.location,
+        coalesce(p.likes, 0) as likes,
+        (
+          select count(*)
+          from public.post_comments pc
+          where pc.post_id = p.id
+        )::int as comments,
+        true as is_liked,
+        exists(
+          select 1
+          from public.post_favorites pf2
+          where pf2.user_id = $1 and pf2.post_id = p.id
+        ) as is_favorited,
+        p.created_at
+      from public.post_likes pl
+      join public.posts p on p.id = pl.post_id
+      where pl.user_id = $1
+      order by pl.created_at desc
     `,
     [userId],
   );
@@ -504,10 +567,6 @@ appRouter.post('/posts/:id/comments', async (req, res) => {
     `,
     [req.params.id, userId, content],
   );
-  await pool.query(
-    `update public.posts set comments = coalesce(comments, 0) + 1 where id = $1`,
-    [req.params.id],
-  );
   return ok(res, { data: result.rows[0], message: '评论成功' });
 });
 appRouter.post('/posts/:id/footprint', async (req, res) => {
@@ -528,7 +587,21 @@ appRouter.get('/posts/footprints', async (req, res) => {
   if (!userId) return;
   const result = await pool.query(
     `
-      select p.*
+      select
+        p.id,
+        p.user_id,
+        p.author_name,
+        p.author_avatar,
+        p.content,
+        p.images,
+        p.location,
+        coalesce(p.likes, 0) as likes,
+        (
+          select count(*)
+          from public.post_comments pc
+          where pc.post_id = p.id
+        )::int as comments,
+        p.created_at
       from public.post_footprints pf
       join public.posts p on p.id = pf.post_id
       where pf.user_id = $1

@@ -59,6 +59,15 @@ flutter:
 
   assets:
     - assets/images/
+    - assets/login/Group.png
+    - assets/login_doodles/Group 1312315300.png
+    - assets/home/logo 1.png
+    - assets/home/top_sketch/插画 2.png
+    - assets/home/feature_settle/Frame 5.png
+    - assets/home/feature_map/Frame 6.png
+    - assets/home/feature_contact/Frame 5.png
+    - assets/home/banner/Rectangle 8.png
+    - assets/home/tab_mark/image 4.png
 
 alipay_payment:
   scheme: alipay2021006157637583

@@ -75,7 +75,7 @@ class User {
       ),
       vipLevel: json['vipLevel'] ?? json['vip_level'] ?? 0,
       title: json['title'] ?? '',
-      balance: _asDouble(json['balance']),
+      balance: _parseDouble(json['balance']) ?? 0,
       couponCount: json['couponCount'] ?? json['coupon_count'] ?? 0,
       followCount: json['followCount'] ?? json['follow_count'] ?? 0,
       fansCount: json['fansCount'] ?? json['fans_count'] ?? 0,
@@ -116,6 +116,13 @@ class User {
       'is_guide': isGuide,
       'guide_application_status': guideApplicationStatus,
     };
+  }
+
+  static double? _parseDouble(dynamic value) {
+    if (value is double) return value;
+    if (value is int) return value.toDouble();
+    if (value is num) return value.toDouble();
+    return double.tryParse(value?.toString() ?? '');
   }
 
   bool get isLoggedIn => id.isNotEmpty;

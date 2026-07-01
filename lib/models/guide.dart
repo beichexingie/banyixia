@@ -40,7 +40,7 @@ class Guide {
       id: json['id']?.toString() ?? '',
       name: json['name'] ?? '',
       avatar: json['avatar'] ?? '',
-      rating: _asDouble(json['rating']),
+      rating: _parseDouble(json['rating']) ?? 0,
       gender: json['gender'] ?? '',
       verified: json['verified'] ?? false,
       tags: List<String>.from(json['tags'] ?? []),
@@ -69,5 +69,12 @@ class Guide {
       'fans': fans,
       'city': city,
     };
+  }
+
+  static double? _parseDouble(dynamic value) {
+    if (value is double) return value;
+    if (value is int) return value.toDouble();
+    if (value is num) return value.toDouble();
+    return double.tryParse(value?.toString() ?? '');
   }
 }

@@ -2,6 +2,7 @@ import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:provider/provider.dart';
+
 import '../../config/app_theme.dart';
 import '../../models/chat_room.dart';
 import '../../providers/message_provider.dart';
@@ -25,33 +26,36 @@ class _MessagesPageState extends State<MessagesPage> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: const Color(0xFFF4F6FB),
+      backgroundColor: Colors.white,
       body: SafeArea(
         child: Column(
           children: [
             _buildHeader(),
-            _buildCategoryPanel(),
-            const SizedBox(height: 12),
+            _buildQuickActions(),
+            const Divider(height: 1, color: Color(0xFFF1F1F1)),
             Expanded(
               child: Consumer<MessageProvider>(
-                builder: (context, provider, child) {
+                builder: (context, provider, _) {
                   if (provider.isLoading && provider.rooms.isEmpty) {
-                    return const Center(child: CircularProgressIndicator(color: AppColors.primary));
+                    return const Center(
+                      child: CircularProgressIndicator(
+                        color: AppColors.primary,
+                      ),
+                    );
                   }
 
-                  final rooms = provider.rooms;
-                  if (rooms.isEmpty) {
-                    return _buildEmpty();
+                  if (provider.rooms.isEmpty) {
+                    return _buildEmptyState();
                   }
 
                   return RefreshIndicator(
                     color: AppColors.primary,
                     onRefresh: () => provider.loadRooms(),
-                    child: ListView.separated(
-                      padding: const EdgeInsets.fromLTRB(16, 0, 16, 20),
-                      itemCount: rooms.length,
-                      separatorBuilder: (_, __) => const SizedBox(height: 12),
-                      itemBuilder: (context, index) => _buildRoomCard(context, rooms[index]),
+                    child: ListView.builder(
+                      padding: const EdgeInsets.fromLTRB(0, 0, 0, 96),
+                      itemCount: provider.rooms.length,
+                      itemBuilder: (context, index) =>
+                          _buildRoomTile(provider.rooms[index]),
                     ),
                   );
                 },
@@ -65,134 +69,164 @@ class _MessagesPageState extends State<MessagesPage> {
 
   Widget _buildHeader() {
     return Padding(
-      padding: const EdgeInsets.fromLTRB(16, 12, 16, 8),
+      padding: const EdgeInsets.fromLTRB(16, 10, 16, 10),
       child: Row(
         children: [
           const Expanded(
-            child: Text('消息通知', style: TextStyle(fontSize: 22, fontWeight: FontWeight.bold)),
+            child: Row(
+              children: [
+                Text(
+                  '消息通知',
+                  style: TextStyle(
+                    fontSize: 22,
+                    fontWeight: FontWeight.w800,
+                    color: Color(0xFF2B3B5B),
+                  ),
+                ),
+                SizedBox(width: 10),
+                Icon(Icons.delete_outline, size: 18, color: AppColors.textHint),
+                SizedBox(width: 4),
+                Text(
+                  '消息清除',
+                  style: TextStyle(fontSize: 13, color: AppColors.textHint),
+                ),
+              ],
+            ),
           ),
-          TextButton(
-            onPressed: () => context.push('/settings/notifications'),
-            child: const Text('消息管理', style: TextStyle(color: Color(0xFF3D6CF5))),
-          ),
-          IconButton(
-            onPressed: () => context.push('/profile/orders'),
-            icon: const Icon(Icons.receipt_long_outlined, color: AppColors.textSecondary),
+          GestureDetector(
+            onTap: () => context.push('/settings/notifications'),
+            child: const Row(
+              children: [
+                Icon(
+                  Icons.settings_outlined,
+                  size: 18,
+                  color: AppColors.textSecondary,
+                ),
+                SizedBox(width: 4),
+                Text(
+                  '消息管理',
+                  style: TextStyle(
+                    fontSize: 13,
+                    color: AppColors.textSecondary,
+                  ),
+                ),
+              ],
+            ),
           ),
         ],
       ),
     );
   }
 
-  Widget _buildCategoryPanel() {
+  Widget _buildQuickActions() {
     return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 16),
-      child: Container(
-        padding: const EdgeInsets.all(14),
-        decoration: BoxDecoration(
-          color: const Color(0xFFE9ECF5),
-          borderRadius: BorderRadius.circular(18),
-        ),
-        child: Row(
-          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-          children: [
-            _buildCategoryItem(Icons.receipt_long, '订单服务', () => context.push('/profile/orders')),
-            _buildCategoryItem(Icons.campaign_outlined, '活动通知', () => _showMessage('活动通知暂未接入后台')),
-            _buildCategoryItem(Icons.notifications_none, '系统通知', () => _showMessage('系统通知暂未接入后台')),
-            _buildCategoryItem(Icons.support_agent_outlined, '在线客服', () => _showMessage('客服入口已保留，后续可接对接 API')),
-          ],
-        ),
+      padding: const EdgeInsets.fromLTRB(12, 10, 12, 16),
+      child: Row(
+        children: [
+          Expanded(
+            child: _quickAction(
+              icon: Icons.receipt_long_outlined,
+              label: '订单服务',
+              onTap: () => context.push('/profile/orders'),
+            ),
+          ),
+          Expanded(
+            child: _quickAction(
+              icon: Icons.campaign_outlined,
+              label: '活动通知',
+              onTap: () => _showMessage('活动通知稍后接入'),
+            ),
+          ),
+          Expanded(
+            child: _quickAction(
+              icon: Icons.notifications_none,
+              label: '系统通知',
+              onTap: () => _showMessage('系统通知稍后接入'),
+            ),
+          ),
+          Expanded(
+            child: _quickAction(
+              icon: Icons.headset_mic_outlined,
+              label: '在线客服',
+              onTap: () => _showMessage('在线客服稍后接入'),
+            ),
+          ),
+        ],
       ),
     );
   }
 
-  Widget _buildCategoryItem(IconData icon, String label, VoidCallback onTap) {
-    return Expanded(
-      child: InkWell(
-        onTap: onTap,
-        borderRadius: BorderRadius.circular(14),
+  Widget _quickAction({
+    required IconData icon,
+    required String label,
+    required VoidCallback onTap,
+  }) {
+    return InkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(18),
+      child: Padding(
+        padding: const EdgeInsets.symmetric(vertical: 4),
         child: Column(
           children: [
             Container(
-              width: 56,
-              height: 56,
-              decoration: BoxDecoration(
-                color: Colors.white,
+              width: 72,
+              height: 72,
+              decoration: const BoxDecoration(
+                color: Color(0xFFEAF9B8),
                 shape: BoxShape.circle,
-                boxShadow: [
-                  BoxShadow(
-                    color: Colors.black.withValues(alpha: 0.06),
-                    blurRadius: 10,
-                    offset: const Offset(0, 3),
-                  ),
-                ],
               ),
-              child: Icon(icon, color: const Color(0xFF3D6CF5)),
+              alignment: Alignment.center,
+              child: Icon(icon, color: AppColors.textPrimary, size: 32),
             ),
-            const SizedBox(height: 8),
-            Text(label, style: const TextStyle(fontSize: 12, color: Color(0xFF3D6CF5), fontWeight: FontWeight.w600)),
+            const SizedBox(height: 12),
+            Text(
+              label,
+              style: const TextStyle(
+                fontSize: 15,
+                color: AppColors.textPrimary,
+                fontWeight: FontWeight.w600,
+              ),
+            ),
           ],
         ),
       ),
     );
   }
 
-  Widget _buildRoomCard(BuildContext context, ChatRoom room) {
+  Widget _buildRoomTile(ChatRoom room) {
+    final shortSeed = room.participantIds.isNotEmpty
+        ? room.participantIds.first.substring(
+            0,
+            room.participantIds.first.length.clamp(0, 4).toInt(),
+          )
+        : '';
+    final displayName = room.otherParticipantName?.trim().isNotEmpty == true
+        ? room.otherParticipantName!
+        : '用户$shortSeed';
+    final subtitle = room.lastMessage?.trim().isNotEmpty == true
+        ? room.lastMessage!
+        : '这里是聊天内容，这里是聊天内容';
+
     return InkWell(
       onTap: () {
         context.push(
-          '/chat/${room.id}?name=${Uri.encodeComponent(room.otherParticipantName ?? "用户")}&avatar=${Uri.encodeComponent(room.otherParticipantAvatar ?? "")}',
+          '/chat/${room.id}?name=${Uri.encodeComponent(displayName)}&avatar=${Uri.encodeComponent(room.otherParticipantAvatar ?? '')}',
         );
       },
-      borderRadius: BorderRadius.circular(16),
-      child: Container(
-        padding: const EdgeInsets.all(14),
-        decoration: BoxDecoration(
-          color: Colors.white,
-          borderRadius: BorderRadius.circular(16),
-          boxShadow: [
-            BoxShadow(
-              color: Colors.black.withValues(alpha: 0.04),
-              blurRadius: 10,
-              offset: const Offset(0, 4),
-            ),
-          ],
-        ),
+      child: Padding(
+        padding: const EdgeInsets.fromLTRB(16, 16, 16, 16),
         child: Row(
           children: [
-            Stack(
-              clipBehavior: Clip.none,
-              children: [
-                ClipOval(
-                  child: CachedNetworkImage(
-                    imageUrl: room.otherParticipantAvatar ?? '',
-                    width: 52,
-                    height: 52,
-                    fit: BoxFit.cover,
-                    errorWidget: (context, url, error) => Container(
-                      width: 52,
-                      height: 52,
-                      color: AppColors.tagBackground,
-                      child: const Icon(Icons.person, color: AppColors.primary),
-                    ),
-                  ),
-                ),
-                if (room.unreadCount > 0)
-                  Positioned(
-                    top: -4,
-                    right: -4,
-                    child: Container(
-                      padding: const EdgeInsets.all(4),
-                      decoration: const BoxDecoration(color: Colors.red, shape: BoxShape.circle),
-                      constraints: const BoxConstraints(minWidth: 18, minHeight: 18),
-                      child: Text(
-                        '${room.unreadCount}',
-                        textAlign: TextAlign.center,
-                        style: const TextStyle(color: Colors.white, fontSize: 10, fontWeight: FontWeight.bold),
-                      ),
-                    ),
-                  ),
-              ],
+            ClipOval(
+              child: (room.otherParticipantAvatar?.isNotEmpty ?? false)
+                  ? CachedNetworkImage(
+                      imageUrl: room.otherParticipantAvatar!,
+                      width: 56,
+                      height: 56,
+                      fit: BoxFit.cover,
+                      errorWidget: (context, url, error) => _avatarFallback(),
+                    )
+                  : _avatarFallback(),
             ),
             const SizedBox(width: 12),
             Expanded(
@@ -203,23 +237,60 @@ class _MessagesPageState extends State<MessagesPage> {
                     children: [
                       Expanded(
                         child: Text(
-                          room.otherParticipantName ?? '未知用户',
-                          style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w600),
+                          displayName,
+                          maxLines: 1,
                           overflow: TextOverflow.ellipsis,
+                          style: const TextStyle(
+                            fontSize: 18,
+                            fontWeight: FontWeight.w700,
+                            color: Color(0xFF2B3B5B),
+                          ),
                         ),
                       ),
-                      Text(room.timeLabel, style: const TextStyle(fontSize: 12, color: AppColors.textHint)),
+                      Text(
+                        room.timeLabel,
+                        style: const TextStyle(
+                          fontSize: 12,
+                          color: AppColors.textHint,
+                        ),
+                      ),
                     ],
                   ),
-                  const SizedBox(height: 4),
-                  Text(
-                    room.lastMessage ??
-                        (room.orderServiceName?.trim().isNotEmpty == true
-                            ? '订单沟通: ${room.orderServiceName}'
-                            : '快开始聊天吧'),
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                    style: const TextStyle(fontSize: 13, color: AppColors.textSecondary),
+                  const SizedBox(height: 8),
+                  Row(
+                    children: [
+                      Expanded(
+                        child: Text(
+                          subtitle,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: const TextStyle(
+                            fontSize: 13,
+                            color: AppColors.textHint,
+                          ),
+                        ),
+                      ),
+                      if (room.unreadCount > 0) ...[
+                        const SizedBox(width: 8),
+                        Container(
+                          width: 28,
+                          height: 28,
+                          decoration: const BoxDecoration(
+                            color: Color(0xFFFF6D6B),
+                            shape: BoxShape.circle,
+                          ),
+                          alignment: Alignment.center,
+                          child: Text(
+                            room.unreadCount > 9 ? '9+' : '${room.unreadCount}',
+                            style: const TextStyle(
+                              fontSize: 11,
+                              color: Colors.white,
+                              fontWeight: FontWeight.w700,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ],
                   ),
                 ],
               ),
@@ -230,24 +301,55 @@ class _MessagesPageState extends State<MessagesPage> {
     );
   }
 
-  Widget _buildEmpty() {
+  Widget _avatarFallback() {
+    return Container(
+      width: 56,
+      height: 56,
+      color: AppColors.surfaceMuted,
+      alignment: Alignment.center,
+      child: const Icon(Icons.person, color: AppColors.textHint),
+    );
+  }
+
+  Widget _buildEmptyState() {
     return Center(
       child: Column(
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
-          Icon(Icons.chat_bubble_outline, size: 64, color: AppColors.textHint.withValues(alpha: 0.5)),
-          const SizedBox(height: 16),
-          const Text('暂无会话', style: AppTextStyles.subtitle),
+          Container(
+            width: 72,
+            height: 72,
+            decoration: BoxDecoration(
+              color: AppColors.surfaceMuted,
+              borderRadius: BorderRadius.circular(24),
+            ),
+            alignment: Alignment.center,
+            child: const Icon(
+              Icons.chat_bubble_outline,
+              size: 34,
+              color: AppColors.textHint,
+            ),
+          ),
+          const SizedBox(height: 14),
+          const Text(
+            '暂无会话',
+            style: TextStyle(
+              fontSize: 17,
+              fontWeight: FontWeight.w800,
+              color: AppColors.textPrimary,
+            ),
+          ),
           const SizedBox(height: 8),
-          Text('历史聊天和订单沟通都会显示在这里', style: AppTextStyles.caption),
+          const Text(
+            '聊天消息和订单沟通都会显示在这里',
+            style: TextStyle(fontSize: 13, color: AppColors.textSecondary),
+          ),
         ],
       ),
     );
   }
 
   void _showMessage(String text) {
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(content: Text(text)),
-    );
+    ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(text)));
   }
 }

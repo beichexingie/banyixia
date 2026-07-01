@@ -25,10 +25,9 @@ class MainScaffold extends StatefulWidget {
 class _MainScaffoldState extends State<MainScaffold> {
   int _currentIndex = 0;
 
-  final List<Widget> _pages = const [
+  static const List<Widget> _pages = [
     HomePage(),
     CompanionPage(),
-    SizedBox(),
     MessagesPage(),
     ProfilePage(),
   ];
@@ -36,106 +35,100 @@ class _MainScaffoldState extends State<MainScaffold> {
   @override
   void initState() {
     super.initState();
-    appTabNotifier.addListener(_onTabNotifierChanged);
+    appTabNotifier.addListener(_handleExternalTabChange);
   }
 
   @override
   void dispose() {
-    appTabNotifier.removeListener(_onTabNotifierChanged);
+    appTabNotifier.removeListener(_handleExternalTabChange);
     super.dispose();
   }
 
-  void _onTabNotifierChanged() {
-    if (appTabNotifier.value == 2) return;
-    if (_currentIndex != appTabNotifier.value) {
-      setState(() {
-        _currentIndex = appTabNotifier.value;
-      });
+  void _handleExternalTabChange() {
+    if (appTabNotifier.value == 2 || _currentIndex == appTabNotifier.value) {
+      return;
     }
+    setState(() {
+      _currentIndex = appTabNotifier.value.clamp(0, 4);
+    });
   }
 
-  void _onTabTapped(int index) {
+  void _onTap(int index) {
     if (index == 2) {
       _showPublishSheet();
       return;
     }
+    setState(() {
+      _currentIndex = index;
+    });
     appTabNotifier.value = index;
   }
 
   void _showPublishSheet() {
-    showModalBottomSheet(
+    showModalBottomSheet<void>(
       context: context,
       backgroundColor: Colors.transparent,
       isScrollControlled: true,
       builder: (context) {
-        return SafeArea(
-          child: Container(
-            margin: const EdgeInsets.fromLTRB(12, 0, 12, 12),
-            padding: const EdgeInsets.fromLTRB(20, 18, 20, 20),
-            decoration: BoxDecoration(
-              color: Colors.white,
-              borderRadius: BorderRadius.circular(28),
-            ),
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Row(
-                  children: [
-                    const SizedBox(width: 40),
-                    const Expanded(
-                      child: Text(
-                        '发布内容',
-                        textAlign: TextAlign.center,
-                        style: TextStyle(
-                          fontSize: 20,
-                          fontWeight: FontWeight.w800,
-                          color: AppColors.textPrimary,
-                        ),
-                      ),
+        return Container(
+          decoration: const BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.vertical(top: Radius.circular(30)),
+          ),
+          child: SafeArea(
+            top: false,
+            child: Padding(
+              padding: const EdgeInsets.fromLTRB(20, 16, 20, 24),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Container(
+                    width: 40,
+                    height: 4,
+                    decoration: BoxDecoration(
+                      color: AppColors.divider,
+                      borderRadius: BorderRadius.circular(999),
                     ),
-                    GestureDetector(
-                      onTap: () => Navigator.pop(context),
-                      child: Container(
-                        width: 40,
-                        height: 40,
-                        decoration: BoxDecoration(
-                          color: AppColors.darkSurface,
-                          borderRadius: BorderRadius.circular(20),
-                        ),
-                        child: const Icon(Icons.close, color: Colors.white),
-                      ),
+                  ),
+                  const SizedBox(height: 18),
+                  const Text(
+                    '发布内容',
+                    style: TextStyle(
+                      fontSize: 20,
+                      fontWeight: FontWeight.w800,
+                      color: AppColors.textPrimary,
                     ),
-                  ],
-                ),
-                const SizedBox(height: 18),
-                _buildPublishOption(
-                  icon: Icons.image_outlined,
-                  title: '发布动态',
-                  subtitle: '记录图片、活动和旅行灵感',
-                  route: '/post/create',
-                ),
-                const Divider(height: 18),
-                _buildPublishOption(
-                  icon: Icons.campaign_outlined,
-                  title: '发布招募/自荐',
-                  subtitle: '发起招募帖或展示自己的地陪服务',
-                  route: '/post/create?mode=recruit',
-                ),
-                const Divider(height: 18),
-                _buildPublishOption(
-                  icon: Icons.edit_note_outlined,
-                  title: '发布需求',
-                  subtitle: '快速发起地陪体验和定制需求',
-                  route: '/demand/create',
-                ),
-                const Divider(height: 18),
-                _buildPublishOption(
-                  icon: Icons.storefront_outlined,
-                  title: '申请成为地陪',
-                  subtitle: '入驻成为本地服务提供者',
-                  route: '/apply/guide',
-                ),
-              ],
+                  ),
+                  const SizedBox(height: 18),
+                  _publishItem(
+                    icon: Icons.photo_library_outlined,
+                    title: '发布帖子',
+                    subtitle: '分享游玩照片、路线和笔记',
+                    route: '/post/create',
+                  ),
+                  const SizedBox(height: 10),
+                  _publishItem(
+                    icon: Icons.campaign_outlined,
+                    title: '发布招募',
+                    subtitle: '招募搭子、同游或本地陪伴',
+                    route: '/post/create?mode=recruit',
+                  ),
+                  const SizedBox(height: 10),
+                  _publishItem(
+                    icon: Icons.assignment_outlined,
+                    title: '发布需求',
+                    subtitle: '填写时间地点，快速发单',
+                    route: '/demand/create',
+                  ),
+                  const SizedBox(height: 10),
+                  _publishItem(
+                    icon: Icons.verified_user_outlined,
+                    title: '申请入驻',
+                    subtitle: '成为平台认证向导',
+                    route: '/apply/guide',
+                  ),
+                ],
+              ),
             ),
           ),
         );
@@ -143,82 +136,117 @@ class _MainScaffoldState extends State<MainScaffold> {
     );
   }
 
-  Widget _buildPublishOption({
+  Widget _publishItem({
     required IconData icon,
     required String title,
     required String subtitle,
-    String? route,
+    required String route,
   }) {
-    return ListTile(
-      contentPadding: EdgeInsets.zero,
-      leading: Container(
-        width: 48,
-        height: 48,
-        decoration: BoxDecoration(
-          color: AppColors.tagBackground,
-          borderRadius: BorderRadius.circular(16),
-        ),
-        child: Icon(icon, color: AppColors.textPrimary),
-      ),
-      title: Text(
-        title,
-        style: const TextStyle(
-          fontWeight: FontWeight.w700,
-          color: AppColors.textPrimary,
-        ),
-      ),
-      subtitle: Text(subtitle, style: AppTextStyles.caption),
-      trailing: const Icon(Icons.chevron_right, color: AppColors.textHint),
+    return InkWell(
       onTap: () {
-        Navigator.pop(context);
-        if (route != null) {
-          context.push(route);
-        }
+        Navigator.of(context).pop();
+        context.push(route);
       },
+      borderRadius: BorderRadius.circular(22),
+      child: Container(
+        padding: const EdgeInsets.all(16),
+        decoration: BoxDecoration(
+          color: AppColors.surfaceMuted,
+          borderRadius: BorderRadius.circular(22),
+        ),
+        child: Row(
+          children: [
+            Container(
+              width: 50,
+              height: 50,
+              decoration: BoxDecoration(
+                color: AppColors.primarySoft,
+                borderRadius: BorderRadius.circular(18),
+              ),
+              alignment: Alignment.center,
+              child: Icon(icon, color: AppColors.textPrimary),
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    title,
+                    style: const TextStyle(
+                      fontSize: 16,
+                      fontWeight: FontWeight.w800,
+                      color: AppColors.textPrimary,
+                    ),
+                  ),
+                  const SizedBox(height: 4),
+                  Text(
+                    subtitle,
+                    style: const TextStyle(
+                      fontSize: 12,
+                      color: AppColors.textSecondary,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            const Icon(Icons.chevron_right, color: AppColors.textHint),
+          ],
+        ),
+      ),
     );
   }
 
   @override
   Widget build(BuildContext context) {
+    final pageIndex = _pageIndexForNav(_currentIndex);
+
     return Scaffold(
       body: IndexedStack(
-        index: _currentIndex > 2 ? _currentIndex - 1 : _currentIndex,
-        children: [_pages[0], _pages[1], _pages[3], _pages[4]],
+        index: pageIndex,
+        children: _pages,
       ),
-      bottomNavigationBar: SafeArea(
-        minimum: const EdgeInsets.fromLTRB(10, 0, 10, 10),
-        child: Container(
-          height: 86,
-          padding: const EdgeInsets.fromLTRB(6, 6, 6, 0),
-          decoration: BoxDecoration(
-            color: Colors.white,
-            borderRadius: BorderRadius.circular(28),
-            boxShadow: [
-              BoxShadow(
-                color: Colors.black.withValues(alpha: 0.06),
-                blurRadius: 20,
-                offset: const Offset(0, -4),
-              ),
-            ],
+      bottomNavigationBar: Container(
+        decoration: const BoxDecoration(
+          color: Colors.white,
+          border: Border(
+            top: BorderSide(color: Color(0xFFF0F0F0)),
           ),
+        ),
+        padding: EdgeInsets.only(bottom: MediaQuery.paddingOf(context).bottom),
+        child: SizedBox(
+          height: 74,
           child: Row(
             mainAxisAlignment: MainAxisAlignment.spaceAround,
             children: [
-              _buildNavItem(0, Icons.public_outlined, Icons.public, '广场'),
-              _buildNavItem(1, Icons.favorite_border, Icons.favorite, '服务'),
-              _buildCenterButton(),
-              Consumer<MessageProvider>(
-                builder: (context, msgProvider, _) {
-                  return _buildNavItem(
-                    3,
-                    Icons.chat_bubble_outline,
-                    Icons.chat_bubble,
-                    '消息',
-                    badge: msgProvider.totalUnread,
-                  );
-                },
+              _navItem(
+                index: 0,
+                label: '广场',
+                icon: Icons.public_outlined,
+                activeIcon: Icons.public,
               ),
-              _buildNavItem(4, Icons.person_outline, Icons.person, '我的'),
+              _navItem(
+                index: 1,
+                label: '服务',
+                icon: Icons.favorite_border,
+                activeIcon: Icons.favorite,
+              ),
+              _centerButton(),
+              Consumer<MessageProvider>(
+                builder: (context, provider, _) => _navItem(
+                  index: 3,
+                  label: '消息',
+                  icon: Icons.chat_bubble_outline,
+                  activeIcon: Icons.chat_bubble,
+                  badge: provider.totalUnread,
+                ),
+              ),
+              _navItem(
+                index: 4,
+                label: '我的',
+                icon: Icons.person_outline,
+                activeIcon: Icons.person,
+              ),
             ],
           ),
         ),
@@ -226,19 +254,20 @@ class _MainScaffoldState extends State<MainScaffold> {
     );
   }
 
-  Widget _buildNavItem(
-    int index,
-    IconData icon,
-    IconData activeIcon,
-    String label, {
+  Widget _navItem({
+    required int index,
+    required String label,
+    required IconData icon,
+    required IconData activeIcon,
     int badge = 0,
   }) {
-    final isActive = _currentIndex == index;
-    return GestureDetector(
-      onTap: () => _onTabTapped(index),
-      behavior: HitTestBehavior.opaque,
+    final active = _currentIndex == index;
+
+    return InkWell(
+      onTap: () => _onTap(index),
+      borderRadius: BorderRadius.circular(18),
       child: SizedBox(
-        width: 60,
+        width: 62,
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
@@ -246,44 +275,48 @@ class _MainScaffoldState extends State<MainScaffold> {
               clipBehavior: Clip.none,
               children: [
                 Icon(
-                  isActive ? activeIcon : icon,
-                  color: isActive ? AppColors.textPrimary : AppColors.textHint,
-                  size: 28,
+                  active ? activeIcon : icon,
+                  size: 24,
+                  color: active
+                      ? AppColors.textPrimary
+                      : const Color(0xFFD0D5E2),
                 ),
                 if (badge > 0)
                   Positioned(
-                    top: -2,
-                    right: -6,
+                    top: -6,
+                    right: -8,
                     child: Container(
-                      padding: const EdgeInsets.all(2),
-                      decoration: const BoxDecoration(
-                        color: Colors.red,
-                        shape: BoxShape.circle,
-                      ),
                       constraints: const BoxConstraints(
-                        minWidth: 16,
-                        minHeight: 16,
+                        minWidth: 18,
+                        minHeight: 18,
+                      ),
+                      padding: const EdgeInsets.symmetric(horizontal: 4),
+                      decoration: const BoxDecoration(
+                        color: Color(0xFFFF6E6B),
+                        shape: BoxShape.circle,
                       ),
                       alignment: Alignment.center,
                       child: Text(
-                        badge > 99 ? '..' : '$badge',
+                        badge > 99 ? '99+' : '$badge',
                         style: const TextStyle(
-                          color: Colors.white,
                           fontSize: 9,
-                          fontWeight: FontWeight.bold,
+                          fontWeight: FontWeight.w700,
+                          color: Colors.white,
                         ),
                       ),
                     ),
                   ),
               ],
             ),
-            const SizedBox(height: 4),
+            const SizedBox(height: 6),
             Text(
               label,
               style: TextStyle(
-                fontSize: 13,
-                color: isActive ? AppColors.textPrimary : AppColors.textHint,
-                fontWeight: isActive ? FontWeight.w700 : FontWeight.w500,
+                fontSize: 10.5,
+                fontWeight: active ? FontWeight.w700 : FontWeight.w500,
+                color: active
+                    ? AppColors.textPrimary
+                    : const Color(0xFFD0D5E2),
               ),
             ),
           ],
@@ -292,30 +325,45 @@ class _MainScaffoldState extends State<MainScaffold> {
     );
   }
 
-  Widget _buildCenterButton() {
+  Widget _centerButton() {
     return GestureDetector(
-      onTap: () => _onTabTapped(2),
+      onTap: () => _onTap(2),
       child: Container(
-        width: 74,
-        height: 74,
+        width: 56,
+        height: 56,
         decoration: BoxDecoration(
-          gradient: AppColors.primaryGradient,
-          borderRadius: BorderRadius.circular(26),
-          border: Border.all(color: Colors.white, width: 6),
+          color: AppColors.primary,
+          shape: BoxShape.circle,
           boxShadow: [
             BoxShadow(
-              color: AppColors.primaryDark.withValues(alpha: 0.18),
-              blurRadius: 14,
-              offset: const Offset(0, 4),
+              color: AppColors.primary.withValues(alpha: 0.32),
+              blurRadius: 18,
+              offset: const Offset(0, 6),
             ),
           ],
         ),
+        alignment: Alignment.center,
         child: const Icon(
           Icons.add,
-          size: 34,
+          size: 30,
           color: AppColors.textPrimary,
         ),
       ),
     );
+  }
+
+  int _pageIndexForNav(int navIndex) {
+    switch (navIndex) {
+      case 0:
+        return 0;
+      case 1:
+        return 1;
+      case 3:
+        return 2;
+      case 4:
+        return 3;
+      default:
+        return 0;
+    }
   }
 }

@@ -18,11 +18,11 @@ class OrderCreatePage extends StatefulWidget {
 }
 
 class _OrderCreatePageState extends State<OrderCreatePage> {
-  final TextEditingController _titleController = TextEditingController();
   final TextEditingController _noteController = TextEditingController();
-  final TextEditingController _budgetController = TextEditingController();
 
+  late final List<_ServiceOption> _serviceOptions;
   late String _selectedAddress;
+
   DateTime _serviceDateTime = DateTime.now().add(
     const Duration(days: 1, hours: 2),
   );
@@ -32,14 +32,18 @@ class _OrderCreatePageState extends State<OrderCreatePage> {
   bool _agreed = true;
   bool _isSubmitting = false;
 
-  double get _manualBudget {
-    final raw = _budgetController.text.trim();
-    if (raw.isEmpty) return 0;
-    return double.tryParse(raw) ?? 0;
+  List<_ServiceOption> get _selectedServices =>
+      _serviceOptions.where((item) => item.count > 0).toList();
+
+  double get _serviceSubtotal {
+    return _serviceOptions.fold<double>(
+      0,
+      (sum, item) => sum + item.price * item.count,
+    );
   }
 
-  double get _systemEstimate {
-    double total = 299;
+  double get _displayAmount {
+    var total = _serviceSubtotal;
     if (_peopleCount > 1) {
       total += (_peopleCount - 1) * 80;
     }
@@ -47,57 +51,85 @@ class _OrderCreatePageState extends State<OrderCreatePage> {
         _serviceDateTime.weekday == DateTime.sunday) {
       total += 60;
     }
-
-    final keywords = '${_titleController.text} ${_noteController.text}';
-    if (keywords.contains('包天') || keywords.contains('全天')) {
-      total += 180;
-    }
-    if (keywords.contains('商务') ||
-        keywords.contains('接机') ||
-        keywords.contains('会展')) {
-      total += 120;
-    }
     return total;
   }
 
-  double get _displayAmount => _manualBudget > 0 ? _manualBudget : _systemEstimate;
+  String get _serviceImageUrl {
+    if (widget.guide.images.isNotEmpty) {
+      return widget.guide.images.first;
+    }
+    if (widget.guide.avatar.isNotEmpty) {
+      return widget.guide.avatar;
+    }
+    return '';
+  }
 
   @override
   void initState() {
     super.initState();
-    _selectedAddress = widget.guide.city.isNotEmpty ? widget.guide.city : '待选择服务地点';
-    _titleController.addListener(_refreshEstimate);
-    _noteController.addListener(_refreshEstimate);
-    _budgetController.addListener(_refreshEstimate);
+    _selectedAddress = widget.guide.city.isNotEmpty
+        ? widget.guide.city
+        : '待选择服务地点';
+    _serviceOptions = _buildInitialServices();
   }
 
   @override
   void dispose() {
-    _titleController
-      ..removeListener(_refreshEstimate)
-      ..dispose();
-    _noteController
-      ..removeListener(_refreshEstimate)
-      ..dispose();
-    _budgetController
-      ..removeListener(_refreshEstimate)
-      ..dispose();
+    _noteController.dispose();
     super.dispose();
   }
 
-  void _refreshEstimate() {
-    if (mounted) {
-      setState(() {});
+  List<_ServiceOption> _buildInitialServices() {
+    final titles = <String>[];
+    for (final tag in widget.guide.tags) {
+      final text = tag.trim();
+      if (text.isNotEmpty && !titles.contains(text)) {
+        titles.add(text);
+      }
+      if (titles.length == 4) {
+        break;
+      }
     }
+
+    const fallbacks = ['休闲游玩', '户外运动', '公务随行', '城市漫步'];
+    for (final title in fallbacks) {
+      if (!titles.contains(title)) {
+        titles.add(title);
+      }
+      if (titles.length == 4) {
+        break;
+      }
+    }
+
+    const prices = [400.0, 400.0, 520.0, 360.0];
+    return List.generate(
+      titles.length,
+      (index) => _ServiceOption(
+        title: titles[index],
+        subtitle: _serviceSubtitleFor(titles[index]),
+        price: prices[index % prices.length],
+        count: index == 0 ? 1 : 0,
+      ),
+    );
+  }
+
+  String _serviceSubtitleFor(String title) {
+    if (title.contains('户外') || title.contains('运动')) {
+      return '适合徒步、骑行、轻运动体验，行程更自由。';
+    }
+    if (title.contains('公务') || title.contains('商务')) {
+      return '适合接待、会面、陪同出行，节奏更高效。';
+    }
+    if (title.contains('漫步') || title.contains('城市')) {
+      return '适合城市探索、街区闲逛、轻松打卡拍照。';
+    }
+    return '适合休闲陪玩、逛街探店、轻松游玩陪同。';
   }
 
   Future<void> _pickLocation() async {
     final result = await context.push<Map<String, dynamic>>(
       '/order/location',
-      extra: {
-        'address': _selectedAddress,
-        'city': widget.guide.city,
-      },
+      extra: {'address': _selectedAddress, 'city': widget.guide.city},
     );
     if (result != null && mounted) {
       setState(() {
@@ -116,13 +148,17 @@ class _OrderCreatePageState extends State<OrderCreatePage> {
       firstDate: DateTime.now(),
       lastDate: DateTime.now().add(const Duration(days: 90)),
     );
-    if (pickedDate == null || !mounted) return;
+    if (pickedDate == null || !mounted) {
+      return;
+    }
 
     final pickedTime = await showTimePicker(
       context: context,
       initialTime: TimeOfDay.fromDateTime(_serviceDateTime),
     );
-    if (pickedTime == null || !mounted) return;
+    if (pickedTime == null || !mounted) {
+      return;
+    }
 
     setState(() {
       _serviceDateTime = DateTime(
@@ -139,8 +175,9 @@ class _OrderCreatePageState extends State<OrderCreatePage> {
     showModalBottomSheet<void>(
       context: context,
       isScrollControlled: true,
+      backgroundColor: Colors.white,
       shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+        borderRadius: BorderRadius.vertical(top: Radius.circular(26)),
       ),
       builder: (ctx) {
         final peopleController = TextEditingController(
@@ -153,27 +190,49 @@ class _OrderCreatePageState extends State<OrderCreatePage> {
             return Padding(
               padding: EdgeInsets.fromLTRB(
                 20,
+                18,
                 20,
-                20,
-                24 + MediaQuery.of(ctx).viewInsets.bottom,
+                20 + MediaQuery.of(ctx).viewInsets.bottom,
               ),
               child: Column(
                 mainAxisSize: MainAxisSize.min,
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  const Text(
-                    '服务人数及偏好',
-                    style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+                  Row(
+                    children: [
+                      const Expanded(
+                        child: Text(
+                          '服务人数及性别',
+                          style: TextStyle(
+                            fontSize: 22,
+                            fontWeight: FontWeight.w900,
+                            color: AppColors.textPrimary,
+                          ),
+                        ),
+                      ),
+                      IconButton(
+                        onPressed: () => Navigator.pop(ctx),
+                        icon: const Icon(Icons.close),
+                      ),
+                    ],
                   ),
-                  const SizedBox(height: 16),
+                  const SizedBox(height: 12),
+                  const Text(
+                    '服务人数',
+                    style: TextStyle(
+                      fontSize: 14,
+                      fontWeight: FontWeight.w700,
+                      color: AppColors.textPrimary,
+                    ),
+                  ),
+                  const SizedBox(height: 8),
                   TextField(
                     controller: peopleController,
                     keyboardType: TextInputType.number,
                     decoration: InputDecoration(
-                      labelText: '服务人数',
-                      hintText: '请输入人数',
+                      hintText: '请输入服务人数',
                       filled: true,
-                      fillColor: const Color(0xFFF7F8FC),
+                      fillColor: const Color(0xFFF6F6F0),
                       border: OutlineInputBorder(
                         borderRadius: BorderRadius.circular(14),
                         borderSide: BorderSide.none,
@@ -181,23 +240,50 @@ class _OrderCreatePageState extends State<OrderCreatePage> {
                     ),
                   ),
                   const SizedBox(height: 16),
-                  const Text('地陪性别偏好'),
-                  const SizedBox(height: 8),
-                  Wrap(
-                    spacing: 10,
-                    runSpacing: 10,
-                    children: ['不限', '男', '女'].map((gender) {
-                      final selected = tempGender == gender;
-                      return ChoiceChip(
-                        label: Text(gender),
-                        selected: selected,
-                        onSelected: (_) => setModalState(() => tempGender = gender),
+                  const Text(
+                    '偏好性别',
+                    style: TextStyle(
+                      fontSize: 14,
+                      fontWeight: FontWeight.w700,
+                      color: AppColors.textPrimary,
+                    ),
+                  ),
+                  const SizedBox(height: 10),
+                  Row(
+                    children: ['男', '女', '不限'].map((item) {
+                      final selected = tempGender == item;
+                      return Expanded(
+                        child: Padding(
+                          padding: const EdgeInsets.only(right: 10),
+                          child: GestureDetector(
+                            onTap: () => setModalState(() => tempGender = item),
+                            child: Container(
+                              height: 48,
+                              decoration: BoxDecoration(
+                                color: selected
+                                    ? AppColors.primary
+                                    : const Color(0xFFF6F6F0),
+                                borderRadius: BorderRadius.circular(14),
+                              ),
+                              alignment: Alignment.center,
+                              child: Text(
+                                item,
+                                style: const TextStyle(
+                                  fontSize: 16,
+                                  fontWeight: FontWeight.w800,
+                                  color: AppColors.textPrimary,
+                                ),
+                              ),
+                            ),
+                          ),
+                        ),
                       );
                     }).toList(),
                   ),
-                  const SizedBox(height: 20),
+                  const SizedBox(height: 24),
                   SizedBox(
                     width: double.infinity,
+                    height: 54,
                     child: ElevatedButton(
                       onPressed: () {
                         final parsedPeople =
@@ -209,14 +295,20 @@ class _OrderCreatePageState extends State<OrderCreatePage> {
                         Navigator.pop(ctx);
                       },
                       style: ElevatedButton.styleFrom(
-                        backgroundColor: const Color(0xFF3D6CF5),
-                        foregroundColor: Colors.white,
+                        backgroundColor: AppColors.primary,
+                        foregroundColor: AppColors.textPrimary,
+                        elevation: 0,
                         shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(16),
+                          borderRadius: BorderRadius.circular(999),
                         ),
-                        padding: const EdgeInsets.symmetric(vertical: 14),
                       ),
-                      child: const Text('确定'),
+                      child: const Text(
+                        '确认',
+                        style: TextStyle(
+                          fontSize: 18,
+                          fontWeight: FontWeight.w900,
+                        ),
+                      ),
                     ),
                   ),
                 ],
@@ -228,64 +320,165 @@ class _OrderCreatePageState extends State<OrderCreatePage> {
     );
   }
 
+  Future<void> _showOrderNotice() async {
+    final remarkController = TextEditingController(text: _noteController.text);
+    final result = await showModalBottomSheet<String>(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.white,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(26)),
+      ),
+      builder: (ctx) {
+        return Padding(
+          padding: EdgeInsets.fromLTRB(
+            20,
+            18,
+            20,
+            20 + MediaQuery.of(ctx).viewInsets.bottom,
+          ),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                children: [
+                  const Expanded(
+                    child: Text(
+                      '订单须知',
+                      style: TextStyle(
+                        fontSize: 22,
+                        fontWeight: FontWeight.w900,
+                        color: AppColors.textPrimary,
+                      ),
+                    ),
+                  ),
+                  IconButton(
+                    onPressed: () => Navigator.pop(ctx),
+                    icon: const Icon(Icons.close),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 6),
+              _buildNoticeItem('下单前请先确认服务地点、时间和人数。'),
+              _buildNoticeItem('如行程临时变化，请尽量提前与对方沟通。'),
+              _buildNoticeItem('平台将提供服务履约与安全保障支持。'),
+              const SizedBox(height: 16),
+              const Text(
+                '补充说明（可选）',
+                style: TextStyle(
+                  fontSize: 14,
+                  fontWeight: FontWeight.w700,
+                  color: AppColors.textPrimary,
+                ),
+              ),
+              const SizedBox(height: 8),
+              TextField(
+                controller: remarkController,
+                maxLines: 4,
+                decoration: InputDecoration(
+                  hintText: '例如：希望提前 10 分钟到达，或有额外的陪同需求',
+                  filled: true,
+                  fillColor: const Color(0xFFF6F6F0),
+                  border: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(14),
+                    borderSide: BorderSide.none,
+                  ),
+                ),
+              ),
+              const SizedBox(height: 20),
+              SizedBox(
+                width: double.infinity,
+                height: 54,
+                child: ElevatedButton(
+                  onPressed: () =>
+                      Navigator.pop(ctx, remarkController.text.trim()),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: AppColors.primary,
+                    foregroundColor: AppColors.textPrimary,
+                    elevation: 0,
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(999),
+                    ),
+                  ),
+                  child: const Text(
+                    '完成',
+                    style: TextStyle(fontSize: 18, fontWeight: FontWeight.w900),
+                  ),
+                ),
+              ),
+            ],
+          ),
+        );
+      },
+    );
+
+    if (result != null && mounted) {
+      setState(() {
+        _noteController.text = result;
+      });
+    }
+  }
+
   Future<void> _submitOrder() async {
     FocusScope.of(context).unfocus();
 
+    if (_selectedServices.isEmpty) {
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(const SnackBar(content: Text('请先选择至少一项服务')));
+      return;
+    }
     if (!_agreed) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('请先勾选协议')),
-      );
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(const SnackBar(content: Text('请先勾选协议')));
       return;
     }
 
     final userId = context.read<UserProvider>().user.id;
-    if (userId == null) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('请先登录')),
-      );
+    if (userId.isEmpty) {
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(const SnackBar(content: Text('请先登录')));
       return;
     }
     if (context.read<UserProvider>().isBanned) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('当前账号受限，暂时不能下单')),
-      );
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(const SnackBar(content: Text('当前账号受限，暂时不能下单')));
       return;
     }
     if (widget.guide.id.trim().isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('地陪信息异常，请重新进入页面')),
-      );
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(const SnackBar(content: Text('陪伴信息异常，请重新进入页面')));
       return;
     }
     if (widget.guide.id == userId) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('不能给自己下单，请选择其他地陪')),
-      );
-      return;
-    }
-
-    final title = _titleController.text.trim();
-    if (title.isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('请填写需求标题')),
-      );
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(const SnackBar(content: Text('不能给自己下单，请选择其他陪伴')));
       return;
     }
 
     final amount = _displayAmount;
     if (amount <= 0) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('金额异常，请检查预算或需求信息')),
-      );
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(const SnackBar(content: Text('订单金额异常，请重新选择服务')));
       return;
     }
 
     setState(() => _isSubmitting = true);
 
     try {
+      final title = _selectedServices.map((item) => item.title).join('、');
       final detail = _noteController.text.trim();
       final serviceSummary = [
-        title,
+        _selectedServices
+            .map((item) => '${item.title}x${item.count}')
+            .join('、'),
         _selectedAddress,
         '${_peopleCount}人',
         _gender,
@@ -299,7 +492,9 @@ class _OrderCreatePageState extends State<OrderCreatePage> {
         guideAvatar: widget.guide.avatar,
         status: OrderStatus.pendingPayment,
         amount: amount,
-        serviceName: detail.isEmpty ? serviceSummary : '$serviceSummary / $detail',
+        serviceName: detail.isEmpty
+            ? serviceSummary
+            : '$serviceSummary / $detail',
         paymentMethod: _paymentMethod,
         paymentStatus: 'pending',
         merchantOrderNo:
@@ -308,12 +503,20 @@ class _OrderCreatePageState extends State<OrderCreatePage> {
         createdAt: DateTime.now(),
       );
 
-      await context.read<OrderProvider>().createOrder(newOrder);
-
-      if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('需求已提交，可前往订单继续支付与处理')),
+      await context.read<OrderProvider>().createOrder(
+        newOrder.copyWith(
+          serviceName: title.isEmpty
+              ? newOrder.serviceName
+              : '$title / ${newOrder.serviceName}',
+        ),
       );
+
+      if (!mounted) {
+        return;
+      }
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(const SnackBar(content: Text('订单已提交，可前往订单页继续支付')));
       context.pop();
     } catch (e) {
       if (mounted) {
@@ -328,24 +531,29 @@ class _OrderCreatePageState extends State<OrderCreatePage> {
     }
   }
 
+  void _updateServiceCount(int index, int delta) {
+    setState(() {
+      final current = _serviceOptions[index].count;
+      final next = current + delta;
+      _serviceOptions[index].count = next < 0 ? 0 : next;
+    });
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: const Color(0xFFF4F6FB),
+      backgroundColor: Colors.white,
       appBar: AppBar(
-        backgroundColor: const Color(0xFFF4F6FB),
+        backgroundColor: Colors.white,
+        foregroundColor: AppColors.textPrimary,
         elevation: 0,
         centerTitle: true,
         title: const Text(
-          '发需求',
-          style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+          '选择服务',
+          style: TextStyle(fontSize: 22, fontWeight: FontWeight.w900),
         ),
         leading: IconButton(
-          icon: const Icon(
-            Icons.arrow_back_ios_new,
-            color: AppColors.textPrimary,
-            size: 18,
-          ),
+          icon: const Icon(Icons.arrow_back_ios_new, size: 22),
           onPressed: () => context.pop(),
         ),
       ),
@@ -354,21 +562,49 @@ class _OrderCreatePageState extends State<OrderCreatePage> {
           children: [
             Expanded(
               child: ListView(
-                padding: const EdgeInsets.fromLTRB(16, 8, 16, 16),
+                padding: EdgeInsets.zero,
                 children: [
-                  _buildGuideCard(),
-                  const SizedBox(height: 12),
-                  _buildDemandCard(),
-                  const SizedBox(height: 12),
+                  Padding(
+                    padding: const EdgeInsets.fromLTRB(16, 22, 16, 0),
+                    child: RichText(
+                      text: TextSpan(
+                        style: const TextStyle(
+                          fontSize: 17,
+                          fontWeight: FontWeight.w700,
+                          color: Color(0xFF777777),
+                        ),
+                        children: [
+                          const TextSpan(text: '共'),
+                          TextSpan(
+                            text: '${_serviceOptions.length}',
+                            style: const TextStyle(
+                              color: Color(0xFFF2A13E),
+                              fontWeight: FontWeight.w900,
+                            ),
+                          ),
+                          const TextSpan(text: '项可选'),
+                        ],
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: 18),
+                  Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 16),
+                    child: _buildServiceCard(),
+                  ),
+                  const SizedBox(height: 14),
+                  Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 16),
+                    child: _buildOrderNoticeButton(),
+                  ),
+                  const SizedBox(height: 16),
+                  _buildSectionGap(),
                   _buildInfoCard(),
-                  const SizedBox(height: 12),
-                  _buildEstimateCard(),
-                  const SizedBox(height: 12),
-                  _buildSafetyCard(),
-                  const SizedBox(height: 12),
+                  _buildSectionGap(),
                   _buildPaymentCard(),
-                  const SizedBox(height: 12),
-                  _buildAgreementCard(),
+                  _buildSectionGap(),
+                  _buildAgreementRow(),
+                  const SizedBox(height: 20),
                 ],
               ),
             ),
@@ -379,376 +615,471 @@ class _OrderCreatePageState extends State<OrderCreatePage> {
     );
   }
 
-  Widget _buildGuideCard() {
-    return Container(
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(18),
-      ),
-      child: Row(
-        children: [
-          CircleAvatar(
-            radius: 28,
-            backgroundImage: widget.guide.avatar.isNotEmpty
-                ? NetworkImage(widget.guide.avatar)
-                : null,
-            child: widget.guide.avatar.isEmpty ? const Icon(Icons.person) : null,
+  Widget _buildServiceCard() {
+    return Column(
+      children: List.generate(_serviceOptions.length, (index) {
+        return Padding(
+          padding: EdgeInsets.only(
+            bottom: index == _serviceOptions.length - 1 ? 0 : 30,
           ),
-          const SizedBox(width: 12),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Row(
+          child: _buildServiceItem(_serviceOptions[index], index),
+        );
+      }),
+    );
+  }
+
+  Widget _buildServiceItem(_ServiceOption item, int index) {
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.center,
+      children: [
+        _buildServiceImage(),
+        const SizedBox(width: 16),
+        Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Container(
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 16,
+                  vertical: 8,
+                ),
+                decoration: BoxDecoration(
+                  gradient: const LinearGradient(
+                    colors: [Color(0xFFCFFF36), Color(0xFFF1FFC3)],
+                    begin: Alignment.centerLeft,
+                    end: Alignment.centerRight,
+                  ),
+                  borderRadius: BorderRadius.circular(999),
+                ),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
                   children: [
-                    Flexible(
-                      child: Text(
-                        widget.guide.name,
-                        style: const TextStyle(
-                          fontSize: 18,
-                          fontWeight: FontWeight.bold,
-                        ),
-                        overflow: TextOverflow.ellipsis,
-                      ),
+                    const Icon(
+                      Icons.spa_outlined,
+                      size: 16,
+                      color: AppColors.textPrimary,
                     ),
                     const SizedBox(width: 6),
-                    Container(
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 6,
-                        vertical: 2,
-                      ),
-                      decoration: BoxDecoration(
-                        color: const Color(0xFFEAF1FF),
-                        borderRadius: BorderRadius.circular(10),
-                      ),
-                      child: const Text(
-                        '认证地陪',
-                        style: TextStyle(
-                          fontSize: 10,
-                          color: Color(0xFF3D6CF5),
-                          fontWeight: FontWeight.w600,
-                        ),
+                    Text(
+                      item.title,
+                      style: const TextStyle(
+                        fontSize: 15,
+                        fontWeight: FontWeight.w900,
+                        color: AppColors.textPrimary,
                       ),
                     ),
                   ],
                 ),
-                const SizedBox(height: 4),
-                Text(
-                  '${widget.guide.city} · ${widget.guide.tags.isNotEmpty ? widget.guide.tags.first : '本地陪同'}',
-                  style: const TextStyle(
-                    color: AppColors.textSecondary,
-                    fontSize: 12,
-                  ),
+              ),
+              const SizedBox(height: 14),
+              Text(
+                item.subtitle,
+                maxLines: 2,
+                overflow: TextOverflow.ellipsis,
+                style: const TextStyle(
+                  fontSize: 15,
+                  height: 1.45,
+                  color: Color(0xFF808080),
                 ),
-              ],
-            ),
+              ),
+            ],
           ),
-          const Icon(Icons.more_horiz, color: AppColors.textHint),
-        ],
+        ),
+        const SizedBox(width: 14),
+        SizedBox(
+          width: 132,
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.end,
+            children: [
+              Text.rich(
+                TextSpan(
+                  children: [
+                    TextSpan(
+                      text: '¥${item.price.toStringAsFixed(0)}',
+                      style: const TextStyle(
+                        fontSize: 24,
+                        fontWeight: FontWeight.w900,
+                        color: Color(0xFFFF5A2D),
+                      ),
+                    ),
+                    const TextSpan(
+                      text: ' /天',
+                      style: TextStyle(
+                        fontSize: 15,
+                        fontWeight: FontWeight.w700,
+                        color: Color(0xFFFF5A2D),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(height: 18),
+              Row(
+                mainAxisAlignment: MainAxisAlignment.end,
+                children: [
+                  _buildCountButton(
+                    icon: Icons.remove_rounded,
+                    filled: false,
+                    onTap: item.count == 0
+                        ? null
+                        : () => _updateServiceCount(index, -1),
+                  ),
+                  const SizedBox(width: 18),
+                  Text(
+                    '${item.count}',
+                    style: const TextStyle(
+                      fontSize: 18,
+                      fontWeight: FontWeight.w800,
+                      color: AppColors.textPrimary,
+                    ),
+                  ),
+                  const SizedBox(width: 18),
+                  _buildCountButton(
+                    icon: Icons.add_rounded,
+                    filled: true,
+                    onTap: () => _updateServiceCount(index, 1),
+                  ),
+                ],
+              ),
+            ],
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildServiceImage() {
+    if (_serviceImageUrl.isEmpty) {
+      return Container(
+        width: 128,
+        height: 128,
+        decoration: BoxDecoration(
+          color: const Color(0xFFF3EEE3),
+          borderRadius: BorderRadius.circular(18),
+        ),
+        alignment: Alignment.center,
+        child: const Icon(
+          Icons.landscape_rounded,
+          size: 30,
+          color: AppColors.textHint,
+        ),
+      );
+    }
+
+    return ClipRRect(
+      borderRadius: BorderRadius.circular(18),
+      child: Image.network(
+        _serviceImageUrl,
+        width: 128,
+        height: 128,
+        fit: BoxFit.cover,
+        errorBuilder: (_, __, ___) {
+          return Container(
+            width: 128,
+            height: 128,
+            color: const Color(0xFFF3EEE3),
+            alignment: Alignment.center,
+            child: const Icon(
+              Icons.landscape_rounded,
+              size: 30,
+              color: AppColors.textHint,
+            ),
+          );
+        },
       ),
     );
   }
 
-  Widget _buildDemandCard() {
-    return Container(
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(18),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          const Text(
-            '需求内容',
-            style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
-          ),
-          const SizedBox(height: 14),
-          TextField(
-            controller: _titleController,
-            maxLength: 20,
-            decoration: InputDecoration(
-              labelText: '需求标题',
-              hintText: '例如：陪同逛展、接机陪游、城市漫步',
-              counterText: '',
-              filled: true,
-              fillColor: const Color(0xFFF7F8FC),
-              border: OutlineInputBorder(
-                borderRadius: BorderRadius.circular(14),
-                borderSide: BorderSide.none,
-              ),
-            ),
-          ),
-          const SizedBox(height: 12),
-          TextField(
-            controller: _noteController,
-            maxLines: 6,
-            decoration: InputDecoration(
-              labelText: '详细说明',
-              hintText: '写清楚你的出行目的、陪同内容、集合方式、额外要求等',
-              alignLabelWithHint: true,
-              filled: true,
-              fillColor: const Color(0xFFF7F8FC),
-              border: OutlineInputBorder(
-                borderRadius: BorderRadius.circular(14),
-                borderSide: BorderSide.none,
-              ),
-            ),
-          ),
-        ],
+  Widget _buildCountButton({
+    required IconData icon,
+    required bool filled,
+    required VoidCallback? onTap,
+  }) {
+    return GestureDetector(
+      onTap: onTap,
+      child: Container(
+        width: 40,
+        height: 40,
+        decoration: BoxDecoration(
+          color: filled ? AppColors.primary : const Color(0xFFF1F1F3),
+          borderRadius: BorderRadius.circular(12),
+        ),
+        alignment: Alignment.center,
+        child: Icon(
+          icon,
+          size: 22,
+          color: onTap == null ? AppColors.textHint : AppColors.textPrimary,
+        ),
       ),
     );
+  }
+
+  Widget _buildOrderNoticeButton() {
+    return Align(
+      alignment: Alignment.centerLeft,
+      child: InkWell(
+        onTap: _showOrderNotice,
+        borderRadius: BorderRadius.circular(999),
+        child: Container(
+          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+          decoration: BoxDecoration(
+            color: const Color(0xFFF6F6F6),
+            borderRadius: BorderRadius.circular(999),
+          ),
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              const Icon(
+                Icons.error_outline_rounded,
+                size: 18,
+                color: Color(0xFF9A9A9A),
+              ),
+              const SizedBox(width: 6),
+              const Text(
+                '订单须知',
+                style: TextStyle(fontSize: 14, color: Color(0xFF7C7C7C)),
+              ),
+              const SizedBox(width: 4),
+              const Icon(
+                Icons.chevron_right_rounded,
+                size: 18,
+                color: Color(0xFFB6B6B6),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildSectionGap() {
+    return Container(height: 12, color: const Color(0xFFF5F5F5));
   }
 
   Widget _buildInfoCard() {
     return Container(
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(18),
-      ),
+      color: Colors.white,
+      padding: const EdgeInsets.symmetric(horizontal: 16),
       child: Column(
         children: [
           _buildInfoRow(
-            '服务地点',
-            _selectedAddress,
-            onTap: _pickLocation,
+            title: '服务地点',
+            value: _selectedAddress,
             icon: Icons.place_outlined,
+            onTap: _pickLocation,
           ),
-          const Divider(height: 22),
+          const Divider(height: 1, color: Color(0xFFF0F0F0)),
           _buildInfoRow(
-            '服务时间',
-            _formatDateTime(_serviceDateTime),
-            onTap: _pickTime,
+            title: '服务时间',
+            value: _formatDateTime(_serviceDateTime),
             icon: Icons.schedule_outlined,
+            onTap: _pickTime,
           ),
-          const Divider(height: 22),
+          const Divider(height: 1, color: Color(0xFFF0F0F0)),
           _buildInfoRow(
-            '服务人数及偏好',
-            '$_peopleCount人 · $_gender',
+            title: '服务人数及性别',
+            value: '$_peopleCount人 / $_gender',
+            icon: Icons.people_outline_rounded,
             onTap: _pickPeopleAndGender,
-            icon: Icons.people_outline,
           ),
         ],
       ),
     );
   }
 
-  Widget _buildEstimateCard() {
-    final usingManualBudget = _manualBudget > 0;
-    return Container(
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(18),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          const Text(
-            '金额与报价',
-            style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
-          ),
-          const SizedBox(height: 14),
-          TextField(
-            controller: _budgetController,
-            keyboardType: const TextInputType.numberWithOptions(decimal: true),
-            decoration: InputDecoration(
-              labelText: '你的预算（可不填）',
-              hintText: '不填写则采用系统预估报价',
-              prefixText: '¥ ',
-              filled: true,
-              fillColor: const Color(0xFFF7F8FC),
-              border: OutlineInputBorder(
-                borderRadius: BorderRadius.circular(14),
-                borderSide: BorderSide.none,
-              ),
-            ),
-          ),
-          const SizedBox(height: 14),
-          Container(
-            padding: const EdgeInsets.all(14),
-            decoration: BoxDecoration(
-              color: const Color(0xFFF7F8FC),
-              borderRadius: BorderRadius.circular(14),
-            ),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Row(
-                  children: [
-                    const Text(
-                      '系统预估报价',
-                      style: TextStyle(
-                        fontSize: 14,
-                        color: AppColors.textSecondary,
-                      ),
-                    ),
-                    const Spacer(),
-                    Text(
-                      '¥${_systemEstimate.toStringAsFixed(0)}',
-                      style: const TextStyle(
-                        fontSize: 18,
-                        color: Color(0xFFE84B2B),
-                        fontWeight: FontWeight.bold,
-                      ),
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 8),
-                Text(
-                  usingManualBudget
-                      ? '当前将按你填写的预算发起订单，后续可接入真实报价或议价接口。'
-                      : '当前先使用系统预估报价占位，后续可替换为真实报价接口。',
-                  style: const TextStyle(
-                    fontSize: 12,
-                    color: AppColors.textSecondary,
-                    height: 1.5,
-                  ),
-                ),
-              ],
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildInfoRow(
-    String title,
-    String value, {
-    VoidCallback? onTap,
-    IconData icon = Icons.place_outlined,
+  Widget _buildInfoRow({
+    required String title,
+    required String value,
+    required IconData icon,
+    required VoidCallback onTap,
   }) {
     return InkWell(
       onTap: onTap,
-      child: Row(
-        children: [
-          Icon(icon, size: 18, color: AppColors.textHint),
-          const SizedBox(width: 8),
-          Text(
-            title,
-            style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w500),
-          ),
-          const Spacer(),
-          Flexible(
-            child: Text(
-              value,
-              textAlign: TextAlign.right,
-              overflow: TextOverflow.ellipsis,
-              style: const TextStyle(fontSize: 13, color: Color(0xFF3D6CF5)),
-            ),
-          ),
-          const Icon(Icons.chevron_right, color: AppColors.textHint),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildSafetyCard() {
-    return Container(
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(18),
-      ),
-      child: const Row(
-        children: [
-          Icon(Icons.shield_outlined, color: AppColors.primary),
-          SizedBox(width: 10),
-          Expanded(
-            child: Text(
-              '平台将保留资金托管与风险保障逻辑，后续可继续扩展真实报价和售后流程。',
-              style: TextStyle(
-                fontSize: 13,
-                color: AppColors.textSecondary,
+      child: Padding(
+        padding: const EdgeInsets.symmetric(vertical: 20),
+        child: Row(
+          children: [
+            Icon(icon, size: 26, color: const Color(0xFF7E7E7E)),
+            const SizedBox(width: 14),
+            Text(
+              '$title：',
+              style: const TextStyle(
+                fontSize: 16,
+                fontWeight: FontWeight.w700,
+                color: AppColors.textPrimary,
               ),
             ),
-          ),
-          Icon(Icons.chevron_right, color: AppColors.textHint),
-        ],
+            const SizedBox(width: 8),
+            Expanded(
+              child: Text(
+                value,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                textAlign: TextAlign.right,
+                style: TextStyle(
+                  fontSize: 16,
+                  fontWeight: FontWeight.w700,
+                  color: value == '请选择'
+                      ? const Color(0xFFC6C6C6)
+                      : AppColors.textPrimary,
+                ),
+              ),
+            ),
+            const SizedBox(width: 6),
+            const Icon(
+              Icons.chevron_right_rounded,
+              size: 22,
+              color: Color(0xFFBEBEBE),
+            ),
+          ],
+        ),
       ),
     );
   }
 
   Widget _buildPaymentCard() {
     return Container(
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(18),
-      ),
+      color: Colors.white,
+      padding: const EdgeInsets.symmetric(horizontal: 16),
       child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const Text(
-            '支付方式',
-            style: TextStyle(fontSize: 15, fontWeight: FontWeight.w600),
-          ),
-          const SizedBox(height: 12),
           _buildPaymentItem(
-            'wechat',
-            '微信支付',
-            Icons.chat_bubble_outline,
-            const Color(0xFF09B83E),
+            value: 'wechat',
+            label: '微信支付',
+            brandColor: const Color(0xFF22C45E),
+            badgeText: '微',
           ),
-          const SizedBox(height: 10),
+          const Divider(height: 1, color: Color(0xFFF0F0F0)),
           _buildPaymentItem(
-            'alipay',
-            '支付宝支付',
-            Icons.payments_outlined,
-            const Color(0xFF3D6CF5),
+            value: 'alipay',
+            label: '支付宝支付',
+            brandColor: const Color(0xFF299CFF),
+            badgeText: '支',
           ),
+          const SizedBox(height: 8),
+          _buildSafetyStrip(),
+          const SizedBox(height: 18),
         ],
       ),
     );
   }
 
-  Widget _buildPaymentItem(
-    String value,
-    String label,
-    IconData icon,
-    Color color,
-  ) {
+  Widget _buildPaymentItem({
+    required String value,
+    required String label,
+    required Color brandColor,
+    required String badgeText,
+  }) {
     final selected = _paymentMethod == value;
     return InkWell(
       onTap: () => setState(() => _paymentMethod = value),
-      borderRadius: BorderRadius.circular(14),
-      child: Row(
+      child: Padding(
+        padding: const EdgeInsets.symmetric(vertical: 18),
+        child: Row(
+          children: [
+            Container(
+              width: 44,
+              height: 44,
+              decoration: BoxDecoration(
+                color: brandColor,
+                shape: BoxShape.circle,
+              ),
+              alignment: Alignment.center,
+              child: Text(
+                badgeText,
+                style: const TextStyle(
+                  fontSize: 24,
+                  fontWeight: FontWeight.w800,
+                  color: Colors.white,
+                ),
+              ),
+            ),
+            const SizedBox(width: 14),
+            Expanded(
+              child: Text(
+                label,
+                style: const TextStyle(
+                  fontSize: 18,
+                  fontWeight: FontWeight.w700,
+                  color: AppColors.textPrimary,
+                ),
+              ),
+            ),
+            Container(
+              width: 34,
+              height: 34,
+              decoration: BoxDecoration(
+                shape: BoxShape.circle,
+                border: Border.all(
+                  color: selected
+                      ? AppColors.textPrimary
+                      : const Color(0xFFD6D6D6),
+                  width: 1.6,
+                ),
+                color: selected ? AppColors.textPrimary : Colors.white,
+              ),
+              alignment: Alignment.center,
+              child: selected
+                  ? const Icon(
+                      Icons.check_rounded,
+                      size: 20,
+                      color: AppColors.primary,
+                    )
+                  : null,
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildSafetyStrip() {
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+      decoration: BoxDecoration(
+        color: const Color(0xFFFFF4EA),
+        borderRadius: BorderRadius.circular(14),
+      ),
+      child: const Row(
         children: [
-          Icon(icon, color: color),
-          const SizedBox(width: 10),
-          Expanded(child: Text(label, style: const TextStyle(fontSize: 14))),
-          Icon(
-            selected ? Icons.radio_button_checked : Icons.radio_button_off,
-            color: selected ? color : AppColors.textHint,
+          Icon(Icons.shield_outlined, size: 18, color: Color(0xFFFFA15A)),
+          SizedBox(width: 8),
+          Expanded(
+            child: Text(
+              '本服务由平台全程保障您的人身财产安全',
+              style: TextStyle(
+                fontSize: 13,
+                fontWeight: FontWeight.w600,
+                color: Color(0xFFFFA15A),
+              ),
+            ),
           ),
         ],
       ),
     );
   }
 
-  Widget _buildAgreementCard() {
+  Widget _buildAgreementRow() {
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+      color: Colors.white,
+      padding: const EdgeInsets.fromLTRB(12, 6, 16, 10),
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Checkbox(
             value: _agreed,
-            onChanged: (v) => setState(() => _agreed = v ?? false),
-            activeColor: const Color(0xFF3D6CF5),
+            onChanged: (value) => setState(() => _agreed = value ?? false),
+            activeColor: Colors.white,
+            checkColor: AppColors.textPrimary,
+            side: const BorderSide(color: Color(0xFFD0D0D0), width: 1.4),
           ),
           const Expanded(
             child: Padding(
-              padding: EdgeInsets.only(top: 12),
+              padding: EdgeInsets.only(top: 14),
               child: Text(
-                '我已阅读并同意《支付协议》《服务协议》和《免责协议》',
-                style: TextStyle(
-                  fontSize: 12,
-                  color: AppColors.textSecondary,
-                ),
+                '我已知晓并同意《支付协议》和《免责协议》',
+                style: TextStyle(fontSize: 13, color: Color(0xFF9A9A9A)),
               ),
             ),
           ),
@@ -759,71 +1090,68 @@ class _OrderCreatePageState extends State<OrderCreatePage> {
 
   Widget _buildBottomBar() {
     return Container(
+      color: Colors.white,
       padding: EdgeInsets.fromLTRB(
         16,
-        10,
+        12,
         16,
-        10 + MediaQuery.of(context).padding.bottom,
+        12 + MediaQuery.of(context).padding.bottom,
       ),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withValues(alpha: 0.05),
-            blurRadius: 10,
-            offset: const Offset(0, -2),
-          ),
-        ],
-      ),
-      child: Row(
-        children: [
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                const Text(
-                  '当前金额',
-                  style: TextStyle(fontSize: 12, color: AppColors.textSecondary),
-                ),
-                const SizedBox(height: 4),
-                Text(
-                  '¥${_displayAmount.toStringAsFixed(0)}',
-                  style: const TextStyle(
-                    fontSize: 22,
-                    fontWeight: FontWeight.bold,
-                    color: Color(0xFFE84B2B),
-                  ),
-                ),
-              ],
+      child: SizedBox(
+        width: double.infinity,
+        height: 58,
+        child: ElevatedButton(
+          onPressed: _isSubmitting ? null : _submitOrder,
+          style: ElevatedButton.styleFrom(
+            backgroundColor: AppColors.primary,
+            foregroundColor: AppColors.textPrimary,
+            elevation: 0,
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(999),
             ),
           ),
-          SizedBox(
-            height: 48,
-            width: 168,
-            child: ElevatedButton(
-              onPressed: _isSubmitting ? null : _submitOrder,
-              style: ElevatedButton.styleFrom(
-                backgroundColor: const Color(0xFF3D6CF5),
-                foregroundColor: Colors.white,
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(24),
+          child: _isSubmitting
+              ? const SizedBox(
+                  width: 22,
+                  height: 22,
+                  child: CircularProgressIndicator(
+                    strokeWidth: 2,
+                    color: AppColors.textPrimary,
+                  ),
+                )
+              : const Text(
+                  '立即付款',
+                  style: TextStyle(fontSize: 20, fontWeight: FontWeight.w900),
                 ),
-                elevation: 0,
+        ),
+      ),
+    );
+  }
+
+  Widget _buildNoticeItem(String text) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 10),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Container(
+            width: 6,
+            height: 6,
+            margin: const EdgeInsets.only(top: 7),
+            decoration: const BoxDecoration(
+              color: AppColors.primaryDeep,
+              shape: BoxShape.circle,
+            ),
+          ),
+          const SizedBox(width: 10),
+          Expanded(
+            child: Text(
+              text,
+              style: const TextStyle(
+                fontSize: 13,
+                height: 1.45,
+                color: AppColors.textSecondary,
               ),
-              child: _isSubmitting
-                  ? const SizedBox(
-                      width: 20,
-                      height: 20,
-                      child: CircularProgressIndicator(
-                        strokeWidth: 2,
-                        color: Colors.white,
-                      ),
-                    )
-                  : const Text(
-                      '提交需求',
-                      style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
-                    ),
             ),
           ),
         ],
@@ -832,10 +1160,22 @@ class _OrderCreatePageState extends State<OrderCreatePage> {
   }
 
   String _formatDateTime(DateTime dateTime) {
-    final twoDigitMonth = dateTime.month.toString().padLeft(2, '0');
-    final twoDigitDay = dateTime.day.toString().padLeft(2, '0');
-    final twoDigitHour = dateTime.hour.toString().padLeft(2, '0');
-    final twoDigitMinute = dateTime.minute.toString().padLeft(2, '0');
-    return '${dateTime.year}-$twoDigitMonth-$twoDigitDay $twoDigitHour:$twoDigitMinute';
+    final hour = dateTime.hour.toString().padLeft(2, '0');
+    final minute = dateTime.minute.toString().padLeft(2, '0');
+    return '${dateTime.month}月${dateTime.day}日 $hour:$minute';
   }
+}
+
+class _ServiceOption {
+  _ServiceOption({
+    required this.title,
+    required this.subtitle,
+    required this.price,
+    this.count = 0,
+  });
+
+  final String title;
+  final String subtitle;
+  final double price;
+  int count;
 }

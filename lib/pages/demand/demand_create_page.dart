@@ -4,7 +4,6 @@ import 'package:provider/provider.dart';
 
 import '../../config/app_theme.dart';
 import '../../providers/demand_provider.dart';
-import '../order/location_picker_page.dart';
 
 class DemandCreatePage extends StatefulWidget {
   const DemandCreatePage({super.key});
@@ -14,17 +13,17 @@ class DemandCreatePage extends StatefulWidget {
 }
 
 class _DemandCreatePageState extends State<DemandCreatePage> {
-  final _titleController = TextEditingController();
-  final _contentController = TextEditingController();
-  final _budgetController = TextEditingController();
-  final _peopleController = TextEditingController();
+  final TextEditingController _titleController = TextEditingController();
+  final TextEditingController _contentController = TextEditingController();
+  final TextEditingController _budgetController = TextEditingController();
+  final TextEditingController _peopleController = TextEditingController();
 
   String _city = '苏州';
   String _location = '';
   DateTime? _startAt;
   DateTime? _endAt;
   String _gender = '不限';
-  final Set<String> _tags = {'陪游'};
+  final Set<String> _tags = {'休闲游玩'};
   bool _submitting = false;
 
   @override
@@ -47,10 +46,14 @@ class _DemandCreatePageState extends State<DemandCreatePage> {
       '/demand/location',
       extra: {'city': _city, 'address': _location.isEmpty ? _city : _location},
     );
-    if (result == null || !mounted) return;
+    if (result == null || !mounted) {
+      return;
+    }
 
     final city = _normalizeCityName(result['city']?.toString());
-    if (city.isEmpty) return;
+    if (city.isEmpty) {
+      return;
+    }
 
     setState(() {
       _city = city;
@@ -63,17 +66,20 @@ class _DemandCreatePageState extends State<DemandCreatePage> {
     });
   }
 
-  Future<void> _pickLocationApiReady() async {
+  Future<void> _pickLocation() async {
     final result = await context.push<Map<String, dynamic>>(
       '/demand/location',
       extra: {'city': _city, 'address': _location},
     );
-    if (result == null || !mounted) return;
+    if (result == null || !mounted) {
+      return;
+    }
 
     setState(() {
-      _city = _normalizeCityName(result['city']?.toString()).isEmpty
-          ? _city
-          : _normalizeCityName(result['city']?.toString());
+      final normalized = _normalizeCityName(result['city']?.toString());
+      if (normalized.isNotEmpty) {
+        _city = normalized;
+      }
       _location =
           result['summary']?.toString() ??
           result['address']?.toString() ??
@@ -82,81 +88,126 @@ class _DemandCreatePageState extends State<DemandCreatePage> {
   }
 
   Future<void> _pickPeopleAndGender() async {
-    final tempController = TextEditingController(text: _peopleController.text);
+    final peopleController = TextEditingController(
+      text: _peopleController.text,
+    );
     String tempGender = _gender;
 
     final result = await showModalBottomSheet<Map<String, String>>(
       context: context,
       isScrollControlled: true,
-      showDragHandle: true,
+      backgroundColor: Colors.white,
       shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+        borderRadius: BorderRadius.vertical(top: Radius.circular(26)),
       ),
       builder: (context) {
         return StatefulBuilder(
           builder: (context, setModalState) {
             return Padding(
-              padding: EdgeInsets.only(
-                left: 16,
-                right: 16,
-                top: 8,
-                bottom: MediaQuery.of(context).viewInsets.bottom + 16,
+              padding: EdgeInsets.fromLTRB(
+                18,
+                16,
+                18,
+                18 + MediaQuery.of(context).viewInsets.bottom,
               ),
               child: Column(
                 mainAxisSize: MainAxisSize.min,
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  const Text(
-                    '服务人数及性别',
-                    style: TextStyle(fontSize: 18, fontWeight: FontWeight.w800),
+                  Row(
+                    children: [
+                      const Expanded(
+                        child: Text(
+                          '服务人数及性别',
+                          style: TextStyle(
+                            fontSize: 22,
+                            fontWeight: FontWeight.w900,
+                            color: AppColors.textPrimary,
+                          ),
+                        ),
+                      ),
+                      IconButton(
+                        onPressed: () => Navigator.pop(context),
+                        icon: const Icon(Icons.close),
+                      ),
+                    ],
                   ),
-                  const SizedBox(height: 16),
+                  const SizedBox(height: 12),
+                  _modalLabel('人数'),
+                  const SizedBox(height: 8),
                   TextField(
-                    controller: tempController,
+                    controller: peopleController,
                     keyboardType: TextInputType.number,
-                    decoration: const InputDecoration(
-                      labelText: '服务人数',
-                      hintText: '请输入人数',
-                      border: OutlineInputBorder(),
+                    decoration: InputDecoration(
+                      hintText: '请输入服务人数',
+                      filled: true,
+                      fillColor: const Color(0xFFF6F6F0),
+                      border: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(14),
+                        borderSide: BorderSide.none,
+                      ),
                     ),
                   ),
                   const SizedBox(height: 16),
-                  const Text(
-                    '性别要求',
-                    style: TextStyle(fontSize: 14, fontWeight: FontWeight.w700),
-                  ),
+                  _modalLabel('性别'),
                   const SizedBox(height: 10),
-                  Wrap(
-                    spacing: 10,
-                    children: ['不限', '男', '女'].map((item) {
+                  Row(
+                    children: ['男', '女', '不限'].map((item) {
                       final selected = tempGender == item;
-                      return ChoiceChip(
-                        label: Text(item),
-                        selected: selected,
-                        onSelected: (_) =>
-                            setModalState(() => tempGender = item),
+                      return Expanded(
+                        child: Padding(
+                          padding: const EdgeInsets.only(right: 10),
+                          child: GestureDetector(
+                            onTap: () => setModalState(() => tempGender = item),
+                            child: Container(
+                              height: 48,
+                              decoration: BoxDecoration(
+                                color: selected
+                                    ? AppColors.primary
+                                    : const Color(0xFFF6F6F0),
+                                borderRadius: BorderRadius.circular(14),
+                              ),
+                              alignment: Alignment.center,
+                              child: Text(
+                                item,
+                                style: const TextStyle(
+                                  fontSize: 16,
+                                  fontWeight: FontWeight.w800,
+                                  color: AppColors.textPrimary,
+                                ),
+                              ),
+                            ),
+                          ),
+                        ),
                       );
                     }).toList(),
                   ),
-                  const SizedBox(height: 18),
+                  const SizedBox(height: 24),
                   SizedBox(
                     width: double.infinity,
-                    height: 48,
+                    height: 54,
                     child: ElevatedButton(
                       onPressed: () {
                         Navigator.pop(context, {
-                          'people': tempController.text.trim(),
+                          'people': peopleController.text.trim(),
                           'gender': tempGender,
                         });
                       },
                       style: ElevatedButton.styleFrom(
                         backgroundColor: AppColors.primary,
-                        foregroundColor: Colors.white,
+                        foregroundColor: AppColors.textPrimary,
+                        elevation: 0,
                         shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(14),
+                          borderRadius: BorderRadius.circular(999),
                         ),
                       ),
-                      child: const Text('确定'),
+                      child: const Text(
+                        '确认',
+                        style: TextStyle(
+                          fontSize: 18,
+                          fontWeight: FontWeight.w900,
+                        ),
+                      ),
                     ),
                   ),
                 ],
@@ -166,6 +217,7 @@ class _DemandCreatePageState extends State<DemandCreatePage> {
         );
       },
     );
+
     if (result != null && mounted) {
       setState(() {
         _peopleController.text = result['people'] ?? '';
@@ -184,439 +236,30 @@ class _DemandCreatePageState extends State<DemandCreatePage> {
     );
     DateTime? tempStart = _startAt;
     DateTime? tempEnd = _endAt;
-
-    if (tempStart == null || !_isSameDay(tempStart, selectedDate)) {
-      tempStart = DateTime(
-        selectedDate.year,
-        selectedDate.month,
-        selectedDate.day,
-        11,
-      );
-      tempEnd = tempStart.add(const Duration(hours: 3));
-    }
+    const minHours = 3;
+    final hours = List.generate(18, (i) => 6 + i);
 
     final result = await showModalBottomSheet<Map<String, DateTime>>(
       context: context,
       isScrollControlled: true,
       backgroundColor: Colors.transparent,
-      shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
-      ),
       builder: (context) {
         final dates = List.generate(5, (i) => now.add(Duration(days: i)));
-        final hours = List.generate(18, (i) => 6 + i);
-        const minHours = 3;
-
-        DateTime atHour(DateTime date, int hour) {
-          return DateTime(date.year, date.month, date.day, hour);
-        }
-
-        int selectedHours() {
-          if (tempStart == null || tempEnd == null) return 0;
-          return tempEnd!.difference(tempStart!).inHours;
-        }
 
         bool disabledHour(int hour) {
           return _isSameDay(selectedDate, now) && hour <= now.hour;
         }
 
+        DateTime atHour(DateTime date, int hour) {
+          return DateTime(date.year, date.month, date.day, hour);
+        }
+
         String dateTitle(DateTime date, int index) {
           if (index == 0) return '今天';
           if (index == 1) return '明天';
-          const weekdays = ['星期一', '星期二', '星期三', '星期四', '星期五', '星期六', '星期日'];
+          const weekdays = ['周一', '周二', '周三', '周四', '周五', '周六', '周日'];
           return weekdays[date.weekday - 1];
         }
-
-        void selectHour(
-          int hour,
-          void Function(void Function()) setModalState,
-        ) {
-          if (disabledHour(hour)) return;
-          final picked = atHour(selectedDate, hour);
-          setModalState(() {
-            if (tempStart == null ||
-                tempEnd != null ||
-                !picked.isAfter(tempStart!)) {
-              tempStart = picked;
-              tempEnd = null;
-              return;
-            }
-            if (picked.difference(tempStart!).inHours < minHours) {
-              ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(content: Text('平台预定服务时间默认 3 小时起订')),
-              );
-              return;
-            }
-            tempEnd = picked;
-          });
-        }
-
-        return StatefulBuilder(
-          builder: (context, setModalState) {
-            final totalHours = selectedHours();
-            final canConfirm = totalHours >= minHours;
-
-            return Container(
-              decoration: const BoxDecoration(
-                color: Color(0xFFF8F7FF),
-                borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
-              ),
-              child: SafeArea(
-                top: false,
-                child: Padding(
-                  padding: EdgeInsets.fromLTRB(
-                    18,
-                    18,
-                    18,
-                    MediaQuery.of(context).viewInsets.bottom + 18,
-                  ),
-                  child: Column(
-                    mainAxisSize: MainAxisSize.min,
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Row(
-                        children: [
-                          const Expanded(
-                            child: Text(
-                              '预约时间',
-                              style: TextStyle(
-                                fontSize: 22,
-                                fontWeight: FontWeight.w800,
-                                color: AppColors.textPrimary,
-                              ),
-                            ),
-                          ),
-                          IconButton(
-                            onPressed: () => Navigator.pop(context),
-                            icon: const Icon(Icons.close),
-                            color: AppColors.textSecondary,
-                          ),
-                        ],
-                      ),
-                      const Text(
-                        '具体开始时间地陪服务将通过电话联系和您确认',
-                        style: TextStyle(
-                          fontSize: 13,
-                          color: AppColors.textHint,
-                        ),
-                      ),
-                      const SizedBox(height: 20),
-                      SizedBox(
-                        height: 86,
-                        child: ListView.separated(
-                          scrollDirection: Axis.horizontal,
-                          itemBuilder: (context, index) {
-                            final date = dates[index];
-                            final selected = _isSameDay(selectedDate, date);
-                            return GestureDetector(
-                              onTap: () => setModalState(() {
-                                selectedDate = DateTime(
-                                  date.year,
-                                  date.month,
-                                  date.day,
-                                );
-                                tempStart = null;
-                                tempEnd = null;
-                              }),
-                              child: AnimatedContainer(
-                                duration: const Duration(milliseconds: 160),
-                                width: 92,
-                                padding: const EdgeInsets.symmetric(
-                                  vertical: 12,
-                                ),
-                                decoration: BoxDecoration(
-                                  color: selected
-                                      ? const Color(0xFFC8F26D)
-                                      : Colors.white.withValues(alpha: 0.55),
-                                  borderRadius: BorderRadius.circular(10),
-                                  border: Border.all(
-                                    color: selected
-                                        ? const Color(0xFFC8F26D)
-                                        : Colors.transparent,
-                                  ),
-                                ),
-                                child: Column(
-                                  mainAxisAlignment: MainAxisAlignment.center,
-                                  children: [
-                                    Text(
-                                      dateTitle(date, index),
-                                      style: TextStyle(
-                                        fontSize: 17,
-                                        fontWeight: selected
-                                            ? FontWeight.w800
-                                            : FontWeight.w600,
-                                        color: selected
-                                            ? AppColors.textPrimary
-                                            : AppColors.textSecondary,
-                                      ),
-                                    ),
-                                    const SizedBox(height: 8),
-                                    Text(
-                                      '${date.month.toString().padLeft(2, '0')}月${date.day.toString().padLeft(2, '0')}日',
-                                      style: TextStyle(
-                                        fontSize: 13,
-                                        fontWeight: selected
-                                            ? FontWeight.w700
-                                            : FontWeight.w400,
-                                        color: selected
-                                            ? AppColors.textPrimary
-                                            : AppColors.textHint,
-                                      ),
-                                    ),
-                                  ],
-                                ),
-                              ),
-                            );
-                          },
-                          separatorBuilder: (_, _) => const SizedBox(width: 10),
-                          itemCount: dates.length,
-                        ),
-                      ),
-                      const SizedBox(height: 28),
-                      const Text(
-                        '预约时间段',
-                        style: TextStyle(
-                          fontSize: 22,
-                          fontWeight: FontWeight.w800,
-                          color: AppColors.textPrimary,
-                        ),
-                      ),
-                      const SizedBox(height: 6),
-                      const Text(
-                        '平台预定服务时间默认 3 小时起订',
-                        style: TextStyle(
-                          fontSize: 13,
-                          color: AppColors.textHint,
-                        ),
-                      ),
-                      const SizedBox(height: 16),
-                      GridView.builder(
-                        shrinkWrap: true,
-                        physics: const NeverScrollableScrollPhysics(),
-                        itemCount: hours.length,
-                        gridDelegate:
-                            const SliverGridDelegateWithFixedCrossAxisCount(
-                              crossAxisCount: 4,
-                              mainAxisSpacing: 12,
-                              crossAxisSpacing: 12,
-                              childAspectRatio: 2.25,
-                            ),
-                        itemBuilder: (context, index) {
-                          final hour = hours[index];
-                          final time = atHour(selectedDate, hour);
-                          final disabled = disabledHour(hour);
-                          final isStart =
-                              tempStart != null &&
-                              _isSameDay(tempStart!, selectedDate) &&
-                              tempStart!.hour == hour;
-                          final isEnd =
-                              tempEnd != null &&
-                              _isSameDay(tempEnd!, selectedDate) &&
-                              tempEnd!.hour == hour;
-                          final inRange =
-                              tempStart != null &&
-                              tempEnd != null &&
-                              time.isAfter(tempStart!) &&
-                              time.isBefore(tempEnd!);
-                          final highlighted = isStart || isEnd;
-                          final night = hour >= 20;
-
-                          return GestureDetector(
-                            onTap: () => selectHour(hour, setModalState),
-                            onLongPress: () => selectHour(hour, setModalState),
-                            child: AnimatedContainer(
-                              duration: const Duration(milliseconds: 150),
-                              decoration: BoxDecoration(
-                                color: highlighted
-                                    ? const Color(0xFFC8F26D)
-                                    : inRange
-                                    ? const Color(0xFFF0F6DA)
-                                    : disabled
-                                    ? const Color(0xFFF4F3F8)
-                                    : Colors.white.withValues(alpha: 0.75),
-                                borderRadius: BorderRadius.circular(10),
-                                border: Border.all(
-                                  color: highlighted
-                                      ? const Color(0xFFC8F26D)
-                                      : Colors.transparent,
-                                ),
-                              ),
-                              child: Stack(
-                                children: [
-                                  if (night)
-                                    const Positioned(
-                                      top: 5,
-                                      left: 8,
-                                      child: Text(
-                                        '夜间',
-                                        style: TextStyle(
-                                          fontSize: 10,
-                                          color: Color(0xFFC78F3A),
-                                        ),
-                                      ),
-                                    ),
-                                  Center(
-                                    child: Column(
-                                      mainAxisSize: MainAxisSize.min,
-                                      children: [
-                                        Text(
-                                          '${hour.toString().padLeft(2, '0')}:00',
-                                          style: TextStyle(
-                                            fontSize: 17,
-                                            fontWeight: highlighted
-                                                ? FontWeight.w800
-                                                : FontWeight.w500,
-                                            color: disabled
-                                                ? const Color(0xFFC9C7D1)
-                                                : AppColors.textPrimary,
-                                          ),
-                                        ),
-                                        const SizedBox(height: 2),
-                                        Text(
-                                          isStart
-                                              ? '开始'
-                                              : isEnd
-                                              ? '结束'
-                                              : '空闲',
-                                          style: TextStyle(
-                                            fontSize: 11,
-                                            color: disabled
-                                                ? const Color(0xFFD5D2DC)
-                                                : highlighted
-                                                ? AppColors.textPrimary
-                                                : AppColors.textHint,
-                                          ),
-                                        ),
-                                      ],
-                                    ),
-                                  ),
-                                ],
-                              ),
-                            ),
-                          );
-                        },
-                      ),
-                      const SizedBox(height: 28),
-                      SizedBox(
-                        width: double.infinity,
-                        height: 56,
-                        child: ElevatedButton(
-                          onPressed: canConfirm
-                              ? () => Navigator.pop(context, {
-                                  'start': tempStart!,
-                                  'end': tempEnd!,
-                                })
-                              : null,
-                          style: ElevatedButton.styleFrom(
-                            backgroundColor: const Color(0xFF242934),
-                            disabledBackgroundColor: const Color(0xFFB6B8C1),
-                            foregroundColor: const Color(0xFFC8F26D),
-                            disabledForegroundColor: Colors.white,
-                            shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(14),
-                            ),
-                          ),
-                          child: Text(
-                            canConfirm ? '共计${totalHours}h 确定' : '请选择至少3小时',
-                            style: const TextStyle(
-                              fontSize: 18,
-                              fontWeight: FontWeight.w800,
-                            ),
-                          ),
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-              ),
-            );
-          },
-        );
-      },
-    );
-
-    if (result != null && mounted) {
-      setState(() {
-        _startAt = result['start'];
-        _endAt = result['end'];
-      });
-    }
-  }
-
-  Future<void> _pickTimeRangeV2() async {
-    final now = DateTime.now();
-    final initialDate = _startAt ?? now.add(const Duration(days: 1));
-    const minHours = 3;
-    const startHour = 6;
-    const endHour = 23;
-    const crossAxisCount = 4;
-    const crossAxisSpacing = 12.0;
-    const mainAxisSpacing = 12.0;
-    const childAspectRatio = 1.68;
-
-    DateTime selectedDate = DateTime(
-      initialDate.year,
-      initialDate.month,
-      initialDate.day,
-    );
-    DateTime? tempStart = _startAt;
-    DateTime? tempEnd = _endAt;
-    int? dragOriginHour;
-
-    DateTime atHour(DateTime date, int hour) =>
-        DateTime(date.year, date.month, date.day, hour);
-
-    bool isDisabledHour(int hour) =>
-        _isSameDay(selectedDate, now) && hour <= now.hour;
-
-    String weekdayLabel(DateTime date) {
-      const weekdays = ['周一', '周二', '周三', '周四', '周五', '周六', '周日'];
-      return weekdays[date.weekday - 1];
-    }
-
-    void setRange(int startHourValue, int endHourValue) {
-      final rangeStart = startHourValue <= endHourValue
-          ? startHourValue
-          : endHourValue;
-      final rangeEnd = startHourValue <= endHourValue
-          ? endHourValue
-          : startHourValue;
-      tempStart = atHour(selectedDate, rangeStart);
-      tempEnd = atHour(selectedDate, rangeEnd);
-    }
-
-    int? hourFromPosition(Offset position, BoxConstraints constraints) {
-      final cellWidth =
-          (constraints.maxWidth - crossAxisSpacing * (crossAxisCount - 1)) /
-          crossAxisCount;
-      final cellHeight = cellWidth / childAspectRatio;
-      final rows =
-          ((endHour - startHour + 1) + crossAxisCount - 1) ~/ crossAxisCount;
-      final blockWidth = cellWidth + crossAxisSpacing;
-      final blockHeight = cellHeight + mainAxisSpacing;
-      final col = (position.dx / blockWidth).floor();
-      final row = (position.dy / blockHeight).floor();
-      if (col < 0 || col >= crossAxisCount || row < 0 || row >= rows) {
-        return null;
-      }
-      final withinX = position.dx - col * blockWidth;
-      final withinY = position.dy - row * blockHeight;
-      if (withinX > cellWidth || withinY > cellHeight) return null;
-      final hour = startHour + row * crossAxisCount + col;
-      if (hour < startHour || hour > endHour) return null;
-      return hour;
-    }
-
-    final result = await showModalBottomSheet<Map<String, DateTime>>(
-      context: context,
-      isScrollControlled: true,
-      backgroundColor: Colors.transparent,
-      builder: (context) {
-        final dates = List.generate(5, (i) => now.add(Duration(days: i)));
-        final hours = List.generate(
-          endHour - startHour + 1,
-          (i) => startHour + i,
-        );
 
         int selectedHours() {
           if (tempStart == null || tempEnd == null) return 0;
@@ -627,26 +270,18 @@ class _DemandCreatePageState extends State<DemandCreatePage> {
           builder: (context, setModalState) {
             final totalHours = selectedHours();
             final canConfirm = totalHours >= minHours;
-            final summaryText = tempStart != null && tempEnd != null
-                ? '${tempStart!.hour.toString().padLeft(2, '0')}:00 - ${tempEnd!.hour.toString().padLeft(2, '0')}:00'
-                : '拖动选择开始和结束时间';
 
             return FractionallySizedBox(
-              heightFactor: 0.88,
+              heightFactor: 0.84,
               child: Container(
                 decoration: const BoxDecoration(
-                  color: Color(0xFFF8F7FF),
-                  borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+                  color: Colors.white,
+                  borderRadius: BorderRadius.vertical(top: Radius.circular(28)),
                 ),
                 child: SafeArea(
                   top: false,
                   child: Padding(
-                    padding: EdgeInsets.fromLTRB(
-                      18,
-                      14,
-                      18,
-                      MediaQuery.of(context).viewInsets.bottom + 16,
-                    ),
+                    padding: const EdgeInsets.fromLTRB(18, 14, 18, 16),
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
@@ -655,8 +290,8 @@ class _DemandCreatePageState extends State<DemandCreatePage> {
                             width: 44,
                             height: 5,
                             decoration: BoxDecoration(
-                              color: const Color(0xFF5A5D6A),
-                              borderRadius: BorderRadius.circular(99),
+                              color: const Color(0xFFD9D9D9),
+                              borderRadius: BorderRadius.circular(999),
                             ),
                           ),
                         ),
@@ -665,10 +300,10 @@ class _DemandCreatePageState extends State<DemandCreatePage> {
                           children: [
                             const Expanded(
                               child: Text(
-                                '服务时间',
+                                '预约服务时间',
                                 style: TextStyle(
                                   fontSize: 22,
-                                  fontWeight: FontWeight.w800,
+                                  fontWeight: FontWeight.w900,
                                   color: AppColors.textPrimary,
                                 ),
                               ),
@@ -676,12 +311,11 @@ class _DemandCreatePageState extends State<DemandCreatePage> {
                             IconButton(
                               onPressed: () => Navigator.pop(context),
                               icon: const Icon(Icons.close),
-                              color: AppColors.textSecondary,
                             ),
                           ],
                         ),
                         const Text(
-                          '先选日期，再在下方拖动时间块选择时长',
+                          '具体开始时间会通过电话联系和您确认',
                           style: TextStyle(
                             fontSize: 13,
                             color: AppColors.textHint,
@@ -689,7 +323,7 @@ class _DemandCreatePageState extends State<DemandCreatePage> {
                         ),
                         const SizedBox(height: 18),
                         SizedBox(
-                          height: 84,
+                          height: 88,
                           child: ListView.separated(
                             scrollDirection: Axis.horizontal,
                             itemCount: dates.length,
@@ -707,52 +341,34 @@ class _DemandCreatePageState extends State<DemandCreatePage> {
                                   );
                                   tempStart = null;
                                   tempEnd = null;
-                                  dragOriginHour = null;
                                 }),
-                                child: AnimatedContainer(
-                                  duration: const Duration(milliseconds: 180),
-                                  width: 92,
-                                  padding: const EdgeInsets.symmetric(
-                                    vertical: 12,
-                                  ),
+                                child: Container(
+                                  width: 84,
                                   decoration: BoxDecoration(
                                     color: selected
-                                        ? const Color(0xFFC8F26D)
-                                        : Colors.white.withValues(alpha: 0.58),
-                                    borderRadius: BorderRadius.circular(12),
-                                    border: Border.all(
-                                      color: selected
-                                          ? const Color(0xFFC8F26D)
-                                          : const Color(0xFFD5D8E2),
-                                    ),
+                                        ? AppColors.primary
+                                        : const Color(0xFFF6F6F0),
+                                    borderRadius: BorderRadius.circular(14),
+                                  ),
+                                  padding: const EdgeInsets.symmetric(
+                                    vertical: 12,
                                   ),
                                   child: Column(
                                     mainAxisAlignment: MainAxisAlignment.center,
                                     children: [
                                       Text(
-                                        index == 0
-                                            ? '今天'
-                                            : index == 1
-                                            ? '明天'
-                                            : weekdayLabel(date),
-                                        style: TextStyle(
-                                          fontSize: 17,
-                                          fontWeight: selected
-                                              ? FontWeight.w800
-                                              : FontWeight.w600,
-                                          color: selected
-                                              ? AppColors.textPrimary
-                                              : AppColors.textSecondary,
+                                        dateTitle(date, index),
+                                        style: const TextStyle(
+                                          fontSize: 16,
+                                          fontWeight: FontWeight.w800,
+                                          color: AppColors.textPrimary,
                                         ),
                                       ),
-                                      const SizedBox(height: 6),
+                                      const SizedBox(height: 8),
                                       Text(
                                         '${date.month.toString().padLeft(2, '0')}月${date.day.toString().padLeft(2, '0')}日',
                                         style: TextStyle(
-                                          fontSize: 13,
-                                          fontWeight: selected
-                                              ? FontWeight.w700
-                                              : FontWeight.w400,
+                                          fontSize: 12,
                                           color: selected
                                               ? AppColors.textPrimary
                                               : AppColors.textHint,
@@ -765,18 +381,18 @@ class _DemandCreatePageState extends State<DemandCreatePage> {
                             },
                           ),
                         ),
-                        const SizedBox(height: 20),
+                        const SizedBox(height: 24),
                         const Text(
                           '预约时间段',
                           style: TextStyle(
                             fontSize: 22,
-                            fontWeight: FontWeight.w800,
+                            fontWeight: FontWeight.w900,
                             color: AppColors.textPrimary,
                           ),
                         ),
                         const SizedBox(height: 6),
                         const Text(
-                          '平台默认最少 3 小时起订',
+                          '平台预约服务时间默认 3 小时起订',
                           style: TextStyle(
                             fontSize: 13,
                             color: AppColors.textHint,
@@ -784,251 +400,122 @@ class _DemandCreatePageState extends State<DemandCreatePage> {
                         ),
                         const SizedBox(height: 14),
                         Expanded(
-                          child: SingleChildScrollView(
-                            child: LayoutBuilder(
-                              builder: (context, constraints) {
-                                final cellWidth =
-                                    (constraints.maxWidth -
-                                        crossAxisSpacing *
-                                            (crossAxisCount - 1)) /
-                                    crossAxisCount;
-                                final cellHeight = cellWidth / childAspectRatio;
-                                final rows =
-                                    (hours.length + crossAxisCount - 1) ~/
-                                    crossAxisCount;
-                                final gridHeight =
-                                    rows * cellHeight +
-                                    (rows - 1) * mainAxisSpacing;
+                          child: GridView.builder(
+                            itemCount: hours.length,
+                            gridDelegate:
+                                const SliverGridDelegateWithFixedCrossAxisCount(
+                                  crossAxisCount: 4,
+                                  mainAxisSpacing: 10,
+                                  crossAxisSpacing: 10,
+                                  childAspectRatio: 1.55,
+                                ),
+                            itemBuilder: (context, index) {
+                              final hour = hours[index];
+                              final disabled = disabledHour(hour);
+                              final time = atHour(selectedDate, hour);
 
-                                return SizedBox(
-                                  height: gridHeight,
-                                  child: GestureDetector(
-                                    behavior: HitTestBehavior.opaque,
-                                    onTapDown: (details) {
-                                      final hour = hourFromPosition(
-                                        details.localPosition,
-                                        constraints,
-                                      );
-                                      if (hour == null ||
-                                          isDisabledHour(hour)) {
-                                        return;
-                                      }
-                                      setModalState(() {
-                                        if (tempStart == null ||
-                                            tempEnd != null) {
-                                          tempStart = atHour(
+                              final isStart =
+                                  tempStart != null &&
+                                  _isSameDay(tempStart!, selectedDate) &&
+                                  tempStart!.hour == hour;
+                              final isEnd =
+                                  tempEnd != null &&
+                                  _isSameDay(tempEnd!, selectedDate) &&
+                                  tempEnd!.hour == hour;
+                              final inRange =
+                                  tempStart != null &&
+                                  tempEnd != null &&
+                                  time.isAfter(tempStart!) &&
+                                  time.isBefore(tempEnd!);
+
+                              final active = isStart || isEnd;
+
+                              return GestureDetector(
+                                onTap: disabled
+                                    ? null
+                                    : () {
+                                        setModalState(() {
+                                          if (tempStart == null ||
+                                              (tempStart != null &&
+                                                  tempEnd != null)) {
+                                            tempStart = atHour(
+                                              selectedDate,
+                                              hour,
+                                            );
+                                            tempEnd = null;
+                                            return;
+                                          }
+                                          final candidate = atHour(
                                             selectedDate,
                                             hour,
                                           );
-                                          tempEnd = null;
-                                          dragOriginHour = hour;
-                                          return;
-                                        }
-                                        if (hour == tempStart!.hour) {
-                                          tempEnd = null;
-                                          dragOriginHour = hour;
-                                          return;
-                                        }
-                                        setRange(tempStart!.hour, hour);
-                                        dragOriginHour = tempStart!.hour;
-                                      });
-                                    },
-                                    onPanStart: (details) {
-                                      final hour = hourFromPosition(
-                                        details.localPosition,
-                                        constraints,
-                                      );
-                                      if (hour == null ||
-                                          isDisabledHour(hour)) {
-                                        return;
-                                      }
-                                      setModalState(() {
-                                        tempStart = atHour(selectedDate, hour);
-                                        tempEnd = null;
-                                        dragOriginHour = hour;
-                                      });
-                                    },
-                                    onPanUpdate: (details) {
-                                      final origin = dragOriginHour;
-                                      if (origin == null) return;
-                                      final hour = hourFromPosition(
-                                        details.localPosition,
-                                        constraints,
-                                      );
-                                      if (hour == null ||
-                                          isDisabledHour(hour)) {
-                                        return;
-                                      }
-                                      setModalState(() {
-                                        setRange(origin, hour);
-                                      });
-                                    },
-                                    onPanEnd: (_) => dragOriginHour = null,
-                                    child: GridView.builder(
-                                      physics:
-                                          const NeverScrollableScrollPhysics(),
-                                      itemCount: hours.length,
-                                      gridDelegate:
-                                          const SliverGridDelegateWithFixedCrossAxisCount(
-                                            crossAxisCount: crossAxisCount,
-                                            mainAxisSpacing: mainAxisSpacing,
-                                            crossAxisSpacing: crossAxisSpacing,
-                                            childAspectRatio: childAspectRatio,
-                                          ),
-                                      itemBuilder: (context, index) {
-                                        final hour = hours[index];
-                                        final time = atHour(selectedDate, hour);
-                                        final disabled = isDisabledHour(hour);
-                                        final isStart =
-                                            tempStart != null &&
-                                            _isSameDay(
-                                              tempStart!,
-                                              selectedDate,
-                                            ) &&
-                                            tempStart!.hour == hour;
-                                        final isEnd =
-                                            tempEnd != null &&
-                                            _isSameDay(
-                                              tempEnd!,
-                                              selectedDate,
-                                            ) &&
-                                            tempEnd!.hour == hour;
-                                        final inRange =
-                                            tempStart != null &&
-                                            tempEnd != null &&
-                                            time.isAfter(tempStart!) &&
-                                            time.isBefore(tempEnd!);
-                                        final highlighted = isStart || isEnd;
-                                        final night = hour >= 20;
-
-                                        return AnimatedContainer(
-                                          duration: const Duration(
-                                            milliseconds: 150,
-                                          ),
-                                          decoration: BoxDecoration(
-                                            color: highlighted
-                                                ? const Color(0xFFC8F26D)
-                                                : inRange
-                                                ? const Color(0xFFF0F6DA)
-                                                : disabled
-                                                ? const Color(0xFFF4F3F8)
-                                                : Colors.white.withValues(
-                                                    alpha: 0.82,
-                                                  ),
-                                            borderRadius: BorderRadius.circular(
-                                              12,
-                                            ),
-                                            border: Border.all(
-                                              color: highlighted
-                                                  ? const Color(0xFFC8F26D)
-                                                  : const Color(0xFFD5D8E2),
-                                            ),
-                                          ),
-                                          child: Stack(
-                                            children: [
-                                              if (night)
-                                                const Positioned(
-                                                  top: 6,
-                                                  left: 8,
-                                                  child: Icon(
-                                                    Icons.nights_stay_rounded,
-                                                    size: 11,
-                                                    color: Color(0xFFC78F3A),
-                                                  ),
-                                                ),
-                                              Center(
-                                                child: Column(
-                                                  mainAxisSize:
-                                                      MainAxisSize.min,
-                                                  children: [
-                                                    Text(
-                                                      '${hour.toString().padLeft(2, '0')}:00',
-                                                      style: TextStyle(
-                                                        fontSize: 16,
-                                                        height: 1,
-                                                        fontWeight: highlighted
-                                                            ? FontWeight.w800
-                                                            : FontWeight.w500,
-                                                        color: disabled
-                                                            ? const Color(
-                                                                0xFFC9C7D1,
-                                                              )
-                                                            : AppColors
-                                                                  .textPrimary,
-                                                      ),
-                                                    ),
-                                                    const SizedBox(height: 1),
-                                                    Text(
-                                                      isStart
-                                                          ? '开始'
-                                                          : isEnd
-                                                          ? '结束'
-                                                          : '可选',
-                                                      style: TextStyle(
-                                                        fontSize: 9,
-                                                        height: 1,
-                                                        color: disabled
-                                                            ? const Color(
-                                                                0xFFD5D2DC,
-                                                              )
-                                                            : highlighted
-                                                            ? AppColors
-                                                                  .textPrimary
-                                                            : AppColors
-                                                                  .textHint,
-                                                      ),
-                                                    ),
-                                                  ],
-                                                ),
+                                          if (!candidate.isAfter(tempStart!)) {
+                                            tempStart = candidate;
+                                            tempEnd = null;
+                                            return;
+                                          }
+                                          if (candidate
+                                                  .difference(tempStart!)
+                                                  .inHours <
+                                              minHours) {
+                                            ScaffoldMessenger.of(
+                                              context,
+                                            ).showSnackBar(
+                                              const SnackBar(
+                                                content: Text('至少选择 3 小时'),
                                               ),
-                                            ],
-                                          ),
-                                        );
+                                            );
+                                            return;
+                                          }
+                                          tempEnd = candidate;
+                                        });
                                       },
-                                    ),
+                                child: Container(
+                                  decoration: BoxDecoration(
+                                    color: active
+                                        ? AppColors.primary
+                                        : inRange
+                                        ? const Color(0xFFF0F6DA)
+                                        : const Color(0xFFF8F8F3),
+                                    borderRadius: BorderRadius.circular(14),
                                   ),
-                                );
-                              },
-                            ),
-                          ),
-                        ),
-                        const SizedBox(height: 16),
-                        Container(
-                          width: double.infinity,
-                          padding: const EdgeInsets.symmetric(
-                            horizontal: 16,
-                            vertical: 14,
-                          ),
-                          decoration: BoxDecoration(
-                            color: Colors.white.withValues(alpha: 0.9),
-                            borderRadius: BorderRadius.circular(16),
-                          ),
-                          child: Row(
-                            children: [
-                              Expanded(
-                                child: Text(
-                                  summaryText,
-                                  style: const TextStyle(
-                                    fontSize: 14,
-                                    fontWeight: FontWeight.w700,
-                                    color: AppColors.textPrimary,
+                                  child: Column(
+                                    mainAxisAlignment: MainAxisAlignment.center,
+                                    children: [
+                                      Text(
+                                        '${hour.toString().padLeft(2, '0')}:00',
+                                        style: TextStyle(
+                                          fontSize: 18,
+                                          fontWeight: FontWeight.w800,
+                                          color: disabled
+                                              ? const Color(0xFFCFCFCF)
+                                              : AppColors.textPrimary,
+                                        ),
+                                      ),
+                                      const SizedBox(height: 4),
+                                      Text(
+                                        isStart
+                                            ? '开始'
+                                            : isEnd
+                                            ? '结束'
+                                            : (disabled ? '约满' : '可约'),
+                                        style: TextStyle(
+                                          fontSize: 11,
+                                          color: disabled
+                                              ? const Color(0xFFCFCFCF)
+                                              : (active
+                                                    ? AppColors.textPrimary
+                                                    : AppColors.textHint),
+                                        ),
+                                      ),
+                                    ],
                                   ),
                                 ),
-                              ),
-                              Text(
-                                totalHours > 0 ? '共计 ${totalHours}h' : '请选择时长',
-                                style: TextStyle(
-                                  fontSize: 13,
-                                  color: totalHours > 0
-                                      ? AppColors.primary
-                                      : AppColors.textHint,
-                                  fontWeight: FontWeight.w700,
-                                ),
-                              ),
-                            ],
+                              );
+                            },
                           ),
                         ),
-                        const SizedBox(height: 16),
+                        const SizedBox(height: 12),
                         SizedBox(
                           width: double.infinity,
                           height: 56,
@@ -1040,21 +527,21 @@ class _DemandCreatePageState extends State<DemandCreatePage> {
                                   })
                                 : null,
                             style: ElevatedButton.styleFrom(
-                              backgroundColor: const Color(0xFF242934),
-                              disabledBackgroundColor: const Color(0xFFB6B8C1),
-                              foregroundColor: const Color(0xFFC8F26D),
-                              disabledForegroundColor: Colors.white,
+                              backgroundColor: AppColors.primary,
+                              foregroundColor: AppColors.textPrimary,
+                              disabledBackgroundColor: const Color(0xFFE5E5E5),
+                              elevation: 0,
                               shape: RoundedRectangleBorder(
-                                borderRadius: BorderRadius.circular(16),
+                                borderRadius: BorderRadius.circular(999),
                               ),
                             ),
                             child: Text(
                               canConfirm
                                   ? '共计 ${totalHours}h 确定'
-                                  : '请选择至少 ${minHours} 小时',
+                                  : '请选择至少 3 小时',
                               style: const TextStyle(
-                                fontSize: 18,
-                                fontWeight: FontWeight.w800,
+                                fontSize: 20,
+                                fontWeight: FontWeight.w900,
                               ),
                             ),
                           ),
@@ -1076,15 +563,6 @@ class _DemandCreatePageState extends State<DemandCreatePage> {
         _endAt = result['end'];
       });
     }
-  }
-
-  bool _isSameDay(DateTime a, DateTime b) =>
-      a.year == b.year && a.month == b.month && a.day == b.day;
-
-  String _formatDateTime(DateTime? dateTime) {
-    if (dateTime == null) return '请选择';
-    const weekdays = ['一', '二', '三', '四', '五', '六', '日'];
-    return '${dateTime.month}月${dateTime.day}日 周${weekdays[dateTime.weekday - 1]} ${dateTime.hour.toString().padLeft(2, '0')}:${dateTime.minute.toString().padLeft(2, '0')}';
   }
 
   Future<void> _submit() async {
@@ -1117,17 +595,20 @@ class _DemandCreatePageState extends State<DemandCreatePage> {
         budget: _budgetController.text.trim(),
         tags: _tags.toList(),
       );
-      if (!mounted) return;
+      if (!mounted) {
+        return;
+      }
       ScaffoldMessenger.of(
         context,
       ).showSnackBar(const SnackBar(content: Text('需求已发布')));
       context.go('/demands');
     } catch (e) {
-      if (mounted) {
-        ScaffoldMessenger.of(
-          context,
-        ).showSnackBar(SnackBar(content: Text('发布失败：$e')));
+      if (!mounted) {
+        return;
       }
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text('发布失败：$e')));
     } finally {
       if (mounted) {
         setState(() => _submitting = false);
@@ -1135,250 +616,125 @@ class _DemandCreatePageState extends State<DemandCreatePage> {
     }
   }
 
-  @override
-  Widget build(BuildContext context) {
-    return Scaffold(
-      backgroundColor: const Color(0xFFF2F4F8),
-      appBar: AppBar(title: const Text('发需求'), centerTitle: true),
-      bottomNavigationBar: SafeArea(
-        top: false,
-        child: Container(
-          padding: const EdgeInsets.fromLTRB(16, 10, 16, 14),
-          decoration: BoxDecoration(
-            color: Colors.white,
-            boxShadow: [
-              BoxShadow(
-                color: Colors.black.withValues(alpha: 0.06),
-                blurRadius: 14,
-                offset: const Offset(0, -4),
-              ),
-            ],
-          ),
-          child: Row(
-            children: [
-              _bottomAction(
-                Icons.visibility_outlined,
-                '预览',
-                onTap: () => ScaffoldMessenger.of(
-                  context,
-                ).showSnackBar(const SnackBar(content: Text('预览功能后续接入'))),
-              ),
-              const SizedBox(width: 12),
-              _bottomAction(
-                Icons.bookmark_border,
-                '存草稿',
-                onTap: () => ScaffoldMessenger.of(
-                  context,
-                ).showSnackBar(const SnackBar(content: Text('草稿功能后续接入'))),
-              ),
-              const SizedBox(width: 12),
-              Expanded(
-                child: SizedBox(
-                  height: 52,
-                  child: ElevatedButton(
-                    onPressed: _submitting ? null : _submit,
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: AppColors.primary,
-                      foregroundColor: Colors.white,
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(18),
-                      ),
-                    ),
-                    child: _submitting
-                        ? const SizedBox(
-                            width: 20,
-                            height: 20,
-                            child: CircularProgressIndicator(
-                              strokeWidth: 2,
-                              color: Colors.white,
-                            ),
-                          )
-                        : const Text(
-                            '发布需求',
-                            style: TextStyle(
-                              fontSize: 16,
-                              fontWeight: FontWeight.w700,
-                            ),
-                          ),
-                  ),
-                ),
-              ),
-            ],
-          ),
-        ),
+  void _saveDraft() {
+    ScaffoldMessenger.of(
+      context,
+    ).showSnackBar(const SnackBar(content: Text('草稿功能稍后接入')));
+  }
+
+  void _showPreview() {
+    FocusScope.of(context).unfocus();
+    showModalBottomSheet<void>(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.white,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(28)),
       ),
-      body: ListView(
-        padding: const EdgeInsets.fromLTRB(16, 16, 16, 16),
-        children: [
-          Container(
-            padding: const EdgeInsets.all(16),
-            decoration: BoxDecoration(
-              color: Colors.white,
-              borderRadius: BorderRadius.circular(24),
-            ),
+      builder: (context) {
+        final timeText = _startAt == null || _endAt == null
+            ? '暂未选择'
+            : '${_formatMoment(_startAt!)} - ${_formatMoment(_endAt!)}';
+        final peopleText = _peopleController.text.trim().isEmpty
+            ? '暂未填写'
+            : '${_peopleController.text.trim()}人 · $_gender';
+
+        return SafeArea(
+          top: false,
+          child: Padding(
+            padding: const EdgeInsets.fromLTRB(18, 18, 18, 24),
             child: Column(
+              mainAxisSize: MainAxisSize.min,
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Row(
-                  crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Container(
-                      width: 112,
-                      height: 112,
-                      decoration: BoxDecoration(
-                        color: const Color(0xFFF1F3F7),
-                        borderRadius: BorderRadius.circular(18),
-                      ),
-                      child: const Column(
-                        mainAxisAlignment: MainAxisAlignment.center,
-                        children: [
-                          Icon(
-                            Icons.add_photo_alternate_outlined,
-                            size: 32,
-                            color: AppColors.textHint,
-                          ),
-                          SizedBox(height: 6),
-                          Text(
-                            '0/9',
-                            style: TextStyle(
-                              fontSize: 16,
-                              fontWeight: FontWeight.w700,
-                              color: AppColors.textHint,
-                            ),
-                          ),
-                        ],
+                    const Expanded(
+                      child: Text(
+                        '需求预览',
+                        style: TextStyle(
+                          fontSize: 22,
+                          fontWeight: FontWeight.w900,
+                          color: AppColors.textPrimary,
+                        ),
                       ),
                     ),
-                    const SizedBox(width: 14),
-                    Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          TextField(
-                            controller: _titleController,
-                            maxLength: 20,
-                            decoration: const InputDecoration(
-                              hintText: '请输入需求标题（20字以内）',
-                              counterText: '',
-                              border: InputBorder.none,
-                            ),
-                          ),
-                          const Divider(height: 1),
-                          const SizedBox(height: 12),
-                          TextField(
-                            controller: _contentController,
-                            maxLines: 5,
-                            decoration: const InputDecoration(
-                              hintText: '商务活动：苏州工业园区金鸡湖大酒店湖光厅，商户活动出席，需95后女生1名',
-                              border: InputBorder.none,
-                            ),
-                          ),
-                        ],
-                      ),
+                    IconButton(
+                      onPressed: () => Navigator.pop(context),
+                      icon: const Icon(Icons.close),
                     ),
                   ],
                 ),
-                const SizedBox(height: 16),
-                Wrap(
-                  spacing: 8,
-                  runSpacing: 8,
-                  children: ['文化讲解', '文娱活动', '摄影陪同', '美食陪吃', 'CityWalk'].map((
-                    item,
-                  ) {
-                    final selected = _tags.contains(item);
-                    return FilterChip(
-                      label: Text(item),
-                      selected: selected,
-                      onSelected: (_) {
-                        setState(() {
-                          if (selected) {
-                            _tags.remove(item);
-                          } else {
-                            _tags.add(item);
-                          }
-                        });
-                      },
-                    );
-                  }).toList(),
+                const SizedBox(height: 10),
+                Text(
+                  _titleController.text.trim().isEmpty
+                      ? '未填写标题'
+                      : _titleController.text.trim(),
+                  style: const TextStyle(
+                    fontSize: 20,
+                    fontWeight: FontWeight.w800,
+                    color: AppColors.textPrimary,
+                  ),
                 ),
-                const SizedBox(height: 8),
-                Align(
-                  alignment: Alignment.centerRight,
+                const SizedBox(height: 12),
+                _previewRow('城市', _city),
+                _previewRow('地点', _location.isEmpty ? '暂未选择' : _location),
+                _previewRow('时间', timeText),
+                _previewRow('人数', peopleText),
+                _previewRow(
+                  '预算',
+                  _budgetController.text.trim().isEmpty
+                      ? '未填写'
+                      : _budgetController.text.trim(),
+                ),
+                const SizedBox(height: 12),
+                Container(
+                  width: double.infinity,
+                  padding: const EdgeInsets.all(14),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFFF7F7F2),
+                    borderRadius: BorderRadius.circular(18),
+                  ),
                   child: Text(
-                    '${_contentController.text.length}/50',
+                    _contentController.text.trim().isEmpty
+                        ? '未填写内容'
+                        : _contentController.text.trim(),
                     style: const TextStyle(
-                      color: AppColors.textHint,
-                      fontSize: 12,
+                      fontSize: 14,
+                      color: AppColors.textPrimary,
+                      height: 1.65,
                     ),
                   ),
                 ),
               ],
             ),
           ),
-          const SizedBox(height: 12),
-          Container(
-            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-            decoration: BoxDecoration(
-              color: Colors.white,
-              borderRadius: BorderRadius.circular(22),
-            ),
-            child: Column(
-              children: [
-                _buildInfoTile(
-                  icon: Icons.place_outlined,
-                  label: '服务地点：',
-                  value: _location.isEmpty ? '请选择服务地点' : _location,
-                  trailing: _buildCityChip(),
-                  onTap: _pickLocationApiReady,
-                ),
-                const Divider(height: 24),
-                _buildInfoTile(
-                  icon: Icons.schedule_outlined,
-                  label: '服务时间：',
-                  value: _startAt == null || _endAt == null
-                      ? '请选择服务时间'
-                      : '${_formatDateTime(_startAt)} - ${_formatDateTime(_endAt)}',
-                  onTap: _pickTimeRangeV2,
-                ),
-                const Divider(height: 24),
-                _buildInfoTile(
-                  icon: Icons.sentiment_satisfied_alt_outlined,
-                  label: '服务人数及性别：',
-                  value: _peopleController.text.isEmpty
-                      ? '请输入人数'
-                      : '${_peopleController.text}人 / $_gender',
-                  onTap: _pickPeopleAndGender,
-                ),
-              ],
+        );
+      },
+    );
+  }
+
+  Widget _previewRow(String label, String value) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 8),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          SizedBox(
+            width: 44,
+            child: Text(
+              label,
+              style: const TextStyle(fontSize: 13, color: AppColors.textHint),
             ),
           ),
-          const SizedBox(height: 12),
-          Container(
-            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
-            decoration: BoxDecoration(
-              color: Colors.white,
-              borderRadius: BorderRadius.circular(18),
-            ),
-            child: Row(
-              children: [
-                const Icon(Icons.verified_outlined, color: AppColors.primary),
-                const SizedBox(width: 10),
-                const Expanded(
-                  child: Text(
-                    '本服务由平台合作保险全程保障您的人身财产安全',
-                    style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600),
-                  ),
-                ),
-                const Icon(Icons.chevron_right, color: AppColors.textHint),
-              ],
-            ),
-          ),
-          const SizedBox(height: 8),
-          TextField(
-            controller: _budgetController,
-            decoration: const InputDecoration(
-              labelText: '预算（可选）',
-              hintText: '例如：300-500',
+          Expanded(
+            child: Text(
+              value,
+              style: const TextStyle(
+                fontSize: 14,
+                color: AppColors.textPrimary,
+                height: 1.45,
+              ),
             ),
           ),
         ],
@@ -1386,34 +742,310 @@ class _DemandCreatePageState extends State<DemandCreatePage> {
     );
   }
 
-  Widget _buildCityChip() {
-    return InkWell(
-      onTap: _pickCity,
-      borderRadius: BorderRadius.circular(20),
-      child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 7),
-        decoration: BoxDecoration(
-          color: AppColors.tagBackground,
-          borderRadius: BorderRadius.circular(20),
+  @override
+  Widget build(BuildContext context) {
+    final bottomInset = MediaQuery.paddingOf(context).bottom;
+    return Scaffold(
+      backgroundColor: const Color(0xFFF7F7F2),
+      appBar: AppBar(
+        backgroundColor: Colors.white,
+        foregroundColor: AppColors.textPrimary,
+        elevation: 0,
+        centerTitle: true,
+        title: const Text(
+          '服务地点',
+          style: TextStyle(fontSize: 22, fontWeight: FontWeight.w800),
         ),
-        child: Row(
-          mainAxisSize: MainAxisSize.min,
+        leading: IconButton(
+          onPressed: () => context.pop(),
+          icon: const Icon(Icons.arrow_back_ios_new, size: 18),
+        ),
+      ),
+      body: SafeArea(
+        child: Column(
           children: [
-            Text(
-              _city,
-              style: const TextStyle(
-                fontWeight: FontWeight.w600,
-                color: AppColors.primary,
+            Expanded(
+              child: ListView(
+                padding: const EdgeInsets.fromLTRB(16, 12, 16, 20),
+                children: [
+                  _buildMainCard(),
+                  const SizedBox(height: 12),
+                  _buildInfoCard(),
+                  const SizedBox(height: 12),
+                  _buildSafetyCard(),
+                ],
               ),
             ),
-            const SizedBox(width: 4),
-            const Icon(
-              Icons.arrow_drop_down,
-              size: 18,
-              color: AppColors.primary,
+            Container(
+              padding: EdgeInsets.fromLTRB(16, 10, 16, 10 + bottomInset),
+              decoration: BoxDecoration(
+                color: Colors.white,
+                boxShadow: [
+                  BoxShadow(
+                    color: Colors.black.withValues(alpha: 0.05),
+                    blurRadius: 12,
+                    offset: const Offset(0, -2),
+                  ),
+                ],
+              ),
+              child: Row(
+                children: [
+                  _bottomAction(
+                    Icons.remove_red_eye_outlined,
+                    '预览',
+                    onTap: _showPreview,
+                  ),
+                  const SizedBox(width: 20),
+                  _bottomAction(
+                    Icons.drafts_outlined,
+                    '存草稿',
+                    onTap: _saveDraft,
+                  ),
+                  const Spacer(),
+                  SizedBox(
+                    width: 184,
+                    height: 52,
+                    child: ElevatedButton(
+                      onPressed: _submitting ? null : _submit,
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: AppColors.primary,
+                        foregroundColor: AppColors.textPrimary,
+                        elevation: 0,
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(999),
+                        ),
+                      ),
+                      child: _submitting
+                          ? const SizedBox(
+                              width: 20,
+                              height: 20,
+                              child: CircularProgressIndicator(
+                                strokeWidth: 2,
+                                color: AppColors.textPrimary,
+                              ),
+                            )
+                          : const Text(
+                              '立即发布',
+                              style: TextStyle(
+                                fontSize: 18,
+                                fontWeight: FontWeight.w900,
+                              ),
+                            ),
+                    ),
+                  ),
+                ],
+              ),
             ),
           ],
         ),
+      ),
+    );
+  }
+
+  Widget _buildMainCard() {
+    final tags = [
+      ('休闲游玩', Icons.local_activity_outlined),
+      ('商务陪同', Icons.person_outline),
+    ];
+
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(26),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Container(
+                width: 124,
+                height: 124,
+                decoration: BoxDecoration(
+                  color: const Color(0xFFF4F5EF),
+                  borderRadius: BorderRadius.circular(18),
+                ),
+                child: Column(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    Container(
+                      width: 32,
+                      height: 32,
+                      decoration: const BoxDecoration(
+                        color: AppColors.primary,
+                        shape: BoxShape.circle,
+                      ),
+                      alignment: Alignment.center,
+                      child: const Icon(
+                        Icons.add,
+                        size: 22,
+                        color: AppColors.textPrimary,
+                      ),
+                    ),
+                    const SizedBox(height: 18),
+                    const Text(
+                      '添加图片',
+                      style: TextStyle(
+                        fontSize: 18,
+                        fontWeight: FontWeight.w700,
+                        color: Color(0xFFD2D2D2),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(width: 14),
+              const Padding(
+                padding: EdgeInsets.only(top: 84),
+                child: Text(
+                  '0/9',
+                  style: TextStyle(
+                    fontSize: 16,
+                    fontWeight: FontWeight.w700,
+                    color: AppColors.textHint,
+                  ),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 18),
+          TextField(
+            controller: _titleController,
+            maxLength: 20,
+            decoration: const InputDecoration(
+              hintText: '请输入活动标题（20字以内）',
+              hintStyle: TextStyle(
+                fontSize: 18,
+                fontWeight: FontWeight.w700,
+                color: Color(0xFFD2D2D2),
+              ),
+              counterText: '',
+              border: InputBorder.none,
+              isDense: true,
+              contentPadding: EdgeInsets.zero,
+            ),
+            style: const TextStyle(
+              fontSize: 22,
+              fontWeight: FontWeight.w800,
+              color: AppColors.textPrimary,
+            ),
+          ),
+          const SizedBox(height: 10),
+          SizedBox(
+            height: 172,
+            child: TextField(
+              controller: _contentController,
+              maxLines: null,
+              expands: true,
+              textAlignVertical: TextAlignVertical.top,
+              decoration: const InputDecoration(
+                hintText:
+                    '请编辑您的活动内容(如「苏州工业园区金鸡湖大酒店湖光厅，商户活动出席，需要95后女生1名」仅限平台沟通勿留私人联系方式，安全自负。)',
+                hintStyle: TextStyle(
+                  fontSize: 14,
+                  color: Color(0xFFD2D2D2),
+                  height: 1.65,
+                ),
+                border: InputBorder.none,
+                contentPadding: EdgeInsets.zero,
+              ),
+              style: const TextStyle(
+                fontSize: 14,
+                color: AppColors.textPrimary,
+                height: 1.65,
+              ),
+            ),
+          ),
+          const SizedBox(height: 14),
+          Wrap(
+            spacing: 10,
+            runSpacing: 10,
+            children: tags.map((item) {
+              final selected = _tags.contains(item.$1);
+              return _buildTagChip(
+                label: item.$1,
+                icon: item.$2,
+                selected: selected,
+                onTap: () {
+                  setState(() {
+                    if (selected) {
+                      _tags.remove(item.$1);
+                    } else {
+                      _tags.add(item.$1);
+                    }
+                  });
+                },
+              );
+            }).toList(),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildInfoCard() {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(22),
+      ),
+      child: Column(
+        children: [
+          _buildInfoTile(
+            icon: Icons.place_outlined,
+            label: '服务地点',
+            value: _location.isEmpty ? '请选择服务地点' : _location,
+            onTap: _pickLocation,
+          ),
+          const Divider(height: 20, thickness: 1, color: Color(0xFFF2F2F2)),
+          _buildInfoTile(
+            icon: Icons.schedule_outlined,
+            label: '服务时间',
+            value: _startAt == null || _endAt == null
+                ? '请选择服务时间'
+                : '${_formatMoment(_startAt!)} - ${_formatMoment(_endAt!)}',
+            onTap: _pickTimeRange,
+          ),
+          const Divider(height: 20, thickness: 1, color: Color(0xFFF2F2F2)),
+          _buildInfoTile(
+            icon: Icons.people_alt_outlined,
+            label: '服务人数及性别',
+            value: _peopleController.text.isEmpty
+                ? '请输入服务人数'
+                : '${_peopleController.text}人·$_gender',
+            onTap: _pickPeopleAndGender,
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildSafetyCard() {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+      decoration: BoxDecoration(
+        color: const Color(0xFFFFFAF1),
+        borderRadius: BorderRadius.circular(18),
+      ),
+      child: const Row(
+        children: [
+          Icon(Icons.verified_user_outlined, color: Color(0xFFFFA24A)),
+          SizedBox(width: 10),
+          Expanded(
+            child: Text(
+              '本服务由平台合作保险全程保障您的人身财产安全',
+              style: TextStyle(
+                fontSize: 13,
+                fontWeight: FontWeight.w600,
+                color: Color(0xFFFFA24A),
+              ),
+            ),
+          ),
+          Icon(Icons.chevron_right, color: AppColors.textHint),
+        ],
       ),
     );
   }
@@ -1423,53 +1055,77 @@ class _DemandCreatePageState extends State<DemandCreatePage> {
     required String label,
     required String value,
     VoidCallback? onTap,
-    Widget? trailing,
   }) {
     return InkWell(
       onTap: onTap,
       borderRadius: BorderRadius.circular(16),
-      child: Row(
-        children: [
-          Icon(icon, size: 20, color: AppColors.textSecondary),
-          const SizedBox(width: 10),
-          Text(
-            label,
-            style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w700),
-          ),
-          const SizedBox(width: 10),
-          Expanded(
-            child: Text(
-              value,
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
-              textAlign: TextAlign.right,
+      child: Padding(
+        padding: const EdgeInsets.symmetric(vertical: 8),
+        child: Row(
+          children: [
+            Icon(icon, size: 22, color: AppColors.primaryDeep),
+            const SizedBox(width: 10),
+            Text(
+              label,
               style: const TextStyle(
-                fontSize: 14,
-                color: AppColors.textSecondary,
+                fontSize: 16,
+                fontWeight: FontWeight.w700,
+                color: AppColors.textPrimary,
               ),
             ),
-          ),
-          if (trailing != null) ...[
             const SizedBox(width: 10),
-            trailing,
-          ] else
+            Expanded(
+              child: Text(
+                value,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                textAlign: TextAlign.right,
+                style: const TextStyle(
+                  fontSize: 15,
+                  fontWeight: FontWeight.w700,
+                  color: AppColors.textPrimary,
+                ),
+              ),
+            ),
             const SizedBox(width: 4),
-          const Icon(Icons.chevron_right, color: AppColors.textHint),
-        ],
+            const Icon(Icons.chevron_right, color: AppColors.textHint),
+          ],
+        ),
       ),
     );
   }
 
-  String _normalizeCityName(String? raw) {
-    final city = (raw ?? '').trim();
-    if (city.isEmpty) return '';
-    const suffixes = ['特别行政区', '自治州', '自治县', '自治区', '地区', '盟', '市'];
-    for (final suffix in suffixes) {
-      if (city.endsWith(suffix) && city.length > suffix.length) {
-        return city.substring(0, city.length - suffix.length);
-      }
-    }
-    return city;
+  Widget _buildTagChip({
+    required String label,
+    required IconData icon,
+    required bool selected,
+    required VoidCallback onTap,
+  }) {
+    return GestureDetector(
+      onTap: onTap,
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 9),
+        decoration: BoxDecoration(
+          color: selected ? AppColors.primarySoft : const Color(0xFFF5F5EF),
+          borderRadius: BorderRadius.circular(999),
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(icon, size: 18, color: AppColors.textPrimary),
+            const SizedBox(width: 6),
+            Text(
+              label,
+              style: const TextStyle(
+                fontSize: 14,
+                fontWeight: FontWeight.w700,
+                color: AppColors.textPrimary,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
   }
 
   Widget _bottomAction(
@@ -1482,16 +1138,8 @@ class _DemandCreatePageState extends State<DemandCreatePage> {
       child: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
-          Container(
-            width: 40,
-            height: 40,
-            decoration: BoxDecoration(
-              color: AppColors.tagBackground,
-              borderRadius: BorderRadius.circular(14),
-            ),
-            child: Icon(icon, color: AppColors.primary, size: 20),
-          ),
-          const SizedBox(height: 4),
+          Icon(icon, color: AppColors.textHint, size: 20),
+          const SizedBox(height: 6),
           Text(
             label,
             style: const TextStyle(fontSize: 12, color: AppColors.textHint),
@@ -1499,5 +1147,40 @@ class _DemandCreatePageState extends State<DemandCreatePage> {
         ],
       ),
     );
+  }
+
+  Widget _modalLabel(String text) {
+    return Text(
+      text,
+      style: const TextStyle(
+        fontSize: 14,
+        fontWeight: FontWeight.w800,
+        color: AppColors.textPrimary,
+      ),
+    );
+  }
+
+  String _normalizeCityName(String? raw) {
+    final city = (raw ?? '').trim();
+    if (city.isEmpty) {
+      return '';
+    }
+
+    const suffixes = ['特别行政区', '自治区', '自治州', '自治县', '地区', '盟', '市'];
+    for (final suffix in suffixes) {
+      if (city.endsWith(suffix) && city.length > suffix.length) {
+        return city.substring(0, city.length - suffix.length);
+      }
+    }
+    return city;
+  }
+
+  bool _isSameDay(DateTime a, DateTime b) {
+    return a.year == b.year && a.month == b.month && a.day == b.day;
+  }
+
+  String _formatMoment(DateTime dateTime) {
+    const weekdays = ['周一', '周二', '周三', '周四', '周五', '周六', '周日'];
+    return '${dateTime.year}.${dateTime.month}.${dateTime.day} ${dateTime.hour.toString().padLeft(2, '0')}:${dateTime.minute.toString().padLeft(2, '0')} ${weekdays[dateTime.weekday - 1]}';
   }
 }
