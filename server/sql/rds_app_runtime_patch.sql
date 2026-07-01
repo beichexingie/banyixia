@@ -378,6 +378,8 @@ create table if not exists public.post_comments (
   id uuid primary key default gen_random_uuid(),
   post_id uuid not null references public.posts(id) on delete cascade,
   user_id uuid not null references public.users(id) on delete cascade,
+  parent_comment_id uuid references public.post_comments(id) on delete cascade,
+  reply_to_comment_id uuid references public.post_comments(id) on delete set null,
   content text not null,
   created_at timestamptz default now()
 );
@@ -385,12 +387,53 @@ create table if not exists public.post_comments (
 alter table if exists public.post_comments
   add column if not exists post_id uuid references public.posts(id) on delete cascade,
   add column if not exists user_id uuid references public.users(id) on delete cascade,
+  add column if not exists parent_comment_id uuid references public.post_comments(id) on delete cascade,
+  add column if not exists reply_to_comment_id uuid references public.post_comments(id) on delete set null,
   add column if not exists content text,
   add column if not exists created_at timestamptz default now();
 
 alter table if exists public.post_comments
   alter column id set default gen_random_uuid(),
   alter column created_at set default now();
+
+create index if not exists idx_post_comments_post_created
+  on public.post_comments (post_id, created_at);
+
+create index if not exists idx_post_comments_parent_created
+  on public.post_comments (parent_comment_id, created_at);
+
+create table if not exists public.post_comment_likes (
+  id uuid primary key default gen_random_uuid(),
+  user_id uuid not null references public.users(id) on delete cascade,
+  comment_id uuid not null references public.post_comments(id) on delete cascade,
+  created_at timestamptz default now()
+);
+
+alter table if exists public.post_comment_likes
+  add column if not exists user_id uuid references public.users(id) on delete cascade,
+  add column if not exists comment_id uuid references public.post_comments(id) on delete cascade,
+  add column if not exists created_at timestamptz default now();
+
+alter table if exists public.post_comment_likes
+  alter column id set default gen_random_uuid(),
+  alter column created_at set default now();
+
+with ranked as (
+  select
+    ctid,
+    row_number() over (
+      partition by user_id, comment_id
+      order by created_at nulls last, ctid
+    ) as rn
+  from public.post_comment_likes
+)
+delete from public.post_comment_likes pcl
+using ranked r
+where pcl.ctid = r.ctid
+  and r.rn > 1;
+
+create unique index if not exists idx_post_comment_likes_user_comment
+  on public.post_comment_likes (user_id, comment_id);
 
 -- Do not add a post_comments -> posts.comments trigger here.
 -- The current Node route already increments posts.comments manually.

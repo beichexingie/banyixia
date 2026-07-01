@@ -1,4 +1,23 @@
-const POST_SELECT = `
+function buildPostSelect({ viewerIdParam = null } = {}) {
+  const viewerStateSelect = viewerIdParam
+    ? `
+    exists(
+      select 1
+      from public.post_likes vpl
+      where vpl.user_id = ${viewerIdParam} and vpl.post_id = p.id
+    ) as is_liked,
+    exists(
+      select 1
+      from public.post_favorites vpf
+      where vpf.user_id = ${viewerIdParam} and vpf.post_id = p.id
+    ) as is_favorited,
+`
+    : `
+    false as is_liked,
+    false as is_favorited,
+`;
+
+  return `
   select
     p.id,
     p.user_id,
@@ -7,28 +26,43 @@ const POST_SELECT = `
     p.content,
     p.images,
     p.location,
-    coalesce(p.likes, 0) as likes,
+    (
+      select count(*)
+      from public.post_likes pl
+      where pl.post_id = p.id
+    )::int as likes,
+    (
+      select count(*)
+      from public.post_favorites pf
+      where pf.post_id = p.id
+    )::int as favorites,
     (
       select count(*)
       from public.post_comments pc
       where pc.post_id = p.id
     )::int as comments,
+    ${viewerStateSelect}
     p.created_at
   from public.posts p
 `;
+}
 
-export async function listPosts(client, { query }) {
+export async function listPosts(client, { query, viewerId = '' }) {
   const params = [];
+  const normalizedViewerId = viewerId?.toString().trim() ?? '';
+  const viewerIdParam = normalizedViewerId
+    ? `$${params.push(normalizedViewerId)}`
+    : null;
   let where = '';
   if (query) {
-    params.push(`%${query}%`);
+    const queryParam = `$${params.push(`%${query}%`)}`;
     where =
-      `where p.content ilike $1 or p.author_name ilike $1 or p.location ilike $1`;
+      `where p.content ilike ${queryParam} or p.author_name ilike ${queryParam} or p.location ilike ${queryParam}`;
   }
 
   const result = await client.query(
     `
-      ${POST_SELECT}
+      ${buildPostSelect({ viewerIdParam })}
       ${where}
       order by p.created_at desc
     `,
@@ -37,14 +71,20 @@ export async function listPosts(client, { query }) {
   return result.rows;
 }
 
-export async function listPostsByUser(client, userId) {
+export async function listPostsByUser(client, userId, viewerId = '') {
+  const params = [];
+  const normalizedViewerId = viewerId?.toString().trim() ?? '';
+  const viewerIdParam = normalizedViewerId
+    ? `$${params.push(normalizedViewerId)}`
+    : null;
+  const authorIdParam = `$${params.push(userId)}`;
   const result = await client.query(
     `
-      ${POST_SELECT}
-      where p.user_id = $1
+      ${buildPostSelect({ viewerIdParam })}
+      where p.user_id = ${authorIdParam}
       order by p.created_at desc
     `,
-    [userId],
+    params,
   );
   return result.rows;
 }
@@ -70,25 +110,31 @@ export async function createPost(client, payload) {
   return result.rows[0] ?? null;
 }
 
-export async function updatePostLikes(client, postId, likes) {
+export async function updatePostLikes(client, postId, delta) {
   await client.query(
     `
       update public.posts
-      set likes = $2
+      set likes = greatest(coalesce(likes, 0) + $2, 0)
       where id = $1
     `,
-    [postId, likes],
+    [postId, delta],
   );
 }
 
-export async function findPostById(client, postId) {
+export async function findPostById(client, postId, viewerId = '') {
+  const params = [];
+  const normalizedViewerId = viewerId?.toString().trim() ?? '';
+  const viewerIdParam = normalizedViewerId
+    ? `$${params.push(normalizedViewerId)}`
+    : null;
+  const postIdParam = `$${params.push(postId)}`;
   const result = await client.query(
     `
-      ${POST_SELECT}
-      where p.id = $1
+      ${buildPostSelect({ viewerIdParam })}
+      where p.id = ${postIdParam}
       limit 1
     `,
-    [postId],
+    params,
   );
   return result.rows[0] ?? null;
 }

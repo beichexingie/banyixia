@@ -12,6 +12,7 @@ class TravelPost {
   final String authorName;
   final String authorAvatar;
   int likes;
+  int favorites;
   int commentCount;
   final String tag;
   final DateTime createdAt;
@@ -29,6 +30,7 @@ class TravelPost {
     required this.authorName,
     required this.authorAvatar,
     this.likes = 0,
+    this.favorites = 0,
     this.commentCount = 0,
     this.tag = '',
     DateTime? createdAt,
@@ -48,6 +50,7 @@ class TravelPost {
       authorName: json['authorName'] ?? json['author'] ?? '',
       authorAvatar: json['authorAvatar'] ?? json['avatar'] ?? '',
       likes: json['likes'] ?? 0,
+      favorites: json['favorites'] ?? 0,
       commentCount: json['comments'] ?? 0,
       tag: json['tag'] ?? '',
       createdAt: json['createdAt'] != null
@@ -70,6 +73,7 @@ class TravelPost {
       'authorName': authorName,
       'authorAvatar': authorAvatar,
       'likes': likes,
+      'favorites': favorites,
       'tag': tag,
       'createdAt': createdAt.toIso8601String(),
       'isLiked': isLiked,

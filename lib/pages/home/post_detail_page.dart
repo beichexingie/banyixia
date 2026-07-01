@@ -26,6 +26,8 @@ class _PostDetailPageState extends State<PostDetailPage> {
   bool _isLoadingComments = false;
   int _currentImageIndex = 0;
   List<PostComment> _comments = [];
+  PostComment? _replyingToComment;
+  final Set<String> _expandedThreadIds = <String>{};
   final TextEditingController _commentController = TextEditingController();
   final PageController _imageController = PageController();
 
@@ -189,7 +191,9 @@ class _PostDetailPageState extends State<PostDetailPage> {
                     controller: _commentController,
                     autofocus: true,
                     decoration: InputDecoration(
-                      hintText: '请输入内容...',
+                      hintText: _replyingToComment == null
+                          ? '请输入内容...'
+                          : '回复 ${_replyingToComment!.userName}...',
                       hintStyle: const TextStyle(
                         fontSize: 14,
                         color: AppColors.textHint,
@@ -211,7 +215,7 @@ class _PostDetailPageState extends State<PostDetailPage> {
                 TextButton(
                   onPressed: () => _submitComment(sheetContext),
                   child: const Text(
-                    '发布',
+                    '发送',
                     style: TextStyle(
                       color: AppColors.textPrimary,
                       fontWeight: FontWeight.w800,
@@ -236,11 +240,22 @@ class _PostDetailPageState extends State<PostDetailPage> {
     _commentController.clear();
 
     try {
-      await context.read<PostProvider>().addComment(widget.post.id, content);
+      final replyTarget = _replyingToComment;
+      await context.read<PostProvider>().addComment(
+        widget.post.id,
+        content,
+        parentCommentId: replyTarget == null
+            ? null
+            : _threadRootId(replyTarget),
+        replyToCommentId: replyTarget?.id,
+      );
       await _loadComments();
       if (!mounted) {
         return;
       }
+      setState(() {
+        _replyingToComment = null;
+      });
       ScaffoldMessenger.of(
         context,
       ).showSnackBar(const SnackBar(content: Text('评论成功')));
@@ -279,15 +294,107 @@ class _PostDetailPageState extends State<PostDetailPage> {
       return const [];
     }
 
-    return _comments
-        .map(
-          (comment) => _CommentThreadData.fromComment(
-            comment,
-            isAuthor: comment.userId == post.authorId,
-            likeCount: comment.likeCount,
-          ),
-        )
+    final rootComments = _comments
+        .where((comment) => comment.parentCommentId.trim().isEmpty)
         .toList();
+    final repliesByRoot = <String, List<PostComment>>{};
+
+    for (final comment in _comments) {
+      final parentId = comment.parentCommentId.trim();
+      if (parentId.isEmpty) {
+        continue;
+      }
+      repliesByRoot.putIfAbsent(parentId, () => <PostComment>[]).add(comment);
+    }
+
+    return rootComments.map((root) {
+      final replies = repliesByRoot[root.id] ?? const <PostComment>[];
+      final isExpanded = _expandedThreadIds.contains(root.id);
+      final visibleReplies = isExpanded || replies.length <= 2
+          ? replies
+          : replies.take(2).toList();
+      final hiddenReplyCount = max(replies.length - visibleReplies.length, 0);
+
+      return _CommentThreadData.fromComment(
+        root,
+        isAuthor: root.userId == post.authorId,
+        likeCount: root.likeCount,
+        replies: visibleReplies
+            .map(
+              (reply) => _CommentReplyData.fromComment(
+                reply,
+                isAuthor: reply.userId == post.authorId,
+                likeCount: reply.likeCount,
+              ),
+            )
+            .toList(),
+        showExpandHint: hiddenReplyCount > 0,
+        hiddenReplyCount: hiddenReplyCount,
+        isExpanded: isExpanded,
+      );
+    }).toList();
+  }
+
+  String _threadRootId(PostComment comment) {
+    final parentId = comment.parentCommentId.trim();
+    return parentId.isEmpty ? comment.id : parentId;
+  }
+
+  Future<void> _toggleCommentLike(PostComment comment) async {
+    final original = comment;
+    final optimistic = comment.copyWith(
+      isLiked: !comment.isLiked,
+      likeCount: comment.isLiked
+          ? max(comment.likeCount - 1, 0)
+          : comment.likeCount + 1,
+    );
+
+    setState(() {
+      _comments = _comments
+          .map((item) => item.id == comment.id ? optimistic : item)
+          .toList();
+    });
+
+    try {
+      final updated = await context.read<PostProvider>().toggleCommentLike(
+        comment,
+      );
+      if (!mounted) {
+        return;
+      }
+      setState(() {
+        _comments = _comments
+            .map((item) => item.id == comment.id ? updated : item)
+            .toList();
+      });
+    } catch (_) {
+      if (!mounted) {
+        return;
+      }
+      setState(() {
+        _comments = _comments
+            .map((item) => item.id == comment.id ? original : item)
+            .toList();
+      });
+    }
+  }
+
+  void _startReply(PostComment comment) {
+    setState(() {
+      _replyingToComment = comment;
+    });
+    _commentController.clear();
+    _showCommentSheet();
+  }
+
+  void _toggleThreadExpanded(String rootId) {
+    setState(() {
+      if (_expandedThreadIds.contains(rootId)) {
+        _expandedThreadIds.remove(rootId);
+      } else {
+        _expandedThreadIds.add(rootId);
+      }
+    });
   }
 
   String _formatCommentTime(DateTime time) {
@@ -600,12 +707,16 @@ class _PostDetailPageState extends State<PostDetailPage> {
   }
 
   Widget _buildCommentThread(_CommentThreadData thread) {
+    final comment = thread.comment;
     return Padding(
       padding: const EdgeInsets.only(bottom: 20),
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          _buildAvatar(thread.userAvatar, 38),
+          GestureDetector(
+            onTap: () => context.push('/user/${comment.userId}'),
+            child: _buildAvatar(thread.userAvatar, 38),
+          ),
           const SizedBox(width: 12),
           Expanded(
             child: Column(
@@ -620,12 +731,16 @@ class _PostDetailPageState extends State<PostDetailPage> {
                         spacing: 6,
                         runSpacing: 4,
                         children: [
-                          Text(
-                            thread.userName,
-                            style: const TextStyle(
-                              fontSize: 14,
-                              fontWeight: FontWeight.w500,
-                              color: Color(0xFF9A9A9A),
+                          GestureDetector(
+                            onTap: () =>
+                                context.push('/user/${comment.userId}'),
+                            child: Text(
+                              thread.userName,
+                              style: const TextStyle(
+                                fontSize: 14,
+                                fontWeight: FontWeight.w500,
+                                color: Color(0xFF9A9A9A),
+                              ),
                             ),
                           ),
                           if (thread.isAuthor) _buildAuthorBadge(),
@@ -633,7 +748,7 @@ class _PostDetailPageState extends State<PostDetailPage> {
                       ),
                     ),
                     const SizedBox(width: 8),
-                    _buildLikeColumn(thread.likeCount),
+                    _buildLikeColumn(thread.comment),
                   ],
                 ),
                 const SizedBox(height: 8),
@@ -656,9 +771,15 @@ class _PostDetailPageState extends State<PostDetailPage> {
                       ),
                     ),
                     const SizedBox(width: 12),
-                    const Text(
-                      '回复',
-                      style: TextStyle(fontSize: 12, color: Color(0xFF7F7F7F)),
+                    GestureDetector(
+                      onTap: () => _startReply(thread.comment),
+                      child: const Text(
+                        '回复',
+                        style: TextStyle(
+                          fontSize: 12,
+                          color: Color(0xFF7F7F7F),
+                        ),
+                      ),
                     ),
                   ],
                 ),
@@ -666,16 +787,21 @@ class _PostDetailPageState extends State<PostDetailPage> {
                   const SizedBox(height: 14),
                   ...thread.replies.map(_buildReplyItem),
                 ],
-                if (thread.showExpandHint) ...[
+                if (thread.showExpandHint || thread.isExpanded) ...[
                   const SizedBox(height: 8),
-                  Padding(
-                    padding: const EdgeInsets.only(left: 2),
-                    child: Text(
-                      '展开2条回复',
-                      style: TextStyle(
-                        fontSize: 12,
-                        fontWeight: FontWeight.w600,
-                        color: const Color(0xFF5D78A8).withValues(alpha: 0.9),
+                  GestureDetector(
+                    onTap: () => _toggleThreadExpanded(thread.comment.id),
+                    child: Padding(
+                      padding: const EdgeInsets.only(left: 2),
+                      child: Text(
+                        thread.isExpanded
+                            ? '收起回复'
+                            : '展开${thread.hiddenReplyCount}条回复',
+                        style: TextStyle(
+                          fontSize: 12,
+                          fontWeight: FontWeight.w600,
+                          color: const Color(0xFF5D78A8).withValues(alpha: 0.9),
+                        ),
                       ),
                     ),
                   ),
@@ -689,13 +815,17 @@ class _PostDetailPageState extends State<PostDetailPage> {
   }
 
   Widget _buildReplyItem(_CommentReplyData reply) {
+    final comment = reply.comment;
     return Padding(
       padding: const EdgeInsets.only(bottom: 12),
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           const SizedBox(width: 8),
-          _buildAvatar(reply.userAvatar, 30),
+          GestureDetector(
+            onTap: () => context.push('/user/${comment.userId}'),
+            child: _buildAvatar(reply.userAvatar, 30),
+          ),
           const SizedBox(width: 10),
           Expanded(
             child: Column(
@@ -710,12 +840,16 @@ class _PostDetailPageState extends State<PostDetailPage> {
                         spacing: 6,
                         runSpacing: 4,
                         children: [
-                          Text(
-                            reply.userName,
-                            style: const TextStyle(
-                              fontSize: 13,
-                              fontWeight: FontWeight.w500,
-                              color: Color(0xFF9A9A9A),
+                          GestureDetector(
+                            onTap: () =>
+                                context.push('/user/${comment.userId}'),
+                            child: Text(
+                              reply.userName,
+                              style: const TextStyle(
+                                fontSize: 13,
+                                fontWeight: FontWeight.w500,
+                                color: Color(0xFF9A9A9A),
+                              ),
                             ),
                           ),
                           if (reply.isAuthor) _buildAuthorBadge(),
@@ -723,16 +857,25 @@ class _PostDetailPageState extends State<PostDetailPage> {
                       ),
                     ),
                     const SizedBox(width: 8),
-                    _buildLikeColumn(reply.likeCount, iconSize: 24),
+                    _buildLikeColumn(reply.comment, iconSize: 24),
                   ],
                 ),
                 const SizedBox(height: 8),
-                Text(
-                  reply.content,
-                  style: const TextStyle(
-                    fontSize: 15,
-                    height: 1.4,
-                    color: AppColors.textPrimary,
+                RichText(
+                  text: TextSpan(
+                    style: const TextStyle(
+                      fontSize: 15,
+                      height: 1.4,
+                      color: AppColors.textPrimary,
+                    ),
+                    children: [
+                      if (reply.replyToUserName.trim().isNotEmpty)
+                        TextSpan(
+                          text: '回复 ${reply.replyToUserName} ',
+                          style: const TextStyle(color: Color(0xFF5D78A8)),
+                        ),
+                      TextSpan(text: reply.content),
+                    ],
                   ),
                 ),
                 const SizedBox(height: 6),
@@ -746,9 +889,15 @@ class _PostDetailPageState extends State<PostDetailPage> {
                       ),
                     ),
                     const SizedBox(width: 12),
-                    const Text(
-                      '回复',
-                      style: TextStyle(fontSize: 11, color: Color(0xFF7F7F7F)),
+                    GestureDetector(
+                      onTap: () => _startReply(reply.comment),
+                      child: const Text(
+                        '回复',
+                        style: TextStyle(
+                          fontSize: 11,
+                          color: Color(0xFF7F7F7F),
+                        ),
+                      ),
                     ),
                   ],
                 ),
@@ -760,18 +909,25 @@ class _PostDetailPageState extends State<PostDetailPage> {
     );
   }
 
-  Widget _buildLikeColumn(int count, {double iconSize = 28}) {
+  Widget _buildLikeColumn(PostComment comment, {double iconSize = 28}) {
     return Row(
       mainAxisSize: MainAxisSize.min,
       children: [
-        Icon(
-          Icons.favorite_border_rounded,
-          size: iconSize,
-          color: const Color(0xFFBCBCBC),
+        GestureDetector(
+          onTap: () => _toggleCommentLike(comment),
+          child: Icon(
+            comment.isLiked
+                ? Icons.favorite_rounded
+                : Icons.favorite_border_rounded,
+            size: iconSize,
+            color: comment.isLiked
+                ? const Color(0xFFFF6F7A)
+                : const Color(0xFFBCBCBC),
+          ),
         ),
         const SizedBox(width: 4),
         Text(
-          '$count',
+          '${comment.likeCount}',
           style: const TextStyle(fontSize: 12, color: Color(0xFF9F9F9F)),
         ),
       ],
@@ -818,9 +974,14 @@ class _PostDetailPageState extends State<PostDetailPage> {
                     borderRadius: BorderRadius.circular(999),
                   ),
                   alignment: Alignment.centerLeft,
-                  child: const Text(
-                    '请输入内容...',
-                    style: TextStyle(fontSize: 14, color: Color(0xFFC9C9C9)),
+                  child: Text(
+                    _replyingToComment == null
+                        ? '请输入内容...'
+                        : '回复 ${_replyingToComment!.userName}...',
+                    style: const TextStyle(
+                      fontSize: 14,
+                      color: Color(0xFFC9C9C9),
+                    ),
                   ),
                 ),
               ),
@@ -841,7 +1002,7 @@ class _PostDetailPageState extends State<PostDetailPage> {
               icon: post.isFavorited
                   ? Icons.bookmark_rounded
                   : Icons.bookmark_border_rounded,
-              label: post.isFavorited ? '已收藏' : '收藏',
+              label: '${max(post.favorites, 0)}',
               color: post.isFavorited
                   ? AppColors.textPrimary
                   : AppColors.textPrimary,
@@ -928,6 +1089,7 @@ class _PostDetailPageState extends State<PostDetailPage> {
 }
 
 class _CommentThreadData {
+  final PostComment comment;
   final String userName;
   final String userAvatar;
   final String content;
@@ -936,8 +1098,11 @@ class _CommentThreadData {
   final bool isAuthor;
   final List<_CommentReplyData> replies;
   final bool showExpandHint;
+  final int hiddenReplyCount;
+  final bool isExpanded;
 
   const _CommentThreadData({
+    required this.comment,
     required this.userName,
     required this.userAvatar,
     required this.content,
@@ -946,6 +1111,8 @@ class _CommentThreadData {
     required this.isAuthor,
     this.replies = const [],
     this.showExpandHint = false,
+    this.hiddenReplyCount = 0,
+    this.isExpanded = false,
   });
 
   factory _CommentThreadData.fromComment(
@@ -954,8 +1121,11 @@ class _CommentThreadData {
     required int likeCount,
     List<_CommentReplyData> replies = const [],
     bool showExpandHint = false,
+    int hiddenReplyCount = 0,
+    bool isExpanded = false,
   }) {
     return _CommentThreadData(
+      comment: comment,
       userName: comment.userName,
       userAvatar: comment.userAvatar,
       content: comment.content,
@@ -964,6 +1134,8 @@ class _CommentThreadData {
       isAuthor: isAuthor,
       replies: replies,
       showExpandHint: showExpandHint,
+      hiddenReplyCount: hiddenReplyCount,
+      isExpanded: isExpanded,
     );
   }
 
@@ -992,20 +1164,24 @@ class _CommentThreadData {
 }
 
 class _CommentReplyData {
+  final PostComment comment;
   final String userName;
   final String userAvatar;
   final String content;
   final String timeLabel;
   final int likeCount;
   final bool isAuthor;
+  final String replyToUserName;
 
   const _CommentReplyData({
+    required this.comment,
     required this.userName,
     required this.userAvatar,
     required this.content,
     required this.timeLabel,
     required this.likeCount,
     required this.isAuthor,
+    this.replyToUserName = '',
   });
 
   factory _CommentReplyData.fromComment(
@@ -1014,12 +1190,14 @@ class _CommentReplyData {
     required int likeCount,
   }) {
     return _CommentReplyData(
+      comment: comment,
       userName: comment.userName,
       userAvatar: comment.userAvatar,
       content: comment.content,
       timeLabel: _CommentThreadData._formatTime(comment.createdAt),
       likeCount: likeCount,
       isAuthor: isAuthor,
+      replyToUserName: comment.replyToUserName,
     );
   }
 }

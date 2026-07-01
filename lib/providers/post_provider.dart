@@ -15,7 +15,7 @@ class PostProvider extends ChangeNotifier {
   String _searchQuery = '';
 
   PostProvider({SessionService? sessionService})
-      : _sessionService = sessionService ?? EcsSessionService();
+    : _sessionService = sessionService ?? EcsSessionService();
 
   List<TravelPost> get posts => _posts;
   bool get isLoading => _isLoading;
@@ -29,78 +29,82 @@ class PostProvider extends ChangeNotifier {
   }
 
   List<TravelPost> _decodePosts(List<dynamic> items) {
-    return items
-        .whereType<Map<String, dynamic>>()
-        .map((data) {
-          final contentText = _firstNonEmptyString([
-                data['content'],
-                data['title'],
-                data['subtitle'],
-              ]) ??
-              '';
-          final lines = contentText
-              .split('\n')
-              .map((line) => line.trim())
-              .where((line) => line.isNotEmpty)
-              .toList();
-          final parsedTitle = _firstNonEmptyString([
-                data['title'],
-                lines.isNotEmpty ? lines.first : null,
-              ]) ??
-              '';
-          final parsedContent = _firstNonEmptyString([
-                data['body'],
-                data['description'],
-                lines.length > 1 ? lines.sublist(1).join('\n') : null,
-                contentText,
-              ]) ??
-              '';
-          final images = _asStringList(data['images']);
-          final nestedAuthor =
-              _asMap(data['author']) ??
-              _asMap(data['user']) ??
-              _asMap(data['users']);
+    return items.whereType<Map<String, dynamic>>().map((data) {
+      final contentText =
+          _firstNonEmptyString([
+            data['content'],
+            data['title'],
+            data['subtitle'],
+          ]) ??
+          '';
+      final lines = contentText
+          .split('\n')
+          .map((line) => line.trim())
+          .where((line) => line.isNotEmpty)
+          .toList();
+      final parsedTitle =
+          _firstNonEmptyString([
+            data['title'],
+            lines.isNotEmpty ? lines.first : null,
+          ]) ??
+          '';
+      final parsedContent =
+          _firstNonEmptyString([
+            data['body'],
+            data['description'],
+            lines.length > 1 ? lines.sublist(1).join('\n') : null,
+            contentText,
+          ]) ??
+          '';
+      final images = _asStringList(data['images']);
+      final nestedAuthor =
+          _asMap(data['author']) ??
+          _asMap(data['user']) ??
+          _asMap(data['users']);
 
-          return TravelPost(
-            id: data['id']?.toString() ?? '',
-            title: parsedTitle,
-            subtitle: parsedContent.length > 20
-                ? '${parsedContent.substring(0, 20)}...'
-                : parsedContent,
-            content: parsedContent,
-            coverImage: images.isNotEmpty
-                ? images.first
-                : 'https://images.unsplash.com/photo-1476514525535-07fb3b4ae5f1?auto=format&fit=crop&q=80&w=800&h=600',
-            images: images,
-            authorId: data['user_id']?.toString() ?? '',
-            authorName:
-                _firstNonEmptyString([
-                  data['author_name'],
-                  data['authorName'],
-                  nestedAuthor?['nickname'],
-                  nestedAuthor?['name'],
-                ]) ??
-                '匿名用户',
-            authorAvatar:
-                _firstNonEmptyString([
-                  data['author_avatar'],
-                  data['authorAvatar'],
-                  nestedAuthor?['avatar'],
-                  nestedAuthor?['avatar_url'],
-                ]) ??
-                '',
-            likes: _parseInt(data['likes']) ?? 0,
-            commentCount: _parseInt(data['comments']) ?? 0,
-            tag: data['location']?.toString() ?? '',
-            createdAt: _parseDateTime(data['created_at']) ?? DateTime.now(),
-            isLiked: _parseBool(data['is_liked']) ?? _parseBool(data['isLiked']) ?? false,
-            isFavorited:
-                _parseBool(data['is_favorited']) ??
-                _parseBool(data['isFavorited']) ??
-                false,
-          );
-        })
-        .toList();
+      return TravelPost(
+        id: data['id']?.toString() ?? '',
+        title: parsedTitle,
+        subtitle: parsedContent.length > 20
+            ? '${parsedContent.substring(0, 20)}...'
+            : parsedContent,
+        content: parsedContent,
+        coverImage: images.isNotEmpty
+            ? images.first
+            : 'https://images.unsplash.com/photo-1476514525535-07fb3b4ae5f1?auto=format&fit=crop&q=80&w=800&h=600',
+        images: images,
+        authorId: data['user_id']?.toString() ?? '',
+        authorName:
+            _firstNonEmptyString([
+              data['author_name'],
+              data['authorName'],
+              nestedAuthor?['nickname'],
+              nestedAuthor?['name'],
+            ]) ??
+            '匿名用户',
+        authorAvatar:
+            _firstNonEmptyString([
+              data['author_avatar'],
+              data['authorAvatar'],
+              nestedAuthor?['avatar'],
+              nestedAuthor?['avatar_url'],
+            ]) ??
+            '',
+        likes: _parseInt(data['likes']) ?? 0,
+        favorites: _parseInt(data['favorites']) ?? 0,
+        commentCount: _parseInt(data['comments']) ?? 0,
+        tag: data['location']?.toString() ?? '',
+        createdAt: _parseDateTime(data['created_at']) ?? DateTime.now(),
+        isLiked:
+            _parseBool(data['is_liked']) ??
+            _parseBool(data['isLiked']) ??
+            false,
+        isFavorited:
+            _parseBool(data['is_favorited']) ??
+            _parseBool(data['isFavorited']) ??
+            false,
+      );
+    }).toList();
   }
 
   Future<void> loadPosts({String? query}) async {
@@ -146,7 +150,10 @@ class PostProvider extends ChangeNotifier {
 
   Future<List<TravelPost>> fetchPostsByUser(String userId) async {
     try {
-      final response = await _api.get('/users/$userId/posts', authToken: _token());
+      final response = await _api.get(
+        '/users/$userId/posts',
+        authToken: _token(),
+      );
       final data = response['data'];
       if (data is List) {
         return _decodePosts(data);
@@ -165,6 +172,9 @@ class PostProvider extends ChangeNotifier {
 
     post.isLiked = !post.isLiked;
     post.likes += post.isLiked ? 1 : -1;
+    if (post.likes < 0) {
+      post.likes = 0;
+    }
     notifyListeners();
 
     try {
@@ -176,6 +186,9 @@ class PostProvider extends ChangeNotifier {
     } catch (e) {
       post.isLiked = !post.isLiked;
       post.likes += post.isLiked ? 1 : -1;
+      if (post.likes < 0) {
+        post.likes = 0;
+      }
       notifyListeners();
       debugPrint('toggleLike error: $e');
     }
@@ -230,6 +243,10 @@ class PostProvider extends ChangeNotifier {
     }
 
     post.isFavorited = !post.isFavorited;
+    post.favorites += post.isFavorited ? 1 : -1;
+    if (post.favorites < 0) {
+      post.favorites = 0;
+    }
     notifyListeners();
 
     try {
@@ -240,6 +257,10 @@ class PostProvider extends ChangeNotifier {
       }
     } catch (e) {
       post.isFavorited = !post.isFavorited;
+      post.favorites += post.isFavorited ? 1 : -1;
+      if (post.favorites < 0) {
+        post.favorites = 0;
+      }
       notifyListeners();
       debugPrint('toggleFavorite error: $e');
     }
@@ -267,7 +288,9 @@ class PostProvider extends ChangeNotifier {
       }
     } on EcsApiException catch (e) {
       if (e.statusCode == 404) {
-        debugPrint('fetchLikedPosts fallback: backend /posts/liked not deployed yet');
+        debugPrint(
+          'fetchLikedPosts fallback: backend /posts/liked not deployed yet',
+        );
         return [];
       }
       debugPrint('fetchLikedPosts error: $e');
@@ -279,7 +302,10 @@ class PostProvider extends ChangeNotifier {
 
   Future<List<PostComment>> loadComments(String postId) async {
     try {
-      final response = await _api.get('/posts/$postId/comments', authToken: _token());
+      final response = await _api.get(
+        '/posts/$postId/comments',
+        authToken: _token(),
+      );
       final data = response['data'];
       if (data is List) {
         final comments = data
@@ -302,7 +328,8 @@ class PostProvider extends ChangeNotifier {
           final missingName =
               comment.userName.trim().isEmpty || comment.userName == '匿名用户';
           final missingAvatar = comment.userAvatar.trim().isEmpty;
-          return comment.userId.trim().isNotEmpty && (missingName || missingAvatar);
+          return comment.userId.trim().isNotEmpty &&
+              (missingName || missingAvatar);
         })
         .map((comment) => comment.userId.trim())
         .toSet()
@@ -353,13 +380,51 @@ class PostProvider extends ChangeNotifier {
     return null;
   }
 
-  Future<void> addComment(String postId, String content) async {
+  Future<void> addComment(
+    String postId,
+    String content, {
+    String? parentCommentId,
+    String? replyToCommentId,
+  }) async {
     await _api.post(
       '/posts/$postId/comments',
       authToken: _token(),
-      body: {'content': content},
+      body: {
+        'content': content,
+        if (parentCommentId != null && parentCommentId.trim().isNotEmpty)
+          'parent_comment_id': parentCommentId.trim(),
+        if (replyToCommentId != null && replyToCommentId.trim().isNotEmpty)
+          'reply_to_comment_id': replyToCommentId.trim(),
+      },
     );
     notifyListeners();
+  }
+
+  Future<PostComment> toggleCommentLike(PostComment comment) async {
+    final token = _token();
+    if (token == null || comment.id.trim().isEmpty) {
+      return comment;
+    }
+
+    final nextLiked = !comment.isLiked;
+    final nextLikeCount = nextLiked
+        ? comment.likeCount + 1
+        : (comment.likeCount - 1).clamp(0, 1 << 30);
+
+    try {
+      if (nextLiked) {
+        await _api.post('/posts/comments/${comment.id}/like', authToken: token);
+      } else {
+        await _api.delete(
+          '/posts/comments/${comment.id}/like',
+          authToken: token,
+        );
+      }
+      return comment.copyWith(isLiked: nextLiked, likeCount: nextLikeCount);
+    } catch (e) {
+      debugPrint('toggleCommentLike error: $e');
+      rethrow;
+    }
   }
 
   Future<void> recordFootprint(String postId) async {

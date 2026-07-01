@@ -386,13 +386,126 @@ appRouter.post('/guides/:id/footprint', async (req, res) => {
 });
 
 appRouter.get('/posts', async (req, res) => {
-  const posts = await listPosts(pool, { query: req.query.q?.toString().trim() || '' });
+  const viewerId = getSessionUserId(req);
+  const posts = await listPosts(pool, {
+    query: req.query.q?.toString().trim() || '',
+    viewerId,
+  });
   return ok(res, { data: posts });
 });
 
 appRouter.get('/posts/following', async (req, res) => {
   const userId = await requireSessionUser(req, res);
   if (!userId) return;
+  const postsResult = await pool.query(
+    `
+      select
+        p.id,
+        p.user_id,
+        p.author_name,
+        p.author_avatar,
+        p.content,
+        p.images,
+        p.location,
+        (
+          select count(*)
+          from public.post_likes pl
+          where pl.post_id = p.id
+        )::int as likes,
+        (
+          select count(*)
+          from public.post_favorites pf2
+          where pf2.post_id = p.id
+        )::int as favorites,
+        (
+          select count(*)
+          from public.post_comments pc
+          where pc.post_id = p.id
+        )::int as comments,
+        exists(
+          select 1
+          from public.post_likes vpl
+          where vpl.user_id = $1 and vpl.post_id = p.id
+        ) as is_liked,
+        exists(
+          select 1
+          from public.post_favorites vpf
+          where vpf.user_id = $1 and vpf.post_id = p.id
+        ) as is_favorited,
+        p.created_at
+      from public.posts p
+      join public.follows f on f.followed_id = p.user_id
+      where f.follower_id = $1
+      order by p.created_at desc
+    `,
+    [userId],
+  );
+  return ok(res, { data: postsResult.rows });
+  /*
+  const parentCommentId = req.body?.parent_comment_id?.toString().trim() ?? '';
+  const replyToCommentId = req.body?.reply_to_comment_id?.toString().trim() ?? '';
+  const normalizedParentCommentId = parentCommentId.isEmpty ? null : parentCommentId;
+  const normalizedReplyToCommentId = replyToCommentId.isEmpty
+    ? normalizedParentCommentId
+    : replyToCommentId;
+  if (normalizedReplyToCommentId != null) {
+    const referenceCommentResult = await pool.query(
+      `
+        select id, post_id
+        from public.post_comments
+        where id = $1
+        limit 1
+      `,
+      [normalizedReplyToCommentId],
+    );
+    const referenceComment = referenceCommentResult.rows[0];
+    if (!referenceComment || referenceComment.post_id !== req.params.id) {
+      return fail(res, 400, '鍥炲鐨勮瘎璁轰笉瀛樺湪');
+    }
+  }
+  const parentCommentId = req.body?.parent_comment_id?.toString().trim() ?? '';
+  const replyToCommentId = req.body?.reply_to_comment_id?.toString().trim() ?? '';
+  const normalizedParentCommentId = parentCommentId.isEmpty ? null : parentCommentId;
+  const normalizedReplyToCommentId = replyToCommentId.isEmpty
+    ? normalizedParentCommentId
+    : replyToCommentId;
+  if (normalizedReplyToCommentId != null) {
+    const referenceCommentResult = await pool.query(
+      `
+        select id, post_id
+        from public.post_comments
+        where id = $1
+        limit 1
+      `,
+      [normalizedReplyToCommentId],
+    );
+    const referenceComment = referenceCommentResult.rows[0];
+    if (!referenceComment || referenceComment.post_id !== req.params.id) {
+      return fail(res, 400, '鍥炲鐨勮瘎璁轰笉瀛樺湪');
+    }
+  }
+  */
+  const parentCommentId = req.body?.parent_comment_id?.toString().trim() ?? '';
+  const replyToCommentId = req.body?.reply_to_comment_id?.toString().trim() ?? '';
+  const normalizedParentCommentId = parentCommentId.isEmpty ? null : parentCommentId;
+  const normalizedReplyToCommentId = replyToCommentId.isEmpty
+    ? normalizedParentCommentId
+    : replyToCommentId;
+  if (normalizedReplyToCommentId != null) {
+    const referenceCommentResult = await pool.query(
+      `
+        select id, post_id
+        from public.post_comments
+        where id = $1
+        limit 1
+      `,
+      [normalizedReplyToCommentId],
+    );
+    const referenceComment = referenceCommentResult.rows[0];
+    if (!referenceComment || referenceComment.post_id !== req.params.id) {
+      return fail(res, 400, '鍥炲鐨勮瘎璁轰笉瀛樺湪');
+    }
+  }
   const result = await pool.query(
     `
       select
@@ -403,12 +516,31 @@ appRouter.get('/posts/following', async (req, res) => {
         p.content,
         p.images,
         p.location,
-        coalesce(p.likes, 0) as likes,
+        (
+          select count(*)
+          from public.post_likes pl
+          where pl.post_id = p.id
+        )::int as likes,
+        (
+          select count(*)
+          from public.post_favorites pf2
+          where pf2.post_id = p.id
+        )::int as favorites,
         (
           select count(*)
           from public.post_comments pc
           where pc.post_id = p.id
         )::int as comments,
+        exists(
+          select 1
+          from public.post_likes vpl
+          where vpl.user_id = $1 and vpl.post_id = p.id
+        ) as is_liked,
+        exists(
+          select 1
+          from public.post_favorites vpf
+          where vpf.user_id = $1 and vpf.post_id = p.id
+        ) as is_favorited,
         p.created_at
       from public.posts p
       join public.follows f on f.followed_id = p.user_id
@@ -421,7 +553,8 @@ appRouter.get('/posts/following', async (req, res) => {
 });
 
 appRouter.get('/users/:id/posts', async (req, res) => {
-  const posts = await listPostsByUser(pool, req.params.id);
+  const viewerId = getSessionUserId(req);
+  const posts = await listPostsByUser(pool, req.params.id, viewerId);
   return ok(res, { data: posts });
 });
 
@@ -443,21 +576,25 @@ appRouter.post('/posts', async (req, res) => {
 appRouter.post('/posts/:id/like', async (req, res) => {
   const userId = await requireSessionUser(req, res);
   if (!userId) return;
-  await pool.query(
+  const insertResult = await pool.query(
     `insert into public.post_likes (user_id, post_id) values ($1, $2) on conflict do nothing`,
     [userId, req.params.id],
   );
-  await pool.query(`update public.posts set likes = coalesce(likes, 0) + 1 where id = $1`, [req.params.id]);
+  if (insertResult.rowCount > 0) {
+    await updatePostLikes(pool, req.params.id, 1);
+  }
   return ok(res, { message: '已点赞' });
 });
 appRouter.delete('/posts/:id/like', async (req, res) => {
   const userId = await requireSessionUser(req, res);
   if (!userId) return;
-  await pool.query(`delete from public.post_likes where user_id = $1 and post_id = $2`, [userId, req.params.id]);
-  await pool.query(
-    `update public.posts set likes = greatest(coalesce(likes, 0) - 1, 0) where id = $1`,
-    [req.params.id],
+  const deleteResult = await pool.query(
+    `delete from public.post_likes where user_id = $1 and post_id = $2`,
+    [userId, req.params.id],
   );
+  if (deleteResult.rowCount > 0) {
+    await updatePostLikes(pool, req.params.id, -1);
+  }
   return ok(res, { message: '已取消点赞' });
 });
 appRouter.post('/posts/:id/favorite', async (req, res) => {
@@ -491,12 +628,31 @@ appRouter.get('/posts/favorites', async (req, res) => {
         p.content,
         p.images,
         p.location,
-        coalesce(p.likes, 0) as likes,
+        (
+          select count(*)
+          from public.post_likes pl
+          where pl.post_id = p.id
+        )::int as likes,
+        (
+          select count(*)
+          from public.post_favorites pf2
+          where pf2.post_id = p.id
+        )::int as favorites,
         (
           select count(*)
           from public.post_comments pc
           where pc.post_id = p.id
         )::int as comments,
+        exists(
+          select 1
+          from public.post_likes vpl
+          where vpl.user_id = $1 and vpl.post_id = p.id
+        ) as is_liked,
+        exists(
+          select 1
+          from public.post_favorites vpf
+          where vpf.user_id = $1 and vpf.post_id = p.id
+        ) as is_favorited,
         p.created_at
       from public.post_favorites pf
       join public.posts p on p.id = pf.post_id
@@ -520,7 +676,16 @@ appRouter.get('/posts/liked', async (req, res) => {
         p.content,
         p.images,
         p.location,
-        coalesce(p.likes, 0) as likes,
+        (
+          select count(*)
+          from public.post_likes pl2
+          where pl2.post_id = p.id
+        )::int as likes,
+        (
+          select count(*)
+          from public.post_favorites pf3
+          where pf3.post_id = p.id
+        )::int as favorites,
         (
           select count(*)
           from public.post_comments pc
@@ -543,31 +708,195 @@ appRouter.get('/posts/liked', async (req, res) => {
   return ok(res, { data: result.rows });
 });
 appRouter.get('/posts/:id/comments', async (req, res) => {
+  const viewerId = getSessionUserId(req);
+  const normalizedViewerIdForComments = viewerId.trim();
+  const safeCommentsResult = await pool.query(
+    `
+      select
+        pc.*,
+        u.nickname as user_name,
+        u.avatar as user_avatar,
+        reply_to_comment.user_id as reply_to_user_id,
+        reply_to_user.nickname as reply_to_user_name,
+        reply_to_user.avatar as reply_to_user_avatar,
+        (
+          select count(*)
+          from public.post_comment_likes pcl
+          where pcl.comment_id = pc.id
+        )::int as like_count,
+        ${
+          normalizedViewerIdForComments.isNotEmpty
+            ? `
+        exists(
+          select 1
+          from public.post_comment_likes viewer_pcl
+          where viewer_pcl.comment_id = pc.id and viewer_pcl.user_id = $2
+        ) as is_liked
+        `
+            : `
+        false as is_liked
+        `
+        }
+      from public.post_comments pc
+      join public.users u on u.id = pc.user_id
+      left join public.post_comments reply_to_comment on reply_to_comment.id = pc.reply_to_comment_id
+      left join public.users reply_to_user on reply_to_user.id = reply_to_comment.user_id
+      where pc.post_id = $1
+      order by coalesce(pc.parent_comment_id, pc.id), pc.parent_comment_id nulls first, pc.created_at asc
+    `,
+    normalizedViewerIdForComments.isNotEmpty
+      ? [req.params.id, normalizedViewerIdForComments]
+      : [req.params.id],
+  );
+  return ok(res, { data: safeCommentsResult.rows });
   const result = await pool.query(
     `
-      select *
-      from public.post_comments
-      where post_id = $1
-      order by created_at asc
+      select
+        pc.*,
+        u.nickname as user_name,
+        u.avatar as user_avatar,
+        reply_to_user.nickname as reply_to_user_name,
+        reply_to_user.avatar as reply_to_user_avatar,
+        (
+          select count(*)
+          from public.post_comment_likes pcl
+          where pcl.comment_id = pc.id
+        )::int as like_count,
+        ${
+          viewerId
+            ? `
+        exists(
+          select 1
+          from public.post_comment_likes viewer_pcl
+          where viewer_pcl.comment_id = pc.id and viewer_pcl.user_id = $2
+        ) as is_liked
+        `
+            : `
+        false as is_liked
+        `
+        }
+      from public.post_comments pc
+      join public.users u on u.id = pc.user_id
+      left join public.post_comments reply_to_comment on reply_to_comment.id = pc.reply_to_comment_id
+      left join public.users reply_to_user on reply_to_user.id = reply_to_comment.user_id
+      where pc.post_id = $1
+      order by pc.created_at asc
     `,
-    [req.params.id],
+    viewerId ? [req.params.id, viewerId] : [req.params.id],
   );
   return ok(res, { data: result.rows });
 });
 appRouter.post('/posts/:id/comments', async (req, res) => {
   const userId = await requireSessionUser(req, res);
   if (!userId) return;
+  const post = await findPostById(pool, req.params.id, userId);
+  if (!post) return fail(res, 404, 'post not found');
+
   const content = req.body?.content?.toString().trim() ?? '';
-  if (!content) return fail(res, 400, '评论不能为空');
+  if (!content) return fail(res, 400, 'comment cannot be empty');
+
+  const parentCommentIdRaw =
+    req.body?.parent_comment_id?.toString().trim() ?? '';
+  const replyToCommentIdRaw =
+    req.body?.reply_to_comment_id?.toString().trim() ?? '';
+
+  let normalizedParentCommentId =
+    parentCommentIdRaw.isEmpty ? null : parentCommentIdRaw;
+  let normalizedReplyToCommentId =
+    replyToCommentIdRaw.isEmpty ? null : replyToCommentIdRaw;
+
+  if (normalizedParentCommentId != null) {
+    const parentLookupResult = await pool.query(
+      `
+        select id, post_id, parent_comment_id
+        from public.post_comments
+        where id = $1
+        limit 1
+      `,
+      [normalizedParentCommentId],
+    );
+    const parentLookup = parentLookupResult.rows[0];
+    if (!parentLookup || parentLookup.post_id !== req.params.id) {
+      return fail(res, 400, 'parent comment not found');
+    }
+    normalizedParentCommentId = parentLookup.parent_comment_id || parentLookup.id;
+  }
+
+  if (normalizedReplyToCommentId != null) {
+    const replyLookupResult = await pool.query(
+      `
+        select id, post_id, parent_comment_id
+        from public.post_comments
+        where id = $1
+        limit 1
+      `,
+      [normalizedReplyToCommentId],
+    );
+    const replyLookup = replyLookupResult.rows[0];
+    if (!replyLookup || replyLookup.post_id !== req.params.id) {
+      return fail(res, 400, 'reply target not found');
+    }
+    const threadRootId = replyLookup.parent_comment_id || replyLookup.id;
+    if (
+      normalizedParentCommentId != null &&
+      normalizedParentCommentId !== threadRootId
+    ) {
+      return fail(res, 400, 'reply target does not match thread');
+    }
+    normalizedParentCommentId = threadRootId;
+    normalizedReplyToCommentId = replyLookup.id;
+  }
+
+  if (normalizedParentCommentId != null && normalizedReplyToCommentId == null) {
+    normalizedReplyToCommentId = normalizedParentCommentId;
+  }
+
   const result = await pool.query(
     `
-      insert into public.post_comments (post_id, user_id, content)
-      values ($1, $2, $3)
+      insert into public.post_comments (
+        post_id,
+        user_id,
+        parent_comment_id,
+        reply_to_comment_id,
+        content
+      )
+      values ($1, $2, $3, $4, $5)
       returning *
     `,
-    [req.params.id, userId, content],
+    [
+      req.params.id,
+      userId,
+      normalizedParentCommentId,
+      normalizedReplyToCommentId,
+      content,
+    ],
   );
-  return ok(res, { data: result.rows[0], message: '评论成功' });
+  return ok(res, { data: result.rows[0], message: 'commented' });
+});
+appRouter.post('/posts/comments/:id/like', async (req, res) => {
+  const userId = await requireSessionUser(req, res);
+  if (!userId) return;
+  await pool.query(
+    `
+      insert into public.post_comment_likes (user_id, comment_id)
+      values ($1, $2)
+      on conflict do nothing
+    `,
+    [userId, req.params.id],
+  );
+  return ok(res, { message: 'liked' });
+});
+appRouter.delete('/posts/comments/:id/like', async (req, res) => {
+  const userId = await requireSessionUser(req, res);
+  if (!userId) return;
+  await pool.query(
+    `
+      delete from public.post_comment_likes
+      where user_id = $1 and comment_id = $2
+    `,
+    [userId, req.params.id],
+  );
+  return ok(res, { message: 'unliked' });
 });
 appRouter.post('/posts/:id/footprint', async (req, res) => {
   const userId = await requireSessionUser(req, res);
@@ -595,12 +924,31 @@ appRouter.get('/posts/footprints', async (req, res) => {
         p.content,
         p.images,
         p.location,
-        coalesce(p.likes, 0) as likes,
+        (
+          select count(*)
+          from public.post_likes pl
+          where pl.post_id = p.id
+        )::int as likes,
+        (
+          select count(*)
+          from public.post_favorites pf2
+          where pf2.post_id = p.id
+        )::int as favorites,
         (
           select count(*)
           from public.post_comments pc
           where pc.post_id = p.id
         )::int as comments,
+        exists(
+          select 1
+          from public.post_likes vpl
+          where vpl.user_id = $1 and vpl.post_id = p.id
+        ) as is_liked,
+        exists(
+          select 1
+          from public.post_favorites vpf
+          where vpf.user_id = $1 and vpf.post_id = p.id
+        ) as is_favorited,
         p.created_at
       from public.post_footprints pf
       join public.posts p on p.id = pf.post_id
