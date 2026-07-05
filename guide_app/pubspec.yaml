@@ -1,0 +1,27 @@
+name: yidianban_guide_app
+description: Separate guide-side Flutter app for Yidianban.
+publish_to: 'none'
+version: 1.0.0+1
+
+environment:
+  sdk: ^3.11.1
+
+dependencies:
+  flutter:
+    sdk: flutter
+  provider: ^6.1.2
+  shared_preferences: ^2.3.4
+  flutter_application_1:
+    path: ..
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+  flutter_lints: ^6.0.0
+
+flutter:
+  uses-material-design: true
+
+alipay_payment:
+  scheme: alipay2021006157637583
+  ios: noutdid
