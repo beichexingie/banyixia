@@ -11,6 +11,14 @@ class GuideSelectServicePage extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final console = context.watch<GuideConsoleProvider>();
+    final selectedCount = console.serviceOptions.fold<int>(
+      0,
+      (sum, item) => sum + item.count,
+    );
+    final selectedAmount = console.serviceOptions.fold<double>(
+      0,
+      (sum, item) => sum + item.pricePerDay * item.count,
+    );
 
     return GuideAppScaffold(
       backgroundColor: Colors.white,
@@ -25,7 +33,7 @@ class GuideSelectServicePage extends StatelessWidget {
               padding: const EdgeInsets.fromLTRB(18, 14, 18, 24),
               children: [
                 Text(
-                  '共${console.serviceOptions.where((item) => item.count > 0).length}项可选',
+                  '已选 $selectedCount 项服务',
                   style: const TextStyle(
                     fontSize: 18,
                     fontWeight: FontWeight.w700,
@@ -101,14 +109,26 @@ class GuideSelectServicePage extends StatelessWidget {
                             const SizedBox(height: 18),
                             Row(
                               children: [
-                                _CountButton(icon: Icons.remove_rounded, active: false),
+                                _CountButton(
+                                  icon: Icons.remove_rounded,
+                                  active: service.count > 0,
+                                  onTap: () => context
+                                      .read<GuideConsoleProvider>()
+                                      .changeServiceOptionCount(service.id, -1),
+                                ),
                                 const SizedBox(width: 14),
                                 Text(
                                   '${service.count}',
                                   style: const TextStyle(fontSize: 20, fontWeight: FontWeight.w900),
                                 ),
                                 const SizedBox(width: 14),
-                                _CountButton(icon: Icons.add_rounded, active: true),
+                                _CountButton(
+                                  icon: Icons.add_rounded,
+                                  active: true,
+                                  onTap: () => context
+                                      .read<GuideConsoleProvider>()
+                                      .changeServiceOptionCount(service.id, 1),
+                                ),
                               ],
                             ),
                           ],
@@ -120,7 +140,11 @@ class GuideSelectServicePage extends StatelessWidget {
                 GuidePillButton(
                   label: '订单须知',
                   icon: Icons.error_outline_rounded,
-                  onTap: () {},
+                  onTap: () {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      const SnackBar(content: Text('订单须知与服务规则页已预留')),
+                    );
+                  },
                   color: const Color(0xFFF4F5F7),
                 ),
                 const SizedBox(height: 24),
@@ -146,6 +170,11 @@ class GuideSelectServicePage extends StatelessWidget {
                         iconColor: const Color(0xFF2DC653),
                         iconText: '微',
                         selected: false,
+                        onTap: () {
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            const SnackBar(content: Text('正式版可在这里切换支付方式')),
+                          );
+                        },
                       ),
                       const Divider(height: 1),
                       _PaymentRow(
@@ -153,6 +182,11 @@ class GuideSelectServicePage extends StatelessWidget {
                         iconColor: const Color(0xFF1FA8F7),
                         iconText: '支',
                         selected: true,
+                        onTap: () {
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            const SnackBar(content: Text('当前演示页默认使用支付宝支付')),
+                          );
+                        },
                       ),
                       Container(
                         width: double.infinity,
@@ -163,7 +197,7 @@ class GuideSelectServicePage extends StatelessWidget {
                           borderRadius: BorderRadius.circular(14),
                         ),
                         child: const Text(
-                          '本服务由**保险全程保障您的人身财产安全',
+                          '本服务由平台合作保险提供行程保障，正式版这里接真实投保说明。',
                           style: TextStyle(
                             fontSize: 15,
                             color: Color(0xFFFF8C3B),
@@ -193,6 +227,20 @@ class GuideSelectServicePage extends StatelessWidget {
               children: [
                 Row(
                   children: [
+                    Text(
+                      '合计 ¥${selectedAmount.toStringAsFixed(0)}',
+                      style: const TextStyle(
+                        fontSize: 20,
+                        fontWeight: FontWeight.w900,
+                        color: Color(0xFFFF5A3C),
+                      ),
+                    ),
+                    const Spacer(),
+                  ],
+                ),
+                const SizedBox(height: 10),
+                Row(
+                  children: [
                     Icon(
                       Icons.radio_button_unchecked,
                       color: AppColors.textHint.withValues(alpha: 0.8),
@@ -213,7 +261,17 @@ class GuideSelectServicePage extends StatelessWidget {
                 SizedBox(
                   width: double.infinity,
                   child: ElevatedButton(
-                    onPressed: () => Navigator.of(context).maybePop(),
+                    onPressed: selectedCount == 0
+                        ? null
+                        : () {
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              SnackBar(
+                                content: Text(
+                                  '已选择 $selectedCount 项服务，支付能力后续接正式订单流',
+                                ),
+                              ),
+                            );
+                          },
                     style: ElevatedButton.styleFrom(
                       backgroundColor: AppColors.primary,
                       foregroundColor: AppColors.textPrimary,
@@ -239,22 +297,28 @@ class GuideSelectServicePage extends StatelessWidget {
 class _CountButton extends StatelessWidget {
   final IconData icon;
   final bool active;
+  final VoidCallback? onTap;
 
   const _CountButton({
     required this.icon,
     required this.active,
+    this.onTap,
   });
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-      width: 42,
-      height: 42,
-      decoration: BoxDecoration(
-        color: active ? AppColors.primary : const Color(0xFFF0F1F5),
-        borderRadius: BorderRadius.circular(12),
+    return InkWell(
+      onTap: active ? onTap : null,
+      borderRadius: BorderRadius.circular(12),
+      child: Container(
+        width: 42,
+        height: 42,
+        decoration: BoxDecoration(
+          color: active ? AppColors.primary : const Color(0xFFF0F1F5),
+          borderRadius: BorderRadius.circular(12),
+        ),
+        child: Icon(icon, color: active ? AppColors.textPrimary : AppColors.textHint),
       ),
-      child: Icon(icon, color: active ? AppColors.textPrimary : AppColors.textHint),
     );
   }
 }
@@ -305,43 +369,48 @@ class _PaymentRow extends StatelessWidget {
   final Color iconColor;
   final String iconText;
   final bool selected;
+  final VoidCallback? onTap;
 
   const _PaymentRow({
     required this.label,
     required this.iconColor,
     required this.iconText,
     required this.selected,
+    this.onTap,
   });
 
   @override
   Widget build(BuildContext context) {
-    return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 18),
-      child: Row(
-        children: [
-          Container(
-            width: 54,
-            height: 54,
-            decoration: BoxDecoration(color: iconColor, shape: BoxShape.circle),
-            alignment: Alignment.center,
-            child: Text(
-              iconText,
-              style: const TextStyle(fontSize: 26, color: Colors.white, fontWeight: FontWeight.w900),
+    return InkWell(
+      onTap: onTap,
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 18),
+        child: Row(
+          children: [
+            Container(
+              width: 54,
+              height: 54,
+              decoration: BoxDecoration(color: iconColor, shape: BoxShape.circle),
+              alignment: Alignment.center,
+              child: Text(
+                iconText,
+                style: const TextStyle(fontSize: 26, color: Colors.white, fontWeight: FontWeight.w900),
+              ),
             ),
-          ),
-          const SizedBox(width: 14),
-          Expanded(
-            child: Text(
-              label,
-              style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w800),
+            const SizedBox(width: 14),
+            Expanded(
+              child: Text(
+                label,
+                style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w800),
+              ),
             ),
-          ),
-          Icon(
-            selected ? Icons.check_circle : Icons.radio_button_unchecked,
-            size: 38,
-            color: selected ? AppColors.textPrimary : AppColors.textHint,
-          ),
-        ],
+            Icon(
+              selected ? Icons.check_circle : Icons.radio_button_unchecked,
+              size: 38,
+              color: selected ? AppColors.textPrimary : AppColors.textHint,
+            ),
+          ],
+        ),
       ),
     );
   }

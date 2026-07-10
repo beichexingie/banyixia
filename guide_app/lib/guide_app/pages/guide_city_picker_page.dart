@@ -129,7 +129,12 @@ class _GuideCityPickerPageState extends State<GuideCityPickerPage> {
               ),
               const SizedBox(width: 8),
               TextButton.icon(
-                onPressed: () {},
+                onPressed: () {
+                  context.read<GuideConsoleProvider>().cycleMockCurrentLocation();
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(content: Text('已切换到新的模拟定位点')),
+                  );
+                },
                 icon: const Icon(Icons.gps_fixed, color: AppColors.textPrimary),
                 label: const Text(
                   '重新定位',
@@ -150,7 +155,11 @@ class _GuideCityPickerPageState extends State<GuideCityPickerPage> {
               _CityChip(
                 label: console.selectedCity,
                 active: true,
-                onTap: () {},
+                onTap: () {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(content: Text('当前接单城市：${console.selectedCity}')),
+                  );
+                },
               ),
             ],
           ),

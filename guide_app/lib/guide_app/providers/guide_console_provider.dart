@@ -54,7 +54,7 @@ class GuideConsoleProvider extends ChangeNotifier {
     ),
   ];
 
-  final List<GuideServiceOption> _serviceOptions = const [
+  final List<GuideServiceOption> _serviceOptions = [
     GuideServiceOption(
       id: 'relax_1',
       name: '休闲游玩',
@@ -135,9 +135,9 @@ class GuideConsoleProvider extends ChangeNotifier {
           color: Color(0xFFF1F4FF),
         ),
         GuideDashboardShortcut(
-          title: '我的动态',
-          subtitle: '经营内容',
-          icon: Icons.public_rounded,
+          title: '需求大厅',
+          subtitle: '查看并报名',
+          icon: Icons.assignment_turned_in_outlined,
           color: Color(0xFFFFF1E9),
         ),
       ];
@@ -257,6 +257,60 @@ class GuideConsoleProvider extends ChangeNotifier {
     );
   }
 
+  void changeServiceOptionCount(String serviceId, int delta) {
+    final index = _serviceOptions.indexWhere((item) => item.id == serviceId);
+    if (index == -1) return;
+    final current = _serviceOptions[index];
+    final nextCount = (current.count + delta).clamp(0, 99);
+    if (nextCount == current.count) return;
+    _serviceOptions[index] = current.copyWith(count: nextCount);
+    notifyListeners();
+  }
+
+  void addMockServiceAddress() {
+    final nextIndex = _serviceAddresses.length + 1;
+    addServiceAddress(
+      GuideAddress(
+        city: '苏州市工业园区',
+        title: '新增服务点 $nextIndex',
+        detail: '月廊街 ${100 + nextIndex} 号',
+        contactName: '刘小林女士',
+        maskedPhone: '159****6890',
+      ),
+    );
+  }
+
+  void cycleMockCurrentLocation() {
+    const candidates = [
+      GuideAddress(
+        city: '江苏省苏州市',
+        title: '姑苏区平江路',
+        detail: '（重新定位后已切换到平江路附近）',
+        contactName: '刘小林女士',
+        maskedPhone: '159****6890',
+      ),
+      GuideAddress(
+        city: '江苏省苏州市',
+        title: '工业园区金鸡湖',
+        detail: '（重新定位后已切换到金鸡湖商圈）',
+        contactName: '刘小林女士',
+        maskedPhone: '159****6890',
+      ),
+      GuideAddress(
+        city: '江苏省苏州市',
+        title: '高新区狮山路',
+        detail: '（重新定位后已切换到狮山商务区）',
+        contactName: '刘小林女士',
+        maskedPhone: '159****6890',
+      ),
+    ];
+    final currentIndex = candidates.indexWhere(
+      (item) => item.title == _currentLocation.title,
+    );
+    final next = candidates[(currentIndex + 1) % candidates.length];
+    updateCurrentLocation(next);
+  }
+
   void setRouteTabIndex(int value) {
     _routeTabIndex = value;
     notifyListeners();
@@ -294,6 +348,7 @@ class GuideConsoleProvider extends ChangeNotifier {
         stage: stage,
         serviceLabel: _serviceLabelForOrder(order),
         etaText: _etaTextForOrder(order),
+        distanceText: _distanceTextForOrder(order),
         amount: order.amount,
         content: order.serviceName.isNotEmpty ? order.serviceName : '客户已提交服务需求，请尽快联系确认',
         address: _currentLocation.summary,
@@ -310,6 +365,7 @@ class GuideConsoleProvider extends ChangeNotifier {
           stage: GuideOrderStage.inProgress,
           serviceLabel: '地陪',
           etaText: '剩余：5小时23分钟',
+          distanceText: '距服务地 2.3km',
           amount: 480,
           content: '订单内容订单内容订单内容订单内容订单内容订单内容订单内容订单内容',
           address: '这是订单地址这是订单地址这是订单地址...',
@@ -322,6 +378,7 @@ class GuideConsoleProvider extends ChangeNotifier {
           stage: GuideOrderStage.newOrder,
           serviceLabel: '定制',
           etaText: '剩余：5小时23分钟',
+          distanceText: '距服务地 8.6km',
           amount: 480,
           content: '订单内容订单内容订单内容订单内容订单内容订单内容订单内容订单内容',
           address: '这是订单地址这是订单地址这是订单地址...',
@@ -350,6 +407,12 @@ class GuideConsoleProvider extends ChangeNotifier {
     final hours = diff.inHours.abs();
     final minutes = diff.inMinutes.abs() % 60;
     return '剩余：${hours}小时${minutes}分钟';
+  }
+
+  String _distanceTextForOrder(Order order) {
+    final seed = order.id.codeUnits.fold<int>(0, (sum, item) => sum + item);
+    final kilometers = ((seed % 120) + 8) / 10;
+    return '距服务地 ${kilometers.toStringAsFixed(1)}km';
   }
 
   Future<void> bootstrapForGuide(UserProvider userProvider) async {

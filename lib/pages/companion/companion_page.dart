@@ -253,7 +253,7 @@ class _CompanionPageState extends State<CompanionPage> {
               padding: EdgeInsets.fromLTRB(
                 active ? 14 : 12,
                 active ? 18 : 14,
-                active ? 56 : 48,
+                active ? 52 : 42,
                 active ? 12 : 10,
               ),
               child: Column(
@@ -262,10 +262,10 @@ class _CompanionPageState extends State<CompanionPage> {
                 children: [
                   Text(
                     category.title,
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
+                    maxLines: 2,
+                    overflow: TextOverflow.fade,
                     style: TextStyle(
-                      fontSize: active ? 24 : 19,
+                      fontSize: active ? 22 : 17,
                       fontWeight: FontWeight.w900,
                       color: AppColors.textPrimary,
                     ),
@@ -276,7 +276,7 @@ class _CompanionPageState extends State<CompanionPage> {
                     maxLines: 2,
                     overflow: TextOverflow.ellipsis,
                     style: TextStyle(
-                      fontSize: active ? 15 : 13,
+                      fontSize: active ? 14 : 12,
                       height: 1.2,
                       color: const Color(0xFF727272),
                     ),
@@ -300,40 +300,56 @@ class _CompanionPageState extends State<CompanionPage> {
   }
 
   Widget _buildItemGrid(List<_ServiceItem> items) {
-    return GridView.builder(
-      shrinkWrap: true,
-      physics: const NeverScrollableScrollPhysics(),
-      itemCount: items.length,
-      gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-        crossAxisCount: 6,
-        mainAxisSpacing: 18,
-        crossAxisSpacing: 8,
-        childAspectRatio: 0.72,
-      ),
-      itemBuilder: (context, index) {
-        final item = items[index];
-        return Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Container(
-              width: 48,
-              height: 48,
-              decoration: BoxDecoration(
-                color: Colors.white.withValues(alpha: 0.55),
-                borderRadius: BorderRadius.circular(16),
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        const spacing = 8.0;
+        const runSpacing = 16.0;
+        final crossAxisCount = constraints.maxWidth >= 340 ? 6 : 5;
+        final itemWidth =
+            (constraints.maxWidth - spacing * (crossAxisCount - 1)) /
+                crossAxisCount;
+        final iconBoxSize = itemWidth >= 52
+            ? 48.0
+            : (itemWidth <= 42 ? 40.0 : itemWidth - 4);
+
+        return Wrap(
+          spacing: spacing,
+          runSpacing: runSpacing,
+          children: items.map((item) {
+            return SizedBox(
+              width: itemWidth,
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Container(
+                    width: iconBoxSize,
+                    height: iconBoxSize,
+                    decoration: BoxDecoration(
+                      color: Colors.white.withValues(alpha: 0.55),
+                      borderRadius: BorderRadius.circular(16),
+                    ),
+                    alignment: Alignment.center,
+                    child: Icon(
+                      item.icon,
+                      size: iconBoxSize * 0.62,
+                      color: AppColors.textPrimary,
+                    ),
+                  ),
+                  const SizedBox(height: 8),
+                  Text(
+                    item.label,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    textAlign: TextAlign.center,
+                    style: const TextStyle(
+                      fontSize: 10.5,
+                      color: Color(0xFF6E6E6E),
+                    ),
+                  ),
+                ],
               ),
-              alignment: Alignment.center,
-              child: Icon(item.icon, size: 30, color: AppColors.textPrimary),
-            ),
-            const SizedBox(height: 8),
-            Text(
-              item.label,
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
-              textAlign: TextAlign.center,
-              style: const TextStyle(fontSize: 11, color: Color(0xFF6E6E6E)),
-            ),
-          ],
+            );
+          }).toList(),
         );
       },
     );
@@ -435,19 +451,46 @@ class _CompanionPageState extends State<CompanionPage> {
   }
 
   List<Guide> _filteredGuides(GuideProvider provider) {
-    final keyword = _categories[_activeCategory].keyword;
-    final list = provider.filteredGuides.where((guide) {
-      final fullText =
-          '${guide.name} ${guide.city} ${guide.description} ${guide.tags.join(' ')}';
-      return keyword.isEmpty || fullText.contains(keyword);
-    }).toList();
+    final baseList = List<Guide>.of(provider.filteredGuides);
+    if (baseList.isEmpty) {
+      return const <Guide>[];
+    }
 
+    final keyword = _categories[_activeCategory].keyword.trim().toLowerCase();
+    final matched = keyword.isEmpty
+        ? baseList
+        : baseList.where((guide) {
+            final fullText =
+                '${guide.name} ${guide.city} ${guide.description} ${guide.tags.join(' ')}'
+                    .toLowerCase();
+            return fullText.contains(keyword);
+          }).toList();
+
+    final list = matched.isNotEmpty ? matched : baseList;
     if (_sortByTime) {
-      list.sort(
-        (a, b) => b.verified.toString().compareTo(a.verified.toString()),
-      );
+      list.sort((a, b) {
+        final verifiedCompare = (b.verified ? 1 : 0).compareTo(
+          a.verified ? 1 : 0,
+        );
+        if (verifiedCompare != 0) {
+          return verifiedCompare;
+        }
+        final ratingCompare = b.rating.compareTo(a.rating);
+        if (ratingCompare != 0) {
+          return ratingCompare;
+        }
+        return b.likes.compareTo(a.likes);
+      });
     } else {
-      list.sort((a, b) => b.rating.compareTo(a.rating));
+      list.sort((a, b) {
+        final scoreA = a.likes + a.fans + a.views;
+        final scoreB = b.likes + b.fans + b.views;
+        final scoreCompare = scoreB.compareTo(scoreA);
+        if (scoreCompare != 0) {
+          return scoreCompare;
+        }
+        return b.rating.compareTo(a.rating);
+      });
     }
     return list;
   }

@@ -21,6 +21,8 @@ class OrdersPage extends StatefulWidget {
 class _OrdersPageState extends State<OrdersPage>
     with SingleTickerProviderStateMixin {
   late final TabController _tabController;
+  final Set<String> _payingOrderIds = <String>{};
+  final Set<String> _completingOrderIds = <String>{};
 
   @override
   void initState() {
@@ -55,6 +57,40 @@ class _OrdersPageState extends State<OrdersPage>
       ScaffoldMessenger.of(
         context,
       ).showSnackBar(SnackBar(content: Text(e.toString())));
+    }
+  }
+
+  Future<void> _payOrder(Order order) async {
+    if (_payingOrderIds.contains(order.id)) return;
+    setState(() => _payingOrderIds.add(order.id));
+    try {
+      final result = await context.read<OrderProvider>().payOrder(order.id);
+      if (!mounted) return;
+      _showSimpleMessage(result.message);
+    } catch (e) {
+      if (!mounted) return;
+      _showSimpleMessage('支付发起失败: $e');
+    } finally {
+      if (mounted) {
+        setState(() => _payingOrderIds.remove(order.id));
+      }
+    }
+  }
+
+  Future<void> _completeOrder(Order order) async {
+    if (_completingOrderIds.contains(order.id)) return;
+    setState(() => _completingOrderIds.add(order.id));
+    try {
+      await context.read<OrderProvider>().completeOrder(order.id);
+      if (!mounted) return;
+      _showSimpleMessage('订单已确认完成');
+    } catch (e) {
+      if (!mounted) return;
+      _showSimpleMessage('确认完成失败: $e');
+    } finally {
+      if (mounted) {
+        setState(() => _completingOrderIds.remove(order.id));
+      }
     }
   }
 
@@ -199,8 +235,13 @@ class _OrdersPageState extends State<OrdersPage>
     final isDebugOrder =
         order.serviceName.contains('0.01') ||
         (order.merchantOrderNo?.startsWith('DBG') ?? false);
+    final isPaying = _payingOrderIds.contains(order.id);
+    final isCompleting = _completingOrderIds.contains(order.id);
 
-    return Container(
+    return InkWell(
+      onTap: () => context.push('/profile/orders/${order.id}'),
+      borderRadius: BorderRadius.circular(22),
+      child: Container(
       margin: const EdgeInsets.only(bottom: 12),
       padding: const EdgeInsets.fromLTRB(14, 12, 14, 14),
       decoration: BoxDecoration(
@@ -355,8 +396,8 @@ class _OrdersPageState extends State<OrdersPage>
                 ),
                 const SizedBox(width: 8),
                 _outlineAction(
-                  label: isDebugOrder ? '继续支付' : '去支付',
-                  onTap: () {},
+                  label: isPaying ? '支付中...' : (isDebugOrder ? '继续支付' : '去支付'),
+                  onTap: isPaying ? null : () => _payOrder(order),
                 ),
               ] else if (order.status == OrderStatus.inProgress) ...[
                 _outlineAction(
@@ -365,8 +406,8 @@ class _OrdersPageState extends State<OrdersPage>
                 ),
                 const SizedBox(width: 8),
                 _outlineAction(
-                  label: '确认完成',
-                  onTap: () => _showSimpleMessage('完成入口稍后接入'),
+                  label: isCompleting ? '提交中...' : '确认完成',
+                  onTap: isCompleting ? null : () => _completeOrder(order),
                 ),
               ] else if (order.status == OrderStatus.pendingReview) ...[
                 _outlineAction(
@@ -393,6 +434,7 @@ class _OrdersPageState extends State<OrdersPage>
           ),
         ],
       ),
+      ),
     );
   }
 
@@ -406,7 +448,7 @@ class _OrdersPageState extends State<OrdersPage>
     );
   }
 
-  Widget _outlineAction({required String label, required VoidCallback onTap}) {
+  Widget _outlineAction({required String label, VoidCallback? onTap}) {
     return SizedBox(
       height: 32,
       child: OutlinedButton(

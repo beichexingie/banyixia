@@ -482,9 +482,40 @@ alter table if exists public.demands
   add column if not exists applicant_count integer default 0,
   add column if not exists created_at timestamptz default now();
 
-alter table if exists public.demands
-  alter column id set default gen_random_uuid(),
-  alter column created_at set default now();
+  alter table if exists public.demands
+    alter column id set default gen_random_uuid(),
+    alter column created_at set default now();
+
+create table if not exists public.demand_applications (
+  id uuid primary key default gen_random_uuid(),
+  demand_id uuid not null references public.demands(id) on delete cascade,
+  guide_id uuid not null references public.guides(id) on delete cascade,
+  guide_name text not null default '',
+  guide_avatar text not null default '',
+  guide_city text not null default '',
+  note text not null default '',
+  status text not null default 'pending',
+  created_at timestamptz default now()
+);
+
+alter table if exists public.demand_applications
+  add column if not exists demand_id uuid references public.demands(id) on delete cascade,
+  add column if not exists guide_id uuid references public.guides(id) on delete cascade,
+  add column if not exists guide_name text default '',
+  add column if not exists guide_avatar text default '',
+  add column if not exists guide_city text default '',
+  add column if not exists note text default '',
+  add column if not exists status text default 'pending',
+  add column if not exists created_at timestamptz default now();
+
+create unique index if not exists idx_demand_applications_unique
+  on public.demand_applications (demand_id, guide_id);
+
+create index if not exists idx_demand_applications_guide
+  on public.demand_applications (guide_id, created_at desc);
+
+create index if not exists idx_demand_applications_demand
+  on public.demand_applications (demand_id, created_at desc);
 
 create table if not exists public.guide_applications (
   id uuid primary key default gen_random_uuid(),

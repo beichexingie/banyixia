@@ -17,6 +17,7 @@ class DemandRequest {
   final List<String> tags;
   final int applicantCount;
   final DateTime createdAt;
+  final List<DemandApplication> applications;
 
   const DemandRequest({
     required this.id,
@@ -37,6 +38,7 @@ class DemandRequest {
     this.tags = const [],
     this.applicantCount = 0,
     required this.createdAt,
+    this.applications = const [],
   });
 
   factory DemandRequest.fromJson(Map<String, dynamic> json) {
@@ -73,6 +75,10 @@ class DemandRequest {
           ? (json['applicant_count'] as num).toInt()
           : int.tryParse(json['applicant_count']?.toString() ?? '') ?? 0,
       createdAt: parseDate(json['created_at']),
+      applications: (json['applications'] as List? ?? const [])
+          .whereType<Map<String, dynamic>>()
+          .map(DemandApplication.fromJson)
+          .toList(),
     );
   }
 
@@ -96,6 +102,7 @@ class DemandRequest {
       'tags': tags,
       'applicant_count': applicantCount,
       'created_at': createdAt.toIso8601String(),
+      'applications': applications.map((item) => item.toJson()).toList(),
     };
   }
 
@@ -118,6 +125,7 @@ class DemandRequest {
     List<String>? tags,
     int? applicantCount,
     DateTime? createdAt,
+    List<DemandApplication>? applications,
   }) {
     return DemandRequest(
       id: id ?? this.id,
@@ -138,6 +146,7 @@ class DemandRequest {
       tags: tags ?? this.tags,
       applicantCount: applicantCount ?? this.applicantCount,
       createdAt: createdAt ?? this.createdAt,
+      applications: applications ?? this.applications,
     );
   }
 
@@ -147,5 +156,59 @@ class DemandRequest {
     final end =
         '${serviceEndAt.month}月${serviceEndAt.day}日 ${serviceEndAt.hour.toString().padLeft(2, '0')}:${serviceEndAt.minute.toString().padLeft(2, '0')}';
     return '$start - $end';
+  }
+}
+
+class DemandApplication {
+  final String id;
+  final String demandId;
+  final String guideId;
+  final String guideName;
+  final String guideAvatar;
+  final String guideCity;
+  final String note;
+  final String status;
+  final DateTime createdAt;
+
+  const DemandApplication({
+    required this.id,
+    required this.demandId,
+    required this.guideId,
+    required this.guideName,
+    required this.guideAvatar,
+    required this.guideCity,
+    required this.note,
+    required this.status,
+    required this.createdAt,
+  });
+
+  factory DemandApplication.fromJson(Map<String, dynamic> json) {
+    return DemandApplication(
+      id: json['id']?.toString() ?? '',
+      demandId: json['demand_id']?.toString() ?? '',
+      guideId: json['guide_id']?.toString() ?? '',
+      guideName: json['guide_name']?.toString() ?? '',
+      guideAvatar: json['guide_avatar']?.toString() ?? '',
+      guideCity: json['guide_city']?.toString() ?? '',
+      note: json['note']?.toString() ?? '',
+      status: json['status']?.toString() ?? 'pending',
+      createdAt:
+          DateTime.tryParse(json['created_at']?.toString() ?? '') ??
+          DateTime.now(),
+    );
+  }
+
+  Map<String, dynamic> toJson() {
+    return {
+      'id': id,
+      'demand_id': demandId,
+      'guide_id': guideId,
+      'guide_name': guideName,
+      'guide_avatar': guideAvatar,
+      'guide_city': guideCity,
+      'note': note,
+      'status': status,
+      'created_at': createdAt.toIso8601String(),
+    };
   }
 }

@@ -601,7 +601,7 @@ class _DemandCreatePageState extends State<DemandCreatePage> {
       ScaffoldMessenger.of(
         context,
       ).showSnackBar(const SnackBar(content: Text('需求已发布')));
-      context.go('/demands');
+      context.go('/demands/me');
     } catch (e) {
       if (!mounted) {
         return;

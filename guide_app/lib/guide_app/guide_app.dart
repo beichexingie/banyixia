@@ -12,6 +12,7 @@ import '../providers/user_provider.dart';
 import 'pages/guide_city_picker_page.dart';
 import 'pages/guide_duty_mode_page.dart';
 import 'pages/guide_duty_settings_page.dart';
+import 'pages/guide_demand_hall_page.dart';
 import 'pages/guide_messages_page.dart';
 import 'pages/guide_order_center_page.dart';
 import 'pages/guide_placeholder_pages.dart';
@@ -140,6 +141,7 @@ class _GuideMainShellState extends State<_GuideMainShell> {
       GuideWorkbenchPage(
         onOpenServiceOps: _openServiceOperations,
         onOpenPublish: _openPublish,
+        onOpenDemandHall: _openDemandHall,
         onOpenEmergencyContacts: _openEmergencyContacts,
         onOpenServiceItems: _openSelectServicePage,
         onOpenAddressManager: _openServiceLocationPage,
@@ -276,6 +278,12 @@ class _GuideMainShellState extends State<_GuideMainShell> {
   Future<void> _openSelectServicePage() async {
     await Navigator.of(context).push(
       MaterialPageRoute(builder: (_) => const GuideSelectServicePage()),
+    );
+  }
+
+  Future<void> _openDemandHall() async {
+    await Navigator.of(context).push(
+      MaterialPageRoute(builder: (_) => const GuideDemandHallPage()),
     );
   }
 

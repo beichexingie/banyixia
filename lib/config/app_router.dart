@@ -24,8 +24,11 @@ import '../pages/admin/audit_list_page.dart';
 import '../pages/profile/user_profile_page.dart';
 import '../pages/demand/demand_list_page.dart';
 import '../pages/demand/demand_create_page.dart';
+import '../pages/demand/demand_detail_page.dart';
+import '../pages/demand/my_demand_list_page.dart';
 import '../pages/common/state_notice_page.dart';
 import '../models/guide.dart';
+import '../pages/profile/order_detail_page.dart';
 
 class AppRouter {
   final UserProvider userProvider;
@@ -109,6 +112,12 @@ class AppRouter {
         },
       ),
       GoRoute(
+        path: '/profile/orders/:id',
+        builder: (context, state) {
+          return OrderDetailPage(orderId: state.pathParameters['id']!);
+        },
+      ),
+      GoRoute(
         path: '/travel_plan/create',
         builder: (context, state) => const TravelPlanCreatePage(),
       ),
@@ -174,6 +183,15 @@ class AppRouter {
       GoRoute(
         path: '/demands',
         builder: (context, state) => const DemandListPage(),
+      ),
+      GoRoute(
+        path: '/demands/me',
+        builder: (context, state) => const MyDemandListPage(),
+      ),
+      GoRoute(
+        path: '/demand/:id',
+        builder: (context, state) =>
+            DemandDetailPage(demandId: state.pathParameters['id']!),
       ),
       GoRoute(
         path: '/demand/create',

@@ -9,6 +9,7 @@ import '../widgets/guide_console_header.dart';
 class GuideWorkbenchPage extends StatelessWidget {
   final VoidCallback onOpenServiceOps;
   final VoidCallback onOpenPublish;
+  final VoidCallback onOpenDemandHall;
   final VoidCallback onOpenEmergencyContacts;
   final VoidCallback onOpenServiceItems;
   final VoidCallback onOpenAddressManager;
@@ -19,6 +20,7 @@ class GuideWorkbenchPage extends StatelessWidget {
     super.key,
     required this.onOpenServiceOps,
     required this.onOpenPublish,
+    required this.onOpenDemandHall,
     required this.onOpenEmergencyContacts,
     required this.onOpenServiceItems,
     required this.onOpenAddressManager,
@@ -91,7 +93,7 @@ class GuideWorkbenchPage extends StatelessWidget {
                   0 => onOpenScheduleCenter,
                   1 => onOpenServiceItems,
                   2 => onOpenReviewCenter,
-                  3 => onOpenPublish,
+                  3 => onOpenDemandHall,
                   _ => null,
                 };
                 return InkWell(
@@ -159,6 +161,33 @@ class GuideWorkbenchPage extends StatelessWidget {
                   ),
                 ),
               ],
+            ),
+            const SizedBox(height: 18),
+            InkWell(
+              onTap: onOpenDemandHall,
+              borderRadius: BorderRadius.circular(24),
+              child: GuideSectionCard(
+                child: Row(
+                  children: [
+                    const Icon(Icons.assignment_turned_in_outlined, size: 30),
+                    const SizedBox(width: 12),
+                    const Expanded(
+                      child: Text(
+                        '需求大厅',
+                        style: TextStyle(
+                          fontSize: 18,
+                          fontWeight: FontWeight.w900,
+                        ),
+                      ),
+                    ),
+                    Icon(
+                      Icons.chevron_right_rounded,
+                      size: 30,
+                      color: Colors.black.withValues(alpha: 0.75),
+                    ),
+                  ],
+                ),
+              ),
             ),
             const SizedBox(height: 18),
             InkWell(

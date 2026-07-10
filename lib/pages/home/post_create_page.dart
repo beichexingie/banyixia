@@ -3,7 +3,6 @@ import 'dart:io';
 
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
-import 'package:go_router/go_router.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:provider/provider.dart';
 
@@ -111,7 +110,7 @@ class _PostCreatePageState extends State<PostCreatePage> {
           );
 
       if (!mounted) return;
-      context.pop();
+      Navigator.of(context).maybePop();
     } catch (e) {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('发布失败: $e')));
@@ -157,7 +156,7 @@ class _PostCreatePageState extends State<PostCreatePage> {
         centerTitle: true,
         leading: IconButton(
           icon: const Icon(Icons.close),
-          onPressed: _isUploading ? null : () => context.pop(),
+          onPressed: _isUploading ? null : () => Navigator.of(context).maybePop(),
         ),
         title: Text(_pageTitle),
         actions: [

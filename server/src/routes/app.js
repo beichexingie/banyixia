@@ -929,6 +929,68 @@ appRouter.get('/demands', async (_req, res) => {
   return ok(res, { data: result.rows });
 });
 
+appRouter.get('/demands/me', async (req, res) => {
+  const userId = await requireSessionUser(req, res);
+  if (!userId) return;
+  const result = await pool.query(
+    `
+      select *
+      from public.demands
+      where author_id = $1
+      order by created_at desc
+    `,
+    [userId],
+  );
+  return ok(res, { data: result.rows });
+});
+
+appRouter.get('/demands/applied', async (req, res) => {
+  const userId = await requireSessionUser(req, res);
+  if (!userId) return;
+  const result = await pool.query(
+    `
+      select
+        d.*,
+        da.id as application_id,
+        da.status as application_status,
+        da.note as application_note,
+        da.created_at as application_created_at
+      from public.demand_applications da
+      join public.demands d on d.id = da.demand_id
+      where da.guide_id = $1
+      order by da.created_at desc
+    `,
+    [userId],
+  );
+  return ok(res, { data: result.rows });
+});
+
+appRouter.get('/demands/:id', async (req, res) => {
+  const demandResult = await pool.query(
+    `select * from public.demands where id = $1 limit 1`,
+    [req.params.id],
+  );
+  const demand = demandResult.rows[0];
+  if (!demand) return fail(res, 404, '需求不存在');
+
+  const applications = await pool.query(
+    `
+      select *
+      from public.demand_applications
+      where demand_id = $1
+      order by created_at desc
+    `,
+    [req.params.id],
+  );
+
+  return ok(res, {
+    data: {
+      ...demand,
+      applications: applications.rows,
+    },
+  });
+});
+
 appRouter.post('/demands', async (req, res) => {
   const userId = await requireSessionUser(req, res);
   if (!userId) return;
@@ -961,6 +1023,149 @@ appRouter.post('/demands', async (req, res) => {
     ],
   );
   return ok(res, { data: result.rows[0] });
+});
+
+appRouter.post('/demands/:id/apply', async (req, res) => {
+  const userId = await requireSessionUser(req, res);
+  if (!userId) return;
+
+  const demandResult = await pool.query(
+    `select * from public.demands where id = $1 limit 1`,
+    [req.params.id],
+  );
+  const demand = demandResult.rows[0];
+  if (!demand) return fail(res, 404, '需求不存在');
+  if (demand.author_id === userId) return fail(res, 400, '不能报名自己的需求');
+
+  const guideResult = await pool.query(
+    `select * from public.guides where id = $1 limit 1`,
+    [userId],
+  );
+  const guide = guideResult.rows[0];
+  if (!guide) return fail(res, 403, '当前账号还不是已入驻地陪');
+
+  const payload = req.body ?? {};
+  const result = await pool.query(
+    `
+      insert into public.demand_applications (
+        demand_id, guide_id, guide_name, guide_avatar, guide_city, note, status
+      ) values ($1,$2,$3,$4,$5,$6,'pending')
+      on conflict (demand_id, guide_id) do update
+      set
+        note = excluded.note,
+        guide_name = excluded.guide_name,
+        guide_avatar = excluded.guide_avatar,
+        guide_city = excluded.guide_city
+      returning *
+    `,
+    [
+      req.params.id,
+      userId,
+      guide.name ?? '',
+      guide.avatar ?? '',
+      guide.city ?? '',
+      payload.note?.toString() ?? '',
+    ],
+  );
+
+  await pool.query(
+    `
+      update public.demands
+      set applicant_count = (
+        select count(*)
+        from public.demand_applications
+        where demand_id = $1
+      )
+      where id = $1
+    `,
+    [req.params.id],
+  );
+
+  return ok(res, { data: result.rows[0], message: '报名成功' });
+});
+
+appRouter.get('/demands/:id/applications', async (req, res) => {
+  const userId = await requireSessionUser(req, res);
+  if (!userId) return;
+  const demandResult = await pool.query(
+    `select * from public.demands where id = $1 limit 1`,
+    [req.params.id],
+  );
+  const demand = demandResult.rows[0];
+  if (!demand) return fail(res, 404, '需求不存在');
+  if (demand.author_id !== userId) return fail(res, 403, '无权限查看该需求报名列表');
+
+  const applications = await pool.query(
+    `
+      select *
+      from public.demand_applications
+      where demand_id = $1
+      order by created_at desc
+    `,
+    [req.params.id],
+  );
+
+  return ok(res, { data: applications.rows });
+});
+
+appRouter.post('/demands/:id/select-guide', async (req, res) => {
+  const userId = await requireSessionUser(req, res);
+  if (!userId) return;
+  const payload = req.body ?? {};
+  const applicationId = payload.application_id?.toString().trim() ?? '';
+  if (!applicationId) return fail(res, 400, '缺少 application_id');
+
+  const demandResult = await pool.query(
+    `select * from public.demands where id = $1 limit 1`,
+    [req.params.id],
+  );
+  const demand = demandResult.rows[0];
+  if (!demand) return fail(res, 404, '需求不存在');
+  if (demand.author_id !== userId) return fail(res, 403, '无权限操作该需求');
+
+  const applicationResult = await pool.query(
+    `select * from public.demand_applications where id = $1 and demand_id = $2 limit 1`,
+    [applicationId, req.params.id],
+  );
+  const application = applicationResult.rows[0];
+  if (!application) return fail(res, 404, '报名记录不存在');
+
+  const created = await withTransaction(async (client) => {
+    await client.query(
+      `update public.demand_applications set status = 'selected' where id = $1`,
+      [applicationId],
+    );
+    await client.query(
+      `update public.demand_applications set status = 'rejected' where demand_id = $1 and id <> $2 and status = 'pending'`,
+      [req.params.id, applicationId],
+    );
+    await client.query(
+      `update public.demands set status = 'matched' where id = $1`,
+      [req.params.id],
+    );
+    const orderResult = await client.query(
+      `
+        insert into public.orders (
+          user_id, guide_id, guide_name, guide_avatar, status, amount,
+          service_name, service_date, payment_method, payment_status, created_at
+        ) values ($1,$2,$3,$4,$5,$6,$7,$8,'alipay','pending', now())
+        returning *
+      `,
+      [
+        demand.author_id,
+        application.guide_id,
+        application.guide_name ?? '',
+        application.guide_avatar ?? '',
+        0,
+        Number.parseFloat(payload.amount?.toString() ?? '') || 0,
+        demand.title ?? demand.content ?? '地陪服务订单',
+        demand.service_start_at,
+      ],
+    );
+    return orderResult.rows[0];
+  });
+
+  return ok(res, { data: created, message: '已选定地陪并生成订单' });
 });
 
 appRouter.get('/chat/rooms', async (req, res) => {

@@ -10,7 +10,6 @@ import '../../providers/order_provider.dart';
 import '../../providers/post_provider.dart';
 import '../../providers/user_provider.dart';
 import '../../models/user.dart' as app_model;
-import '../main_scaffold.dart';
 
 class ProfilePage extends StatefulWidget {
   const ProfilePage({super.key});
@@ -21,6 +20,7 @@ class ProfilePage extends StatefulWidget {
 
 class _ProfilePageState extends State<ProfilePage> {
   int _contentTab = 0;
+  bool _isDebugPaying = false;
   late Future<List<TravelPost>> _contentFuture;
 
   @override
@@ -59,6 +59,39 @@ class _ProfilePageState extends State<ProfilePage> {
     });
   }
 
+  Future<void> _startDebugPayment() async {
+    final userProvider = context.read<UserProvider>();
+    if (!userProvider.isLoggedIn) {
+      _showSnack('请先登录后再发起 0.01 支付测试');
+      return;
+    }
+    if (_isDebugPaying) {
+      return;
+    }
+
+    setState(() {
+      _isDebugPaying = true;
+    });
+    try {
+      final result = await context.read<OrderProvider>().createAndPayDebugOrder();
+      if (!mounted) return;
+      _showSnack(
+        result.success
+            ? '0.01 测试订单已创建，正在拉起支付宝'
+            : result.message,
+      );
+    } catch (e) {
+      if (!mounted) return;
+      _showSnack('0.01 测试失败: $e');
+    } finally {
+      if (mounted) {
+        setState(() {
+          _isDebugPaying = false;
+        });
+      }
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final user = context.watch<UserProvider>().user;
@@ -81,6 +114,7 @@ class _ProfilePageState extends State<ProfilePage> {
                   children: [
                     _buildVipCard(user),
                     _buildOrdersPanel(orderProvider),
+                    _buildMyDemandEntry(),
                     _buildCouponBanner(user),
                     _buildMenuPanel(user),
                     _buildPostCategoryTabs(),
@@ -384,7 +418,124 @@ class _ProfilePageState extends State<ProfilePage> {
               ),
             ],
           ),
+          const SizedBox(height: 14),
+          InkWell(
+            onTap: _isDebugPaying ? null : _startDebugPayment,
+            borderRadius: BorderRadius.circular(16),
+            child: Container(
+              width: double.infinity,
+              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+              decoration: BoxDecoration(
+                color: const Color(0xFFFFF8E6),
+                borderRadius: BorderRadius.circular(16),
+                border: Border.all(color: const Color(0xFFFFE8A3)),
+              ),
+              child: Row(
+                children: [
+                  Container(
+                    width: 34,
+                    height: 34,
+                    decoration: BoxDecoration(
+                      color: Colors.white,
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    alignment: Alignment.center,
+                    child: _isDebugPaying
+                        ? const SizedBox(
+                            width: 16,
+                            height: 16,
+                            child: CircularProgressIndicator(
+                              strokeWidth: 2,
+                              color: AppColors.textPrimary,
+                            ),
+                          )
+                        : const Icon(
+                            Icons.bolt_rounded,
+                            color: AppColors.textPrimary,
+                            size: 18,
+                          ),
+                  ),
+                  const SizedBox(width: 12),
+                  const Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          '0.01 元支付联调测试',
+                          style: TextStyle(
+                            fontSize: 14,
+                            fontWeight: FontWeight.w800,
+                            color: AppColors.textPrimary,
+                          ),
+                        ),
+                        SizedBox(height: 2),
+                        Text(
+                          '点击后会直接创建测试订单并拉起支付宝',
+                          style: TextStyle(
+                            fontSize: 11.5,
+                            color: AppColors.textSecondary,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  Text(
+                    _isDebugPaying ? '发起中' : '立即测试',
+                    style: const TextStyle(
+                      fontSize: 12.5,
+                      fontWeight: FontWeight.w800,
+                      color: AppColors.textPrimary,
+                    ),
+                  ),
+                  const SizedBox(width: 4),
+                  const Icon(
+                    Icons.chevron_right,
+                    size: 18,
+                    color: AppColors.textPrimary,
+                  ),
+                ],
+              ),
+            ),
+          ),
         ],
+      ),
+    );
+  }
+
+  Widget _buildMyDemandEntry() {
+    return Container(
+      margin: const EdgeInsets.fromLTRB(16, 0, 16, 12),
+      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 14),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(18),
+      ),
+      child: InkWell(
+        onTap: () => context.push('/demands/me'),
+        borderRadius: BorderRadius.circular(14),
+        child: Row(
+          children: const [
+            Icon(
+              Icons.assignment_outlined,
+              color: AppColors.textPrimary,
+            ),
+            SizedBox(width: 10),
+            Expanded(
+              child: Text(
+                '我的需求',
+                style: TextStyle(
+                  fontSize: 16,
+                  fontWeight: FontWeight.w800,
+                  color: AppColors.textPrimary,
+                ),
+              ),
+            ),
+            Icon(
+              Icons.chevron_right_rounded,
+              color: AppColors.textHint,
+            ),
+          ],
+        ),
       ),
     );
   }

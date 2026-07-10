@@ -69,7 +69,11 @@ class GuideProfilePage extends StatelessWidget {
                         const SizedBox(width: 10),
                         GuidePillButton(
                           label: console.selectedCity,
-                          onTap: () {},
+                          onTap: () {
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              SnackBar(content: Text('当前服务城市：${console.selectedCity}')),
+                            );
+                          },
                           color: Colors.white,
                         ),
                       ],
@@ -105,7 +109,11 @@ class GuideProfilePage extends StatelessWidget {
                 _ProfileRow(
                   icon: Icons.badge_outlined,
                   title: '认证资料',
-                  onTap: () {},
+                  onTap: () {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      const SnackBar(content: Text('认证资料页已预留，后续接真实审核资料')),
+                    );
+                  },
                 ),
                 const Divider(height: 1),
                 _ProfileRow(
@@ -117,7 +125,11 @@ class GuideProfilePage extends StatelessWidget {
                 _ProfileRow(
                   icon: Icons.policy_outlined,
                   title: '平台规则',
-                  onTap: () {},
+                  onTap: () {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      const SnackBar(content: Text('平台规则页已预留')),
+                    );
+                  },
                 ),
               ],
             ),

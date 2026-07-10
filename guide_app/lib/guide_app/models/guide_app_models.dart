@@ -238,6 +238,7 @@ class GuideOrderCardData {
   final GuideOrderStage stage;
   final String serviceLabel;
   final String etaText;
+  final String distanceText;
   final double amount;
   final String content;
   final String address;
@@ -250,6 +251,7 @@ class GuideOrderCardData {
     required this.stage,
     required this.serviceLabel,
     required this.etaText,
+    required this.distanceText,
     required this.amount,
     required this.content,
     required this.address,

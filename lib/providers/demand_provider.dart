@@ -9,6 +9,8 @@ class DemandProvider extends ChangeNotifier {
   final SessionService _sessionService;
 
   List<DemandRequest> _demands = [];
+  List<DemandRequest> _myDemands = [];
+  List<DemandRequest> _appliedDemands = [];
   bool _isLoading = false;
   String _searchQuery = '';
   String _selectedCity = '全国';
@@ -18,6 +20,8 @@ class DemandProvider extends ChangeNotifier {
       : _sessionService = sessionService ?? EcsSessionService();
 
   List<DemandRequest> get demands => _demands;
+  List<DemandRequest> get myDemands => _myDemands;
+  List<DemandRequest> get appliedDemands => _appliedDemands;
   bool get isLoading => _isLoading;
   String get searchQuery => _searchQuery;
   String get selectedCity => _selectedCity;
@@ -99,6 +103,54 @@ class DemandProvider extends ChangeNotifier {
     }
   }
 
+  Future<void> loadMyDemands() async {
+    final response = await _api.get('/demands/me', authToken: _token());
+    final data = response['data'];
+    if (data is List) {
+      _myDemands = data
+          .whereType<Map<String, dynamic>>()
+          .map(DemandRequest.fromJson)
+          .toList();
+      notifyListeners();
+    }
+  }
+
+  Future<void> loadAppliedDemands() async {
+    final response = await _api.get('/demands/applied', authToken: _token());
+    final data = response['data'];
+    if (data is List) {
+      _appliedDemands = data
+          .whereType<Map<String, dynamic>>()
+          .map(DemandRequest.fromJson)
+          .toList();
+      notifyListeners();
+    }
+  }
+
+  Future<DemandRequest> getDemandDetail(String demandId) async {
+    final response = await _api.get('/demands/$demandId', authToken: _token());
+    final data = response['data'];
+    if (data is Map<String, dynamic>) {
+      return DemandRequest.fromJson(data);
+    }
+    throw Exception('需求详情加载失败');
+  }
+
+  Future<List<DemandApplication>> getDemandApplications(String demandId) async {
+    final response = await _api.get(
+      '/demands/$demandId/applications',
+      authToken: _token(),
+    );
+    final data = response['data'];
+    if (data is List) {
+      return data
+          .whereType<Map<String, dynamic>>()
+          .map(DemandApplication.fromJson)
+          .toList();
+    }
+    return const [];
+  }
+
   Future<DemandRequest> createDemand({
     required String title,
     required String content,
@@ -136,10 +188,43 @@ class DemandProvider extends ChangeNotifier {
       final demand = DemandRequest.fromJson(data);
       _demands.removeWhere((item) => item.id == demand.id);
       _demands.insert(0, demand);
+      _myDemands.removeWhere((item) => item.id == demand.id);
+      _myDemands.insert(0, demand);
       notifyListeners();
       return demand;
     }
     throw Exception('创建失败');
+  }
+
+  Future<void> applyToDemand(
+    String demandId, {
+    String note = '',
+  }) async {
+    await _api.post(
+      '/demands/$demandId/apply',
+      authToken: _token(),
+      body: {'note': note},
+    );
+    await loadAppliedDemands();
+    await loadDemands();
+  }
+
+  Future<Map<String, dynamic>> selectGuideAndCreateOrder({
+    required String demandId,
+    required String applicationId,
+    required double amount,
+  }) async {
+    final response = await _api.post(
+      '/demands/$demandId/select-guide',
+      authToken: _token(),
+      body: {
+        'application_id': applicationId,
+        'amount': amount,
+      },
+    );
+    await loadMyDemands();
+    await loadDemands();
+    return response['data'] as Map<String, dynamic>;
   }
 
   void registerInterest(String id) {

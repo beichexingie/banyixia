@@ -87,7 +87,11 @@ class _GuideOrderCenterPageState extends State<GuideOrderCenterPage> {
                   GuidePillButton(
                     label: '默认排序',
                     icon: Icons.keyboard_arrow_down_rounded,
-                    onTap: () {},
+                    onTap: () {
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        const SnackBar(content: Text('当前为默认排序，后续可切换按距离/佣金/时间排序')),
+                      );
+                    },
                     color: Colors.white,
                     foregroundColor: AppColors.textSecondary,
                   ),
@@ -320,6 +324,22 @@ class _GuideOrderCard extends StatelessWidget {
                   style: const TextStyle(
                     fontSize: 16,
                     color: AppColors.textSecondary,
+                  ),
+                ),
+              ),
+              const SizedBox(width: 10),
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                decoration: BoxDecoration(
+                  color: const Color(0xFFF7F7F2),
+                  borderRadius: BorderRadius.circular(999),
+                ),
+                child: Text(
+                  data.distanceText,
+                  style: const TextStyle(
+                    fontSize: 12,
+                    fontWeight: FontWeight.w700,
+                    color: AppColors.textPrimary,
                   ),
                 ),
               ),

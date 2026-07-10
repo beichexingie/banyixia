@@ -6,12 +6,23 @@ import '../models/guide_app_models.dart';
 import '../providers/guide_console_provider.dart';
 import '../widgets/guide_app_shell.dart';
 
-class GuideServiceLocationPage extends StatelessWidget {
+class GuideServiceLocationPage extends StatefulWidget {
   const GuideServiceLocationPage({super.key});
+
+  @override
+  State<GuideServiceLocationPage> createState() => _GuideServiceLocationPageState();
+}
+
+class _GuideServiceLocationPageState extends State<GuideServiceLocationPage> {
+  bool _expanded = false;
 
   @override
   Widget build(BuildContext context) {
     final console = context.watch<GuideConsoleProvider>();
+    final visibleAddresses = _expanded
+        ? console.serviceAddresses
+        : console.serviceAddresses.take(2).toList();
+
     return GuideAppScaffold(
       safeAreaTop: false,
       backgroundColor: Colors.white,
@@ -135,7 +146,12 @@ class GuideServiceLocationPage extends StatelessWidget {
                             ),
                           ),
                           TextButton.icon(
-                            onPressed: () {},
+                            onPressed: () {
+                              context.read<GuideConsoleProvider>().cycleMockCurrentLocation();
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                const SnackBar(content: Text('已切换到新的模拟定位点')),
+                              );
+                            },
                             icon: const Icon(Icons.gps_fixed, color: AppColors.textPrimary),
                             label: const Text(
                               '重新定位',
@@ -159,30 +175,58 @@ class GuideServiceLocationPage extends StatelessWidget {
                               style: TextStyle(fontSize: 18, color: AppColors.textHint),
                             ),
                           ),
-                          _SmallActionButton(label: '新增', icon: Icons.add, onTap: () {}),
+                          _SmallActionButton(
+                            label: '新增',
+                            icon: Icons.add,
+                            onTap: () {
+                              context.read<GuideConsoleProvider>().addMockServiceAddress();
+                              setState(() => _expanded = true);
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                const SnackBar(content: Text('已新增一条模拟服务地址')),
+                              );
+                            },
+                          ),
                           const SizedBox(width: 10),
-                          _SmallActionButton(label: '管理', icon: Icons.edit_outlined, onTap: () {}),
+                          _SmallActionButton(
+                            label: '管理',
+                            icon: Icons.edit_outlined,
+                            onTap: () {
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                const SnackBar(content: Text('地址管理能力已预留，后续接编辑/删除')),
+                              );
+                            },
+                          ),
                         ],
                       ),
                       const SizedBox(height: 12),
-                      ...console.serviceAddresses.map((address) => _AddressTile(address: address)),
-                      const SizedBox(height: 12),
-                      InkWell(
-                        onTap: () {},
-                        child: const Padding(
-                          padding: EdgeInsets.symmetric(vertical: 6),
-                          child: Row(
-                            children: [
-                              Text(
-                                '展开更多',
-                                style: TextStyle(fontSize: 18, color: AppColors.textSecondary),
-                              ),
-                              SizedBox(width: 6),
-                              Icon(Icons.keyboard_arrow_down_rounded, color: AppColors.textSecondary),
-                            ],
+                      ...visibleAddresses.map((address) => _AddressTile(address: address)),
+                      if (console.serviceAddresses.length > 2) ...[
+                        const SizedBox(height: 12),
+                        InkWell(
+                          onTap: () => setState(() => _expanded = !_expanded),
+                          child: Padding(
+                            padding: const EdgeInsets.symmetric(vertical: 6),
+                            child: Row(
+                              children: [
+                                Text(
+                                  _expanded ? '收起地址' : '展开更多',
+                                  style: const TextStyle(
+                                    fontSize: 18,
+                                    color: AppColors.textSecondary,
+                                  ),
+                                ),
+                                const SizedBox(width: 6),
+                                Icon(
+                                  _expanded
+                                      ? Icons.keyboard_arrow_up_rounded
+                                      : Icons.keyboard_arrow_down_rounded,
+                                  color: AppColors.textSecondary,
+                                ),
+                              ],
+                            ),
                           ),
                         ),
-                      ),
+                      ],
                     ],
                   ),
                 ),
