@@ -75,7 +75,7 @@ export function buildMerchantOrderNo(rawOrderNo, fallbackOrderId) {
 
 function buildSignContent(params) {
   return Object.keys(params)
-      .filter((key) => key !== 'sign' && key !== 'sign_type' && params[key] !== '')
+      .filter((key) => key !== 'sign' && params[key] !== '')
       .sort()
       .map((key) => `${key}=${params[key]}`)
       .join('&');
