@@ -32,32 +32,27 @@ class GuideConsoleHeader extends StatelessWidget {
         ? '1209384'
         : compactId.substring(0, compactId.length > 6 ? 6 : compactId.length);
 
-    return Wrap(
-      spacing: 12,
-      runSpacing: 12,
-      crossAxisAlignment: WrapCrossAlignment.start,
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         ClipOval(
           child: Image.network(
             user.avatar.isNotEmpty
                 ? user.avatar
                 : 'https://picsum.photos/seed/guide-user/120/120',
-            width: compact ? 52 : 60,
-            height: compact ? 52 : 60,
+            width: compact ? 50 : 56,
+            height: compact ? 50 : 56,
             fit: BoxFit.cover,
             errorBuilder: (_, __, ___) => Container(
-              width: compact ? 52 : 60,
-              height: compact ? 52 : 60,
+              width: compact ? 50 : 56,
+              height: compact ? 50 : 56,
               color: const Color(0xFFECEEF2),
               child: const Icon(Icons.person, color: AppColors.textHint),
             ),
           ),
         ),
-        ConstrainedBox(
-          constraints: BoxConstraints(
-            minWidth: compact ? 180 : 210,
-            maxWidth: compact ? 220 : 260,
-          ),
+        const SizedBox(width: 10),
+        Expanded(
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
@@ -68,15 +63,15 @@ class GuideConsoleHeader extends StatelessWidget {
                       user.nickname.isNotEmpty ? user.nickname : '用户108937',
                       overflow: TextOverflow.ellipsis,
                       style: const TextStyle(
-                        fontSize: 18,
+                        fontSize: 17,
                         fontWeight: FontWeight.w900,
                         color: AppColors.textPrimary,
                       ),
                     ),
                   ),
-                  const SizedBox(width: 8),
+                  const SizedBox(width: 6),
                   Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
                     decoration: BoxDecoration(
                       color: const Color(0xFFF1B35B),
                       borderRadius: BorderRadius.circular(999),
@@ -84,6 +79,7 @@ class GuideConsoleHeader extends StatelessWidget {
                     child: const Text(
                       'VIP',
                       style: TextStyle(
+                        fontSize: 11,
                         fontWeight: FontWeight.w900,
                         color: Color(0xFF6A4100),
                       ),
@@ -91,11 +87,8 @@ class GuideConsoleHeader extends StatelessWidget {
                   ),
                 ],
               ),
-              const SizedBox(height: 6),
-              Wrap(
-                spacing: 10,
-                runSpacing: 8,
-                crossAxisAlignment: WrapCrossAlignment.center,
+              const SizedBox(height: 4),
+              Row(
                 children: [
                   Text(
                     'IP：$visibleId',
@@ -104,6 +97,7 @@ class GuideConsoleHeader extends StatelessWidget {
                       color: AppColors.textHint,
                     ),
                   ),
+                  const SizedBox(width: 10),
                   GuidePillButton(
                     label: statusLabel,
                     icon: Icons.remove_circle,
@@ -117,22 +111,25 @@ class GuideConsoleHeader extends StatelessWidget {
           ),
         ),
         if (!compact) ...[
+          const SizedBox(width: 12),
           _SideActionButton(
             icon: Icons.mark_chat_unread_outlined,
             label: '接单设置',
             onTap: onSettingsTap,
           ),
+          const SizedBox(width: 8),
           _SideActionButton(
             icon: Icons.person_pin_circle_outlined,
             label: '专属运营',
             onTap: onServiceOperationTap,
           ),
         ] else ...[
+          const SizedBox(width: 8),
           InkWell(
             onTap: onEmergencyTap,
             borderRadius: BorderRadius.circular(999),
             child: Container(
-              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
               decoration: BoxDecoration(
                 color: const Color(0xFFF3F4F6),
                 borderRadius: BorderRadius.circular(999),
@@ -173,24 +170,24 @@ class _SideActionButton extends StatelessWidget {
       onTap: onTap,
       borderRadius: BorderRadius.circular(18),
       child: SizedBox(
-        width: 74,
+        width: 66,
         child: Column(
           children: [
             Container(
-              width: 74,
-              height: 74,
+              width: 48,
+              height: 48,
               decoration: BoxDecoration(
                 color: const Color(0xFFF4F5F7),
-                borderRadius: BorderRadius.circular(18),
+                borderRadius: BorderRadius.circular(16),
               ),
-              child: Icon(icon, color: AppColors.textPrimary),
+              child: Icon(icon, size: 24, color: AppColors.textPrimary),
             ),
             const SizedBox(height: 6),
             Text(
               label,
               textAlign: TextAlign.center,
               style: const TextStyle(
-                fontSize: 12,
+                fontSize: 11,
                 color: AppColors.textSecondary,
               ),
             ),

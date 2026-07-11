@@ -52,36 +52,33 @@ class _GuideOrderCenterPageState extends State<GuideOrderCenterPage> {
                     onToggleOnlineTap: () => console.setOnline(!console.isOnline),
                   ),
                   const SizedBox(height: 22),
-                  Wrap(
-                    spacing: 18,
-                    runSpacing: 12,
-                    crossAxisAlignment: WrapCrossAlignment.center,
+                  Row(
                     children: [
                       for (final stage in GuideOrderStage.values)
-                        _OrderStageTab(
-                          label: stage.label,
-                          active: stage == _selectedStage,
-                          onTap: () => setState(() => _selectedStage = stage),
+                        Padding(
+                          padding: const EdgeInsets.only(right: 26),
+                          child: _OrderStageTab(
+                            label: stage.label,
+                            active: stage == _selectedStage,
+                            onTap: () => setState(() => _selectedStage = stage),
+                          ),
                         ),
+                      const Spacer(),
                       InkWell(
                         onTap: widget.onOpenRoute,
                         borderRadius: BorderRadius.circular(999),
-                        child: const Padding(
-                          padding: EdgeInsets.symmetric(horizontal: 4, vertical: 2),
-                          child: Row(
-                            mainAxisSize: MainAxisSize.min,
-                            children: [
-                              Icon(Icons.route_outlined, size: 24),
-                              SizedBox(width: 6),
-                              Text(
-                                '路线',
-                                style: TextStyle(
-                                  fontSize: 16,
-                                  fontWeight: FontWeight.w800,
-                                ),
+                        child: const Row(
+                          children: [
+                            Icon(Icons.route_outlined, size: 26),
+                            SizedBox(width: 6),
+                            Text(
+                              '路线',
+                              style: TextStyle(
+                                fontSize: 16,
+                                fontWeight: FontWeight.w800,
                               ),
-                            ],
-                          ),
+                            ),
+                          ],
                         ),
                       ),
                     ],
@@ -227,10 +224,7 @@ class _GuideOrderCard extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Wrap(
-            spacing: 12,
-            runSpacing: 10,
-            crossAxisAlignment: WrapCrossAlignment.center,
+          Row(
             children: [
               Container(
                 padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
@@ -247,6 +241,7 @@ class _GuideOrderCard extends StatelessWidget {
                   ),
                 ),
               ),
+              const SizedBox(width: 14),
               Text(
                 data.etaText,
                 style: const TextStyle(
@@ -255,23 +250,19 @@ class _GuideOrderCard extends StatelessWidget {
                   color: Color(0xFFFF9B33),
                 ),
               ),
-              Row(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  const Text(
-                    '预计佣金',
-                    style: TextStyle(fontSize: 16, color: AppColors.textHint),
-                  ),
-                  const SizedBox(width: 8),
-                  Text(
-                    '¥${data.amount.toStringAsFixed(0)}',
-                    style: const TextStyle(
-                      fontSize: 18,
-                      fontWeight: FontWeight.w900,
-                      color: Color(0xFFFF5A3C),
-                    ),
-                  ),
-                ],
+              const Spacer(),
+              const Text(
+                '预计佣金',
+                style: TextStyle(fontSize: 16, color: AppColors.textHint),
+              ),
+              const SizedBox(width: 8),
+              Text(
+                '¥${data.amount.toStringAsFixed(0)}',
+                style: const TextStyle(
+                  fontSize: 18,
+                  fontWeight: FontWeight.w900,
+                  color: Color(0xFFFF5A3C),
+                ),
               ),
             ],
           ),
@@ -354,17 +345,21 @@ class _GuideOrderCard extends StatelessWidget {
             ],
           ),
           const SizedBox(height: 18),
-          Wrap(
-            spacing: 10,
-            runSpacing: 10,
+          Row(
             children: [
               _OutlineActionButton(
+                icon: Icons.support_agent_rounded,
+                label: '客服',
+                onTap: () {},
+              ),
+              const SizedBox(width: 10),
+              _OutlineActionButton(
                 icon: Icons.call_outlined,
-                label: '联系用户',
+                label: '联系',
                 onTap: onChatTap,
               ),
-              SizedBox(
-                width: 188,
+              const SizedBox(width: 10),
+              Expanded(
                 child: InkWell(
                   onTap: onPrimaryTap,
                   borderRadius: BorderRadius.circular(999),
@@ -383,7 +378,6 @@ class _GuideOrderCard extends StatelessWidget {
                     ),
                     child: Row(
                       mainAxisAlignment: MainAxisAlignment.center,
-                      mainAxisSize: MainAxisSize.min,
                       children: [
                         Icon(
                           data.primaryAction.icon,
@@ -391,16 +385,12 @@ class _GuideOrderCard extends StatelessWidget {
                           color: AppColors.textPrimary,
                         ),
                         const SizedBox(width: 8),
-                        Flexible(
-                          child: Text(
-                            data.primaryAction.label,
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
-                            style: const TextStyle(
-                              fontSize: 15,
-                              fontWeight: FontWeight.w900,
-                              color: AppColors.textPrimary,
-                            ),
+                        Text(
+                          data.primaryAction.label,
+                          style: const TextStyle(
+                            fontSize: 15,
+                            fontWeight: FontWeight.w900,
+                            color: AppColors.textPrimary,
                           ),
                         ),
                       ],

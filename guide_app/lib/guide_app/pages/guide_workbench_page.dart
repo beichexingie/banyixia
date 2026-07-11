@@ -7,6 +7,7 @@ import '../widgets/guide_app_shell.dart';
 import '../widgets/guide_console_header.dart';
 
 class GuideWorkbenchPage extends StatelessWidget {
+  final VoidCallback onOpenDutySettings;
   final VoidCallback onOpenServiceOps;
   final VoidCallback onOpenPublish;
   final VoidCallback onOpenDemandHall;
@@ -21,6 +22,7 @@ class GuideWorkbenchPage extends StatelessWidget {
 
   const GuideWorkbenchPage({
     super.key,
+    required this.onOpenDutySettings,
     required this.onOpenServiceOps,
     required this.onOpenPublish,
     required this.onOpenDemandHall,
@@ -83,52 +85,29 @@ class GuideWorkbenchPage extends StatelessWidget {
               ),
             ),
             const SizedBox(height: 22),
-            GridView.builder(
-              shrinkWrap: true,
-              physics: const NeverScrollableScrollPhysics(),
-              itemCount: console.shortcuts.length,
-              gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-                crossAxisCount: 4,
-                childAspectRatio: 0.74,
-                crossAxisSpacing: 14,
-                mainAxisSpacing: 14,
-              ),
-              itemBuilder: (context, index) {
-                final item = console.shortcuts[index];
-                final onTap = switch (index) {
-                  0 => onOpenScheduleCenter,
-                  1 => onOpenServiceItems,
-                  2 => onOpenReviewCenter,
-                  3 => onOpenDemandHall,
-                  _ => null,
-                };
-                return InkWell(
-                  onTap: onTap,
-                  borderRadius: BorderRadius.circular(24),
-                  child: Column(
-                    children: [
-                      Container(
-                        width: 88,
-                        height: 88,
-                        decoration: BoxDecoration(
-                          color: Colors.white,
-                          borderRadius: BorderRadius.circular(24),
-                        ),
-                        child: Icon(item.icon, size: 36, color: AppColors.textPrimary),
-                      ),
-                      const SizedBox(height: 10),
-                      Text(
-                        item.title,
-                        textAlign: TextAlign.center,
-                        style: const TextStyle(
-                          fontSize: 15,
-                          fontWeight: FontWeight.w700,
-                        ),
-                      ),
-                    ],
-                  ),
-                );
-              },
+            Row(
+              children: [
+                _ShortcutItem(
+                  title: console.shortcuts[0].title,
+                  icon: console.shortcuts[0].icon,
+                  onTap: onOpenScheduleCenter,
+                ),
+                _ShortcutItem(
+                  title: console.shortcuts[1].title,
+                  icon: console.shortcuts[1].icon,
+                  onTap: onOpenServiceItems,
+                ),
+                _ShortcutItem(
+                  title: console.shortcuts[2].title,
+                  icon: console.shortcuts[2].icon,
+                  onTap: onOpenReviewCenter,
+                ),
+                _ShortcutItem(
+                  title: '我的动态',
+                  icon: Icons.public_rounded,
+                  onTap: onOpenPublish,
+                ),
+              ],
             ),
             const SizedBox(height: 20),
             Row(
@@ -145,7 +124,7 @@ class GuideWorkbenchPage extends StatelessWidget {
                     onTap: onOpenPromotionCenter,
                   ),
                 ),
-                const SizedBox(width: 16),
+                const SizedBox(width: 14),
                 Expanded(
                   child: Column(
                     children: [
@@ -175,43 +154,16 @@ class GuideWorkbenchPage extends StatelessWidget {
             ),
             const SizedBox(height: 18),
             InkWell(
-              onTap: onOpenDemandHall,
+              onTap: onOpenDutySettings,
               borderRadius: BorderRadius.circular(24),
               child: GuideSectionCard(
                 child: Row(
                   children: [
-                    const Icon(Icons.assignment_turned_in_outlined, size: 30),
+                    const Icon(Icons.mark_chat_unread_outlined, size: 28),
                     const SizedBox(width: 12),
                     const Expanded(
                       child: Text(
-                        '需求大厅',
-                        style: TextStyle(
-                          fontSize: 18,
-                          fontWeight: FontWeight.w900,
-                        ),
-                      ),
-                    ),
-                    Icon(
-                      Icons.chevron_right_rounded,
-                      size: 30,
-                      color: Colors.black.withValues(alpha: 0.75),
-                    ),
-                  ],
-                ),
-              ),
-            ),
-            const SizedBox(height: 18),
-            InkWell(
-              onTap: onOpenAddressManager,
-              borderRadius: BorderRadius.circular(24),
-              child: GuideSectionCard(
-                child: Row(
-                  children: [
-                    const Icon(Icons.mark_chat_read_outlined, size: 30),
-                    const SizedBox(width: 12),
-                    const Expanded(
-                      child: Text(
-                        '服务地址管理',
+                        '接单设置',
                         style: TextStyle(
                           fontSize: 18,
                           fontWeight: FontWeight.w900,
@@ -375,8 +327,8 @@ class _BigTaskCard extends StatelessWidget {
       onTap: onTap,
       borderRadius: BorderRadius.circular(28),
       child: Container(
-        height: tall ? 286 : 135,
-        padding: const EdgeInsets.all(20),
+        height: tall ? 250 : 120,
+        padding: const EdgeInsets.fromLTRB(18, 18, 18, 18),
         decoration: BoxDecoration(
           color: backgroundColor,
           borderRadius: BorderRadius.circular(28),
@@ -392,7 +344,7 @@ class _BigTaskCard extends StatelessWidget {
                   Text(
                     title,
                     style: TextStyle(
-                      fontSize: tall ? 26 : 22,
+                      fontSize: tall ? 24 : 20,
                       fontWeight: FontWeight.w900,
                       color: foregroundColor,
                     ),
@@ -401,7 +353,7 @@ class _BigTaskCard extends StatelessWidget {
                   Text(
                     subtitle,
                     style: TextStyle(
-                      fontSize: 16,
+                      fontSize: 14,
                       color: foregroundColor,
                       height: 1.4,
                     ),
@@ -417,7 +369,7 @@ class _BigTaskCard extends StatelessWidget {
                       child: Text(
                         buttonLabel!,
                         style: const TextStyle(
-                          fontSize: 16,
+                          fontSize: 14,
                           fontWeight: FontWeight.w900,
                           color: Colors.white,
                         ),
@@ -430,7 +382,51 @@ class _BigTaskCard extends StatelessWidget {
             Positioned(
               right: 0,
               bottom: 0,
-              child: Icon(icon, size: tall ? 120 : 74, color: foregroundColor),
+              child: Icon(icon, size: tall ? 104 : 62, color: foregroundColor),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _ShortcutItem extends StatelessWidget {
+  final String title;
+  final IconData icon;
+  final VoidCallback onTap;
+
+  const _ShortcutItem({
+    required this.title,
+    required this.icon,
+    required this.onTap,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Expanded(
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(18),
+        child: Column(
+          children: [
+            Container(
+              width: 74,
+              height: 74,
+              decoration: BoxDecoration(
+                color: Colors.white,
+                borderRadius: BorderRadius.circular(18),
+              ),
+              child: Icon(icon, size: 34, color: AppColors.textPrimary),
+            ),
+            const SizedBox(height: 10),
+            Text(
+              title,
+              textAlign: TextAlign.center,
+              style: const TextStyle(
+                fontSize: 14,
+                fontWeight: FontWeight.w700,
+              ),
             ),
           ],
         ),

@@ -143,6 +143,7 @@ class _GuideMainShellState extends State<_GuideMainShell> {
         onOpenChat: _openMessages,
       ),
       GuideWorkbenchPage(
+        onOpenDutySettings: _openDutySettings,
         onOpenServiceOps: _openServiceOperations,
         onOpenPublish: _openPublish,
         onOpenDemandHall: _openDemandHall,
