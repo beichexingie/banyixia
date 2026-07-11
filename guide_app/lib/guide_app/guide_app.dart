@@ -4,7 +4,6 @@ import 'package:provider/provider.dart';
 import '../bootstrap/app_bootstrap.dart';
 import '../config/app_theme.dart';
 import '../pages/auth/login_page.dart';
-import '../pages/home/post_create_page.dart';
 import '../providers/demand_provider.dart';
 import '../providers/message_provider.dart';
 import '../providers/order_provider.dart';
@@ -18,11 +17,10 @@ import 'pages/guide_messages_page.dart';
 import 'pages/guide_order_center_page.dart';
 import 'pages/guide_placeholder_pages.dart';
 import 'pages/guide_profile_page.dart';
+import 'pages/guide_reference_page.dart';
 import 'pages/guide_route_page.dart';
-import 'pages/guide_select_service_page.dart';
 import 'pages/guide_service_location_page.dart';
 import 'pages/guide_service_type_page.dart';
-import 'pages/guide_workbench_page.dart';
 import 'providers/guide_console_provider.dart';
 
 class GuideApp extends StatelessWidget {
@@ -142,17 +140,12 @@ class _GuideMainShellState extends State<_GuideMainShell> {
         onOpenRoute: _openRoute,
         onOpenChat: _openMessages,
       ),
-      GuideWorkbenchPage(
-        onOpenServiceOps: _openServiceOperations,
-        onOpenPublish: _openPublish,
+      GuideReferencePage(
         onOpenDemandHall: _openDemandHall,
-        onOpenEmergencyContacts: _openEmergencyContacts,
-        onOpenServiceItems: _openSelectServicePage,
         onOpenAddressManager: _openServiceLocationPage,
-        onOpenReviewCenter: _openReviewCenter,
-        onOpenScheduleCenter: _openScheduleCenter,
+        onOpenMessages: _openMessages,
+        onOpenRoute: _openRoute,
       ),
-      const SizedBox.shrink(),
       const GuideMessagesPage(),
       GuideProfilePage(
         onOpenDutySettings: _openDutySettings,
@@ -165,20 +158,6 @@ class _GuideMainShellState extends State<_GuideMainShell> {
       body: IndexedStack(
         index: _currentIndex,
         children: pages,
-      ),
-      floatingActionButtonLocation: FloatingActionButtonLocation.centerDocked,
-      floatingActionButton: InkWell(
-        onTap: _openPublish,
-        borderRadius: BorderRadius.circular(24),
-        child: Container(
-          width: 84,
-          height: 62,
-          decoration: BoxDecoration(
-            color: AppColors.primary,
-            borderRadius: BorderRadius.circular(24),
-          ),
-          child: const Icon(Icons.add_rounded, size: 40, color: AppColors.textPrimary),
-        ),
       ),
       bottomNavigationBar: Container(
         decoration: const BoxDecoration(
@@ -203,20 +182,19 @@ class _GuideMainShellState extends State<_GuideMainShell> {
                 active: _currentIndex == 1,
                 onTap: () => setState(() => _currentIndex = 1),
               ),
-              const SizedBox(width: 86),
               _NavItem(
                 icon: Icons.forum_outlined,
                 activeIcon: Icons.forum_rounded,
                 label: '消息',
-                active: _currentIndex == 3,
-                onTap: () => setState(() => _currentIndex = 3),
+                active: _currentIndex == 2,
+                onTap: () => setState(() => _currentIndex = 2),
               ),
               _NavItem(
                 icon: Icons.person_outline_rounded,
                 activeIcon: Icons.person_rounded,
                 label: '我的',
-                active: _currentIndex == 4,
-                onTap: () => setState(() => _currentIndex = 4),
+                active: _currentIndex == 3,
+                onTap: () => setState(() => _currentIndex = 3),
               ),
             ],
           ),
@@ -226,15 +204,7 @@ class _GuideMainShellState extends State<_GuideMainShell> {
   }
 
   void _openMessages() {
-    setState(() => _currentIndex = 3);
-  }
-
-  Future<void> _openPublish() async {
-    await Navigator.of(context).push(
-      MaterialPageRoute(
-        builder: (_) => const PostCreatePage(mode: 'recruit'),
-      ),
-    );
+    setState(() => _currentIndex = 2);
   }
 
   Future<void> _openRoute() async {
@@ -276,12 +246,6 @@ class _GuideMainShellState extends State<_GuideMainShell> {
   Future<void> _openServiceLocationPage() async {
     await Navigator.of(context).push(
       MaterialPageRoute(builder: (_) => const GuideServiceLocationPage()),
-    );
-  }
-
-  Future<void> _openSelectServicePage() async {
-    await Navigator.of(context).push(
-      MaterialPageRoute(builder: (_) => const GuideSelectServicePage()),
     );
   }
 

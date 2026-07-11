@@ -27,14 +27,15 @@ class GuideConsoleHeader extends StatelessWidget {
     final user = context.watch<UserProvider>().user;
     final console = context.watch<GuideConsoleProvider>();
     final statusLabel = console.isOnline ? '在线中' : '下线中';
-    final sideButtonSize = compact ? 64.0 : 74.0;
     final compactId = user.id.replaceAll('-', '');
     final visibleId = compactId.isEmpty
         ? '1209384'
         : compactId.substring(0, compactId.length > 6 ? 6 : compactId.length);
 
-    return Row(
-      crossAxisAlignment: CrossAxisAlignment.start,
+    return Wrap(
+      spacing: 12,
+      runSpacing: 12,
+      crossAxisAlignment: WrapCrossAlignment.start,
       children: [
         ClipOval(
           child: Image.network(
@@ -52,8 +53,11 @@ class GuideConsoleHeader extends StatelessWidget {
             ),
           ),
         ),
-        const SizedBox(width: 14),
-        Expanded(
+        ConstrainedBox(
+          constraints: BoxConstraints(
+            minWidth: compact ? 180 : 210,
+            maxWidth: compact ? 220 : 260,
+          ),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
@@ -88,7 +92,10 @@ class GuideConsoleHeader extends StatelessWidget {
                 ],
               ),
               const SizedBox(height: 6),
-              Row(
+              Wrap(
+                spacing: 10,
+                runSpacing: 8,
+                crossAxisAlignment: WrapCrossAlignment.center,
                 children: [
                   Text(
                     'IP：$visibleId',
@@ -97,7 +104,6 @@ class GuideConsoleHeader extends StatelessWidget {
                       color: AppColors.textHint,
                     ),
                   ),
-                  const SizedBox(width: 10),
                   GuidePillButton(
                     label: statusLabel,
                     icon: Icons.remove_circle,
@@ -111,22 +117,17 @@ class GuideConsoleHeader extends StatelessWidget {
           ),
         ),
         if (!compact) ...[
-          const SizedBox(width: 10),
           _SideActionButton(
             icon: Icons.mark_chat_unread_outlined,
             label: '接单设置',
-            size: sideButtonSize,
             onTap: onSettingsTap,
           ),
-          const SizedBox(width: 10),
           _SideActionButton(
             icon: Icons.person_pin_circle_outlined,
             label: '专属运营',
-            size: sideButtonSize,
             onTap: onServiceOperationTap,
           ),
         ] else ...[
-          const SizedBox(width: 8),
           InkWell(
             onTap: onEmergencyTap,
             borderRadius: BorderRadius.circular(999),
@@ -158,13 +159,11 @@ class GuideConsoleHeader extends StatelessWidget {
 class _SideActionButton extends StatelessWidget {
   final IconData icon;
   final String label;
-  final double size;
   final VoidCallback? onTap;
 
   const _SideActionButton({
     required this.icon,
     required this.label,
-    required this.size,
     this.onTap,
   });
 
@@ -174,12 +173,12 @@ class _SideActionButton extends StatelessWidget {
       onTap: onTap,
       borderRadius: BorderRadius.circular(18),
       child: SizedBox(
-        width: size,
+        width: 74,
         child: Column(
           children: [
             Container(
-              width: size,
-              height: size,
+              width: 74,
+              height: 74,
               decoration: BoxDecoration(
                 color: const Color(0xFFF4F5F7),
                 borderRadius: BorderRadius.circular(18),
