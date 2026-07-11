@@ -5,6 +5,7 @@ import '../bootstrap/app_bootstrap.dart';
 import '../config/app_theme.dart';
 import '../pages/auth/login_page.dart';
 import '../pages/home/post_create_page.dart';
+import '../providers/demand_provider.dart';
 import '../providers/message_provider.dart';
 import '../providers/order_provider.dart';
 import '../providers/post_provider.dart';
@@ -38,6 +39,9 @@ class GuideApp extends StatelessWidget {
         ),
         ChangeNotifierProvider(
           create: (_) => PostProvider(sessionService: sessionService)..loadPosts(),
+        ),
+        ChangeNotifierProvider(
+          create: (_) => DemandProvider(sessionService: sessionService)..loadDemands(),
         ),
         ChangeNotifierProvider(
           create: (_) => OrderProvider(sessionService: sessionService)..loadOrders(),
