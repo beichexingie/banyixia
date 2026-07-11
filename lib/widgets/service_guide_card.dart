@@ -112,14 +112,14 @@ class ServiceGuideCard extends StatelessWidget {
                     ),
                   ),
                   const SizedBox(height: 14),
-                  Row(
+                  Wrap(
+                    spacing: 18,
+                    runSpacing: 12,
+                    crossAxisAlignment: WrapCrossAlignment.center,
                     children: [
                       _metric(Icons.favorite_border_rounded, '$likes'),
-                      const SizedBox(width: 24),
                       _metric(Icons.mode_comment_outlined, '$comments'),
-                      const SizedBox(width: 24),
                       _metric(Icons.star_border_rounded, '$favorites'),
-                      const Spacer(),
                       SizedBox(
                         height: 42,
                         child: ElevatedButton(
@@ -133,7 +133,7 @@ class ServiceGuideCard extends StatelessWidget {
                             shape: RoundedRectangleBorder(
                               borderRadius: BorderRadius.circular(999),
                             ),
-                            padding: const EdgeInsets.symmetric(horizontal: 22),
+                            padding: const EdgeInsets.symmetric(horizontal: 18),
                           ),
                           child: const Text(
                             '去下单',

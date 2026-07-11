@@ -466,7 +466,7 @@ class _HomePageState extends State<HomePage>
           borderRadius: BorderRadius.circular(999),
           child: Container(
             height: 58,
-            padding: const EdgeInsets.symmetric(horizontal: 24),
+            padding: const EdgeInsets.symmetric(horizontal: 16),
             decoration: BoxDecoration(
               color: Colors.white,
               borderRadius: BorderRadius.circular(999),
@@ -479,13 +479,19 @@ class _HomePageState extends State<HomePage>
               ],
             ),
             child: Row(
+              mainAxisSize: MainAxisSize.min,
               children: [
-                Text(
-                  _selectedCity,
-                  style: const TextStyle(
-                    fontSize: 18,
-                    fontWeight: FontWeight.w900,
-                    color: AppColors.textPrimary,
+                ConstrainedBox(
+                  constraints: const BoxConstraints(maxWidth: 78),
+                  child: Text(
+                    _selectedCity,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: const TextStyle(
+                      fontSize: 16,
+                      fontWeight: FontWeight.w900,
+                      color: AppColors.textPrimary,
+                    ),
                   ),
                 ),
                 const SizedBox(width: 7),
@@ -566,52 +572,52 @@ class _HomePageState extends State<HomePage>
 
   Widget _buildTabSelector() {
     const labels = ['推荐', '最新', '关注'];
-    return Row(
-      children: List.generate(labels.length, (index) {
-        final selected = _currentTab == index;
-        return Padding(
-          padding: EdgeInsets.only(right: index == labels.length - 1 ? 0 : 24),
-          child: GestureDetector(
-            onTap: () => _tabController.animateTo(index),
-            child: AnimatedContainer(
-              duration: const Duration(milliseconds: 180),
-              curve: Curves.easeOut,
-              height: 44,
-              padding: EdgeInsets.symmetric(
-                horizontal: selected ? 18 : 0,
-              ),
-              decoration: BoxDecoration(
-                color: selected ? AppColors.primary : Colors.transparent,
-                borderRadius: BorderRadius.circular(999),
-              ),
-              child: Row(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  if (selected && index == 0) ...[
-                    Image.asset(
-                      'assets/login/Group.png',
-                      width: 18,
-                      height: 34,
-                      fit: BoxFit.contain,
+    return SingleChildScrollView(
+      scrollDirection: Axis.horizontal,
+      physics: const BouncingScrollPhysics(),
+      child: Row(
+        children: List.generate(labels.length, (index) {
+          final selected = _currentTab == index;
+          return Padding(
+            padding: EdgeInsets.only(right: index == labels.length - 1 ? 0 : 24),
+            child: GestureDetector(
+              onTap: () => _tabController.animateTo(index),
+              child: AnimatedContainer(
+                duration: const Duration(milliseconds: 180),
+                curve: Curves.easeOut,
+                height: 44,
+                padding: EdgeInsets.symmetric(horizontal: selected ? 18 : 0),
+                decoration: BoxDecoration(
+                  color: selected ? AppColors.primary : Colors.transparent,
+                  borderRadius: BorderRadius.circular(999),
+                ),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    if (selected && index == 0) ...[
+                      Image.asset(
+                        'assets/login/Group.png',
+                        width: 18,
+                        height: 34,
+                        fit: BoxFit.contain,
+                      ),
+                      const SizedBox(width: 8),
+                    ],
+                    Text(
+                      labels[index],
+                      style: TextStyle(
+                        fontSize: 16,
+                        fontWeight: selected ? FontWeight.w900 : FontWeight.w700,
+                        color: selected ? AppColors.textPrimary : AppColors.textSecondary,
+                      ),
                     ),
-                    const SizedBox(width: 8),
                   ],
-                  Text(
-                    labels[index],
-                    style: TextStyle(
-                      fontSize: 17,
-                      fontWeight: selected ? FontWeight.w900 : FontWeight.w700,
-                      color: selected
-                          ? AppColors.textPrimary
-                          : AppColors.textSecondary,
-                    ),
-                  ),
-                ],
+                ),
               ),
             ),
-          ),
-        );
-      }),
+          );
+        }),
+      ),
     );
   }
 
@@ -700,10 +706,16 @@ class _HomePageState extends State<HomePage>
                 ],
               ),
             ),
-            const SizedBox(width: 8),
-            Align(
-              alignment: large ? Alignment.bottomRight : Alignment.centerRight,
-              child: illustration,
+            const SizedBox(width: 4),
+            Flexible(
+              child: Align(
+                alignment: large ? Alignment.bottomRight : Alignment.centerRight,
+                child: FittedBox(
+                  fit: BoxFit.scaleDown,
+                  alignment: Alignment.centerRight,
+                  child: illustration,
+                ),
+              ),
             ),
           ],
         ),
@@ -758,7 +770,7 @@ class _HomePageState extends State<HomePage>
               crossAxisCount: 2,
               mainAxisSpacing: 14,
               crossAxisSpacing: 14,
-              childAspectRatio: 0.61,
+              childAspectRatio: 0.68,
             ),
             itemCount: posts.length,
             itemBuilder: (context, index) => TravelCard(
@@ -799,7 +811,7 @@ class _HomePageState extends State<HomePage>
             crossAxisCount: 2,
             mainAxisSpacing: 14,
             crossAxisSpacing: 14,
-            childAspectRatio: 0.61,
+            childAspectRatio: 0.68,
           ),
           itemCount: posts.length,
           itemBuilder: (context, index) => TravelCard(

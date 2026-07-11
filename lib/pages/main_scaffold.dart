@@ -26,7 +26,7 @@ class _MainScaffoldState extends State<MainScaffold> {
   int _currentIndex = 0;
 
   static const List<Widget> _pages = [
-    CompanionPage(),
+    HomePage(),
     CompanionPage(),
     MessagesPage(),
     ProfilePage(),
@@ -221,7 +221,7 @@ class _MainScaffoldState extends State<MainScaffold> {
             children: [
               _navItem(
                 index: 0,
-                label: '推荐',
+                label: '广场',
                 icon: Icons.explore_outlined,
                 activeIcon: Icons.explore,
               ),
