@@ -17,6 +17,13 @@ class Order {
   final OrderStatus status;
   final double amount;
   final String serviceName;
+  final String serviceAddress;
+  final String serviceCity;
+  final double? serviceLat;
+  final double? serviceLng;
+  final int? distanceMeters;
+  final int? routeDistanceMeters;
+  final int? routeDurationSeconds;
   final String paymentMethod;
   final String paymentStatus;
   final String? paymentRequestId;
@@ -35,6 +42,13 @@ class Order {
     required this.status,
     required this.amount,
     this.serviceName = '',
+    this.serviceAddress = '',
+    this.serviceCity = '',
+    this.serviceLat,
+    this.serviceLng,
+    this.distanceMeters,
+    this.routeDistanceMeters,
+    this.routeDurationSeconds,
     this.paymentMethod = '',
     this.paymentStatus = '',
     this.paymentRequestId,
@@ -60,6 +74,13 @@ class Order {
       status: _parseStatus(json['status']),
       amount: _parseDouble(json['amount']) ?? 0,
       serviceName: json['service_name'] ?? '',
+      serviceAddress: json['service_address'] ?? '',
+      serviceCity: json['service_city'] ?? '',
+      serviceLat: _parseDouble(json['service_lat']),
+      serviceLng: _parseDouble(json['service_lng']),
+      distanceMeters: _parseInt(json['distance_meters']),
+      routeDistanceMeters: _parseInt(json['route_distance_meters']),
+      routeDurationSeconds: _parseInt(json['route_duration_seconds']),
       paymentMethod: json['payment_method'] ?? '',
       paymentStatus: json['payment_status'] ?? '',
       paymentRequestId: json['payment_request_id']?.toString(),
@@ -86,6 +107,10 @@ class Order {
       'status': status.index,
       'amount': amount,
       'service_name': serviceName,
+      'service_address': serviceAddress,
+      'service_city': serviceCity,
+      'service_lat': serviceLat,
+      'service_lng': serviceLng,
       'payment_method': paymentMethod,
       'payment_status': paymentStatus,
       if (paymentRequestId != null) 'payment_request_id': paymentRequestId,
@@ -112,6 +137,13 @@ class Order {
     OrderStatus? status,
     double? amount,
     String? serviceName,
+    String? serviceAddress,
+    String? serviceCity,
+    double? serviceLat,
+    double? serviceLng,
+    int? distanceMeters,
+    int? routeDistanceMeters,
+    int? routeDurationSeconds,
     String? paymentMethod,
     String? paymentStatus,
     String? paymentRequestId,
@@ -130,6 +162,13 @@ class Order {
       status: status ?? this.status,
       amount: amount ?? this.amount,
       serviceName: serviceName ?? this.serviceName,
+      serviceAddress: serviceAddress ?? this.serviceAddress,
+      serviceCity: serviceCity ?? this.serviceCity,
+      serviceLat: serviceLat ?? this.serviceLat,
+      serviceLng: serviceLng ?? this.serviceLng,
+      distanceMeters: distanceMeters ?? this.distanceMeters,
+      routeDistanceMeters: routeDistanceMeters ?? this.routeDistanceMeters,
+      routeDurationSeconds: routeDurationSeconds ?? this.routeDurationSeconds,
       paymentMethod: paymentMethod ?? this.paymentMethod,
       paymentStatus: paymentStatus ?? this.paymentStatus,
       paymentRequestId: paymentRequestId ?? this.paymentRequestId,
@@ -185,6 +224,19 @@ class Order {
     if (value is int) return value.toDouble();
     if (value is num) return value.toDouble();
     return double.tryParse(value?.toString() ?? '');
+  }
+
+  static int? _parseInt(dynamic value) {
+    if (value is int) return value;
+    if (value is num) return value.toInt();
+    return int.tryParse(value?.toString() ?? '');
+  }
+
+  String get distanceText {
+    final meters = routeDistanceMeters ?? distanceMeters;
+    if (meters == null) return '待定位';
+    if (meters < 1000) return '${meters}m';
+    return '${(meters / 1000).toStringAsFixed(1)}km';
   }
 
   String get statusLabel {

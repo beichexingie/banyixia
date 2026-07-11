@@ -43,6 +43,7 @@ export const config = {
   port: Number(process.env.PORT || 3000),
   databaseUrl: requireEnv('DATABASE_URL'),
   databaseSsl: parseBoolean(process.env.DATABASE_SSL, false),
+  amapWebServiceKey: process.env.AMAP_WEB_SERVICE_KEY?.trim() || '',
   alipayAppId: process.env.ALIPAY_APP_ID?.trim() || '',
   alipayPrivateKey: process.env.ALIPAY_PRIVATE_KEY?.trim() || '',
   alipayPublicKey: process.env.ALIPAY_PUBLIC_KEY?.trim() || '',

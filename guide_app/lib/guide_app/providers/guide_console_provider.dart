@@ -351,7 +351,9 @@ class GuideConsoleProvider extends ChangeNotifier {
         distanceText: _distanceTextForOrder(order),
         amount: order.amount,
         content: order.serviceName.isNotEmpty ? order.serviceName : '客户已提交服务需求，请尽快联系确认',
-        address: _currentLocation.summary,
+        address: order.serviceAddress.isNotEmpty
+            ? order.serviceAddress
+            : _currentLocation.summary,
         imageUrls: _mockOrderImages,
         primaryAction: primaryAction,
         serviceTime: order.serviceDate ?? order.createdAt.add(const Duration(hours: 6)),
@@ -410,6 +412,9 @@ class GuideConsoleProvider extends ChangeNotifier {
   }
 
   String _distanceTextForOrder(Order order) {
+    if ((order.routeDistanceMeters ?? order.distanceMeters) != null) {
+      return '距服务地 ${order.distanceText}';
+    }
     final seed = order.id.codeUnits.fold<int>(0, (sum, item) => sum + item);
     final kilometers = ((seed % 120) + 8) / 10;
     return '距服务地 ${kilometers.toStringAsFixed(1)}km';

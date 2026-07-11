@@ -22,6 +22,9 @@ class _OrderCreatePageState extends State<OrderCreatePage> {
 
   late final List<_ServiceOption> _serviceOptions;
   late String _selectedAddress;
+  double? _serviceLat;
+  double? _serviceLng;
+  String _serviceCity = '';
 
   DateTime _serviceDateTime = DateTime.now().add(
     const Duration(days: 1, hours: 2),
@@ -70,6 +73,7 @@ class _OrderCreatePageState extends State<OrderCreatePage> {
     _selectedAddress = widget.guide.city.isNotEmpty
         ? widget.guide.city
         : '待选择服务地点';
+    _serviceCity = widget.guide.city;
     _serviceOptions = _buildInitialServices();
   }
 
@@ -137,6 +141,12 @@ class _OrderCreatePageState extends State<OrderCreatePage> {
             result['summary']?.toString() ??
             result['address']?.toString() ??
             _selectedAddress;
+        _serviceCity =
+            result['city']?.toString().trim().isNotEmpty == true
+                ? result['city'].toString().trim()
+                : _serviceCity;
+        _serviceLat = (result['latitude'] as num?)?.toDouble();
+        _serviceLng = (result['longitude'] as num?)?.toDouble();
       });
     }
   }
@@ -495,6 +505,10 @@ class _OrderCreatePageState extends State<OrderCreatePage> {
         serviceName: detail.isEmpty
             ? serviceSummary
             : '$serviceSummary / $detail',
+        serviceAddress: _selectedAddress,
+        serviceCity: _serviceCity,
+        serviceLat: _serviceLat,
+        serviceLng: _serviceLng,
         paymentMethod: _paymentMethod,
         paymentStatus: 'pending',
         merchantOrderNo:

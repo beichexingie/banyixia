@@ -4,6 +4,8 @@ class DemandRequest {
   final String content;
   final String city;
   final String location;
+  final double? serviceLat;
+  final double? serviceLng;
   final DateTime serviceStartAt;
   final DateTime serviceEndAt;
   final int peopleCount;
@@ -25,6 +27,8 @@ class DemandRequest {
     required this.content,
     required this.city,
     required this.location,
+    this.serviceLat,
+    this.serviceLng,
     required this.serviceStartAt,
     required this.serviceEndAt,
     required this.peopleCount,
@@ -55,6 +59,8 @@ class DemandRequest {
       content: json['content'] ?? '',
       city: json['city'] ?? '',
       location: json['location'] ?? '',
+      serviceLat: _parseDouble(json['service_lat']),
+      serviceLng: _parseDouble(json['service_lng']),
       serviceStartAt: parseDate(json['service_start_at']),
       serviceEndAt: parseDate(
         json['service_end_at'],
@@ -89,6 +95,8 @@ class DemandRequest {
       'content': content,
       'city': city,
       'location': location,
+      'service_lat': serviceLat,
+      'service_lng': serviceLng,
       'service_start_at': serviceStartAt.toIso8601String(),
       'service_end_at': serviceEndAt.toIso8601String(),
       'people_count': peopleCount,
@@ -112,6 +120,8 @@ class DemandRequest {
     String? content,
     String? city,
     String? location,
+    double? serviceLat,
+    double? serviceLng,
     DateTime? serviceStartAt,
     DateTime? serviceEndAt,
     int? peopleCount,
@@ -133,6 +143,8 @@ class DemandRequest {
       content: content ?? this.content,
       city: city ?? this.city,
       location: location ?? this.location,
+      serviceLat: serviceLat ?? this.serviceLat,
+      serviceLng: serviceLng ?? this.serviceLng,
       serviceStartAt: serviceStartAt ?? this.serviceStartAt,
       serviceEndAt: serviceEndAt ?? this.serviceEndAt,
       peopleCount: peopleCount ?? this.peopleCount,
@@ -156,6 +168,11 @@ class DemandRequest {
     final end =
         '${serviceEndAt.month}月${serviceEndAt.day}日 ${serviceEndAt.hour.toString().padLeft(2, '0')}:${serviceEndAt.minute.toString().padLeft(2, '0')}';
     return '$start - $end';
+  }
+
+  static double? _parseDouble(dynamic value) {
+    if (value is num) return value.toDouble();
+    return double.tryParse(value?.toString() ?? '');
   }
 }
 

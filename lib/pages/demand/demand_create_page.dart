@@ -20,6 +20,8 @@ class _DemandCreatePageState extends State<DemandCreatePage> {
 
   String _city = '苏州';
   String _location = '';
+  double? _serviceLat;
+  double? _serviceLng;
   DateTime? _startAt;
   DateTime? _endAt;
   String _gender = '不限';
@@ -63,6 +65,8 @@ class _DemandCreatePageState extends State<DemandCreatePage> {
             result['address']?.toString() ??
             _location;
       }
+      _serviceLat = (result['latitude'] as num?)?.toDouble();
+      _serviceLng = (result['longitude'] as num?)?.toDouble();
     });
   }
 
@@ -84,6 +88,8 @@ class _DemandCreatePageState extends State<DemandCreatePage> {
           result['summary']?.toString() ??
           result['address']?.toString() ??
           _location;
+      _serviceLat = (result['latitude'] as num?)?.toDouble();
+      _serviceLng = (result['longitude'] as num?)?.toDouble();
     });
   }
 
@@ -588,6 +594,8 @@ class _DemandCreatePageState extends State<DemandCreatePage> {
         content: _contentController.text.trim(),
         city: _city,
         location: _location,
+        serviceLat: _serviceLat,
+        serviceLng: _serviceLng,
         serviceStartAt: _startAt!,
         serviceEndAt: _endAt!,
         peopleCount: peopleCount,

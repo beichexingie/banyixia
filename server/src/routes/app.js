@@ -104,6 +104,81 @@ function buildPublicUrl(req, relativePath) {
   return `${protocol}://${host}${relativePath}`;
 }
 
+function toNullableNumber(value) {
+  if (value == null || value === '') return null;
+  const parsed = Number.parseFloat(value.toString());
+  return Number.isFinite(parsed) ? parsed : null;
+}
+
+function haversineDistanceMeters(lat1, lng1, lat2, lng2) {
+  if ([lat1, lng1, lat2, lng2].some((item) => item == null)) {
+    return null;
+  }
+  const toRadians = (value) => (value * Math.PI) / 180;
+  const earthRadius = 6371000;
+  const dLat = toRadians(lat2 - lat1);
+  const dLng = toRadians(lng2 - lng1);
+  const a =
+    Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+    Math.cos(toRadians(lat1)) *
+      Math.cos(toRadians(lat2)) *
+      Math.sin(dLng / 2) *
+      Math.sin(dLng / 2);
+  const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+  return Math.round(earthRadius * c);
+}
+
+function withDistanceFields(row, guideLocation) {
+  if (!row) return row;
+  const serviceLat = toNullableNumber(row.service_lat);
+  const serviceLng = toNullableNumber(row.service_lng);
+  const guideLat = toNullableNumber(
+    guideLocation?.current_lat ?? row.current_lat ?? row.guide_current_lat,
+  );
+  const guideLng = toNullableNumber(
+    guideLocation?.current_lng ?? row.current_lng ?? row.guide_current_lng,
+  );
+  const straightDistanceMeters = haversineDistanceMeters(
+    guideLat,
+    guideLng,
+    serviceLat,
+    serviceLng,
+  );
+  return {
+    ...row,
+    service_lat: serviceLat,
+    service_lng: serviceLng,
+    guide_current_lat: guideLat,
+    guide_current_lng: guideLng,
+    distance_meters: row.distance_meters ?? straightDistanceMeters,
+    route_distance_meters:
+      row.route_distance_meters ?? straightDistanceMeters,
+    route_duration_seconds:
+      row.route_duration_seconds ??
+      (straightDistanceMeters == null
+        ? null
+        : Math.max(60, Math.round(straightDistanceMeters / 1.1))),
+  };
+}
+
+async function fetchGuideLocation(client, guideId) {
+  if (!guideId) return null;
+  const result = await client.query(
+    `
+      select
+        current_lat,
+        current_lng,
+        current_location_text,
+        location_updated_at
+      from public.guides
+      where id = $1
+      limit 1
+    `,
+    [guideId],
+  );
+  return result.rows[0] ?? null;
+}
+
 async function requireSessionUser(req, res) {
   const userId = getSessionUserId(req);
   if (!userId) {
@@ -924,9 +999,13 @@ appRouter.get('/posts/footprints', async (req, res) => {
   return ok(res, { data: result.rows });
 });
 
-appRouter.get('/demands', async (_req, res) => {
+appRouter.get('/demands', async (req, res) => {
+  const viewerId = getSessionUserId(req);
+  const guideLocation = viewerId ? await fetchGuideLocation(pool, viewerId) : null;
   const result = await pool.query(`select * from public.demands order by created_at desc`);
-  return ok(res, { data: result.rows });
+  return ok(res, {
+    data: result.rows.map((row) => withDistanceFields(row, guideLocation)),
+  });
 });
 
 appRouter.get('/demands/me', async (req, res) => {
@@ -941,12 +1020,19 @@ appRouter.get('/demands/me', async (req, res) => {
     `,
     [userId],
   );
-  return ok(res, { data: result.rows });
+  return ok(res, {
+    data: result.rows.map((row) => ({
+      ...row,
+      service_lat: toNullableNumber(row.service_lat),
+      service_lng: toNullableNumber(row.service_lng),
+    })),
+  });
 });
 
 appRouter.get('/demands/applied', async (req, res) => {
   const userId = await requireSessionUser(req, res);
   if (!userId) return;
+  const guideLocation = await fetchGuideLocation(pool, userId);
   const result = await pool.query(
     `
       select
@@ -962,10 +1048,14 @@ appRouter.get('/demands/applied', async (req, res) => {
     `,
     [userId],
   );
-  return ok(res, { data: result.rows });
+  return ok(res, {
+    data: result.rows.map((row) => withDistanceFields(row, guideLocation)),
+  });
 });
 
 appRouter.get('/demands/:id', async (req, res) => {
+  const viewerId = getSessionUserId(req);
+  const guideLocation = viewerId ? await fetchGuideLocation(pool, viewerId) : null;
   const demandResult = await pool.query(
     `select * from public.demands where id = $1 limit 1`,
     [req.params.id],
@@ -985,7 +1075,7 @@ appRouter.get('/demands/:id', async (req, res) => {
 
   return ok(res, {
     data: {
-      ...demand,
+      ...withDistanceFields(demand, guideLocation),
       applications: applications.rows,
     },
   });
@@ -998,11 +1088,11 @@ appRouter.post('/demands', async (req, res) => {
   const result = await pool.query(
     `
       insert into public.demands (
-        title, content, city, location, service_start_at, service_end_at,
+        title, content, city, location, service_lat, service_lng, service_start_at, service_end_at,
         people_count, gender, budget, status, author_id, author_name,
         author_avatar, tags
       ) values (
-        $1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14::text[]
+        $1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16::text[]
       ) returning *
     `,
     [
@@ -1010,6 +1100,8 @@ appRouter.post('/demands', async (req, res) => {
       payload.content,
       payload.city,
       payload.location,
+      toNullableNumber(payload.service_lat),
+      toNullableNumber(payload.service_lng),
       payload.service_start_at,
       payload.service_end_at,
       payload.people_count,
@@ -1022,7 +1114,13 @@ appRouter.post('/demands', async (req, res) => {
       payload.tags ?? [],
     ],
   );
-  return ok(res, { data: result.rows[0] });
+  return ok(res, {
+    data: {
+      ...result.rows[0],
+      service_lat: toNullableNumber(result.rows[0].service_lat),
+      service_lng: toNullableNumber(result.rows[0].service_lng),
+    },
+  });
 });
 
 appRouter.post('/demands/:id/apply', async (req, res) => {
@@ -1130,6 +1228,8 @@ appRouter.post('/demands/:id/select-guide', async (req, res) => {
   const application = applicationResult.rows[0];
   if (!application) return fail(res, 404, '报名记录不存在');
 
+  const selectedGuideLocation = await fetchGuideLocation(pool, application.guide_id);
+
   const created = await withTransaction(async (client) => {
     await client.query(
       `update public.demand_applications set status = 'selected' where id = $1`,
@@ -1147,8 +1247,9 @@ appRouter.post('/demands/:id/select-guide', async (req, res) => {
       `
         insert into public.orders (
           user_id, guide_id, guide_name, guide_avatar, status, amount,
-          service_name, service_date, payment_method, payment_status, created_at
-        ) values ($1,$2,$3,$4,$5,$6,$7,$8,'alipay','pending', now())
+          service_name, service_address, service_city, service_lat, service_lng,
+          service_date, payment_method, payment_status, created_at
+        ) values ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,'alipay','pending', now())
         returning *
       `,
       [
@@ -1159,10 +1260,14 @@ appRouter.post('/demands/:id/select-guide', async (req, res) => {
         0,
         Number.parseFloat(payload.amount?.toString() ?? '') || 0,
         demand.title ?? demand.content ?? '地陪服务订单',
+        demand.location ?? '',
+        demand.city ?? '',
+        toNullableNumber(demand.service_lat),
+        toNullableNumber(demand.service_lng),
         demand.service_start_at,
       ],
     );
-    return orderResult.rows[0];
+    return withDistanceFields(orderResult.rows[0], selectedGuideLocation);
   });
 
   return ok(res, { data: created, message: '已选定地陪并生成订单' });
@@ -1258,7 +1363,12 @@ appRouter.get('/orders', handleRoute(async (req, res) => {
     `,
     [userId],
   );
-  return ok(res, { data: result.rows });
+  const enriched = [];
+  for (const row of result.rows) {
+    const guideLocation = await fetchGuideLocation(pool, row.guide_id);
+    enriched.push(withDistanceFields(row, guideLocation));
+  }
+  return ok(res, { data: enriched });
 }));
 
 appRouter.post('/orders', handleRoute(async (req, res) => {
@@ -1273,9 +1383,10 @@ appRouter.post('/orders', handleRoute(async (req, res) => {
     `
       insert into public.orders (
         user_id, guide_id, guide_name, guide_avatar, status, amount,
-        service_name, payment_method, payment_status, merchant_order_no, created_at
+        service_name, service_address, service_city, service_lat, service_lng,
+        service_date, payment_method, payment_status, merchant_order_no, created_at
       )
-      values ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10, now())
+      values ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14, now())
       returning *
     `,
     [
@@ -1286,12 +1397,18 @@ appRouter.post('/orders', handleRoute(async (req, res) => {
       payload.status ?? 0,
       payload.amount ?? 0,
       payload.serviceName ?? payload.service_name ?? '',
+      payload.serviceAddress ?? payload.service_address ?? '',
+      payload.serviceCity ?? payload.service_city ?? '',
+      toNullableNumber(payload.serviceLat ?? payload.service_lat),
+      toNullableNumber(payload.serviceLng ?? payload.service_lng),
+      payload.serviceDate ?? payload.service_date ?? null,
       payload.paymentMethod ?? payload.payment_method ?? 'alipay',
       payload.paymentStatus ?? payload.payment_status ?? 'pending',
       payload.merchantOrderNo ?? payload.merchant_order_no ?? null,
     ],
   );
-  return ok(res, { data: result.rows[0] });
+  const guideLocation = await fetchGuideLocation(pool, guideId);
+  return ok(res, { data: withDistanceFields(result.rows[0], guideLocation) });
 }));
 
 appRouter.put('/orders/:id', handleRoute(async (req, res) => {
@@ -1419,6 +1536,42 @@ appRouter.post('/guide-applications', async (req, res) => {
   );
   return ok(res, { data: result.rows[0] });
 });
+
+appRouter.put('/guides/me/location', handleRoute(async (req, res) => {
+  const userId = await requireSessionUser(req, res);
+  if (!userId) return;
+  const payload = req.body ?? {};
+  const result = await pool.query(
+    `
+      update public.guides
+      set
+        current_lat = $2,
+        current_lng = $3,
+        current_location_text = coalesce($4, current_location_text),
+        location_updated_at = now()
+      where id = $1
+      returning *
+    `,
+    [
+      userId,
+      toNullableNumber(payload.latitude ?? payload.current_lat),
+      toNullableNumber(payload.longitude ?? payload.current_lng),
+      payload.location_text?.toString() ??
+          payload.current_location_text?.toString() ??
+          null,
+    ],
+  );
+  if (!result.rows[0]) {
+    return fail(res, 404, 'guide not found');
+  }
+  return ok(res, {
+    data: {
+      ...result.rows[0],
+      current_lat: toNullableNumber(result.rows[0].current_lat),
+      current_lng: toNullableNumber(result.rows[0].current_lng),
+    },
+  });
+}));
 
 appRouter.get('/admin/guide-applications', async (_req, res) => {
   const result = await pool.query(`select * from public.guide_applications where status = 'pending' order by created_at desc`);

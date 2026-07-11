@@ -448,6 +448,8 @@ create table if not exists public.demands (
   content text not null,
   city text not null,
   location text not null,
+  service_lat double precision,
+  service_lng double precision,
   service_start_at timestamptz not null,
   service_end_at timestamptz not null,
   people_count integer not null default 1,
@@ -468,6 +470,8 @@ alter table if exists public.demands
   add column if not exists content text,
   add column if not exists city text,
   add column if not exists location text,
+  add column if not exists service_lat double precision,
+  add column if not exists service_lng double precision,
   add column if not exists service_start_at timestamptz,
   add column if not exists service_end_at timestamptz,
   add column if not exists people_count integer default 1,
@@ -585,6 +589,13 @@ create table if not exists public.orders (
   status integer default 0,
   amount double precision not null default 0.0,
   service_name text default '',
+  service_address text default '',
+  service_city text default '',
+  service_lat double precision,
+  service_lng double precision,
+  distance_meters integer,
+  route_distance_meters integer,
+  route_duration_seconds integer,
   service_date timestamptz,
   payment_method text default 'alipay',
   payment_status text default 'pending',
@@ -603,6 +614,13 @@ alter table if exists public.orders
   add column if not exists status integer default 0,
   add column if not exists amount double precision default 0.0,
   add column if not exists service_name text default '',
+  add column if not exists service_address text default '',
+  add column if not exists service_city text default '',
+  add column if not exists service_lat double precision,
+  add column if not exists service_lng double precision,
+  add column if not exists distance_meters integer,
+  add column if not exists route_distance_meters integer,
+  add column if not exists route_duration_seconds integer,
   add column if not exists service_date timestamptz,
   add column if not exists payment_method text default 'alipay',
   add column if not exists payment_status text default 'pending',
@@ -634,6 +652,12 @@ where o.ctid = r.ctid
 create unique index if not exists idx_orders_merchant_order_no
   on public.orders (merchant_order_no)
   where merchant_order_no is not null;
+
+alter table if exists public.guides
+  add column if not exists current_lat double precision,
+  add column if not exists current_lng double precision,
+  add column if not exists current_location_text text,
+  add column if not exists location_updated_at timestamptz;
 
 -- ---------------------------------------------------------------------------
 -- Chat / wallet tables
