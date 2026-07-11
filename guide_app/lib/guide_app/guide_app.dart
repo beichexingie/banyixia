@@ -4,6 +4,7 @@ import 'package:provider/provider.dart';
 import '../bootstrap/app_bootstrap.dart';
 import '../config/app_theme.dart';
 import '../pages/auth/login_page.dart';
+import '../pages/home/post_create_page.dart';
 import '../providers/demand_provider.dart';
 import '../providers/message_provider.dart';
 import '../providers/order_provider.dart';
@@ -17,10 +18,11 @@ import 'pages/guide_messages_page.dart';
 import 'pages/guide_order_center_page.dart';
 import 'pages/guide_placeholder_pages.dart';
 import 'pages/guide_profile_page.dart';
-import 'pages/guide_reference_page.dart';
 import 'pages/guide_route_page.dart';
+import 'pages/guide_select_service_page.dart';
 import 'pages/guide_service_location_page.dart';
 import 'pages/guide_service_type_page.dart';
+import 'pages/guide_workbench_page.dart';
 import 'providers/guide_console_provider.dart';
 
 class GuideApp extends StatelessWidget {
@@ -140,16 +142,27 @@ class _GuideMainShellState extends State<_GuideMainShell> {
         onOpenRoute: _openRoute,
         onOpenChat: _openMessages,
       ),
-      GuideReferencePage(
+      GuideWorkbenchPage(
+        onOpenServiceOps: _openServiceOperations,
+        onOpenPublish: _openPublish,
         onOpenDemandHall: _openDemandHall,
+        onOpenEmergencyContacts: _openEmergencyContacts,
+        onOpenServiceItems: _openSelectServicePage,
         onOpenAddressManager: _openServiceLocationPage,
-        onOpenMessages: _openMessages,
-        onOpenRoute: _openRoute,
+        onOpenReviewCenter: _openReviewCenter,
+        onOpenScheduleCenter: _openScheduleCenter,
+        onOpenPromotionCenter: _openPromotionCenter,
+        onOpenTaskCenter: _openTaskCenter,
+        onOpenTrainingCenter: _openTrainingCenter,
       ),
+      const SizedBox.shrink(),
       const GuideMessagesPage(),
       GuideProfilePage(
         onOpenDutySettings: _openDutySettings,
         onOpenAddressManager: _openServiceLocationPage,
+        onOpenCityPicker: _openCityPage,
+        onOpenCertification: _openCertificationPage,
+        onOpenPlatformRules: _openPlatformRulesPage,
       ),
     ];
 
@@ -158,6 +171,20 @@ class _GuideMainShellState extends State<_GuideMainShell> {
       body: IndexedStack(
         index: _currentIndex,
         children: pages,
+      ),
+      floatingActionButtonLocation: FloatingActionButtonLocation.centerDocked,
+      floatingActionButton: InkWell(
+        onTap: _openPublish,
+        borderRadius: BorderRadius.circular(24),
+        child: Container(
+          width: 84,
+          height: 62,
+          decoration: BoxDecoration(
+            color: AppColors.primary,
+            borderRadius: BorderRadius.circular(24),
+          ),
+          child: const Icon(Icons.add_rounded, size: 40, color: AppColors.textPrimary),
+        ),
       ),
       bottomNavigationBar: Container(
         decoration: const BoxDecoration(
@@ -182,19 +209,20 @@ class _GuideMainShellState extends State<_GuideMainShell> {
                 active: _currentIndex == 1,
                 onTap: () => setState(() => _currentIndex = 1),
               ),
+              const SizedBox(width: 86),
               _NavItem(
                 icon: Icons.forum_outlined,
                 activeIcon: Icons.forum_rounded,
                 label: '消息',
-                active: _currentIndex == 2,
-                onTap: () => setState(() => _currentIndex = 2),
+                active: _currentIndex == 3,
+                onTap: () => setState(() => _currentIndex = 3),
               ),
               _NavItem(
                 icon: Icons.person_outline_rounded,
                 activeIcon: Icons.person_rounded,
                 label: '我的',
-                active: _currentIndex == 3,
-                onTap: () => setState(() => _currentIndex = 3),
+                active: _currentIndex == 4,
+                onTap: () => setState(() => _currentIndex = 4),
               ),
             ],
           ),
@@ -204,7 +232,15 @@ class _GuideMainShellState extends State<_GuideMainShell> {
   }
 
   void _openMessages() {
-    setState(() => _currentIndex = 2);
+    setState(() => _currentIndex = 3);
+  }
+
+  Future<void> _openPublish() async {
+    await Navigator.of(context).push(
+      MaterialPageRoute(
+        builder: (_) => const PostCreatePage(mode: 'recruit'),
+      ),
+    );
   }
 
   Future<void> _openRoute() async {
@@ -246,6 +282,12 @@ class _GuideMainShellState extends State<_GuideMainShell> {
   Future<void> _openServiceLocationPage() async {
     await Navigator.of(context).push(
       MaterialPageRoute(builder: (_) => const GuideServiceLocationPage()),
+    );
+  }
+
+  Future<void> _openSelectServicePage() async {
+    await Navigator.of(context).push(
+      MaterialPageRoute(builder: (_) => const GuideSelectServicePage()),
     );
   }
 
@@ -298,6 +340,66 @@ class _GuideMainShellState extends State<_GuideMainShell> {
           title: '时间管理',
           message: '这里后续可以接日历排班、请假、接单时段和黑名单时间段配置。',
           icon: Icons.calendar_month_outlined,
+        ),
+      ),
+    );
+  }
+
+  Future<void> _openPromotionCenter() async {
+    await Navigator.of(context).push(
+      MaterialPageRoute(
+        builder: (_) => const GuidePlaceholderPage(
+          title: '拉新赚钱',
+          message: '这里后续可以接邀请收益、分佣记录、邀请码和推广素材。',
+          icon: Icons.campaign_outlined,
+        ),
+      ),
+    );
+  }
+
+  Future<void> _openTaskCenter() async {
+    await Navigator.of(context).push(
+      MaterialPageRoute(
+        builder: (_) => const GuidePlaceholderPage(
+          title: '任务中心',
+          message: '这里后续可以接签到任务、成长任务、奖励进度和任务明细。',
+          icon: Icons.task_alt_rounded,
+        ),
+      ),
+    );
+  }
+
+  Future<void> _openTrainingCenter() async {
+    await Navigator.of(context).push(
+      MaterialPageRoute(
+        builder: (_) => const GuidePlaceholderPage(
+          title: '培训中心',
+          message: '这里后续可以接培训课程、考试记录、上岗指南和常见问题。',
+          icon: Icons.school_outlined,
+        ),
+      ),
+    );
+  }
+
+  Future<void> _openCertificationPage() async {
+    await Navigator.of(context).push(
+      MaterialPageRoute(
+        builder: (_) => const GuidePlaceholderPage(
+          title: '认证资料',
+          message: '这里后续可以接实名认证、从业资料、审核进度和补件入口。',
+          icon: Icons.badge_outlined,
+        ),
+      ),
+    );
+  }
+
+  Future<void> _openPlatformRulesPage() async {
+    await Navigator.of(context).push(
+      MaterialPageRoute(
+        builder: (_) => const GuidePlaceholderPage(
+          title: '平台规则',
+          message: '这里后续可以接接单规则、服务规范、违规说明和申诉指引。',
+          icon: Icons.policy_outlined,
         ),
       ),
     );

@@ -15,6 +15,9 @@ class GuideWorkbenchPage extends StatelessWidget {
   final VoidCallback onOpenAddressManager;
   final VoidCallback onOpenReviewCenter;
   final VoidCallback onOpenScheduleCenter;
+  final VoidCallback onOpenPromotionCenter;
+  final VoidCallback onOpenTaskCenter;
+  final VoidCallback onOpenTrainingCenter;
 
   const GuideWorkbenchPage({
     super.key,
@@ -26,6 +29,9 @@ class GuideWorkbenchPage extends StatelessWidget {
     required this.onOpenAddressManager,
     required this.onOpenReviewCenter,
     required this.onOpenScheduleCenter,
+    required this.onOpenPromotionCenter,
+    required this.onOpenTaskCenter,
+    required this.onOpenTrainingCenter,
   });
 
   @override
@@ -136,6 +142,7 @@ class GuideWorkbenchPage extends StatelessWidget {
                     foregroundColor: console.taskCards[0].foregroundColor,
                     buttonLabel: '立即邀请',
                     tall: true,
+                    onTap: onOpenPromotionCenter,
                   ),
                 ),
                 const SizedBox(width: 16),
@@ -148,6 +155,8 @@ class GuideWorkbenchPage extends StatelessWidget {
                         icon: console.taskCards[1].icon,
                         backgroundColor: console.taskCards[1].backgroundColor,
                         foregroundColor: console.taskCards[1].foregroundColor,
+                        buttonLabel: '查看任务',
+                        onTap: onOpenTaskCenter,
                       ),
                       const SizedBox(height: 16),
                       _BigTaskCard(
@@ -156,6 +165,8 @@ class GuideWorkbenchPage extends StatelessWidget {
                         icon: console.taskCards[2].icon,
                         backgroundColor: console.taskCards[2].backgroundColor,
                         foregroundColor: console.taskCards[2].foregroundColor,
+                        buttonLabel: '进入培训',
+                        onTap: onOpenTrainingCenter,
                       ),
                     ],
                   ),
@@ -345,6 +356,7 @@ class _BigTaskCard extends StatelessWidget {
   final Color foregroundColor;
   final String? buttonLabel;
   final bool tall;
+  final VoidCallback? onTap;
 
   const _BigTaskCard({
     required this.title,
@@ -354,69 +366,74 @@ class _BigTaskCard extends StatelessWidget {
     required this.foregroundColor,
     this.buttonLabel,
     this.tall = false,
+    this.onTap,
   });
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-      height: tall ? 286 : 135,
-      padding: const EdgeInsets.all(20),
-      decoration: BoxDecoration(
-        color: backgroundColor,
-        borderRadius: BorderRadius.circular(28),
-      ),
-      child: Stack(
-        children: [
-          Positioned(
-            left: 0,
-            top: 0,
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  title,
-                  style: TextStyle(
-                    fontSize: tall ? 26 : 22,
-                    fontWeight: FontWeight.w900,
-                    color: foregroundColor,
-                  ),
-                ),
-                const SizedBox(height: 10),
-                Text(
-                  subtitle,
-                  style: TextStyle(
-                    fontSize: 16,
-                    color: foregroundColor,
-                    height: 1.4,
-                  ),
-                ),
-                if (buttonLabel != null) ...[
-                  const SizedBox(height: 20),
-                  Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 10),
-                    decoration: const BoxDecoration(
-                      color: Colors.black,
-                      borderRadius: BorderRadius.all(Radius.circular(999)),
+    return InkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(28),
+      child: Container(
+        height: tall ? 286 : 135,
+        padding: const EdgeInsets.all(20),
+        decoration: BoxDecoration(
+          color: backgroundColor,
+          borderRadius: BorderRadius.circular(28),
+        ),
+        child: Stack(
+          children: [
+            Positioned(
+              left: 0,
+              top: 0,
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    title,
+                    style: TextStyle(
+                      fontSize: tall ? 26 : 22,
+                      fontWeight: FontWeight.w900,
+                      color: foregroundColor,
                     ),
-                    child: const Text(
-                      '立即邀请',
-                      style: TextStyle(
-                        fontSize: 16,
-                        fontWeight: FontWeight.w900,
-                        color: Colors.white,
+                  ),
+                  const SizedBox(height: 10),
+                  Text(
+                    subtitle,
+                    style: TextStyle(
+                      fontSize: 16,
+                      color: foregroundColor,
+                      height: 1.4,
+                    ),
+                  ),
+                  if (buttonLabel != null) ...[
+                    const SizedBox(height: 20),
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 10),
+                      decoration: const BoxDecoration(
+                        color: Colors.black,
+                        borderRadius: BorderRadius.all(Radius.circular(999)),
+                      ),
+                      child: Text(
+                        buttonLabel!,
+                        style: const TextStyle(
+                          fontSize: 16,
+                          fontWeight: FontWeight.w900,
+                          color: Colors.white,
+                        ),
                       ),
                     ),
-                  ),
+                  ],
                 ],
-              ],
+              ),
             ),
-          ),
-          Positioned(
-            right: 0,
-            bottom: 0,
-            child: Icon(icon, size: tall ? 120 : 74, color: foregroundColor),
-          ),
-        ],
+            Positioned(
+              right: 0,
+              bottom: 0,
+              child: Icon(icon, size: tall ? 120 : 74, color: foregroundColor),
+            ),
+          ],
+        ),
       ),
     );
   }

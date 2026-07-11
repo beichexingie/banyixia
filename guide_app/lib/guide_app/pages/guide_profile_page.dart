@@ -9,11 +9,17 @@ import '../widgets/guide_app_shell.dart';
 class GuideProfilePage extends StatelessWidget {
   final VoidCallback onOpenDutySettings;
   final VoidCallback onOpenAddressManager;
+  final VoidCallback onOpenCityPicker;
+  final VoidCallback onOpenCertification;
+  final VoidCallback onOpenPlatformRules;
 
   const GuideProfilePage({
     super.key,
     required this.onOpenDutySettings,
     required this.onOpenAddressManager,
+    required this.onOpenCityPicker,
+    required this.onOpenCertification,
+    required this.onOpenPlatformRules,
   });
 
   @override
@@ -69,11 +75,7 @@ class GuideProfilePage extends StatelessWidget {
                         const SizedBox(width: 10),
                         GuidePillButton(
                           label: console.selectedCity,
-                          onTap: () {
-                            ScaffoldMessenger.of(context).showSnackBar(
-                              SnackBar(content: Text('当前服务城市：${console.selectedCity}')),
-                            );
-                          },
+                          onTap: onOpenCityPicker,
                           color: Colors.white,
                         ),
                       ],
@@ -109,11 +111,7 @@ class GuideProfilePage extends StatelessWidget {
                 _ProfileRow(
                   icon: Icons.badge_outlined,
                   title: '认证资料',
-                  onTap: () {
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      const SnackBar(content: Text('认证资料页已预留，后续接真实审核资料')),
-                    );
-                  },
+                  onTap: onOpenCertification,
                 ),
                 const Divider(height: 1),
                 _ProfileRow(
@@ -125,11 +123,7 @@ class GuideProfilePage extends StatelessWidget {
                 _ProfileRow(
                   icon: Icons.policy_outlined,
                   title: '平台规则',
-                  onTap: () {
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      const SnackBar(content: Text('平台规则页已预留')),
-                    );
-                  },
+                  onTap: onOpenPlatformRules,
                 ),
               ],
             ),
