@@ -69,12 +69,16 @@ class GuideWorkbenchPage extends StatelessWidget {
                   const Expanded(
                     child: Text(
                       'hi～我是你的一点伴专属运营',
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
                       style: TextStyle(
                         fontSize: 18,
                         fontWeight: FontWeight.w900,
+                        height: 1.3,
                       ),
                     ),
                   ),
+                  const SizedBox(width: 12),
                   GuidePillButton(
                     label: '联系运营',
                     icon: Icons.mark_chat_unread_outlined,
@@ -256,11 +260,15 @@ class _StatsCard extends StatelessWidget {
                   ),
                 ),
                 const SizedBox(height: 26),
-                Row(
+                Wrap(
+                  spacing: 12,
+                  runSpacing: 18,
                   children: items
                       .map(
-                        (item) => Expanded(
+                        (item) => SizedBox(
+                          width: 64,
                           child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
                               Text(
                                 item.$1,
@@ -270,16 +278,20 @@ class _StatsCard extends StatelessWidget {
                                 ),
                               ),
                               const SizedBox(height: 10),
-                              Text(
-                                item.$2,
-                                style: const TextStyle(
-                                  fontSize: 32,
-                                  fontWeight: FontWeight.w900,
+                              FittedBox(
+                                fit: BoxFit.scaleDown,
+                                alignment: Alignment.centerLeft,
+                                child: Text(
+                                  item.$2,
+                                  style: const TextStyle(
+                                    fontSize: 32,
+                                    fontWeight: FontWeight.w900,
+                                  ),
                                 ),
                               ),
                               const SizedBox(height: 6),
                               const Text(
-                                '昨日',
+                                '累计',
                                 style: TextStyle(
                                   fontSize: 15,
                                   color: AppColors.textSecondary,

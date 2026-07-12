@@ -57,32 +57,32 @@ class GuideConsoleProvider extends ChangeNotifier {
   final List<GuideServiceOption> _serviceOptions = [
     GuideServiceOption(
       id: 'relax_1',
-      name: '休闲游玩',
-      description: '这是详情这是详情这是详情这是详情这是详情这是详情...',
+      name: '城市漫步陪同',
+      description: '适合半日或一日轻松出行，含路线建议、景点串联与拍照打卡陪同。',
       pricePerDay: 400,
       imageUrl: 'https://images.unsplash.com/photo-1506744038136-46273834b3fb?auto=format&fit=crop&w=320&q=80',
       count: 1,
     ),
     GuideServiceOption(
       id: 'relax_2',
-      name: '休闲游玩',
-      description: '这是详情这是详情这是详情这是详情这是详情这是详情...',
+      name: '美食探店陪同',
+      description: '根据客户口味与时间安排本地探店路线，适合情侣、朋友和亲子出行。',
       pricePerDay: 400,
       imageUrl: 'https://images.unsplash.com/photo-1500530855697-b586d89ba3ee?auto=format&fit=crop&w=320&q=80',
       count: 1,
     ),
     GuideServiceOption(
       id: 'relax_3',
-      name: '休闲游玩',
-      description: '这是详情这是详情这是详情这是详情这是详情这是详情...',
+      name: '夜游行程陪同',
+      description: '偏向夜景、散步、拍照与轻社交氛围，适合晚间短时段服务。',
       pricePerDay: 400,
       imageUrl: 'https://images.unsplash.com/photo-1493246507139-91e8fad9978e?auto=format&fit=crop&w=320&q=80',
       count: 1,
     ),
     GuideServiceOption(
       id: 'relax_4',
-      name: '休闲游玩',
-      description: '这是详情这是详情这是详情这是详情这是详情这是详情...',
+      name: '定制陪同服务',
+      description: '根据客户目的地、节奏和人数做个性化安排，适合高客单定制单。',
       pricePerDay: 400,
       imageUrl: 'https://images.unsplash.com/photo-1469474968028-56623f02e42e?auto=format&fit=crop&w=320&q=80',
       count: 1,
@@ -107,13 +107,15 @@ class GuideConsoleProvider extends ChangeNotifier {
   List<GuideServiceType> get serviceTypeList => GuideServiceType.values;
   List<GuideDutyMode> get modeList => GuideDutyMode.values;
 
-  GuideWorkbenchStats get stats => const GuideWorkbenchStats(
-        totalOrders: 1290,
-        completedOrders: 880,
-        positiveReviews: 10,
-        cancelOrders: 2,
-        cancellationRate: 20,
-      );
+  GuideWorkbenchStats _stats = const GuideWorkbenchStats(
+    totalOrders: 0,
+    completedOrders: 0,
+    positiveReviews: 0,
+    cancelOrders: 0,
+    cancellationRate: 0,
+  );
+
+  GuideWorkbenchStats get stats => _stats;
 
   List<GuideDashboardShortcut> get shortcuts => const [
         GuideDashboardShortcut(
@@ -350,7 +352,7 @@ class GuideConsoleProvider extends ChangeNotifier {
         etaText: _etaTextForOrder(order),
         distanceText: _distanceTextForOrder(order),
         amount: order.amount,
-        content: order.serviceName.isNotEmpty ? order.serviceName : '客户已提交服务需求，请尽快联系确认',
+        content: _contentForOrder(order),
         address: order.serviceAddress.isNotEmpty
             ? order.serviceAddress
             : _currentLocation.summary,
@@ -372,11 +374,11 @@ class GuideConsoleProvider extends ChangeNotifier {
           etaText: '剩余：5小时23分钟',
           distanceText: '距服务地 2.3km',
           amount: 480,
-          content: '订单内容订单内容订单内容订单内容订单内容订单内容订单内容订单内容',
-          address: '这是订单地址这是订单地址这是订单地址...',
+          content: '苏州平江路半日陪同，客户希望安排轻松路线，含拍照打卡与晚餐建议。',
+          address: '苏州市姑苏区平江路历史街区游客中心',
           serviceCity: '苏州',
-          serviceLat: 31.3126,
-          serviceLng: 120.6424,
+          serviceLat: 31.3202,
+          serviceLng: 120.6336,
           imageUrls: _mockOrderImages,
           primaryAction: GuideOrderAction.arrived,
           serviceTime: DateTime.now().add(const Duration(hours: 5)),
@@ -388,11 +390,11 @@ class GuideConsoleProvider extends ChangeNotifier {
           etaText: '剩余：5小时23分钟',
           distanceText: '距服务地 8.6km',
           amount: 480,
-          content: '订单内容订单内容订单内容订单内容订单内容订单内容订单内容订单内容',
-          address: '这是订单地址这是订单地址这是订单地址...',
+          content: '金鸡湖夜游定制单，客户两人出行，希望包含拍照点和夜景路线建议。',
+          address: '苏州市工业园区金鸡湖音乐喷泉广场',
           serviceCity: '苏州',
-          serviceLat: 31.3026,
-          serviceLng: 120.6745,
+          serviceLat: 31.3148,
+          serviceLng: 120.7072,
           imageUrls: _mockOrderImages,
           primaryAction: GuideOrderAction.goToService,
           serviceTime: DateTime.now().add(const Duration(hours: 7)),
@@ -429,6 +431,16 @@ class GuideConsoleProvider extends ChangeNotifier {
     return '距服务地 ${kilometers.toStringAsFixed(1)}km';
   }
 
+  String _contentForOrder(Order order) {
+    if (order.serviceName.trim().isNotEmpty) {
+      return order.serviceName.trim();
+    }
+    if (order.serviceAddress.trim().isNotEmpty) {
+      return '客户已预约 ${order.serviceAddress.trim()} 附近服务，请尽快联系确认具体行程安排。';
+    }
+    return '客户已提交服务需求，请尽快联系确认服务细节。';
+  }
+
   Future<void> bootstrapForGuide(UserProvider userProvider) async {
     await initialize(userProvider);
   }
@@ -446,6 +458,66 @@ class GuideConsoleProvider extends ChangeNotifier {
     if (orderProvider.orders.isEmpty) {
       await orderProvider.loadOrders();
     }
+    _stats = _buildStats(orderProvider.orders);
+    final derivedAddresses = _buildServiceAddresses(orderProvider.orders);
+    if (derivedAddresses.isNotEmpty) {
+      _serviceAddresses = derivedAddresses;
+    }
+    notifyListeners();
+  }
+
+  GuideWorkbenchStats _buildStats(List<Order> orders) {
+    if (orders.isEmpty) {
+      return const GuideWorkbenchStats(
+        totalOrders: 0,
+        completedOrders: 0,
+        positiveReviews: 0,
+        cancelOrders: 0,
+        cancellationRate: 0,
+      );
+    }
+    final totalOrders = orders.length;
+    final completedOrders = orders
+        .where((item) => item.status == OrderStatus.completed)
+        .length;
+    final positiveReviews = orders
+        .where((item) => item.status == OrderStatus.pendingReview)
+        .length;
+    final cancelOrders = orders
+        .where((item) => item.status == OrderStatus.cancelled)
+        .length;
+    final cancellationRate = totalOrders == 0
+        ? 0
+        : ((cancelOrders / totalOrders) * 100).round();
+    return GuideWorkbenchStats(
+      totalOrders: totalOrders,
+      completedOrders: completedOrders,
+      positiveReviews: positiveReviews,
+      cancelOrders: cancelOrders,
+      cancellationRate: cancellationRate,
+    );
+  }
+
+  List<GuideAddress> _buildServiceAddresses(List<Order> orders) {
+    final seen = <String>{};
+    final result = <GuideAddress>[];
+    for (final order in orders) {
+      final address = order.serviceAddress.trim();
+      if (address.isEmpty || seen.contains(address)) {
+        continue;
+      }
+      seen.add(address);
+      result.add(
+        GuideAddress(
+          city: order.serviceCity.isNotEmpty ? order.serviceCity : _selectedCity,
+          title: address,
+          detail: order.serviceName.isNotEmpty ? order.serviceName : '订单服务地点',
+          contactName: order.guideName.isNotEmpty ? order.guideName : '客户',
+          maskedPhone: '待联系',
+        ),
+      );
+    }
+    return result;
   }
 
   GuideServiceType? _serviceTypeFromName(String raw) {

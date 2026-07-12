@@ -52,24 +52,26 @@ class _GuideOrderCenterPageState extends State<GuideOrderCenterPage> {
                     onToggleOnlineTap: () => console.setOnline(!console.isOnline),
                   ),
                   const SizedBox(height: 22),
-                  Row(
+                  Wrap(
+                    spacing: 22,
+                    runSpacing: 12,
+                    crossAxisAlignment: WrapCrossAlignment.center,
                     children: [
                       for (final stage in GuideOrderStage.values)
-                        Padding(
-                          padding: const EdgeInsets.only(right: 26),
-                          child: _OrderStageTab(
-                            label: stage.label,
-                            active: stage == _selectedStage,
-                            onTap: () => setState(() => _selectedStage = stage),
-                          ),
+                        _OrderStageTab(
+                          label: stage.label,
+                          active: stage == _selectedStage,
+                          onTap: () => setState(() => _selectedStage = stage),
                         ),
-                      const Spacer(),
                       InkWell(
-                        onTap: () => widget.onOpenRoute(filtered.isNotEmpty ? filtered.first : null),
+                        onTap: () => widget.onOpenRoute(
+                          filtered.isNotEmpty ? filtered.first : null,
+                        ),
                         borderRadius: BorderRadius.circular(999),
                         child: const Row(
+                          mainAxisSize: MainAxisSize.min,
                           children: [
-                            Icon(Icons.route_outlined, size: 26),
+                            Icon(Icons.route_outlined, size: 24),
                             SizedBox(width: 6),
                             Text(
                               '路线',
@@ -224,7 +226,10 @@ class _GuideOrderCard extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Row(
+          Wrap(
+            spacing: 12,
+            runSpacing: 10,
+            crossAxisAlignment: WrapCrossAlignment.center,
             children: [
               Container(
                 padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
@@ -241,7 +246,6 @@ class _GuideOrderCard extends StatelessWidget {
                   ),
                 ),
               ),
-              const SizedBox(width: 14),
               Text(
                 data.etaText,
                 style: const TextStyle(
@@ -250,48 +254,52 @@ class _GuideOrderCard extends StatelessWidget {
                   color: Color(0xFFFF9B33),
                 ),
               ),
-              const Spacer(),
-              const Text(
-                '预计佣金',
-                style: TextStyle(fontSize: 16, color: AppColors.textHint),
-              ),
-              const SizedBox(width: 8),
-              Text(
-                '¥${data.amount.toStringAsFixed(0)}',
-                style: const TextStyle(
-                  fontSize: 18,
-                  fontWeight: FontWeight.w900,
-                  color: Color(0xFFFF5A3C),
-                ),
+              Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  const Text(
+                    '预计佣金',
+                    style: TextStyle(fontSize: 15, color: AppColors.textHint),
+                  ),
+                  const SizedBox(width: 6),
+                  Text(
+                    '¥${data.amount.toStringAsFixed(0)}',
+                    style: const TextStyle(
+                      fontSize: 18,
+                      fontWeight: FontWeight.w900,
+                      color: Color(0xFFFF5A3C),
+                    ),
+                  ),
+                ],
               ),
             ],
           ),
           const SizedBox(height: 16),
-          Row(
-            children: data.imageUrls
-                .map(
-                  (image) => Expanded(
-                    child: Padding(
-                      padding: EdgeInsets.only(
-                        right: image == data.imageUrls.last ? 0 : 10,
-                      ),
-                      child: ClipRRect(
-                        borderRadius: BorderRadius.circular(18),
-                        child: AspectRatio(
-                          aspectRatio: 1,
-                          child: Image.network(
-                            image,
-                            fit: BoxFit.cover,
-                            errorBuilder: (_, __, ___) => Container(
-                              color: const Color(0xFFECEEF2),
-                            ),
-                          ),
-                        ),
-                      ),
-                    ),
-                  ),
-                )
-                .toList(),
+          Container(
+            width: double.infinity,
+            padding: const EdgeInsets.all(16),
+            decoration: BoxDecoration(
+              color: const Color(0xFFF7F8FA),
+              borderRadius: BorderRadius.circular(18),
+            ),
+            child: Wrap(
+              spacing: 8,
+              runSpacing: 8,
+              children: [
+                _OrderInfoChip(
+                  icon: Icons.schedule_outlined,
+                  label: _formatServiceTime(data.serviceTime),
+                ),
+                _OrderInfoChip(
+                  icon: Icons.attach_money_rounded,
+                  label: '订单金额 ¥${data.amount.toStringAsFixed(0)}',
+                ),
+                _OrderInfoChip(
+                  icon: Icons.place_outlined,
+                  label: data.distanceText,
+                ),
+              ],
+            ),
           ),
           const SizedBox(height: 16),
           Container(
@@ -345,65 +353,85 @@ class _GuideOrderCard extends StatelessWidget {
             ],
           ),
           const SizedBox(height: 18),
-          Row(
-            children: [
-              _OutlineActionButton(
-                icon: Icons.support_agent_rounded,
-                label: '客服',
-                onTap: () {},
-              ),
-              const SizedBox(width: 10),
-              _OutlineActionButton(
-                icon: Icons.call_outlined,
-                label: '联系',
-                onTap: onChatTap,
-              ),
-              const SizedBox(width: 10),
-              Expanded(
-                child: InkWell(
-                  onTap: onPrimaryTap,
-                  borderRadius: BorderRadius.circular(999),
-                  child: Container(
-                    padding: const EdgeInsets.symmetric(vertical: 18),
-                    decoration: BoxDecoration(
-                      color: data.primaryAction == GuideOrderAction.arrived
-                          ? AppColors.primary
-                          : Colors.white,
-                      borderRadius: BorderRadius.circular(999),
-                      border: Border.all(
-                        color: data.primaryAction == GuideOrderAction.arrived
-                            ? AppColors.primary
-                            : const Color(0xFFE3E4E8),
-                      ),
-                    ),
-                    child: Row(
-                      mainAxisAlignment: MainAxisAlignment.center,
+          LayoutBuilder(
+            builder: (context, constraints) {
+              if (constraints.maxWidth < 360) {
+                return Column(
+                  children: [
+                    Row(
                       children: [
-                        Icon(
-                          data.primaryAction.icon,
-                          size: 20,
-                          color: AppColors.textPrimary,
+                        Expanded(
+                          child: _OutlineActionButton(
+                            icon: Icons.support_agent_rounded,
+                            label: '客服',
+                            onTap: () {},
+                          ),
                         ),
-                        const SizedBox(width: 8),
-                        Text(
-                          data.primaryAction.label,
-                          style: const TextStyle(
-                            fontSize: 15,
-                            fontWeight: FontWeight.w900,
-                            color: AppColors.textPrimary,
+                        const SizedBox(width: 10),
+                        Expanded(
+                          child: _OutlineActionButton(
+                            icon: Icons.call_outlined,
+                            label: '联系',
+                            onTap: onChatTap,
                           ),
                         ),
                       ],
                     ),
+                    const SizedBox(height: 10),
+                    SizedBox(
+                      width: double.infinity,
+                      child: _PrimaryActionButton(
+                        icon: data.primaryAction.icon,
+                        label: data.primaryAction.label,
+                        active: data.primaryAction == GuideOrderAction.arrived,
+                        onTap: onPrimaryTap,
+                      ),
+                    ),
+                  ],
+                );
+              }
+              return Row(
+                children: [
+                  Expanded(
+                    child: _OutlineActionButton(
+                      icon: Icons.support_agent_rounded,
+                      label: '客服',
+                      onTap: () {},
+                    ),
                   ),
-                ),
-              ),
-            ],
+                  const SizedBox(width: 10),
+                  Expanded(
+                    child: _OutlineActionButton(
+                      icon: Icons.call_outlined,
+                      label: '联系',
+                      onTap: onChatTap,
+                    ),
+                  ),
+                  const SizedBox(width: 10),
+                  Expanded(
+                    child: _PrimaryActionButton(
+                      icon: data.primaryAction.icon,
+                      label: data.primaryAction.label,
+                      active: data.primaryAction == GuideOrderAction.arrived,
+                      onTap: onPrimaryTap,
+                    ),
+                  ),
+                ],
+              );
+            },
           ),
         ],
       ),
     );
   }
+}
+
+String _formatServiceTime(DateTime serviceTime) {
+  final month = serviceTime.month.toString().padLeft(2, '0');
+  final day = serviceTime.day.toString().padLeft(2, '0');
+  final hour = serviceTime.hour.toString().padLeft(2, '0');
+  final minute = serviceTime.minute.toString().padLeft(2, '0');
+  return '$month/$day $hour:$minute 服务';
 }
 
 class _OutlineActionButton extends StatelessWidget {
@@ -423,24 +451,115 @@ class _OutlineActionButton extends StatelessWidget {
       onTap: onTap,
       borderRadius: BorderRadius.circular(999),
       child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 22, vertical: 16),
+        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 16),
         decoration: BoxDecoration(
           borderRadius: BorderRadius.circular(999),
           border: Border.all(color: const Color(0xFFE3E4E8)),
         ),
         child: Row(
+          mainAxisAlignment: MainAxisAlignment.center,
           children: [
             Icon(icon, size: 20),
             const SizedBox(width: 8),
-            Text(
-              label,
-              style: const TextStyle(
-                fontSize: 14,
-                fontWeight: FontWeight.w800,
+            Flexible(
+              child: Text(
+                label,
+                overflow: TextOverflow.ellipsis,
+                style: const TextStyle(
+                  fontSize: 14,
+                  fontWeight: FontWeight.w800,
+                ),
               ),
             ),
           ],
         ),
+      ),
+    );
+  }
+}
+
+class _PrimaryActionButton extends StatelessWidget {
+  final IconData icon;
+  final String label;
+  final bool active;
+  final VoidCallback onTap;
+
+  const _PrimaryActionButton({
+    required this.icon,
+    required this.label,
+    required this.active,
+    required this.onTap,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return InkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(999),
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 18),
+        decoration: BoxDecoration(
+          color: active ? AppColors.primary : Colors.white,
+          borderRadius: BorderRadius.circular(999),
+          border: Border.all(
+            color: active ? AppColors.primary : const Color(0xFFE3E4E8),
+          ),
+        ),
+        child: Row(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Icon(icon, size: 20, color: AppColors.textPrimary),
+            const SizedBox(width: 8),
+            Flexible(
+              child: Text(
+                label,
+                overflow: TextOverflow.ellipsis,
+                style: const TextStyle(
+                  fontSize: 15,
+                  fontWeight: FontWeight.w900,
+                  color: AppColors.textPrimary,
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _OrderInfoChip extends StatelessWidget {
+  final IconData icon;
+  final String label;
+
+  const _OrderInfoChip({
+    required this.icon,
+    required this.label,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(999),
+        border: Border.all(color: const Color(0xFFE5E7EB)),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(icon, size: 16, color: AppColors.textSecondary),
+          const SizedBox(width: 6),
+          Text(
+            label,
+            style: const TextStyle(
+              fontSize: 12.5,
+              fontWeight: FontWeight.w700,
+              color: AppColors.textPrimary,
+            ),
+          ),
+        ],
       ),
     );
   }

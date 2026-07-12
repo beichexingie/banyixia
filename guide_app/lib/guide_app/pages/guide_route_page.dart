@@ -1,4 +1,6 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_map/flutter_map.dart';
+import 'package:latlong2/latlong.dart';
 import 'package:provider/provider.dart';
 import 'package:flutter_application_1/config/amap_config.dart';
 import 'package:flutter_application_1/config/app_theme.dart';
@@ -288,6 +290,36 @@ class _GuideRoutePageState extends State<GuideRoutePage> {
                     )
                   else ...[
                     GuideSectionCard(
+                      padding: const EdgeInsets.fromLTRB(12, 12, 12, 12),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          const Padding(
+                            padding: EdgeInsets.fromLTRB(6, 2, 6, 10),
+                            child: Text(
+                              '路线图',
+                              style: TextStyle(
+                                fontSize: 18,
+                                fontWeight: FontWeight.w900,
+                              ),
+                            ),
+                          ),
+                          ClipRRect(
+                            borderRadius: BorderRadius.circular(22),
+                            child: SizedBox(
+                              height: 260,
+                              child: _RouteMapView(
+                                route: _route,
+                                originPosition: _originPosition,
+                                destinationPosition: _destinationPosition,
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                    const SizedBox(height: 16),
+                    GuideSectionCard(
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
@@ -429,6 +461,171 @@ class _RoundIconButton extends StatelessWidget {
           shape: BoxShape.circle,
         ),
         child: Icon(icon, color: AppColors.textPrimary, size: 20),
+      ),
+    );
+  }
+}
+
+class _RouteMapView extends StatelessWidget {
+  final MapRoute? route;
+  final MapPosition? originPosition;
+  final MapPosition? destinationPosition;
+  static const AmapMapService _coordinateConverter = AmapMapService();
+
+  const _RouteMapView({
+    required this.route,
+    required this.originPosition,
+    required this.destinationPosition,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final polylinePoints = (route?.polyline ?? const <LatLng>[])
+        .map(_coordinateConverter.toGcj02LatLng)
+        .toList();
+    final points = <LatLng>[
+      if (originPosition?.latitude != null && originPosition?.longitude != null)
+        _coordinateConverter.toGcj02LatLng(
+          LatLng(originPosition!.latitude!, originPosition!.longitude!),
+        ),
+      ...polylinePoints,
+      if (destinationPosition?.latitude != null &&
+          destinationPosition?.longitude != null)
+        _coordinateConverter.toGcj02LatLng(
+          LatLng(
+            destinationPosition!.latitude!,
+            destinationPosition!.longitude!,
+          ),
+        ),
+    ];
+
+    if (points.isEmpty) {
+      return Container(
+        color: const Color(0xFFF4F5F7),
+        alignment: Alignment.center,
+        child: const Text(
+          '暂无可绘制的路线图',
+          style: TextStyle(
+            fontSize: 14,
+            color: AppColors.textSecondary,
+          ),
+        ),
+      );
+    }
+
+    final bounds = LatLngBounds.fromPoints(points);
+    final center = _centerOfBounds(bounds);
+
+    return FlutterMap(
+      options: MapOptions(
+        initialCenter: center,
+        initialZoom: _zoomForBounds(bounds),
+        interactionOptions: const InteractionOptions(
+          flags: InteractiveFlag.pinchZoom | InteractiveFlag.drag,
+        ),
+      ),
+      children: [
+        TileLayer(
+          urlTemplate:
+              'https://webrd0{s}.is.autonavi.com/appmaptile?lang=zh_cn&size=1&scale=1&style=7&x={x}&y={y}&z={z}',
+          subdomains: const ['1', '2', '3', '4'],
+          userAgentPackageName: 'com.yidianban.guide',
+        ),
+        if (polylinePoints.isNotEmpty)
+          PolylineLayer(
+            polylines: [
+              Polyline(
+                points: polylinePoints,
+                strokeWidth: 5,
+                color: AppColors.primary,
+              ),
+            ],
+          ),
+        MarkerLayer(
+          markers: [
+            if (originPosition?.latitude != null &&
+                originPosition?.longitude != null)
+              Marker(
+                point: LatLng(
+                  originPosition!.latitude!,
+                  originPosition!.longitude!,
+                ),
+                width: 40,
+                height: 40,
+                child: const _RouteMarker(
+                  color: Color(0xFF21B26B),
+                  label: '起',
+                ),
+              ),
+            if (destinationPosition?.latitude != null &&
+                destinationPosition?.longitude != null)
+              Marker(
+                point: LatLng(
+                  destinationPosition!.latitude!,
+                  destinationPosition!.longitude!,
+                ),
+                width: 40,
+                height: 40,
+                child: const _RouteMarker(
+                  color: Color(0xFFFF7A45),
+                  label: '终',
+                ),
+              ),
+          ],
+        ),
+      ],
+    );
+  }
+
+  LatLng _centerOfBounds(LatLngBounds bounds) {
+    final centerLat = (bounds.north + bounds.south) / 2;
+    final centerLng = (bounds.east + bounds.west) / 2;
+    return LatLng(centerLat, centerLng);
+  }
+
+  double _zoomForBounds(LatLngBounds bounds) {
+    final latDiff = (bounds.north - bounds.south).abs();
+    final lngDiff = (bounds.east - bounds.west).abs();
+    final diff = latDiff > lngDiff ? latDiff : lngDiff;
+    if (diff < 0.005) return 15;
+    if (diff < 0.02) return 13;
+    if (diff < 0.08) return 11;
+    if (diff < 0.2) return 10;
+    return 9;
+  }
+}
+
+class _RouteMarker extends StatelessWidget {
+  final Color color;
+  final String label;
+
+  const _RouteMarker({
+    required this.color,
+    required this.label,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      decoration: BoxDecoration(
+        color: color,
+        shape: BoxShape.circle,
+        boxShadow: const [
+          BoxShadow(
+            color: Color(0x22000000),
+            blurRadius: 8,
+            offset: Offset(0, 3),
+          ),
+        ],
+      ),
+      alignment: Alignment.center,
+      child: Text(
+        label,
+        style: const TextStyle(
+          fontSize: 14,
+          fontWeight: FontWeight.w900,
+          color: Colors.white,
+        ),
       ),
     );
   }
