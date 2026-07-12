@@ -11,7 +11,7 @@ import '../widgets/guide_console_header.dart';
 class GuideOrderCenterPage extends StatefulWidget {
   final VoidCallback onOpenSettings;
   final VoidCallback onOpenServiceOps;
-  final VoidCallback onOpenRoute;
+  final ValueChanged<GuideOrderCardData?> onOpenRoute;
   final VoidCallback onOpenChat;
 
   const GuideOrderCenterPage({
@@ -65,7 +65,7 @@ class _GuideOrderCenterPageState extends State<GuideOrderCenterPage> {
                         ),
                       const Spacer(),
                       InkWell(
-                        onTap: widget.onOpenRoute,
+                        onTap: () => widget.onOpenRoute(filtered.isNotEmpty ? filtered.first : null),
                         borderRadius: BorderRadius.circular(999),
                         child: const Row(
                           children: [
@@ -134,14 +134,14 @@ class _GuideOrderCenterPageState extends State<GuideOrderCenterPage> {
                           data: order,
                           onChatTap: widget.onOpenChat,
                           onPrimaryTap: order.primaryAction == GuideOrderAction.navigate
-                              ? widget.onOpenRoute
+                              ? () => widget.onOpenRoute(order)
                               : () {
                                   if (order.primaryAction == GuideOrderAction.arrived) {
                                     ScaffoldMessenger.of(context).showSnackBar(
                                       const SnackBar(content: Text('已标记到达服务地点')),
                                     );
                                   } else {
-                                    widget.onOpenRoute();
+                                    widget.onOpenRoute(order);
                                   }
                                 },
                         ),

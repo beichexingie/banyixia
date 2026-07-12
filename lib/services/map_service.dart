@@ -38,6 +38,38 @@ class MapPosition {
   });
 }
 
+class MapRouteStep {
+  final String instruction;
+  final String road;
+  final int distanceMeters;
+  final int durationSeconds;
+  final List<LatLng> polyline;
+
+  const MapRouteStep({
+    required this.instruction,
+    required this.road,
+    required this.distanceMeters,
+    required this.durationSeconds,
+    this.polyline = const [],
+  });
+}
+
+class MapRoute {
+  final int distanceMeters;
+  final int durationSeconds;
+  final String? taxiCostText;
+  final List<LatLng> polyline;
+  final List<MapRouteStep> steps;
+
+  const MapRoute({
+    required this.distanceMeters,
+    required this.durationSeconds,
+    this.taxiCostText,
+    this.polyline = const [],
+    this.steps = const [],
+  });
+}
+
 abstract class MapService {
   Future<List<MapSuggestion>> searchPlaces({
     required String keyword,
@@ -55,6 +87,13 @@ abstract class MapService {
   });
 
   Future<MapPosition?> currentPosition();
+
+  Future<MapRoute?> planDrivingRoute({
+    required double originLatitude,
+    required double originLongitude,
+    required double destinationLatitude,
+    required double destinationLongitude,
+  });
 
   String? staticMapUrl({
     required double latitude,
@@ -268,6 +307,71 @@ class AmapMapService implements MapService {
     );
   }
 
+  @override
+  Future<MapRoute?> planDrivingRoute({
+    required double originLatitude,
+    required double originLongitude,
+    required double destinationLatitude,
+    required double destinationLongitude,
+  }) async {
+    if (!_isEnabled) return null;
+
+    final originGcj = _wgs84ToGcj02(originLatitude, originLongitude);
+    final destinationGcj = _wgs84ToGcj02(
+      destinationLatitude,
+      destinationLongitude,
+    );
+
+    final uri = Uri.https(
+      'restapi.amap.com',
+      '/v3/direction/driving',
+      <String, String>{
+        'key': apiKey.trim(),
+        'origin': '${originGcj.$2},${originGcj.$1}',
+        'destination': '${destinationGcj.$2},${destinationGcj.$1}',
+        'extensions': 'all',
+        'strategy': '0',
+      },
+    );
+
+    final data = await _getJson(uri);
+    _ensureSuccess(data);
+    final route = data?['route'];
+    if (route is! Map) return null;
+    final paths = route['paths'];
+    if (paths is! List || paths.isEmpty) return null;
+    final firstPath = paths.first;
+    if (firstPath is! Map) return null;
+
+    final steps = <MapRouteStep>[];
+    final allPoints = <LatLng>[];
+    final rawSteps = firstPath['steps'];
+    if (rawSteps is List) {
+      for (final item in rawSteps) {
+        if (item is! Map) continue;
+        final stepPoints = _parsePolyline(item['polyline']?.toString());
+        allPoints.addAll(stepPoints);
+        steps.add(
+          MapRouteStep(
+            instruction: item['instruction']?.toString() ?? '',
+            road: item['road']?.toString() ?? '',
+            distanceMeters: int.tryParse(item['distance']?.toString() ?? '') ?? 0,
+            durationSeconds: int.tryParse(item['duration']?.toString() ?? '') ?? 0,
+            polyline: stepPoints,
+          ),
+        );
+      }
+    }
+
+    return MapRoute(
+      distanceMeters: int.tryParse(firstPath['distance']?.toString() ?? '') ?? 0,
+      durationSeconds: int.tryParse(firstPath['duration']?.toString() ?? '') ?? 0,
+      taxiCostText: route['taxi_cost']?.toString(),
+      polyline: allPoints,
+      steps: steps,
+    );
+  }
+
   LatLng toGcj02LatLng(LatLng point) {
     final converted = _wgs84ToGcj02(point.latitude, point.longitude);
     return LatLng(converted.$1, converted.$2);
@@ -335,6 +439,23 @@ class AmapMapService implements MapService {
     final latitude = double.tryParse(parts[1]);
     if (latitude == null || longitude == null) return null;
     return (latitude, longitude);
+  }
+
+  List<LatLng> _parsePolyline(String? rawPolyline) {
+    if (rawPolyline == null || rawPolyline.trim().isEmpty) {
+      return const [];
+    }
+    final points = <LatLng>[];
+    final segments = rawPolyline.split(';');
+    for (final segment in segments) {
+      final location = _parseLocation(segment.trim());
+      if (location == null || location.$1 == null || location.$2 == null) {
+        continue;
+      }
+      final wgs84 = _gcj02ToWgs84Exact(location.$1!, location.$2!);
+      points.add(LatLng(wgs84.$1, wgs84.$2));
+    }
+    return points;
   }
 
   String _extractCity(dynamic addressComponent) {
@@ -485,6 +606,16 @@ class PlaceholderMapService extends AmapMapService {
 
   @override
   Future<MapPosition?> currentPosition() async {
+    return null;
+  }
+
+  @override
+  Future<MapRoute?> planDrivingRoute({
+    required double originLatitude,
+    required double originLongitude,
+    required double destinationLatitude,
+    required double destinationLongitude,
+  }) async {
     return null;
   }
 

@@ -5,10 +5,10 @@ import 'package:go_router/go_router.dart';
 import 'package:provider/provider.dart';
 
 import '../../config/app_theme.dart';
-import '../../models/travel_post.dart';
-import '../../providers/post_provider.dart';
-import '../../widgets/travel_card.dart';
+import '../../models/guide.dart';
+import '../../providers/guide_provider.dart';
 import '../main_scaffold.dart';
+import '../../widgets/service_guide_card.dart';
 
 class HomePage extends StatefulWidget {
   const HomePage({super.key});
@@ -32,8 +32,11 @@ class _HomePageState extends State<HomePage>
     _tabController = TabController(length: 3, vsync: this);
     _tabController.addListener(_handleTabChanged);
     _searchController = TextEditingController();
+    _searchController.addListener(_handleSearchChanged);
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      context.read<PostProvider>().loadPosts();
+      final provider = context.read<GuideProvider>();
+      provider.setCity(_selectedCity);
+      provider.loadGuides();
     });
   }
 
@@ -41,6 +44,7 @@ class _HomePageState extends State<HomePage>
   void dispose() {
     _tabController.removeListener(_handleTabChanged);
     _tabController.dispose();
+    _searchController.removeListener(_handleSearchChanged);
     _searchController.dispose();
     super.dispose();
   }
@@ -52,6 +56,11 @@ class _HomePageState extends State<HomePage>
     setState(() {
       _currentTab = _tabController.index;
     });
+  }
+
+  void _handleSearchChanged() {
+    if (!mounted) return;
+    context.read<GuideProvider>().setSearchQuery(_searchController.text.trim());
   }
 
   Future<void> _pickCityWithLocationPicker() async {
@@ -74,6 +83,7 @@ class _HomePageState extends State<HomePage>
     setState(() {
       _selectedCity = city;
     });
+    context.read<GuideProvider>().setCity(city);
   }
 
   String _normalizeCityName(String? raw) {
@@ -91,10 +101,8 @@ class _HomePageState extends State<HomePage>
     return city;
   }
 
-  void _searchPosts() {
-    context.read<PostProvider>().loadPosts(
-          query: _searchController.text.trim(),
-        );
+  void _searchGuides() {
+    context.read<GuideProvider>().setSearchQuery(_searchController.text.trim());
   }
 
   void _showSignInFeedback() {
@@ -147,9 +155,9 @@ class _HomePageState extends State<HomePage>
           child: TabBarView(
             controller: _tabController,
             children: [
-              _buildPostGrid(),
-              _buildPostGrid(sortLatest: true),
-              _buildFollowingGrid(),
+              _buildGuideList(),
+              _buildGuideList(sortByHot: false),
+              _buildGuideList(showFallbackAction: true),
             ],
           ),
         ),
@@ -233,8 +241,7 @@ class _HomePageState extends State<HomePage>
                               children: [
                                 Expanded(child: _buildBrandBlock()),
                                 Padding(
-                                  padding:
-                                      const EdgeInsets.only(top: 4, right: 2),
+                                  padding: const EdgeInsets.only(top: 4, right: 2),
                                   child: IconButton(
                                     onPressed: _showSignInFeedback,
                                     iconSize: 22,
@@ -303,8 +310,7 @@ class _HomePageState extends State<HomePage>
                                       _featureCard(
                                         title: '入驻',
                                         subtitle: '',
-                                        onTap: () =>
-                                            context.push('/apply/guide'),
+                                        onTap: () => context.push('/apply/guide'),
                                         illustration: _buildFeatureIllustration(
                                           'assets/home/feature_map/Frame 6.png',
                                           width: 96,
@@ -315,15 +321,13 @@ class _HomePageState extends State<HomePage>
                                       _featureCard(
                                         title: '联系我们',
                                         subtitle: '',
-                                        onTap: () => ScaffoldMessenger.of(
-                                          context,
-                                        ).showSnackBar(
+                                        onTap: () => ScaffoldMessenger.of(context)
+                                            .showSnackBar(
                                           const SnackBar(
                                             content: Text('客服入口稍后接入'),
                                           ),
                                         ),
-                                        illustration:
-                                            _buildFeatureIllustration(
+                                        illustration: _buildFeatureIllustration(
                                           'assets/home/feature_contact/Frame 5.png',
                                           width: 96,
                                           height: 78,
@@ -439,7 +443,7 @@ class _HomePageState extends State<HomePage>
                 Expanded(
                   child: TextField(
                     controller: _searchController,
-                    onSubmitted: (_) => _searchPosts(),
+                    onSubmitted: (_) => _searchGuides(),
                     style: const TextStyle(
                       fontSize: 15,
                       fontWeight: FontWeight.w500,
@@ -736,87 +740,62 @@ class _HomePageState extends State<HomePage>
     );
   }
 
-  Widget _buildPostGrid({bool sortLatest = false}) {
-    return Consumer<PostProvider>(
+  Widget _buildGuideList({
+    bool sortByHot = true,
+    bool showFallbackAction = false,
+  }) {
+    return Consumer<GuideProvider>(
       builder: (context, provider, _) {
-        if (provider.isLoading && provider.posts.isEmpty) {
+        if (provider.isLoading && provider.guides.isEmpty) {
           return const Center(
             child: CircularProgressIndicator(color: AppColors.primary),
           );
         }
 
-        final posts = List<TravelPost>.from(provider.posts);
-        if (sortLatest) {
-          posts.sort((a, b) => b.createdAt.compareTo(a.createdAt));
+        final guides = List<Guide>.from(provider.filteredGuides);
+        if (sortByHot) {
+          guides.sort((a, b) {
+            final scoreA = a.likes + a.fans + a.views;
+            final scoreB = b.likes + b.fans + b.views;
+            final scoreCompare = scoreB.compareTo(scoreA);
+            if (scoreCompare != 0) return scoreCompare;
+            return b.rating.compareTo(a.rating);
+          });
+        } else {
+          guides.sort((a, b) {
+            final verifiedCompare = (b.verified ? 1 : 0).compareTo(a.verified ? 1 : 0);
+            if (verifiedCompare != 0) return verifiedCompare;
+            final ratingCompare = b.rating.compareTo(a.rating);
+            if (ratingCompare != 0) return ratingCompare;
+            return b.likes.compareTo(a.likes);
+          });
         }
 
-        if (posts.isEmpty) {
+        if (guides.isEmpty) {
           return _emptyState(
-            icon: Icons.article_outlined,
-            title: '还没有内容',
-            subtitle: '去发布第一条动态吧',
+            icon: Icons.people_outline,
+            title: '暂时没有地陪',
+            subtitle: '可以切换城市或去服务页查看更多认证地陪',
+            actionText: showFallbackAction ? '去服务页' : null,
+            onAction: showFallbackAction ? () => MainScaffold.switchTo(1) : null,
           );
         }
 
         return RefreshIndicator(
           color: AppColors.primary,
-          onRefresh: () => provider.loadPosts(),
-          child: GridView.builder(
+          onRefresh: () => provider.loadGuides(),
+          child: ListView.separated(
             physics: const AlwaysScrollableScrollPhysics(
               parent: BouncingScrollPhysics(),
             ),
-            padding: const EdgeInsets.fromLTRB(18, 2, 18, 100),
-            gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-              crossAxisCount: 2,
-              mainAxisSpacing: 14,
-              crossAxisSpacing: 14,
-              childAspectRatio: 0.68,
+            padding: const EdgeInsets.fromLTRB(18, 8, 18, 100),
+            itemCount: guides.length,
+            separatorBuilder: (_, __) => const SizedBox(height: 14),
+            itemBuilder: (context, index) => ServiceGuideCard(
+              guide: guides[index],
+              rankLabel: '${index + 1}',
+              statusLabel: '最早可约 今天 14:00',
             ),
-            itemCount: posts.length,
-            itemBuilder: (context, index) => TravelCard(
-              post: posts[index],
-              cityLabel: _selectedCity,
-            ),
-          ),
-        );
-      },
-    );
-  }
-
-  Widget _buildFollowingGrid() {
-    return FutureBuilder<List<TravelPost>>(
-      future: context.read<PostProvider>().fetchFollowingPosts(),
-      builder: (context, snapshot) {
-        if (snapshot.connectionState == ConnectionState.waiting) {
-          return const Center(
-            child: CircularProgressIndicator(color: AppColors.primary),
-          );
-        }
-
-        final posts = snapshot.data ?? const <TravelPost>[];
-        if (posts.isEmpty) {
-          return _emptyState(
-            icon: Icons.people_outline,
-            title: '还没有关注内容',
-            subtitle: '去服务页看看感兴趣的人吧',
-            actionText: '去服务页',
-            onAction: () => MainScaffold.switchTo(1),
-          );
-        }
-
-        return GridView.builder(
-          physics: const BouncingScrollPhysics(),
-          padding: const EdgeInsets.fromLTRB(18, 2, 18, 100),
-          gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-            crossAxisCount: 2,
-            mainAxisSpacing: 14,
-            crossAxisSpacing: 14,
-            childAspectRatio: 0.68,
-          ),
-          itemCount: posts.length,
-          itemBuilder: (context, index) => TravelCard(
-            post: posts[index],
-            cityLabel: _selectedCity,
           ),
         );
       },

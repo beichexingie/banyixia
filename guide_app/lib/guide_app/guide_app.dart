@@ -10,6 +10,7 @@ import '../providers/message_provider.dart';
 import '../providers/order_provider.dart';
 import '../providers/post_provider.dart';
 import '../providers/user_provider.dart';
+import 'models/guide_app_models.dart';
 import 'pages/guide_city_picker_page.dart';
 import 'pages/guide_duty_mode_page.dart';
 import 'pages/guide_duty_settings_page.dart';
@@ -244,9 +245,9 @@ class _GuideMainShellState extends State<_GuideMainShell> {
     );
   }
 
-  Future<void> _openRoute() async {
+  Future<void> _openRoute([GuideOrderCardData? order]) async {
     await Navigator.of(context).push(
-      MaterialPageRoute(builder: (_) => const GuideRoutePage()),
+      MaterialPageRoute(builder: (_) => GuideRoutePage(order: order)),
     );
   }
 

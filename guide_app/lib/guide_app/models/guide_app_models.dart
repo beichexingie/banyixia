@@ -242,6 +242,9 @@ class GuideOrderCardData {
   final double amount;
   final String content;
   final String address;
+  final String serviceCity;
+  final double? serviceLat;
+  final double? serviceLng;
   final List<String> imageUrls;
   final GuideOrderAction primaryAction;
   final DateTime serviceTime;
@@ -255,6 +258,9 @@ class GuideOrderCardData {
     required this.amount,
     required this.content,
     required this.address,
+    this.serviceCity = '',
+    this.serviceLat,
+    this.serviceLng,
     required this.imageUrls,
     required this.primaryAction,
     required this.serviceTime,
