@@ -42,6 +42,8 @@ function buildPostSelect({ viewerIdParam = null } = {}) {
       where pc.post_id = p.id
     )::int as comments,
     ${viewerStateSelect}
+    p.review_status,
+    p.reject_reason,
     p.created_at
   from public.posts p
 `;
@@ -93,9 +95,10 @@ export async function createPost(client, payload) {
   const result = await client.query(
     `
       insert into public.posts (
-        user_id, author_name, author_avatar, content, images, location, likes, comments
+        user_id, author_name, author_avatar, content, images, location,
+        likes, comments, review_status, reject_reason, moderation_hits, moderation_source
       )
-      values ($1, $2, $3, $4, $5::text[], $6, 0, 0)
+      values ($1, $2, $3, $4, $5::text[], $6, 0, 0, $7, $8, $9::text[], $10)
       returning *
     `,
     [
@@ -105,6 +108,10 @@ export async function createPost(client, payload) {
       payload.content,
       payload.images ?? [],
       payload.location ?? '',
+      payload.review_status ?? 'approved',
+      payload.reject_reason ?? null,
+      payload.moderation_hits ?? [],
+      payload.moderation_source ?? null,
     ],
   );
   return result.rows[0] ?? null;

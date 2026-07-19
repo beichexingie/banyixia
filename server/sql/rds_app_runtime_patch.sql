@@ -789,19 +789,50 @@ alter table if exists public.posts
   add column if not exists review_status text default 'approved',
   add column if not exists reviewed_by uuid references public.users(id) on delete set null,
   add column if not exists reviewed_at timestamptz,
-  add column if not exists reject_reason text;
+  add column if not exists reject_reason text,
+  add column if not exists moderation_hits text[] default '{}'::text[],
+  add column if not exists moderation_source text;
 
 alter table if exists public.post_comments
   add column if not exists review_status text default 'approved',
   add column if not exists reviewed_by uuid references public.users(id) on delete set null,
   add column if not exists reviewed_at timestamptz,
-  add column if not exists reject_reason text;
+  add column if not exists reject_reason text,
+  add column if not exists moderation_hits text[] default '{}'::text[],
+  add column if not exists moderation_source text;
 
 alter table if exists public.demands
   add column if not exists review_status text default 'approved',
   add column if not exists reviewed_by uuid references public.users(id) on delete set null,
   add column if not exists reviewed_at timestamptz,
-  add column if not exists reject_reason text;
+  add column if not exists reject_reason text,
+  add column if not exists moderation_hits text[] default '{}'::text[],
+  add column if not exists moderation_source text;
+
+create table if not exists public.moderation_audit_logs (
+  id uuid primary key default gen_random_uuid(),
+  user_id uuid references public.users(id) on delete set null,
+  target_type text not null,
+  target_id text,
+  action text not null,
+  hits text[] default '{}'::text[],
+  source text,
+  provider_payload jsonb default '{}'::jsonb,
+  created_at timestamptz default now()
+);
+
+alter table if exists public.moderation_audit_logs
+  add column if not exists user_id uuid references public.users(id) on delete set null,
+  add column if not exists target_type text,
+  add column if not exists target_id text,
+  add column if not exists action text,
+  add column if not exists hits text[] default '{}'::text[],
+  add column if not exists source text,
+  add column if not exists provider_payload jsonb default '{}'::jsonb,
+  add column if not exists created_at timestamptz default now();
+
+create index if not exists idx_moderation_audit_logs_created
+  on public.moderation_audit_logs (created_at desc);
 
 create index if not exists idx_posts_review_status_created
   on public.posts (review_status, created_at desc);

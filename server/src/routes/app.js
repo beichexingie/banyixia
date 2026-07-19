@@ -17,7 +17,7 @@ import {
   updatePostLikes,
 } from '../repositories/posts.js';
 import { ensureChatRoom, findOrderById, findOrderByMerchantOrderNo } from '../repositories/orders.js';
-import { assertPayloadAllowed, assertTextAllowed } from '../services/moderation.js';
+import { assertPayloadAllowed, assertTextAllowed, reviewImage } from '../services/moderation.js';
 import { bindAxbVirtualNumber } from '../services/virtual_number.js';
 
 export const appRouter = express.Router();
@@ -280,7 +280,7 @@ appRouter.post('/auth/logout', async (_req, res) => {
 
 appRouter.post('/moderation/review', handleRoute(async (req, res) => {
   const payload = req.body ?? {};
-  assertTextAllowed(payload.text?.toString() ?? '', {
+  await assertTextAllowed(payload.text?.toString() ?? '', {
     field: payload.field?.toString() || '内容',
   });
   return ok(res, { data: { passed: true }, message: '审核通过' });
@@ -650,7 +650,7 @@ appRouter.post('/posts', async (req, res) => {
   const userId = await requireSessionUser(req, res);
   if (!userId) return;
   const payload = req.body ?? {};
-  assertPayloadAllowed(payload, [
+  const moderation = await assertPayloadAllowed(payload, [
     { key: 'title', label: '标题' },
     { key: 'content', label: '正文' },
     { key: 'tag', label: '位置/标签' },
@@ -662,8 +662,17 @@ appRouter.post('/posts', async (req, res) => {
     content: `${payload.title ?? ''}\n${payload.content ?? ''}`.trim(),
     images: payload.images ?? [],
     location: payload.tag ?? '',
+    review_status: moderation.reviewStatus,
+    reject_reason: moderation.reviewStatus === 'pending'
+      ? `命中审核规则: ${moderation.hits.join(', ')}`
+      : null,
+    moderation_hits: moderation.hits,
+    moderation_source: moderation.results?.map((item) => item.source).filter(Boolean).join(',') ?? '',
   });
-  return ok(res, { data: created });
+  return ok(res, {
+    data: created,
+    message: moderation.reviewStatus === 'pending' ? '内容已提交，等待人工审核' : '发布成功',
+  });
 });
 
 appRouter.post('/posts/:id/like', async (req, res) => {
@@ -851,7 +860,7 @@ appRouter.post('/posts/:id/comments', async (req, res) => {
 
   const content = req.body?.content?.toString().trim() ?? '';
   if (!content) return fail(res, 400, 'comment cannot be empty');
-  assertTextAllowed(content, { field: '评论' });
+  const moderation = await assertTextAllowed(content, { field: '评论' });
 
   const parentCommentIdRaw =
     req.body?.parent_comment_id?.toString().trim() ?? '';
@@ -916,9 +925,11 @@ appRouter.post('/posts/:id/comments', async (req, res) => {
         user_id,
         parent_comment_id,
         reply_to_comment_id,
-        content
+        content,
+        review_status,
+        reject_reason
       )
-      values ($1, $2, $3, $4, $5)
+      values ($1, $2, $3, $4, $5, $6, $7)
       returning *
     `,
     [
@@ -927,9 +938,16 @@ appRouter.post('/posts/:id/comments', async (req, res) => {
       normalizedParentCommentId,
       normalizedReplyToCommentId,
       content,
+      moderation.reviewStatus,
+      moderation.reviewStatus === 'pending'
+        ? `命中审核规则: ${moderation.hits.join(', ')}`
+        : null,
     ],
   );
-  return ok(res, { data: result.rows[0], message: 'commented' });
+  return ok(res, {
+    data: result.rows[0],
+    message: moderation.reviewStatus === 'pending' ? '评论已提交，等待人工审核' : 'commented',
+  });
 });
 appRouter.post('/posts/comments/:id/like', async (req, res) => {
   const userId = await requireSessionUser(req, res);
@@ -1104,7 +1122,7 @@ appRouter.post('/demands', async (req, res) => {
   const userId = await requireSessionUser(req, res);
   if (!userId) return;
   const payload = req.body ?? {};
-  assertPayloadAllowed(payload, [
+  const moderation = await assertPayloadAllowed(payload, [
     { key: 'title', label: '需求标题' },
     { key: 'content', label: '需求内容' },
     { key: 'city', label: '服务城市' },
@@ -1115,9 +1133,9 @@ appRouter.post('/demands', async (req, res) => {
       insert into public.demands (
         title, content, city, location, service_lat, service_lng, service_start_at, service_end_at,
         people_count, gender, budget, status, author_id, author_name,
-        author_avatar, tags
+        author_avatar, tags, review_status, reject_reason
       ) values (
-        $1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16::text[]
+        $1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16::text[],$17,$18
       ) returning *
     `,
     [
@@ -1137,6 +1155,10 @@ appRouter.post('/demands', async (req, res) => {
       payload.author_name ?? '我',
       payload.author_avatar ?? '',
       payload.tags ?? [],
+      moderation.reviewStatus,
+      moderation.reviewStatus === 'pending'
+        ? `命中审核规则: ${moderation.hits.join(', ')}`
+        : null,
     ],
   );
   return ok(res, {
@@ -1145,6 +1167,7 @@ appRouter.post('/demands', async (req, res) => {
       service_lat: toNullableNumber(result.rows[0].service_lat),
       service_lng: toNullableNumber(result.rows[0].service_lng),
     },
+    message: moderation.reviewStatus === 'pending' ? 'pending manual review' : 'published',
   });
 });
 
@@ -1168,7 +1191,7 @@ appRouter.post('/demands/:id/apply', async (req, res) => {
   if (!guide) return fail(res, 403, '当前账号还不是已入驻地陪');
 
   const payload = req.body ?? {};
-  assertPayloadAllowed(payload, [
+  await assertPayloadAllowed(payload, [
     { key: 'note', label: '报名备注' },
   ]);
   const result = await pool.query(
@@ -1355,7 +1378,7 @@ appRouter.post('/chat/rooms/:id/messages', async (req, res) => {
   const content = req.body?.content?.toString() ?? '';
   const type = req.body?.type?.toString() ?? 'text';
   if (type === 'text') {
-    assertTextAllowed(content, { field: '聊天内容' });
+    await assertTextAllowed(content, { field: '聊天内容' });
   }
   const result = await pool.query(
     `
@@ -1591,7 +1614,21 @@ appRouter.post('/uploads/post-image', handleRoute(async (req, res) => {
     mimeType: payload.mime_type ?? payload.mimeType ?? 'image/jpeg',
     bytesBase64: payload.bytes_base64 ?? payload.bytesBase64,
   });
-  return ok(res, { data: { url: buildPublicUrl(req, relativeUrl) } });
+  const publicUrl = buildPublicUrl(req, relativeUrl);
+  const moderation = await reviewImage(publicUrl, { field: 'post image' });
+  if (!moderation.passed) {
+    return fail(res, 400, 'image blocked by moderation', {
+      moderation_hits: moderation.hits,
+    });
+  }
+  return ok(res, {
+    data: {
+      url: publicUrl,
+      review_status: moderation.reviewStatus,
+      moderation_hits: moderation.hits,
+    },
+    message: moderation.reviewStatus === 'pending' ? 'pending manual review' : 'uploaded',
+  });
 }));
 
 appRouter.post('/uploads/avatar', handleRoute(async (req, res) => {

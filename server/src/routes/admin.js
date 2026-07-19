@@ -488,7 +488,7 @@ adminRouter.get('/chat/rooms/:id', requirePermission('chat'), handleRoute(async 
 adminRouter.post('/chat/rooms/:id/messages', requirePermission('chat'), handleRoute(async (req, res) => {
   const content = req.body?.content?.toString().trim() ?? '';
   if (!content) return fail(res, 400, '消息内容不能为空');
-  assertPayloadAllowed({ content }, [{ key: 'content', label: '客服消息' }]);
+  await assertPayloadAllowed({ content }, [{ key: 'content', label: '客服消息' }]);
   const result = await pool.query(
     `
       insert into public.messages (room_id, sender_id, content, type)
@@ -513,7 +513,7 @@ adminRouter.get('/activities', requirePermission('activity'), handleRoute(async 
 
 adminRouter.post('/activities', requirePermission('activity'), handleRoute(async (req, res) => {
   const payload = req.body ?? {};
-  assertPayloadAllowed(payload, [
+  await assertPayloadAllowed(payload, [
     { key: 'title', label: '活动标题' },
     { key: 'summary', label: '活动摘要' },
     { key: 'content', label: '活动内容' },
@@ -552,7 +552,7 @@ adminRouter.get('/coupons', requirePermission('coupon'), handleRoute(async (_req
 
 adminRouter.post('/coupons', requirePermission('coupon'), handleRoute(async (req, res) => {
   const payload = req.body ?? {};
-  assertPayloadAllowed(payload, [
+  await assertPayloadAllowed(payload, [
     { key: 'title', label: '优惠券名称' },
     { key: 'code', label: '优惠码' },
   ]);
