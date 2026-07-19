@@ -38,6 +38,13 @@ function parsePhoneCodeMap(value) {
       }, {});
 }
 
+function parseKeywordList(value) {
+  return (value ?? '')
+      .split(/[,，\n\r]+/)
+      .map((item) => item.trim())
+      .filter((item) => item.length > 0);
+}
+
 export const config = {
   nodeEnv: process.env.NODE_ENV?.trim() || 'development',
   port: Number(process.env.PORT || 3000),
@@ -52,6 +59,16 @@ export const config = {
   corsOrigins: parseList(process.env.CORS_ORIGINS),
   authWhitelistEnabled: parseBoolean(process.env.AUTH_WHITELIST_ENABLED, false),
   authWhitelist: parsePhoneCodeMap(process.env.AUTH_WHITELIST),
+  moderationEnabled: parseBoolean(process.env.MODERATION_ENABLED, true),
+  moderationForbiddenWords: parseKeywordList(process.env.MODERATION_FORBIDDEN_WORDS),
+  aliyunAccessKeyId: process.env.ALIYUN_ACCESS_KEY_ID?.trim() || '',
+  aliyunAccessKeySecret: process.env.ALIYUN_ACCESS_KEY_SECRET?.trim() || '',
+  aliyunDyplsPoolKey: process.env.ALIYUN_DYPLS_POOL_KEY?.trim() || '',
+  aliyunDyplsPhoneNoX: process.env.ALIYUN_DYPLS_PHONE_NO_X?.trim() || '',
+  aliyunDyplsProduct: process.env.ALIYUN_DYPLS_PRODUCT?.trim() || 'Dyplsapi',
+  aliyunDyplsDomain: process.env.ALIYUN_DYPLS_DOMAIN?.trim() || 'dyplsapi.aliyuncs.com',
+  aliyunDyplsRegionId: process.env.ALIYUN_DYPLS_REGION_ID?.trim() || 'cn-hangzhou',
+  virtualNumberEnabled: parseBoolean(process.env.VIRTUAL_NUMBER_ENABLED, false),
 };
 
 export function hasAlipayConfig() {

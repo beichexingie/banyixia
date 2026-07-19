@@ -7,11 +7,13 @@ import { config } from './config.js';
 import { healthRouter } from './routes/health.js';
 import { appRouter } from './routes/app.js';
 import { paymentsRouter } from './routes/payments.js';
+import { adminRouter } from './routes/admin.js';
 
 const app = express();
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 const uploadsDir = path.resolve(__dirname, '../uploads');
+const adminDir = path.resolve(__dirname, '../public/admin');
 
 app.use(
   cors({
@@ -21,6 +23,10 @@ app.use(
 );
 app.use(express.json({ limit: '12mb' }));
 app.use('/uploads', express.static(uploadsDir));
+app.use('/admin', express.static(adminDir));
+app.get('/admin', (_req, res) => {
+  res.sendFile(path.join(adminDir, 'index.html'));
+});
 app.use((req, _res, next) => {
   const headerUserId = req.headers['x-user-id']?.toString().trim();
   const authHeader = req.headers.authorization?.toString().trim() ?? '';
@@ -42,6 +48,7 @@ app.get('/', (_req, res) => {
 
 app.use('/health', healthRouter);
 app.use('/api/health', healthRouter);
+app.use('/api/admin', adminRouter);
 app.use('/api', appRouter);
 app.use('/api/payments', paymentsRouter);
 app.use('/api', paymentsRouter);

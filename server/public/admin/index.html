@@ -1,0 +1,68 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>一点伴运营后台</title>
+    <link rel="stylesheet" href="./styles.css" />
+  </head>
+  <body>
+    <aside class="sidebar">
+      <div class="brand">
+        <div class="brand-mark">地</div>
+        <div>
+          <strong>地陪运营后台</strong>
+          <span>Yidianban Console</span>
+        </div>
+      </div>
+      <nav id="nav" class="nav"></nav>
+      <div class="operator-card">
+        <div class="avatar">营</div>
+        <div>
+          <strong id="operatorName">未登录</strong>
+          <span id="operatorRole">请填写后台用户 ID</span>
+        </div>
+      </div>
+    </aside>
+
+    <main class="main">
+      <header class="topbar">
+        <div class="search">
+          <span>⌕</span>
+          <input id="globalSearch" placeholder="搜索订单、用户、手机号、工单..." />
+        </div>
+        <div class="top-actions">
+          <button id="refreshBtn" class="ghost-btn">刷新</button>
+          <button id="switchAccountBtn" class="ghost-btn">切换账号</button>
+          <div class="notice">3</div>
+          <div id="roleBadge" class="role-badge">访客</div>
+        </div>
+      </header>
+
+      <section id="content" class="content"></section>
+    </main>
+
+    <div id="loginPanel" class="login-panel">
+      <div class="login-card">
+        <div class="brand-mark large">地</div>
+        <h1>进入运营后台</h1>
+        <p>
+          先输入已有用户的 user_id。该用户需要在 users 表里
+          <code>is_admin=true</code>，或存在于 <code>admin_staff</code> 表。
+        </p>
+        <input id="adminUserIdInput" placeholder="粘贴管理员 / 客服用户 ID" />
+        <button id="loginBtn">进入后台</button>
+        <small>正式上线前建议再接后台账号密码或短信登录，这版先用于运营联调。</small>
+      </div>
+    </div>
+
+    <template id="emptyTpl">
+      <div class="empty">
+        <strong>暂无数据</strong>
+        <span>数据库里还没有对应记录，后续有真实业务数据后会自动显示。</span>
+      </div>
+    </template>
+
+    <script src="./app.js"></script>
+  </body>
+</html>

@@ -754,6 +754,210 @@ alter table if exists public.transactions
   alter column id set default gen_random_uuid(),
   alter column created_at set default now();
 
+create table if not exists public.virtual_number_bindings (
+  id uuid primary key default gen_random_uuid(),
+  order_id uuid not null references public.orders(id) on delete cascade,
+  user_id uuid not null references public.users(id) on delete cascade,
+  guide_id uuid not null references public.users(id) on delete cascade,
+  phone_no_x text not null,
+  bind_id text,
+  out_id text,
+  expires_at timestamptz not null,
+  provider_payload jsonb default '{}'::jsonb,
+  created_at timestamptz default now()
+);
+
+alter table if exists public.virtual_number_bindings
+  add column if not exists order_id uuid references public.orders(id) on delete cascade,
+  add column if not exists user_id uuid references public.users(id) on delete cascade,
+  add column if not exists guide_id uuid references public.users(id) on delete cascade,
+  add column if not exists phone_no_x text,
+  add column if not exists bind_id text,
+  add column if not exists out_id text,
+  add column if not exists expires_at timestamptz,
+  add column if not exists provider_payload jsonb default '{}'::jsonb,
+  add column if not exists created_at timestamptz default now();
+
+create index if not exists idx_virtual_number_bindings_order_expires
+  on public.virtual_number_bindings (order_id, expires_at desc);
+
+-- ---------------------------------------------------------------------------
+-- Admin console / operation tables
+-- ---------------------------------------------------------------------------
+
+alter table if exists public.posts
+  add column if not exists review_status text default 'approved',
+  add column if not exists reviewed_by uuid references public.users(id) on delete set null,
+  add column if not exists reviewed_at timestamptz,
+  add column if not exists reject_reason text;
+
+alter table if exists public.post_comments
+  add column if not exists review_status text default 'approved',
+  add column if not exists reviewed_by uuid references public.users(id) on delete set null,
+  add column if not exists reviewed_at timestamptz,
+  add column if not exists reject_reason text;
+
+alter table if exists public.demands
+  add column if not exists review_status text default 'approved',
+  add column if not exists reviewed_by uuid references public.users(id) on delete set null,
+  add column if not exists reviewed_at timestamptz,
+  add column if not exists reject_reason text;
+
+create index if not exists idx_posts_review_status_created
+  on public.posts (review_status, created_at desc);
+
+create index if not exists idx_post_comments_review_status_created
+  on public.post_comments (review_status, created_at desc);
+
+create index if not exists idx_demands_review_status_created
+  on public.demands (review_status, created_at desc);
+
+create table if not exists public.admin_staff (
+  id uuid primary key default gen_random_uuid(),
+  user_id uuid not null references public.users(id) on delete cascade,
+  role text not null default 'support',
+  permissions text[] not null default '{}'::text[],
+  display_name text,
+  is_active boolean not null default true,
+  created_at timestamptz default now(),
+  updated_at timestamptz default now(),
+  constraint admin_staff_role_check check (role in ('admin', 'support', 'operator', 'reviewer'))
+);
+
+alter table if exists public.admin_staff
+  add column if not exists user_id uuid references public.users(id) on delete cascade,
+  add column if not exists role text default 'support',
+  add column if not exists permissions text[] default '{}'::text[],
+  add column if not exists display_name text,
+  add column if not exists is_active boolean default true,
+  add column if not exists created_at timestamptz default now(),
+  add column if not exists updated_at timestamptz default now();
+
+create unique index if not exists idx_admin_staff_user_id
+  on public.admin_staff (user_id);
+
+create table if not exists public.admin_operation_logs (
+  id uuid primary key default gen_random_uuid(),
+  actor_user_id uuid references public.users(id) on delete set null,
+  action text not null,
+  target_type text,
+  target_id text,
+  detail jsonb default '{}'::jsonb,
+  ip text,
+  created_at timestamptz default now()
+);
+
+alter table if exists public.admin_operation_logs
+  add column if not exists actor_user_id uuid references public.users(id) on delete set null,
+  add column if not exists action text,
+  add column if not exists target_type text,
+  add column if not exists target_id text,
+  add column if not exists detail jsonb default '{}'::jsonb,
+  add column if not exists ip text,
+  add column if not exists created_at timestamptz default now();
+
+create index if not exists idx_admin_operation_logs_created
+  on public.admin_operation_logs (created_at desc);
+
+create table if not exists public.admin_activities (
+  id uuid primary key default gen_random_uuid(),
+  title text not null,
+  summary text default '',
+  content text default '',
+  banner_image text default '',
+  status text not null default 'draft',
+  starts_at timestamptz,
+  ends_at timestamptz,
+  created_by uuid references public.users(id) on delete set null,
+  created_at timestamptz default now(),
+  updated_at timestamptz default now(),
+  constraint admin_activities_status_check check (status in ('draft', 'published', 'offline'))
+);
+
+alter table if exists public.admin_activities
+  add column if not exists title text,
+  add column if not exists summary text default '',
+  add column if not exists content text default '',
+  add column if not exists banner_image text default '',
+  add column if not exists status text default 'draft',
+  add column if not exists starts_at timestamptz,
+  add column if not exists ends_at timestamptz,
+  add column if not exists created_by uuid references public.users(id) on delete set null,
+  add column if not exists created_at timestamptz default now(),
+  add column if not exists updated_at timestamptz default now();
+
+create index if not exists idx_admin_activities_status_created
+  on public.admin_activities (status, created_at desc);
+
+create table if not exists public.coupons (
+  id uuid primary key default gen_random_uuid(),
+  title text not null,
+  code text,
+  amount double precision not null default 0.0,
+  min_spend double precision not null default 0.0,
+  total_count integer not null default 0,
+  issued_count integer not null default 0,
+  status text not null default 'draft',
+  starts_at timestamptz,
+  ends_at timestamptz,
+  created_by uuid references public.users(id) on delete set null,
+  created_at timestamptz default now(),
+  updated_at timestamptz default now(),
+  constraint coupons_status_check check (status in ('draft', 'active', 'offline'))
+);
+
+alter table if exists public.coupons
+  add column if not exists title text,
+  add column if not exists code text,
+  add column if not exists amount double precision default 0.0,
+  add column if not exists min_spend double precision default 0.0,
+  add column if not exists total_count integer default 0,
+  add column if not exists issued_count integer default 0,
+  add column if not exists status text default 'draft',
+  add column if not exists starts_at timestamptz,
+  add column if not exists ends_at timestamptz,
+  add column if not exists created_by uuid references public.users(id) on delete set null,
+  add column if not exists created_at timestamptz default now(),
+  add column if not exists updated_at timestamptz default now();
+
+create unique index if not exists idx_coupons_code
+  on public.coupons (code)
+  where code is not null;
+
+create index if not exists idx_coupons_status_created
+  on public.coupons (status, created_at desc);
+
+create table if not exists public.customer_service_tickets (
+  id uuid primary key default gen_random_uuid(),
+  user_id uuid references public.users(id) on delete set null,
+  room_id uuid references public.chat_rooms(id) on delete set null,
+  title text not null default '客服会话',
+  status text not null default 'open',
+  priority text not null default 'normal',
+  assigned_to uuid references public.users(id) on delete set null,
+  last_message text,
+  last_message_at timestamptz,
+  created_at timestamptz default now(),
+  updated_at timestamptz default now(),
+  constraint customer_service_tickets_status_check check (status in ('open', 'pending', 'closed')),
+  constraint customer_service_tickets_priority_check check (priority in ('low', 'normal', 'high'))
+);
+
+alter table if exists public.customer_service_tickets
+  add column if not exists user_id uuid references public.users(id) on delete set null,
+  add column if not exists room_id uuid references public.chat_rooms(id) on delete set null,
+  add column if not exists title text default '客服会话',
+  add column if not exists status text default 'open',
+  add column if not exists priority text default 'normal',
+  add column if not exists assigned_to uuid references public.users(id) on delete set null,
+  add column if not exists last_message text,
+  add column if not exists last_message_at timestamptz,
+  add column if not exists created_at timestamptz default now(),
+  add column if not exists updated_at timestamptz default now();
+
+create index if not exists idx_customer_service_tickets_status_updated
+  on public.customer_service_tickets (status, updated_at desc);
+
 -- ---------------------------------------------------------------------------
 -- Runtime triggers / functions
 -- ---------------------------------------------------------------------------

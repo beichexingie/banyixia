@@ -134,7 +134,7 @@ class _GuideOrderCenterPageState extends State<GuideOrderCenterPage> {
                         padding: const EdgeInsets.only(bottom: 18),
                         child: _GuideOrderCard(
                           data: order,
-                          onChatTap: widget.onOpenChat,
+                          onChatTap: () => _contactCustomer(order),
                           onPrimaryTap: order.primaryAction == GuideOrderAction.navigate
                               ? () => widget.onOpenRoute(order)
                               : () {
@@ -156,6 +156,36 @@ class _GuideOrderCenterPageState extends State<GuideOrderCenterPage> {
         ],
       ),
     );
+  }
+
+  Future<void> _contactCustomer(GuideOrderCardData order) async {
+    try {
+      final virtualNumber = await context
+          .read<OrderProvider>()
+          .getVirtualNumber(order.id);
+      if (!mounted) return;
+      await showDialog<void>(
+        context: context,
+        builder: (context) => AlertDialog(
+          title: const Text('虚拟号联系'),
+          content: Text(
+            '请拨打平台虚拟号联系客户：\n\n$virtualNumber\n\n该号码为隐私保护号码，不会暴露双方真实手机号。',
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(context).pop(),
+              child: const Text('知道了'),
+            ),
+          ],
+        ),
+      );
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('虚拟号不可用，已转到消息：$e')),
+      );
+      widget.onOpenChat();
+    }
   }
 }
 

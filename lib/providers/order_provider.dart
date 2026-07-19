@@ -200,4 +200,19 @@ class OrderProvider extends ChangeNotifier {
     await _api.post('/orders/$orderId/cancel', authToken: _token());
     await loadOrders();
   }
+
+  Future<String> getVirtualNumber(String orderId) async {
+    final response = await _api.post(
+      '/orders/$orderId/virtual-number',
+      authToken: _token(),
+    );
+    final data = response['data'];
+    if (data is Map<String, dynamic>) {
+      final phoneNoX = data['phone_no_x']?.toString() ?? '';
+      if (phoneNoX.trim().isNotEmpty) {
+        return phoneNoX.trim();
+      }
+    }
+    throw Exception('虚拟号返回为空');
+  }
 }

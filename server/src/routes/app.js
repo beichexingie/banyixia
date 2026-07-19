@@ -17,6 +17,8 @@ import {
   updatePostLikes,
 } from '../repositories/posts.js';
 import { ensureChatRoom, findOrderById, findOrderByMerchantOrderNo } from '../repositories/orders.js';
+import { assertPayloadAllowed, assertTextAllowed } from '../services/moderation.js';
+import { bindAxbVirtualNumber } from '../services/virtual_number.js';
 
 export const appRouter = express.Router();
 const __filename = fileURLToPath(import.meta.url);
@@ -30,6 +32,9 @@ function handleRoute(handler) {
     } catch (error) {
       console.error(`[appRouter] ${req.method} ${req.originalUrl}`, error);
       if (res.headersSent) return;
+      if (error.statusCode) {
+        return fail(res, error.statusCode, error.message || '请求失败');
+      }
       return fail(res, 500, error.message || '服务器内部错误');
     }
   };
@@ -272,6 +277,14 @@ appRouter.post('/auth/verify-code', handleRoute(async (req, res) => {
 appRouter.post('/auth/logout', async (_req, res) => {
   return ok(res, { message: '已退出登录' });
 });
+
+appRouter.post('/moderation/review', handleRoute(async (req, res) => {
+  const payload = req.body ?? {};
+  assertTextAllowed(payload.text?.toString() ?? '', {
+    field: payload.field?.toString() || '内容',
+  });
+  return ok(res, { data: { passed: true }, message: '审核通过' });
+}));
 
 appRouter.get('/users/me', async (req, res) => {
   const userId = await requireSessionUser(req, res);
@@ -637,6 +650,11 @@ appRouter.post('/posts', async (req, res) => {
   const userId = await requireSessionUser(req, res);
   if (!userId) return;
   const payload = req.body ?? {};
+  assertPayloadAllowed(payload, [
+    { key: 'title', label: '标题' },
+    { key: 'content', label: '正文' },
+    { key: 'tag', label: '位置/标签' },
+  ]);
   const created = await createPost(pool, {
     user_id: userId,
     author_name: payload.author_name ?? '我',
@@ -833,6 +851,7 @@ appRouter.post('/posts/:id/comments', async (req, res) => {
 
   const content = req.body?.content?.toString().trim() ?? '';
   if (!content) return fail(res, 400, 'comment cannot be empty');
+  assertTextAllowed(content, { field: '评论' });
 
   const parentCommentIdRaw =
     req.body?.parent_comment_id?.toString().trim() ?? '';
@@ -1085,6 +1104,12 @@ appRouter.post('/demands', async (req, res) => {
   const userId = await requireSessionUser(req, res);
   if (!userId) return;
   const payload = req.body ?? {};
+  assertPayloadAllowed(payload, [
+    { key: 'title', label: '需求标题' },
+    { key: 'content', label: '需求内容' },
+    { key: 'city', label: '服务城市' },
+    { key: 'location', label: '服务地点' },
+  ]);
   const result = await pool.query(
     `
       insert into public.demands (
@@ -1143,6 +1168,9 @@ appRouter.post('/demands/:id/apply', async (req, res) => {
   if (!guide) return fail(res, 403, '当前账号还不是已入驻地陪');
 
   const payload = req.body ?? {};
+  assertPayloadAllowed(payload, [
+    { key: 'note', label: '报名备注' },
+  ]);
   const result = await pool.query(
     `
       insert into public.demand_applications (
@@ -1326,6 +1354,9 @@ appRouter.post('/chat/rooms/:id/messages', async (req, res) => {
   const roomId = req.params.id;
   const content = req.body?.content?.toString() ?? '';
   const type = req.body?.type?.toString() ?? 'text';
+  if (type === 'text') {
+    assertTextAllowed(content, { field: '聊天内容' });
+  }
   const result = await pool.query(
     `
       insert into public.messages (room_id, sender_id, content, type)
@@ -1457,6 +1488,89 @@ appRouter.post('/orders/:id/cancel', handleRoute(async (req, res) => {
   }
   await pool.query(`update public.orders set status = 4 where id = $1`, [req.params.id]);
   return ok(res, { message: '已取消' });
+}));
+
+appRouter.post('/orders/:id/virtual-number', handleRoute(async (req, res) => {
+  const userId = await requireSessionUser(req, res);
+  if (!userId) return;
+
+  const orderResult = await pool.query(
+    `
+      select
+        o.id,
+        o.user_id,
+        o.guide_id,
+        customer.phone as customer_phone,
+        guide_user.phone as guide_phone
+      from public.orders o
+      join public.users customer on customer.id = o.user_id
+      join public.users guide_user on guide_user.id = o.guide_id
+      where o.id = $1
+      limit 1
+    `,
+    [req.params.id],
+  );
+  const order = orderResult.rows[0];
+  if (!order) return fail(res, 404, '订单不存在');
+  if (order.user_id !== userId && order.guide_id !== userId) {
+    return fail(res, 403, '无权联系该订单用户');
+  }
+  if (!order.customer_phone || !order.guide_phone) {
+    return fail(res, 400, '订单双方手机号不完整，无法绑定虚拟号');
+  }
+
+  const existing = await pool.query(
+    `
+      select *
+      from public.virtual_number_bindings
+      where order_id = $1 and expires_at > now()
+      order by created_at desc
+      limit 1
+    `,
+    [order.id],
+  );
+  if (existing.rows[0]) {
+    return ok(res, {
+      data: {
+        phone_no_x: existing.rows[0].phone_no_x,
+        expires_at: existing.rows[0].expires_at,
+      },
+      message: '已获取虚拟号',
+    });
+  }
+
+  const outId = `order_${order.id}_${Date.now()}`;
+  const bindResult = await bindAxbVirtualNumber({
+    phoneNoA: order.customer_phone,
+    phoneNoB: order.guide_phone,
+    outId,
+    expirationSeconds: 3600,
+  });
+  const saved = await pool.query(
+    `
+      insert into public.virtual_number_bindings (
+        order_id, user_id, guide_id, phone_no_x, bind_id, out_id, expires_at, provider_payload
+      ) values ($1,$2,$3,$4,$5,$6,now() + interval '1 hour',$7::jsonb)
+      returning *
+    `,
+    [
+      order.id,
+      order.user_id,
+      order.guide_id,
+      bindResult.phoneNoX,
+      bindResult.bindId,
+      outId,
+      JSON.stringify(bindResult.raw ?? {}),
+    ],
+  );
+
+  return ok(res, {
+    data: {
+      phone_no_x: saved.rows[0].phone_no_x,
+      expires_at: saved.rows[0].expires_at,
+    },
+    message: '已获取虚拟号',
+  });
 }));
 
 appRouter.get('/wallet', async (req, res) => {

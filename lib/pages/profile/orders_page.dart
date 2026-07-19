@@ -45,6 +45,31 @@ class _OrdersPageState extends State<OrdersPage>
 
   Future<void> _contactGuide(Order order) async {
     try {
+      final virtualNumber = await context
+          .read<OrderProvider>()
+          .getVirtualNumber(order.id);
+      if (!mounted) return;
+      await showDialog<void>(
+        context: context,
+        builder: (context) => AlertDialog(
+          title: const Text('虚拟号联系'),
+          content: Text(
+            '请拨打平台虚拟号联系地陪：\n\n$virtualNumber\n\n该号码为隐私保护号码，不会暴露双方真实手机号。',
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(context).pop(),
+              child: const Text('知道了'),
+            ),
+          ],
+        ),
+      );
+      return;
+    } catch (e) {
+      debugPrint('Get virtual number fallback to chat: $e');
+    }
+
+    try {
       final roomId = await context.read<MessageProvider>().getOrCreateRoom(
         order.guideId,
       );
