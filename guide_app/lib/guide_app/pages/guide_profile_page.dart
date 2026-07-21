@@ -26,6 +26,7 @@ class GuideProfilePage extends StatelessWidget {
   Widget build(BuildContext context) {
     final user = context.watch<UserProvider>().user;
     final console = context.watch<GuideConsoleProvider>();
+    final stats = console.stats;
 
     return GuideAppScaffold(
       backgroundColor: const Color(0xFFF0F1F3),
@@ -87,6 +88,17 @@ class GuideProfilePage extends StatelessWidget {
           ),
           const SizedBox(height: 20),
           GuideSectionCard(
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.spaceAround,
+              children: [
+                _ProfileStat(label: '接单量', value: '${stats.totalOrders}'),
+                _ProfileStat(label: '完单量', value: '${stats.completedOrders}'),
+                _ProfileStat(label: '好评数', value: '${stats.positiveReviews}'),
+                _ProfileStat(label: '退单量', value: '${stats.cancelOrders}'),
+              ],
+            ),
+          ),
+          if (false) GuideSectionCard(
             child: Row(
               mainAxisAlignment: MainAxisAlignment.spaceAround,
               children: const [

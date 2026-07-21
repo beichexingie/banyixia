@@ -106,8 +106,99 @@ class _GuideAppGate extends StatelessWidget {
     if (!userProvider.isLoggedIn) {
       return const LoginPage();
     }
+    if (!userProvider.user.isGuideApproved) {
+      return GuideAccessGatePage(
+        status: userProvider.user.guideApplicationStatus,
+      );
+    }
 
     return const _GuideMainShell();
+  }
+}
+
+class GuideAccessGatePage extends StatelessWidget {
+  final String? status;
+
+  const GuideAccessGatePage({
+    super.key,
+    required this.status,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final isPending = status == 'pending';
+    final isRejected = status == 'rejected';
+    final title = isPending
+        ? '地陪认证审核中'
+        : isRejected
+            ? '地陪认证未通过'
+            : '请先完成地陪认证';
+    final message = isPending
+        ? '你的地陪入驻资料已经提交，平台审核通过后才能进入地陪端接单。'
+        : isRejected
+            ? '你的地陪入驻资料暂未通过，请回到客户端补充或重新提交认证资料。'
+            : '当前账号还不是认证地陪。请先在客户端提交地陪入驻申请，通过后再使用地陪端。';
+
+    return Scaffold(
+      backgroundColor: const Color(0xFFF0F1F3),
+      body: SafeArea(
+        child: Center(
+          child: Padding(
+            padding: const EdgeInsets.all(24),
+            child: Container(
+              width: double.infinity,
+              padding: const EdgeInsets.all(24),
+              decoration: BoxDecoration(
+                color: Colors.white,
+                borderRadius: BorderRadius.circular(28),
+              ),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Icon(
+                    isRejected
+                        ? Icons.error_outline_rounded
+                        : isPending
+                            ? Icons.hourglass_top_rounded
+                            : Icons.verified_user_outlined,
+                    size: 68,
+                    color: AppColors.primaryDark,
+                  ),
+                  const SizedBox(height: 18),
+                  Text(
+                    title,
+                    textAlign: TextAlign.center,
+                    style: const TextStyle(
+                      fontSize: 24,
+                      fontWeight: FontWeight.w900,
+                      color: AppColors.textPrimary,
+                    ),
+                  ),
+                  const SizedBox(height: 12),
+                  Text(
+                    message,
+                    textAlign: TextAlign.center,
+                    style: const TextStyle(
+                      fontSize: 15,
+                      height: 1.6,
+                      color: AppColors.textSecondary,
+                    ),
+                  ),
+                  const SizedBox(height: 22),
+                  SizedBox(
+                    width: double.infinity,
+                    child: ElevatedButton(
+                      onPressed: () => context.read<UserProvider>().logout(),
+                      child: const Text('退出当前账号'),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
   }
 }
 

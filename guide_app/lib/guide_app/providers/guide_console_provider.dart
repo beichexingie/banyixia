@@ -331,7 +331,7 @@ class GuideConsoleProvider extends ChangeNotifier {
   List<GuideOrderCardData> buildGuideOrders(List<Order> orders) {
     final guideSideOrders = orders.where((item) => item.guideId.isNotEmpty).toList();
     if (guideSideOrders.isEmpty) {
-      return _mockGuideOrders;
+      return const [];
     }
     return guideSideOrders.map((order) {
       final stage = switch (order.status) {
