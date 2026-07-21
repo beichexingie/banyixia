@@ -107,8 +107,8 @@ async function getGreenClient() {
     const Config = openApiModule.default?.Config ?? openApiModule.Config;
     const GreenClient = greenModule.default?.default ?? greenModule.default ?? greenModule.Client;
     return new GreenClient(new Config({
-      accessKeyId: config.aliyunAccessKeyId,
-      accessKeySecret: config.aliyunAccessKeySecret,
+      accessKeyId: config.aliyunContentSafetyAccessKeyId,
+      accessKeySecret: config.aliyunContentSafetyAccessKeySecret,
       endpoint: config.aliyunGreenEndpoint,
     }));
   })();
@@ -118,8 +118,8 @@ async function getGreenClient() {
 function canUseAliyunModeration() {
   return Boolean(
     config.aliyunContentSafetyEnabled &&
-    config.aliyunAccessKeyId &&
-    config.aliyunAccessKeySecret,
+    config.aliyunContentSafetyAccessKeyId &&
+    config.aliyunContentSafetyAccessKeySecret,
   );
 }
 

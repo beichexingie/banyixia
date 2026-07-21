@@ -66,6 +66,14 @@ export const config = {
   aliyunGreenEndpoint: process.env.ALIYUN_GREEN_ENDPOINT?.trim() || 'green-cip.cn-shanghai.aliyuncs.com',
   aliyunTextModerationService: process.env.ALIYUN_TEXT_MODERATION_SERVICE?.trim() || 'comment_detection',
   aliyunImageModerationService: process.env.ALIYUN_IMAGE_MODERATION_SERVICE?.trim() || 'baselineCheck_global',
+  aliyunContentSafetyAccessKeyId:
+    process.env.ALIYUN_CONTENT_SAFETY_ACCESS_KEY_ID?.trim() ||
+    process.env.ALIYUN_ACCESS_KEY_ID?.trim() ||
+    '',
+  aliyunContentSafetyAccessKeySecret:
+    process.env.ALIYUN_CONTENT_SAFETY_ACCESS_KEY_SECRET?.trim() ||
+    process.env.ALIYUN_ACCESS_KEY_SECRET?.trim() ||
+    '',
   aliyunAccessKeyId: process.env.ALIYUN_ACCESS_KEY_ID?.trim() || '',
   aliyunAccessKeySecret: process.env.ALIYUN_ACCESS_KEY_SECRET?.trim() || '',
   aliyunDyplsPoolKey: process.env.ALIYUN_DYPLS_POOL_KEY?.trim() || '',
