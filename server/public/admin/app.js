@@ -364,15 +364,22 @@ async function renderReviews() {
   });
   els.content.querySelectorAll('[data-review]').forEach((button) => {
     button.addEventListener('click', async () => {
-      const reason = button.dataset.review === 'reject'
-        ? window.prompt('填写拒绝原因，可留空') || ''
-        : '';
-      await api(`/api/admin/review/${button.dataset.type}/${button.dataset.id}/${button.dataset.review}`, {
-        method: 'POST',
-        body: JSON.stringify({ reject_reason: reason }),
-      });
-      toast('审核状态已更新');
-      renderReviews();
+      try {
+        button.disabled = true;
+        const reason = button.dataset.review === 'reject'
+          ? window.prompt('填写拒绝原因，可留空') || ''
+          : '';
+        await api(`/api/admin/review/${button.dataset.type}/${button.dataset.id}/${button.dataset.review}`, {
+          method: 'POST',
+          body: JSON.stringify({ reject_reason: reason }),
+        });
+        toast('审核状态已更新');
+        renderReviews();
+      } catch (error) {
+        toast(`审核失败：${error.message}`);
+      } finally {
+        button.disabled = false;
+      }
     });
   });
 }

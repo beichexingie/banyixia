@@ -413,6 +413,47 @@ async function updateContentReview(req, res, status) {
       `,
       [req.params.id, status === 'approved' ? 'approved' : 'rejected', reason],
     );
+    if (status === 'approved' && result.rows[0]) {
+      await pool.query(
+        `
+          insert into public.guides (
+            id, name, avatar, rating, gender, verified, tags, description, images, views, likes, fans, city, created_at
+          )
+          select
+            ga.user_id,
+            coalesce(nullif(ga.full_name, ''), u.nickname, '认证地陪'),
+            coalesce(nullif(ga.avatar, ''), u.avatar, ''),
+            5.0,
+            coalesce(ga.gender, u.gender, ''),
+            true,
+            coalesce(ga.service_tags, u.guide_tags, array[]::text[]),
+            coalesce(nullif(ga.bio, ''), u.guide_introduction, u.bio, ''),
+            coalesce(ga.images, array[]::text[]),
+            0,
+            0,
+            0,
+            coalesce(nullif(ga.city, ''), u.city, ''),
+            now()
+          from public.guide_applications ga
+          join public.users u on u.id = ga.user_id
+          where ga.id = $1
+          on conflict (id) do update set
+            name = excluded.name,
+            avatar = excluded.avatar,
+            gender = excluded.gender,
+            verified = true,
+            tags = excluded.tags,
+            description = excluded.description,
+            images = excluded.images,
+            city = excluded.city
+        `,
+        [req.params.id],
+      );
+      await pool.query(
+        `insert into public.wallets (user_id) values ($1) on conflict (user_id) do nothing`,
+        [result.rows[0].user_id],
+      );
+    }
   } else {
     result = await pool.query(
       `
