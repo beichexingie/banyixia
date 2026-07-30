@@ -83,6 +83,24 @@ class _GuideOrderCenterPageState extends State<GuideOrderCenterPage> {
                           ],
                         ),
                       ),
+                      InkWell(
+                        onTap: () => context.read<OrderProvider>().loadOrders(),
+                        borderRadius: BorderRadius.circular(999),
+                        child: const Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Icon(Icons.refresh_rounded, size: 24),
+                            SizedBox(width: 6),
+                            Text(
+                              '刷新',
+                              style: TextStyle(
+                                fontSize: 16,
+                                fontWeight: FontWeight.w800,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
                     ],
                   ),
                   const SizedBox(height: 18),
@@ -140,6 +158,12 @@ class _GuideOrderCenterPageState extends State<GuideOrderCenterPage> {
                               : () async {
                                   if (order.primaryAction == GuideOrderAction.accept) {
                                     await _acceptOrder(order);
+                                    return;
+                                  }
+                                  if (order.primaryAction == GuideOrderAction.waitingPayment) {
+                                    ScaffoldMessenger.of(context).showSnackBar(
+                                      const SnackBar(content: Text('已接单，等待用户付款')),
+                                    );
                                     return;
                                   }
                                   if (order.primaryAction == GuideOrderAction.arrived) {
@@ -312,7 +336,7 @@ class _GuideOrderCard extends StatelessWidget {
                   ),
                   const SizedBox(width: 6),
                   Text(
-                    '¥${data.amount.toStringAsFixed(0)}',
+                    '¥${_formatAmount(data.amount)}',
                     style: const TextStyle(
                       fontSize: 18,
                       fontWeight: FontWeight.w900,
@@ -341,7 +365,7 @@ class _GuideOrderCard extends StatelessWidget {
                 ),
                 _OrderInfoChip(
                   icon: Icons.attach_money_rounded,
-                  label: '订单金额 ¥${data.amount.toStringAsFixed(0)}',
+                  label: '订单金额 ¥${_formatAmount(data.amount)}',
                 ),
                 _OrderInfoChip(
                   icon: Icons.place_outlined,
@@ -350,6 +374,38 @@ class _GuideOrderCard extends StatelessWidget {
               ],
             ),
           ),
+          if (data.stage == GuideOrderStage.inProgress) ...[
+            const SizedBox(height: 12),
+            Container(
+              width: double.infinity,
+              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+              decoration: BoxDecoration(
+                color: const Color(0xFFEFFFF1),
+                borderRadius: BorderRadius.circular(16),
+                border: Border.all(color: const Color(0xFFCDEFD3)),
+              ),
+              child: Row(
+                children: [
+                  const Icon(
+                    Icons.account_balance_wallet_outlined,
+                    size: 20,
+                    color: Color(0xFF2F8F43),
+                  ),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: Text(
+                      '已入账 ¥${_formatAmount(data.amount)}，当前为平台托管中，订单完成后可提现',
+                      style: const TextStyle(
+                        fontSize: 13,
+                        fontWeight: FontWeight.w800,
+                        color: Color(0xFF2F8F43),
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
           const SizedBox(height: 16),
           Container(
             width: double.infinity,
@@ -481,6 +537,13 @@ String _formatServiceTime(DateTime serviceTime) {
   final hour = serviceTime.hour.toString().padLeft(2, '0');
   final minute = serviceTime.minute.toString().padLeft(2, '0');
   return '$month/$day $hour:$minute 服务';
+}
+
+String _formatAmount(double amount) {
+  if (amount > 0 && amount < 1) {
+    return amount.toStringAsFixed(2);
+  }
+  return amount.toStringAsFixed(0);
 }
 
 class _OutlineActionButton extends StatelessWidget {

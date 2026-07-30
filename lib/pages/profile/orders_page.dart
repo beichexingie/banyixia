@@ -132,6 +132,13 @@ class _OrdersPageState extends State<OrdersPage>
           '我的订单',
           style: TextStyle(fontWeight: FontWeight.w800),
         ),
+        actions: [
+          IconButton(
+            onPressed: () => context.read<OrderProvider>().loadOrders(),
+            icon: const Icon(Icons.refresh_rounded),
+            tooltip: '刷新订单',
+          ),
+        ],
         bottom: PreferredSize(
           preferredSize: const Size.fromHeight(44),
           child: Container(
@@ -259,7 +266,11 @@ class _OrdersPageState extends State<OrdersPage>
     final (statusText, statusColor) = _statusMeta(order.status);
     final isDebugOrder =
         order.serviceName.contains('0.01') ||
-        (order.merchantOrderNo?.startsWith('DBG') ?? false);
+        (order.merchantOrderNo?.startsWith('DBG') ?? false) ||
+        (order.merchantOrderNo?.startsWith('TEST001') ?? false);
+    final waitingGuideAccept = isDebugOrder &&
+        order.status == OrderStatus.pendingPayment &&
+        order.paymentStatus == 'pending';
     final isPaying = _payingOrderIds.contains(order.id);
     final isCompleting = _completingOrderIds.contains(order.id);
 
@@ -342,7 +353,7 @@ class _OrdersPageState extends State<OrdersPage>
                         ),
                         const SizedBox(width: 8),
                         Text(
-                          '¥${order.amount.toStringAsFixed(0)}',
+                          '¥${_formatAmount(order.amount)}',
                           style: const TextStyle(
                             fontSize: 17,
                             fontWeight: FontWeight.w800,
@@ -421,8 +432,12 @@ class _OrdersPageState extends State<OrdersPage>
                 ),
                 const SizedBox(width: 8),
                 _outlineAction(
-                  label: isPaying ? '支付中...' : (isDebugOrder ? '继续支付' : '去支付'),
-                  onTap: isPaying ? null : () => _payOrder(order),
+                  label: waitingGuideAccept
+                      ? '等待接单'
+                      : isPaying
+                          ? '支付中...'
+                          : (isDebugOrder ? '继续支付' : '去支付'),
+                  onTap: waitingGuideAccept || isPaying ? null : () => _payOrder(order),
                 ),
               ] else if (order.status == OrderStatus.inProgress) ...[
                 _outlineAction(
@@ -523,6 +538,13 @@ class _OrdersPageState extends State<OrdersPage>
       return '2026年6月15日 14:00';
     }
     return '${dateTime.year}年${dateTime.month}月${dateTime.day}日 ${dateTime.hour.toString().padLeft(2, '0')}:${dateTime.minute.toString().padLeft(2, '0')}';
+  }
+
+  String _formatAmount(double amount) {
+    if (amount > 0 && amount < 1) {
+      return amount.toStringAsFixed(2);
+    }
+    return amount.toStringAsFixed(0);
   }
 
   void _showSimpleMessage(String text) {

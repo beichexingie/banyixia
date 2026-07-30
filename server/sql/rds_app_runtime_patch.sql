@@ -754,6 +754,62 @@ alter table if exists public.transactions
   alter column id set default gen_random_uuid(),
   alter column created_at set default now();
 
+create table if not exists public.guide_payout_accounts (
+  user_id uuid primary key references public.users(id) on delete cascade,
+  alipay_account text,
+  alipay_user_id text,
+  real_name text not null default '',
+  status text not null default 'pending',
+  reject_reason text,
+  verified_at timestamptz,
+  created_at timestamptz default now(),
+  updated_at timestamptz default now()
+);
+
+alter table if exists public.guide_payout_accounts
+  add column if not exists alipay_account text,
+  add column if not exists alipay_user_id text,
+  add column if not exists real_name text not null default '',
+  add column if not exists status text not null default 'pending',
+  add column if not exists reject_reason text,
+  add column if not exists verified_at timestamptz,
+  add column if not exists created_at timestamptz default now(),
+  add column if not exists updated_at timestamptz default now();
+
+create table if not exists public.withdrawal_requests (
+  id uuid primary key default gen_random_uuid(),
+  user_id uuid not null references public.users(id) on delete cascade,
+  amount double precision not null,
+  status text not null default 'pending',
+  payout_account_snapshot jsonb default '{}'::jsonb,
+  provider text default 'alipay',
+  provider_order_no text,
+  reject_reason text,
+  created_at timestamptz default now(),
+  reviewed_at timestamptz,
+  paid_at timestamptz,
+  updated_at timestamptz default now()
+);
+
+alter table if exists public.withdrawal_requests
+  add column if not exists user_id uuid references public.users(id) on delete cascade,
+  add column if not exists amount double precision,
+  add column if not exists status text not null default 'pending',
+  add column if not exists payout_account_snapshot jsonb default '{}'::jsonb,
+  add column if not exists provider text default 'alipay',
+  add column if not exists provider_order_no text,
+  add column if not exists reject_reason text,
+  add column if not exists created_at timestamptz default now(),
+  add column if not exists reviewed_at timestamptz,
+  add column if not exists paid_at timestamptz,
+  add column if not exists updated_at timestamptz default now();
+
+create index if not exists idx_withdrawal_requests_user_id
+  on public.withdrawal_requests (user_id);
+
+create index if not exists idx_withdrawal_requests_status_created
+  on public.withdrawal_requests (status, created_at desc);
+
 create table if not exists public.virtual_number_bindings (
   id uuid primary key default gen_random_uuid(),
   order_id uuid not null references public.orders(id) on delete cascade,

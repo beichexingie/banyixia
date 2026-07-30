@@ -287,6 +287,7 @@ extension GuideOrderStageX on GuideOrderStage {
 
 enum GuideOrderAction {
   accept,
+  waitingPayment,
   goToService,
   arrived,
   navigate,
@@ -297,6 +298,8 @@ extension GuideOrderActionX on GuideOrderAction {
     switch (this) {
       case GuideOrderAction.accept:
         return '接单';
+      case GuideOrderAction.waitingPayment:
+        return '等待付款';
       case GuideOrderAction.goToService:
         return '前往服务地点';
       case GuideOrderAction.arrived:
@@ -310,6 +313,8 @@ extension GuideOrderActionX on GuideOrderAction {
     switch (this) {
       case GuideOrderAction.accept:
         return Icons.check_circle_rounded;
+      case GuideOrderAction.waitingPayment:
+        return Icons.hourglass_top_rounded;
       case GuideOrderAction.goToService:
         return Icons.near_me_rounded;
       case GuideOrderAction.arrived:

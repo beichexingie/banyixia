@@ -17,6 +17,12 @@ import {
   updatePostLikes,
 } from '../repositories/posts.js';
 import { ensureChatRoom, findOrderById, findOrderByMerchantOrderNo } from '../repositories/orders.js';
+import {
+  freezeWithdrawBalance,
+  recordWalletTransaction,
+  refundWithdrawBalance,
+  releasePendingBalance,
+} from '../repositories/wallets.js';
 import { assertPayloadAllowed, assertTextAllowed, reviewImage } from '../services/moderation.js';
 import { bindAxbVirtualNumber } from '../services/virtual_number.js';
 
@@ -188,6 +194,17 @@ async function requireSessionUser(req, res) {
   const userId = getSessionUserId(req);
   if (!userId) {
     fail(res, 401, '未登录');
+    return null;
+  }
+  return userId;
+}
+
+async function requireAdminUser(req, res) {
+  const userId = await requireSessionUser(req, res);
+  if (!userId) return null;
+  const user = await hydrateUser(pool, userId);
+  if (!user?.is_admin) {
+    fail(res, 403, '无管理员权限');
     return null;
   }
   return userId;
@@ -1624,7 +1641,23 @@ appRouter.post('/orders/:id/complete', handleRoute(async (req, res) => {
   if (order.user_id !== userId && order.guide_id !== userId) {
     return fail(res, 403, '无权限操作订单');
   }
-  await pool.query(`update public.orders set status = 3 where id = $1`, [req.params.id]);
+  if (Number(order.status) === 3) {
+    return ok(res, { message: '订单已完成' });
+  }
+  await withTransaction(async (client) => {
+    await client.query(`update public.orders set status = 3 where id = $1`, [req.params.id]);
+    if (order.payment_status === 'paid') {
+      await releasePendingBalance(client, order.guide_id, Number(order.amount));
+      await recordWalletTransaction(client, {
+        userId: order.guide_id,
+        orderId: order.id,
+        type: 'income_available',
+        amount: Number(order.amount),
+        actualAmount: Number(order.amount),
+        description: `订单完成，收入转为可提现：${order.service_name ?? '地陪服务订单'}`,
+      });
+    }
+  });
   return ok(res, { message: '已完成' });
 }));
 
@@ -1728,8 +1761,196 @@ appRouter.get('/wallet', async (req, res) => {
   if (!userId) return;
   const wallet = await pool.query(`select * from public.wallets where user_id = $1 limit 1`, [userId]);
   const tx = await pool.query(`select * from public.transactions where user_id = $1 order by created_at desc`, [userId]);
-  return ok(res, { data: { wallet: wallet.rows[0] ?? null, transactions: tx.rows } });
+  const payoutAccount = await pool.query(
+    `select * from public.guide_payout_accounts where user_id = $1 limit 1`,
+    [userId],
+  );
+  const withdrawals = await pool.query(
+    `select * from public.withdrawal_requests where user_id = $1 order by created_at desc limit 50`,
+    [userId],
+  );
+  return ok(res, {
+    data: {
+      wallet: wallet.rows[0] ?? null,
+      payout_account: payoutAccount.rows[0] ?? null,
+      withdrawals: withdrawals.rows,
+      transactions: tx.rows,
+    },
+  });
 });
+
+appRouter.put('/wallet/payout-account', handleRoute(async (req, res) => {
+  const userId = await requireSessionUser(req, res);
+  if (!userId) return;
+  const payload = req.body ?? {};
+  const alipayAccount = payload.alipay_account?.toString().trim() ?? '';
+  const alipayUserId = payload.alipay_user_id?.toString().trim() ?? '';
+  const realName = payload.real_name?.toString().trim() ?? '';
+  if (!realName) return fail(res, 400, '真实姓名不能为空');
+  if (!alipayAccount && !alipayUserId) {
+    return fail(res, 400, '支付宝账号或支付宝 user_id 至少填写一个');
+  }
+  const result = await pool.query(
+    `
+      insert into public.guide_payout_accounts (
+        user_id, alipay_account, alipay_user_id, real_name, status, reject_reason, updated_at
+      ) values ($1,$2,$3,$4,'pending',null,now())
+      on conflict (user_id) do update set
+        alipay_account = excluded.alipay_account,
+        alipay_user_id = excluded.alipay_user_id,
+        real_name = excluded.real_name,
+        status = 'pending',
+        reject_reason = null,
+        updated_at = now()
+      returning *
+    `,
+    [userId, alipayAccount || null, alipayUserId || null, realName],
+  );
+  return ok(res, { data: result.rows[0], message: '收款账号已提交，等待平台审核' });
+}));
+
+appRouter.post('/wallet/withdraw', handleRoute(async (req, res) => {
+  const userId = await requireSessionUser(req, res);
+  if (!userId) return;
+  const amount = Number(req.body?.amount ?? 0);
+  if (!(amount > 0)) return fail(res, 400, '提现金额必须大于0');
+  const accountResult = await pool.query(
+    `select * from public.guide_payout_accounts where user_id = $1 limit 1`,
+    [userId],
+  );
+  const account = accountResult.rows[0];
+  if (!account || account.status !== 'approved') {
+    return fail(res, 400, '请先绑定并通过审核支付宝收款账号');
+  }
+
+  const created = await withTransaction(async (client) => {
+    const wallet = await freezeWithdrawBalance(client, userId, amount);
+    if (!wallet) {
+      const error = new Error('可提现余额不足');
+      error.statusCode = 400;
+      throw error;
+    }
+    const result = await client.query(
+      `
+        insert into public.withdrawal_requests (
+          user_id, amount, status, payout_account_snapshot, provider, updated_at
+        ) values ($1,$2,'pending',$3::jsonb,'alipay',now())
+        returning *
+      `,
+      [userId, amount, JSON.stringify(account)],
+    );
+    await recordWalletTransaction(client, {
+      userId,
+      orderId: null,
+      type: 'withdraw_freeze',
+      amount: -amount,
+      actualAmount: -amount,
+      description: '申请提现，冻结可提现余额',
+    });
+    return result.rows[0];
+  });
+
+  return ok(res, { data: created, message: '提现申请已提交' });
+}));
+
+appRouter.get('/admin/withdrawals', handleRoute(async (req, res) => {
+  const adminId = await requireAdminUser(req, res);
+  if (!adminId) return;
+  const status = req.query.status?.toString().trim();
+  const result = await pool.query(
+    `
+      select wr.*, u.phone, u.nickname
+      from public.withdrawal_requests wr
+      join public.users u on u.id = wr.user_id
+      where ($1::text is null or wr.status = $1)
+      order by wr.created_at desc
+      limit 200
+    `,
+    [status || null],
+  );
+  return ok(res, { data: result.rows });
+}));
+
+appRouter.post('/admin/withdrawals/:id/approve', handleRoute(async (req, res) => {
+  const adminId = await requireAdminUser(req, res);
+  if (!adminId) return;
+  const result = await pool.query(
+    `
+      update public.withdrawal_requests
+      set status = 'approved', reviewed_at = now(), updated_at = now()
+      where id = $1 and status = 'pending'
+      returning *
+    `,
+    [req.params.id],
+  );
+  if (!result.rows[0]) return fail(res, 404, '提现申请不存在或状态不可审核');
+  return ok(res, { data: result.rows[0], message: '提现申请已审核通过' });
+}));
+
+appRouter.post('/admin/withdrawals/:id/reject', handleRoute(async (req, res) => {
+  const adminId = await requireAdminUser(req, res);
+  if (!adminId) return;
+  const reason = req.body?.reason?.toString().trim() ?? '审核未通过';
+  const rejected = await withTransaction(async (client) => {
+    const query = await client.query(
+      `
+        update public.withdrawal_requests
+        set status = 'rejected', reject_reason = $2, reviewed_at = now(), updated_at = now()
+        where id = $1 and status in ('pending','approved')
+        returning *
+      `,
+      [req.params.id, reason],
+    );
+    const item = query.rows[0];
+    if (!item) return null;
+    await refundWithdrawBalance(client, item.user_id, Number(item.amount));
+    await recordWalletTransaction(client, {
+      userId: item.user_id,
+      orderId: null,
+      type: 'withdraw_reject_refund',
+      amount: Number(item.amount),
+      actualAmount: Number(item.amount),
+      description: `提现驳回，余额退回：${reason}`,
+    });
+    return item;
+  });
+  if (!rejected) return fail(res, 404, '提现申请不存在或状态不可驳回');
+  return ok(res, { data: rejected, message: '提现申请已驳回并退回余额' });
+}));
+
+appRouter.post('/admin/withdrawals/:id/mark-paid', handleRoute(async (req, res) => {
+  const adminId = await requireAdminUser(req, res);
+  if (!adminId) return;
+  const providerOrderNo = req.body?.provider_order_no?.toString().trim() ?? '';
+  const paid = await withTransaction(async (client) => {
+    const query = await client.query(
+      `
+        update public.withdrawal_requests
+        set
+          status = 'paid',
+          provider_order_no = coalesce($2, provider_order_no),
+          paid_at = now(),
+          updated_at = now()
+        where id = $1 and status = 'approved'
+        returning *
+      `,
+      [req.params.id, providerOrderNo || null],
+    );
+    const item = query.rows[0];
+    if (!item) return null;
+    await recordWalletTransaction(client, {
+      userId: item.user_id,
+      orderId: null,
+      type: 'withdraw_paid',
+      amount: -Number(item.amount),
+      actualAmount: -Number(item.amount),
+      description: '提现已打款到支付宝',
+    });
+    return item;
+  });
+  if (!paid) return fail(res, 404, '提现申请不存在或尚未审核通过');
+  return ok(res, { data: paid, message: '提现已标记为打款完成' });
+}));
 
 appRouter.post('/uploads/post-image', handleRoute(async (req, res) => {
   const userId = await requireSessionUser(req, res);

@@ -18,7 +18,7 @@ class ProfilePage extends StatefulWidget {
 }
 
 class _ProfilePageState extends State<ProfilePage> {
-  bool _isDebugPaying = false;
+  bool _isCreatingTestOrder = false;
 
   @override
   void initState() {
@@ -36,35 +36,26 @@ class _ProfilePageState extends State<ProfilePage> {
     ]);
   }
 
-  Future<void> _startDebugPayment() async {
+  Future<void> _createOneCentTestOrder() async {
     final userProvider = context.read<UserProvider>();
     if (!userProvider.isLoggedIn) {
-      _showSnack('请先登录后再发起 0.01 支付测试');
+      _showSnack('请先登录后再创建 0.01 测试订单');
       return;
     }
-    if (_isDebugPaying) {
-      return;
-    }
+    if (_isCreatingTestOrder) return;
 
-    setState(() {
-      _isDebugPaying = true;
-    });
+    setState(() => _isCreatingTestOrder = true);
     try {
-      final result = await context.read<OrderProvider>().createAndPayDebugOrder();
+      final order = await context.read<OrderProvider>().createOneCentTestOrder();
       if (!mounted) return;
-      _showSnack(
-        result.success
-            ? '0.01 测试订单已创建，正在拉起支付宝'
-            : result.message,
-      );
+      _showSnack('0.01 测试订单已创建，等待地陪接单');
+      context.push('/profile/orders?tab=1', extra: order);
     } catch (e) {
       if (!mounted) return;
-      _showSnack('0.01 测试失败: $e');
+      _showSnack('创建 0.01 测试订单失败: $e');
     } finally {
       if (mounted) {
-        setState(() {
-          _isDebugPaying = false;
-        });
+        setState(() => _isCreatingTestOrder = false);
       }
     }
   }
@@ -396,7 +387,7 @@ class _ProfilePageState extends State<ProfilePage> {
           ),
           const SizedBox(height: 14),
           InkWell(
-            onTap: _isDebugPaying ? null : _startDebugPayment,
+            onTap: _isCreatingTestOrder ? null : _createOneCentTestOrder,
             borderRadius: BorderRadius.circular(16),
             child: Container(
               width: double.infinity,
@@ -416,7 +407,7 @@ class _ProfilePageState extends State<ProfilePage> {
                       borderRadius: BorderRadius.circular(12),
                     ),
                     alignment: Alignment.center,
-                    child: _isDebugPaying
+                    child: _isCreatingTestOrder
                         ? const SizedBox(
                             width: 16,
                             height: 16,
@@ -437,7 +428,7 @@ class _ProfilePageState extends State<ProfilePage> {
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         Text(
-                          '0.01 元支付联调测试',
+                          '创建 0.01 测试订单',
                           style: TextStyle(
                             fontSize: 14,
                             fontWeight: FontWeight.w800,
@@ -446,7 +437,7 @@ class _ProfilePageState extends State<ProfilePage> {
                         ),
                         SizedBox(height: 2),
                         Text(
-                          '点击后会直接创建测试订单并拉起支付宝',
+                          '用户创建订单，地陪接单后再到订单页付款',
                           style: TextStyle(
                             fontSize: 11.5,
                             color: AppColors.textSecondary,
@@ -456,7 +447,7 @@ class _ProfilePageState extends State<ProfilePage> {
                     ),
                   ),
                   Text(
-                    _isDebugPaying ? '发起中' : '立即测试',
+                    _isCreatingTestOrder ? '创建中' : '创建订单',
                     style: const TextStyle(
                       fontSize: 12.5,
                       fontWeight: FontWeight.w800,

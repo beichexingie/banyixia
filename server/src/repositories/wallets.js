@@ -24,6 +24,51 @@ export async function incrementPendingBalance(client, userId, amount) {
   );
 }
 
+export async function releasePendingBalance(client, userId, amount) {
+  await ensureWallet(client, userId);
+  await client.query(
+    `
+      update public.wallets
+      set
+        pending_balance = greatest(coalesce(pending_balance, 0) - $2, 0),
+        balance = coalesce(balance, 0) + $2,
+        updated_at = now()
+      where user_id = $1
+    `,
+    [userId, amount],
+  );
+}
+
+export async function freezeWithdrawBalance(client, userId, amount) {
+  await ensureWallet(client, userId);
+  const result = await client.query(
+    `
+      update public.wallets
+      set
+        balance = coalesce(balance, 0) - $2,
+        updated_at = now()
+      where user_id = $1 and coalesce(balance, 0) >= $2
+      returning *
+    `,
+    [userId, amount],
+  );
+  return result.rows[0] ?? null;
+}
+
+export async function refundWithdrawBalance(client, userId, amount) {
+  await ensureWallet(client, userId);
+  await client.query(
+    `
+      update public.wallets
+      set
+        balance = coalesce(balance, 0) + $2,
+        updated_at = now()
+      where user_id = $1
+    `,
+    [userId, amount],
+  );
+}
+
 export async function recordWalletTransaction(client, {
   userId,
   orderId,
