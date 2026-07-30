@@ -77,6 +77,7 @@ function tableForContentType(type) {
     case 'demands':
       return { table: 'public.demands', label: 'demand' };
     case 'guide-application':
+    case 'guide_application':
     case 'guide_applications':
       return { table: 'public.guide_applications', label: 'guide_application' };
     default:
