@@ -5,7 +5,6 @@ import 'package:provider/provider.dart';
 
 import '../../config/app_theme.dart';
 import '../../models/guide.dart';
-import '../../providers/guide_provider.dart';
 import '../../providers/message_provider.dart';
 import '../../providers/user_provider.dart';
 
@@ -38,11 +37,6 @@ class _GuideDetailPageState extends State<GuideDetailPage> {
 
   void _initData() {
     _checkFollowStatus();
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (_guide != null) {
-        context.read<GuideProvider>().recordFootprint(_guide!.id);
-      }
-    });
   }
 
   Future<void> _fetchGuide() async {
@@ -118,59 +112,42 @@ class _GuideDetailPageState extends State<GuideDetailPage> {
 
     return Scaffold(
       backgroundColor: AppColors.background,
-      body: DefaultTabController(
-        length: 2,
-        child: NestedScrollView(
-          headerSliverBuilder: (context, innerBoxIsScrolled) {
-            return [
-              SliverAppBar(
-                pinned: true,
-                expandedHeight: 420,
-                backgroundColor: Colors.transparent,
-                elevation: 0,
-                leading: _CircleIconButton(
-                  icon: Icons.arrow_back_ios_new,
-                  onTap: () => context.pop(),
+      body: NestedScrollView(
+        headerSliverBuilder: (context, innerBoxIsScrolled) {
+          return [
+            SliverAppBar(
+              pinned: true,
+              expandedHeight: 420,
+              backgroundColor: Colors.transparent,
+              elevation: 0,
+              leading: _CircleIconButton(
+                icon: Icons.arrow_back_ios_new,
+                onTap: () => context.pop(),
+              ),
+              actions: [
+                _CircleIconButton(
+                  icon: Icons.more_horiz,
+                  onTap: _showShareModal,
                 ),
-                actions: [
-                  _CircleIconButton(
-                    icon: Icons.more_horiz,
-                    onTap: _showShareModal,
-                  ),
-                  const SizedBox(width: 8),
-                ],
-                flexibleSpace: FlexibleSpaceBar(
-                  background: _buildHero(guide, isSelfGuide),
-                ),
-                bottom: PreferredSize(
-                  preferredSize: const Size.fromHeight(56),
-                  child: Container(
-                    decoration: const BoxDecoration(
-                      color: Colors.white,
-                      borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
-                    ),
-                    child: const TabBar(
-                      labelColor: AppColors.textPrimary,
-                      unselectedLabelColor: AppColors.textHint,
-                      indicatorColor: AppColors.primaryDark,
-                      indicatorWeight: 3,
-                      tabs: [
-                        Tab(text: '服务'),
-                        Tab(text: '动态'),
-                      ],
-                    ),
+                const SizedBox(width: 8),
+              ],
+              flexibleSpace: FlexibleSpaceBar(
+                background: _buildHero(guide, isSelfGuide),
+              ),
+              bottom: PreferredSize(
+                preferredSize: const Size.fromHeight(20),
+                child: Container(
+                  height: 20,
+                  decoration: const BoxDecoration(
+                    color: AppColors.background,
+                    borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
                   ),
                 ),
               ),
-            ];
-          },
-          body: TabBarView(
-            children: [
-              _buildServiceTab(guide),
-              _buildNoteTab(guide),
-            ],
-          ),
-        ),
+            ),
+          ];
+        },
+        body: _buildServiceTab(guide),
       ),
       bottomNavigationBar: _buildBottomBar(guide),
     );
@@ -380,44 +357,6 @@ class _GuideDetailPageState extends State<GuideDetailPage> {
     );
   }
 
-  Widget _buildNoteTab(Guide guide) {
-    return ListView(
-      padding: const EdgeInsets.fromLTRB(20, 16, 20, 110),
-      children: [
-        if (guide.images.isEmpty)
-          const Padding(
-            padding: EdgeInsets.only(top: 40),
-            child: Center(
-              child: Text('暂时还没有动态内容', style: TextStyle(color: AppColors.textHint)),
-            ),
-          )
-        else
-          Wrap(
-            spacing: 10,
-            runSpacing: 10,
-            children: guide.images
-                .map(
-                  (img) => ClipRRect(
-                    borderRadius: BorderRadius.circular(16),
-                    child: CachedNetworkImage(
-                      imageUrl: img,
-                      width: (MediaQuery.of(context).size.width - 60) / 3,
-                      height: (MediaQuery.of(context).size.width - 60) / 3,
-                      fit: BoxFit.cover,
-                      errorWidget: (context, url, error) => Container(
-                        width: (MediaQuery.of(context).size.width - 60) / 3,
-                        height: (MediaQuery.of(context).size.width - 60) / 3,
-                        color: AppColors.tagBackground,
-                      ),
-                    ),
-                  ),
-                )
-                .toList(),
-          ),
-      ],
-    );
-  }
-
   Widget _buildBottomBar(Guide guide) {
     return Container(
       padding: EdgeInsets.fromLTRB(20, 10, 20, MediaQuery.of(context).padding.bottom + 10),
@@ -433,16 +372,11 @@ class _GuideDetailPageState extends State<GuideDetailPage> {
             onTap: _contactGuide,
           ),
           const SizedBox(width: 20),
-          Consumer<GuideProvider>(
-            builder: (context, provider, child) {
-              final isFavorited = provider.favoriteIds.contains(guide.id);
-              return _BottomAction(
-                icon: isFavorited ? Icons.star : Icons.star_border,
-                label: isFavorited ? '收藏' : '收藏',
-                active: isFavorited,
-                onTap: () => provider.toggleFavorite(guide.id),
-              );
-            },
+          _BottomAction(
+            icon: _isFollowing ? Icons.check_circle : Icons.person_add_alt_1_outlined,
+            label: _isFollowing ? '已关注' : '关注',
+            active: _isFollowing,
+            onTap: _isFollowLoading ? () {} : _toggleFollow,
           ),
           const SizedBox(width: 18),
           Expanded(

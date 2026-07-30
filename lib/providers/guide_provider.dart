@@ -13,6 +13,7 @@ class GuideProvider extends ChangeNotifier {
   String _selectedCity = '全国';
   Set<String> _favoriteIds = {};
   Set<String> _likedIds = {};
+  Set<String> _followingIds = {};
   List<Guide> _footprints = [];
   String? _filterGender;
   double? _filterMaxPrice;
@@ -27,6 +28,7 @@ class GuideProvider extends ChangeNotifier {
   String get selectedCity => _selectedCity;
   Set<String> get favoriteIds => _favoriteIds;
   Set<String> get likedIds => _likedIds;
+  Set<String> get followingIds => _followingIds;
   List<Guide> get footprints => _footprints;
   String? get filterGender => _filterGender;
   double? get filterMaxPrice => _filterMaxPrice;
@@ -41,6 +43,7 @@ class GuideProvider extends ChangeNotifier {
   }
 
   List<Guide> get favoriteGuides => _guides.where((g) => _favoriteIds.contains(g.id)).toList();
+  List<Guide> get followingGuides => _guides.where((g) => _followingIds.contains(g.id)).toList();
 
   List<Guide> get filteredGuides {
     return _guides.where((g) {
@@ -123,6 +126,7 @@ class GuideProvider extends ChangeNotifier {
       if (data is Map<String, dynamic>) {
         _favoriteIds = (data['favorite_ids'] as List? ?? const []).map((e) => e.toString()).toSet();
         _likedIds = (data['liked_ids'] as List? ?? const []).map((e) => e.toString()).toSet();
+        _followingIds = (data['following_guide_ids'] as List? ?? const []).map((e) => e.toString()).toSet();
         final footprints = data['footprints'];
         if (footprints is List) {
           _footprints = footprints

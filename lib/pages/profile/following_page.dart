@@ -3,7 +3,6 @@ import 'package:provider/provider.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:go_router/go_router.dart';
 import '../../providers/user_provider.dart';
-import '../../providers/guide_provider.dart';
 import '../../models/user.dart';
 import '../../config/app_theme.dart';
 
@@ -60,7 +59,7 @@ class _FollowingPageState extends State<FollowingPage> {
     return Scaffold(
       backgroundColor: AppColors.background,
       appBar: AppBar(
-        title: const Text('我关注的博主', style: TextStyle(color: AppColors.textPrimary, fontSize: 18, fontWeight: FontWeight.bold)),
+        title: const Text('我关注的地陪', style: TextStyle(color: AppColors.textPrimary, fontSize: 18, fontWeight: FontWeight.bold)),
         backgroundColor: Colors.white,
         elevation: 0,
         centerTitle: true,
@@ -75,7 +74,7 @@ class _FollowingPageState extends State<FollowingPage> {
                     children: [
                       Icon(Icons.people_outline, size: 64, color: AppColors.textHint.withValues(alpha: 0.5)),
                       const SizedBox(height: 16),
-                      const Text('还没有关注任何人喔', style: AppTextStyles.subtitle),
+                      const Text('还没有关注任何地陪喔', style: AppTextStyles.subtitle),
                     ],
                   ),
                 )
@@ -112,12 +111,7 @@ class _FollowingPageState extends State<FollowingPage> {
                           child: const Text('取消关注', style: TextStyle(fontSize: 12)),
                         ),
                         onTap: () {
-                          final isGuide = context.read<GuideProvider>().guides.any((g) => g.id == user.id);
-                          if (isGuide) {
-                            context.push('/guide/${user.id}');
-                          } else {
-                            context.push('/user/${user.id}');
-                          }
+                          context.push('/guide/${user.id}');
                         },
                       ),
                     );

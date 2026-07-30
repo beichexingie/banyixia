@@ -2,12 +2,44 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
 import '../../config/app_theme.dart';
+import '../../providers/user_provider.dart';
 import '../models/guide_app_models.dart';
 import '../providers/guide_console_provider.dart';
 import '../widgets/guide_app_shell.dart';
 
-class GuideServiceTypePage extends StatelessWidget {
+class GuideServiceTypePage extends StatefulWidget {
   const GuideServiceTypePage({super.key});
+
+  @override
+  State<GuideServiceTypePage> createState() => _GuideServiceTypePageState();
+}
+
+class _GuideServiceTypePageState extends State<GuideServiceTypePage> {
+  bool _isSaving = false;
+
+  Future<void> _save() async {
+    if (_isSaving) return;
+    setState(() => _isSaving = true);
+    try {
+      await context.read<GuideConsoleProvider>().saveServiceTypesToProfile(
+            context.read<UserProvider>(),
+          );
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('服务标签已保存到地陪主页')),
+      );
+      Navigator.of(context).maybePop();
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('保存失败: $e')),
+      );
+    } finally {
+      if (mounted) {
+        setState(() => _isSaving = false);
+      }
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -124,7 +156,7 @@ class GuideServiceTypePage extends StatelessWidget {
             child: SizedBox(
               width: double.infinity,
               child: ElevatedButton(
-                onPressed: () => Navigator.of(context).maybePop(),
+                onPressed: _isSaving ? null : _save,
                 style: ElevatedButton.styleFrom(
                   backgroundColor: AppColors.primary,
                   foregroundColor: AppColors.textPrimary,
@@ -132,9 +164,9 @@ class GuideServiceTypePage extends StatelessWidget {
                   shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(999)),
                   elevation: 0,
                 ),
-                child: const Text(
-                  '确定',
-                  style: TextStyle(fontSize: 18, fontWeight: FontWeight.w900),
+                child: Text(
+                  _isSaving ? '保存中...' : '确定',
+                  style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w900),
                 ),
               ),
             ),

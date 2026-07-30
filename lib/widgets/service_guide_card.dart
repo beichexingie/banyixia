@@ -111,6 +111,14 @@ class ServiceGuideCard extends StatelessWidget {
                       color: Color(0xFF8B8B8B),
                     ),
                   ),
+                  if (guide.tags.isNotEmpty) ...[
+                    const SizedBox(height: 10),
+                    Wrap(
+                      spacing: 6,
+                      runSpacing: 6,
+                      children: guide.tags.take(4).map(_serviceTag).toList(),
+                    ),
+                  ],
                   const SizedBox(height: 14),
                   Wrap(
                     spacing: 18,
@@ -237,6 +245,26 @@ class ServiceGuideCard extends StatelessWidget {
           style: const TextStyle(fontSize: 14, color: Color(0xFFA7A7A7)),
         ),
       ],
+    );
+  }
+
+  Widget _serviceTag(String text) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 5),
+      decoration: BoxDecoration(
+        color: AppColors.primarySoft,
+        borderRadius: BorderRadius.circular(999),
+      ),
+      child: Text(
+        text,
+        maxLines: 1,
+        overflow: TextOverflow.ellipsis,
+        style: const TextStyle(
+          fontSize: 11,
+          fontWeight: FontWeight.w700,
+          color: AppColors.textPrimary,
+        ),
+      ),
     );
   }
 

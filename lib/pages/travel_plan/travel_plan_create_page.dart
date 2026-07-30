@@ -37,7 +37,7 @@ class TravelPlanCreatePage extends StatelessWidget {
                   ),
                   SizedBox(height: 10),
                   Text(
-                    '现在可以直接发布需求，或者发布招募帖，避免出现一个独立但无实际业务支撑的空页面。',
+                    '现在可以直接发布需求，填写时间、地点和服务要求后等待地陪报名。',
                     style: TextStyle(
                       fontSize: 14,
                       color: AppColors.textSecondary,
@@ -53,13 +53,6 @@ class TravelPlanCreatePage extends StatelessWidget {
               title: '发需求',
               subtitle: '定制你的地陪体验',
               onTap: () => context.push('/demand/create'),
-            ),
-            const SizedBox(height: 12),
-            _QuickEntryCard(
-              icon: Icons.campaign_outlined,
-              title: '发布招募',
-              subtitle: '寻找同行伙伴或活动参与者',
-              onTap: () => context.push('/post/create?mode=recruit'),
             ),
           ],
         ),

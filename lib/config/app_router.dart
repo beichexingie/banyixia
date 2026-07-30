@@ -1,12 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import '../providers/user_provider.dart';
-import '../providers/post_provider.dart';
 import '../providers/guide_provider.dart';
 import '../pages/main_scaffold.dart';
 import '../pages/auth/login_page.dart';
-import '../pages/home/post_detail_page.dart';
-import '../pages/home/post_create_page.dart';
 import '../pages/apply/apply_guide_page.dart';
 import '../pages/messages/chat_room_page.dart';
 import '../pages/profile/settings_page.dart';
@@ -18,6 +15,7 @@ import '../pages/profile/help_feedback_page.dart';
 import '../pages/profile/coupons_page.dart';
 import '../pages/profile/balance_page.dart';
 import '../pages/profile/orders_page.dart';
+import '../pages/profile/following_page.dart';
 import '../pages/order/order_create_page.dart';
 import '../pages/order/location_picker_page.dart';
 import '../pages/admin/audit_list_page.dart';
@@ -32,10 +30,9 @@ import '../pages/profile/order_detail_page.dart';
 
 class AppRouter {
   final UserProvider userProvider;
-  final PostProvider postProvider;
   final GuideProvider guideProvider;
 
-  AppRouter(this.userProvider, this.postProvider, this.guideProvider);
+  AppRouter(this.userProvider, this.guideProvider);
 
   late final GoRouter router = GoRouter(
     initialLocation: '/',
@@ -52,26 +49,6 @@ class AppRouter {
     routes: [
       GoRoute(path: '/', builder: (context, state) => const MainScaffold()),
       GoRoute(path: '/login', builder: (context, state) => const LoginPage()),
-      GoRoute(
-        path: '/post/create',
-        builder: (context, state) {
-          final mode = state.uri.queryParameters['mode'] ?? 'share';
-          return PostCreatePage(mode: mode);
-        },
-      ),
-      GoRoute(
-        path: '/post/:id',
-        builder: (context, state) {
-          final id = state.pathParameters['id'];
-          // Find the post from provider synchronously
-          final post = postProvider.posts.firstWhere(
-            (p) => p.id == id,
-            // Fallback object to avoid exceptions if not found
-            orElse: () => postProvider.posts.first,
-          );
-          return PostDetailPage(post: post);
-        },
-      ),
       GoRoute(
         path: '/guide/:id',
         builder: (context, state) {
@@ -110,6 +87,10 @@ class AppRouter {
               int.tryParse(state.uri.queryParameters['tab'] ?? '0') ?? 0;
           return OrdersPage(initialTab: initialTab);
         },
+      ),
+      GoRoute(
+        path: '/following',
+        builder: (context, state) => const FollowingPage(),
       ),
       GoRoute(
         path: '/profile/orders/:id',

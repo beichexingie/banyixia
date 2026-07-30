@@ -18,71 +18,7 @@ class _CompanionPageState extends State<CompanionPage> {
   late final TextEditingController _searchController;
 
   String _selectedCity = '苏州';
-  int _activeCategory = 0;
   bool _sortByTime = true;
-
-  final List<_ServiceCategory> _categories = const [
-    _ServiceCategory(
-      title: '休闲游玩',
-      subtitle: '这是文案哦\n这是文案哦',
-      keyword: '休闲',
-      heroIcon: Icons.weekend_outlined,
-      items: [
-        _ServiceItem(Icons.restaurant_outlined, '老吃家'),
-        _ServiceItem(Icons.directions_walk, '城市漫步'),
-        _ServiceItem(Icons.storefront_outlined, '打卡探店'),
-        _ServiceItem(Icons.map_outlined, '本地陪玩'),
-        _ServiceItem(Icons.palette_outlined, '观影赏剧'),
-        _ServiceItem(Icons.directions_car_outlined, '露营自驾'),
-        _ServiceItem(Icons.attractions_outlined, '游乐园'),
-        _ServiceItem(Icons.dashboard_customize_outlined, '桌游娱乐'),
-        _ServiceItem(Icons.rocket_launch_outlined, '剧本密室'),
-        _ServiceItem(Icons.sports_baseball_outlined, '桌球陪练'),
-        _ServiceItem(Icons.sports_esports_outlined, '开黑搭子'),
-        _ServiceItem(Icons.shopping_bag_outlined, '代排购物'),
-      ],
-    ),
-    _ServiceCategory(
-      title: '户外运动',
-      subtitle: '这是文案哦\n这是文案哦',
-      keyword: '户外',
-      heroIcon: Icons.terrain_outlined,
-      items: [
-        _ServiceItem(Icons.hiking_outlined, '徒步爬山'),
-        _ServiceItem(Icons.directions_run, '轻氧慢跑'),
-        _ServiceItem(Icons.fitness_center, '健身陪同'),
-        _ServiceItem(Icons.self_improvement_outlined, '养生气功'),
-        _ServiceItem(Icons.pedal_bike_outlined, '骑行竞走'),
-        _ServiceItem(Icons.surfing_outlined, '滑板冲浪'),
-        _ServiceItem(Icons.sports_tennis_outlined, '羽毛球'),
-        _ServiceItem(Icons.sports_baseball_outlined, '网球'),
-        _ServiceItem(Icons.golf_course_outlined, '高尔夫'),
-        _ServiceItem(Icons.pool_outlined, '游泳'),
-        _ServiceItem(Icons.ads_click_outlined, '射箭击靶'),
-        _ServiceItem(Icons.filter_hdr_outlined, '攀岩登壁'),
-      ],
-    ),
-    _ServiceCategory(
-      title: '公务随行',
-      subtitle: '这是文案哦\n这是文案哦',
-      keyword: '商务',
-      heroIcon: Icons.business_center_outlined,
-      items: [
-        _ServiceItem(Icons.sports_bar_outlined, '微醺小酌'),
-        _ServiceItem(Icons.mic_external_on_outlined, '欢乐K歌'),
-        _ServiceItem(Icons.record_voice_over_outlined, '商务接待'),
-        _ServiceItem(Icons.music_note_outlined, '乐器表演'),
-        _ServiceItem(Icons.apartment_outlined, '礼仪展会'),
-        _ServiceItem(Icons.favorite_border, '树洞倾诉'),
-        _ServiceItem(Icons.support_agent_outlined, '会务主持'),
-        _ServiceItem(Icons.translate_outlined, '专业翻译'),
-        _ServiceItem(Icons.local_hospital_outlined, '医疗陪同'),
-        _ServiceItem(Icons.spa_outlined, '茶艺师'),
-        _ServiceItem(Icons.badge_outlined, '秘书助理'),
-        _ServiceItem(Icons.local_taxi_outlined, '商务司机'),
-      ],
-    ),
-  ];
 
   @override
   void initState() {
@@ -118,7 +54,6 @@ class _CompanionPageState extends State<CompanionPage> {
         child: Consumer<GuideProvider>(
           builder: (context, provider, _) {
             final guides = _filteredGuides(provider);
-            final category = _categories[_activeCategory];
 
             return RefreshIndicator(
               color: AppColors.primary,
@@ -127,7 +62,7 @@ class _CompanionPageState extends State<CompanionPage> {
                 physics: const AlwaysScrollableScrollPhysics(),
                 padding: EdgeInsets.zero,
                 children: [
-                  _buildTopSection(category),
+                  _buildTopSection(),
                   _buildBottomSection(provider, guides),
                 ],
               ),
@@ -138,7 +73,7 @@ class _CompanionPageState extends State<CompanionPage> {
     );
   }
 
-  Widget _buildTopSection(_ServiceCategory category) {
+  Widget _buildTopSection() {
     return Container(
       decoration: const BoxDecoration(
         gradient: LinearGradient(
@@ -153,10 +88,6 @@ class _CompanionPageState extends State<CompanionPage> {
         child: Column(
           children: [
             _buildSearchBar(),
-            const SizedBox(height: 18),
-            _buildCategoryRow(),
-            const SizedBox(height: 22),
-            _buildItemGrid(category.items),
           ],
         ),
       ),
@@ -200,158 +131,6 @@ class _CompanionPageState extends State<CompanionPage> {
           ),
         ],
       ),
-    );
-  }
-
-  Widget _buildCategoryRow() {
-    return Row(
-      crossAxisAlignment: CrossAxisAlignment.end,
-      children: List.generate(_categories.length, (index) {
-        final active = index == _activeCategory;
-        return Expanded(
-          flex: active ? 118 : 94,
-          child: Padding(
-            padding: EdgeInsets.only(
-              right: index == _categories.length - 1 ? 0 : 10,
-            ),
-            child: _buildCategoryCard(_categories[index], index, active),
-          ),
-        );
-      }),
-    );
-  }
-
-  Widget _buildCategoryCard(_ServiceCategory category, int index, bool active) {
-    return GestureDetector(
-      onTap: () => setState(() => _activeCategory = index),
-      child: AnimatedContainer(
-        duration: const Duration(milliseconds: 220),
-        curve: Curves.easeOutCubic,
-        height: active ? 156 : 130,
-        decoration: BoxDecoration(
-          borderRadius: BorderRadius.circular(24),
-          gradient: LinearGradient(
-            colors: active
-                ? const [Color(0xFFD9FF57), Color(0xFFF0FFC0)]
-                : const [Color(0xFFF2FFD7), Color(0xFFF8FCEB)],
-            begin: Alignment.topLeft,
-            end: Alignment.bottomRight,
-          ),
-          boxShadow: [
-            BoxShadow(
-              color: const Color(
-                0xFFCBF55C,
-              ).withValues(alpha: active ? 0.22 : 0.08),
-              blurRadius: active ? 18 : 10,
-              offset: const Offset(0, 8),
-            ),
-          ],
-        ),
-        child: Stack(
-          children: [
-            Padding(
-              padding: EdgeInsets.fromLTRB(
-                active ? 14 : 12,
-                active ? 18 : 14,
-                active ? 52 : 42,
-                active ? 12 : 10,
-              ),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Text(
-                    category.title,
-                    maxLines: 2,
-                    overflow: TextOverflow.fade,
-                    style: TextStyle(
-                      fontSize: active ? 22 : 17,
-                      fontWeight: FontWeight.w900,
-                      color: AppColors.textPrimary,
-                    ),
-                  ),
-                  const SizedBox(height: 10),
-                  Text(
-                    category.subtitle,
-                    maxLines: 2,
-                    overflow: TextOverflow.ellipsis,
-                    style: TextStyle(
-                      fontSize: active ? 14 : 12,
-                      height: 1.2,
-                      color: const Color(0xFF727272),
-                    ),
-                  ),
-                ],
-              ),
-            ),
-            Positioned(
-              right: active ? 12 : 10,
-              bottom: active ? 10 : 8,
-              child: Icon(
-                category.heroIcon,
-                size: active ? 50 : 40,
-                color: AppColors.textPrimary,
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-
-  Widget _buildItemGrid(List<_ServiceItem> items) {
-    return LayoutBuilder(
-      builder: (context, constraints) {
-        const spacing = 8.0;
-        const runSpacing = 16.0;
-        final crossAxisCount = constraints.maxWidth >= 340 ? 6 : 5;
-        final itemWidth =
-            (constraints.maxWidth - spacing * (crossAxisCount - 1)) /
-                crossAxisCount;
-        final iconBoxSize = itemWidth >= 52
-            ? 48.0
-            : (itemWidth <= 42 ? 40.0 : itemWidth - 4);
-
-        return Wrap(
-          spacing: spacing,
-          runSpacing: runSpacing,
-          children: items.map((item) {
-            return SizedBox(
-              width: itemWidth,
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Container(
-                    width: iconBoxSize,
-                    height: iconBoxSize,
-                    decoration: BoxDecoration(
-                      color: Colors.white.withValues(alpha: 0.55),
-                      borderRadius: BorderRadius.circular(16),
-                    ),
-                    alignment: Alignment.center,
-                    child: Icon(
-                      item.icon,
-                      size: iconBoxSize * 0.62,
-                      color: AppColors.textPrimary,
-                    ),
-                  ),
-                  const SizedBox(height: 8),
-                  Text(
-                    item.label,
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                    textAlign: TextAlign.center,
-                    style: const TextStyle(
-                      fontSize: 10.5,
-                      color: Color(0xFF6E6E6E),
-                    ),
-                  ),
-                ],
-              ),
-            );
-          }).toList(),
-        );
-      },
     );
   }
 
@@ -456,17 +235,7 @@ class _CompanionPageState extends State<CompanionPage> {
       return const <Guide>[];
     }
 
-    final keyword = _categories[_activeCategory].keyword.trim().toLowerCase();
-    final matched = keyword.isEmpty
-        ? baseList
-        : baseList.where((guide) {
-            final fullText =
-                '${guide.name} ${guide.city} ${guide.description} ${guide.tags.join(' ')}'
-                    .toLowerCase();
-            return fullText.contains(keyword);
-          }).toList();
-
-    final list = matched.isNotEmpty ? matched : baseList;
+    final list = baseList;
     if (_sortByTime) {
       list.sort((a, b) {
         final verifiedCompare = (b.verified ? 1 : 0).compareTo(
@@ -565,25 +334,3 @@ class _CompanionPageState extends State<CompanionPage> {
   }
 }
 
-class _ServiceCategory {
-  final String title;
-  final String subtitle;
-  final String keyword;
-  final IconData heroIcon;
-  final List<_ServiceItem> items;
-
-  const _ServiceCategory({
-    required this.title,
-    required this.subtitle,
-    required this.keyword,
-    required this.heroIcon,
-    required this.items,
-  });
-}
-
-class _ServiceItem {
-  final IconData icon;
-  final String label;
-
-  const _ServiceItem(this.icon, this.label);
-}

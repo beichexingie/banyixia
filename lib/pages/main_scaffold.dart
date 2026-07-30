@@ -101,20 +101,6 @@ class _MainScaffoldState extends State<MainScaffold> {
                   ),
                   const SizedBox(height: 18),
                   _publishItem(
-                    icon: Icons.photo_library_outlined,
-                    title: '发布帖子',
-                    subtitle: '分享游玩照片、路线和笔记',
-                    route: '/post/create',
-                  ),
-                  const SizedBox(height: 10),
-                  _publishItem(
-                    icon: Icons.campaign_outlined,
-                    title: '发布招募',
-                    subtitle: '招募搭子、同游或本地陪伴',
-                    route: '/post/create?mode=recruit',
-                  ),
-                  const SizedBox(height: 10),
-                  _publishItem(
                     icon: Icons.assignment_outlined,
                     title: '发布需求',
                     subtitle: '填写时间地点，快速发单',

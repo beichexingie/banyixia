@@ -4,7 +4,6 @@ import 'package:shared_preferences/shared_preferences.dart';
 import '../../models/order.dart';
 import '../../models/user.dart';
 import '../../providers/order_provider.dart';
-import '../../providers/post_provider.dart';
 import '../../providers/user_provider.dart';
 import '../models/guide_app_models.dart';
 
@@ -194,6 +193,7 @@ class GuideConsoleProvider extends ChangeNotifier {
         _enabledTypes = parsed;
       }
     }
+    _syncEnabledTypesFromUser(userProvider.user);
     _refreshLoginState(userProvider.user);
     _isInitialized = true;
     notifyListeners();
@@ -207,7 +207,19 @@ class GuideConsoleProvider extends ChangeNotifier {
 
   Future<void> hydrateFromUser(UserProvider userProvider) async {
     _refreshLoginState(userProvider.user);
+    _syncEnabledTypesFromUser(userProvider.user);
     notifyListeners();
+  }
+
+  void _syncEnabledTypesFromUser(User user) {
+    if (user.guideTags.isEmpty) return;
+    final parsed = user.guideTags
+        .map(_serviceTypeFromLabel)
+        .whereType<GuideServiceType>()
+        .toSet();
+    if (parsed.isNotEmpty) {
+      _enabledTypes = parsed;
+    }
   }
 
   Future<void> setMode(GuideDutyMode mode) async {
@@ -256,6 +268,40 @@ class GuideConsoleProvider extends ChangeNotifier {
     await prefs.setStringList(
       _enabledTypesKey,
       _enabledTypes.map((item) => item.name).toList(),
+    );
+  }
+
+  Future<void> saveServiceTypesToProfile(UserProvider userProvider) async {
+    final selectedLabels = _enabledTypes
+        .map((item) => item.label)
+        .where((item) => item.trim().isNotEmpty)
+        .toSet()
+        .toList();
+    await userProvider.updateUser(
+      User(
+        id: userProvider.user.id,
+        nickname: userProvider.user.nickname,
+        avatar: userProvider.user.avatar,
+        bio: userProvider.user.bio,
+        gender: userProvider.user.gender,
+        city: userProvider.user.city,
+        birthday: userProvider.user.birthday,
+        wechat: userProvider.user.wechat,
+        occupation: userProvider.user.occupation,
+        guideIntroduction: userProvider.user.guideIntroduction,
+        guideTags: selectedLabels,
+        vipLevel: userProvider.user.vipLevel,
+        title: userProvider.user.title,
+        balance: userProvider.user.balance,
+        couponCount: userProvider.user.couponCount,
+        followCount: userProvider.user.followCount,
+        fansCount: userProvider.user.fansCount,
+        isBanned: userProvider.user.isBanned,
+        cancelCount: userProvider.user.cancelCount,
+        isAdmin: userProvider.user.isAdmin,
+        isGuide: userProvider.user.isGuide,
+        guideApplicationStatus: userProvider.user.guideApplicationStatus,
+      ),
     );
   }
 
@@ -448,13 +494,9 @@ class GuideConsoleProvider extends ChangeNotifier {
   Future<void> syncFromProviders({
     required UserProvider userProvider,
     required OrderProvider orderProvider,
-    required PostProvider postProvider,
   }) async {
     await initialize(userProvider);
     await hydrateFromUser(userProvider);
-    if (postProvider.posts.isEmpty) {
-      await postProvider.loadPosts();
-    }
     if (orderProvider.orders.isEmpty) {
       await orderProvider.loadOrders();
     }
@@ -523,6 +565,15 @@ class GuideConsoleProvider extends ChangeNotifier {
   GuideServiceType? _serviceTypeFromName(String raw) {
     for (final item in GuideServiceType.values) {
       if (item.name == raw) {
+        return item;
+      }
+    }
+    return null;
+  }
+
+  GuideServiceType? _serviceTypeFromLabel(String raw) {
+    for (final item in GuideServiceType.values) {
+      if (item.label == raw) {
         return item;
       }
     }

@@ -4,11 +4,9 @@ import 'package:provider/provider.dart';
 import '../bootstrap/app_bootstrap.dart';
 import '../config/app_theme.dart';
 import '../pages/auth/login_page.dart';
-import '../pages/home/post_create_page.dart';
 import '../providers/demand_provider.dart';
 import '../providers/message_provider.dart';
 import '../providers/order_provider.dart';
-import '../providers/post_provider.dart';
 import '../providers/user_provider.dart';
 import 'models/guide_app_models.dart';
 import 'pages/guide_city_picker_page.dart';
@@ -37,9 +35,6 @@ class GuideApp extends StatelessWidget {
       providers: [
         ChangeNotifierProvider(
           create: (_) => UserProvider(sessionService: sessionService),
-        ),
-        ChangeNotifierProvider(
-          create: (_) => PostProvider(sessionService: sessionService)..loadPosts(),
         ),
         ChangeNotifierProvider(
           create: (_) => DemandProvider(sessionService: sessionService)..loadDemands(),
@@ -77,11 +72,9 @@ class _GuideAppBootstrapperState extends State<_GuideAppBootstrapper> {
     WidgetsBinding.instance.addPostFrameCallback((_) async {
       final userProvider = context.read<UserProvider>();
       final orderProvider = context.read<OrderProvider>();
-      final postProvider = context.read<PostProvider>();
       await context.read<GuideConsoleProvider>().syncFromProviders(
             userProvider: userProvider,
             orderProvider: orderProvider,
-            postProvider: postProvider,
           );
     });
   }
@@ -219,7 +212,6 @@ class _GuideMainShellState extends State<_GuideMainShell> {
       await context.read<GuideConsoleProvider>().syncFromProviders(
             userProvider: context.read<UserProvider>(),
             orderProvider: context.read<OrderProvider>(),
-            postProvider: context.read<PostProvider>(),
           );
       await context.read<MessageProvider>().loadRooms();
     });
@@ -329,11 +321,7 @@ class _GuideMainShellState extends State<_GuideMainShell> {
   }
 
   Future<void> _openPublish() async {
-    await Navigator.of(context).push(
-      MaterialPageRoute(
-        builder: (_) => const PostCreatePage(mode: 'recruit'),
-      ),
-    );
+    await _openDemandHall();
   }
 
   Future<void> _openRoute([GuideOrderCardData? order]) async {

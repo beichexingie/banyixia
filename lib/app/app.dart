@@ -9,7 +9,6 @@ import '../providers/demand_provider.dart';
 import '../providers/guide_provider.dart';
 import '../providers/message_provider.dart';
 import '../providers/order_provider.dart';
-import '../providers/post_provider.dart';
 import '../providers/user_provider.dart';
 import '../services/payment_service.dart';
 import '../bootstrap/app_bootstrap.dart';
@@ -35,9 +34,6 @@ class BanyixiaApp extends StatelessWidget {
           create: (_) => UserProvider(sessionService: sessionService),
         ),
         ChangeNotifierProvider(
-          create: (_) => PostProvider(sessionService: sessionService)..loadPosts(),
-        ),
-        ChangeNotifierProvider(
           create: (_) => GuideProvider(sessionService: sessionService)..loadGuides(),
         ),
         ChangeNotifierProvider(
@@ -60,7 +56,6 @@ class BanyixiaApp extends StatelessWidget {
         builder: (context) {
           final router = AppRouter(
             context.read<UserProvider>(),
-            context.read<PostProvider>(),
             context.read<GuideProvider>(),
           ).router;
 

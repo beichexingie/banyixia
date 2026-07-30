@@ -45,6 +45,42 @@ enum GuideServiceType {
   localCompanion,
   customTrip,
   errandHelp,
+  foodie,
+  cityWalk,
+  storeVisit,
+  localPlay,
+  movieShow,
+  campingDrive,
+  amusementPark,
+  boardGame,
+  escapeRoom,
+  billiards,
+  gamePartner,
+  shoppingQueue,
+  hiking,
+  jogging,
+  fitness,
+  wellness,
+  cycling,
+  surfing,
+  badminton,
+  tennis,
+  golf,
+  swimming,
+  archery,
+  climbing,
+  drinks,
+  karaoke,
+  businessReception,
+  performance,
+  etiquetteExpo,
+  listening,
+  eventHost,
+  translation,
+  medicalEscort,
+  teaArt,
+  assistant,
+  businessDriver,
 }
 
 extension GuideServiceTypeX on GuideServiceType {
@@ -56,6 +92,78 @@ extension GuideServiceTypeX on GuideServiceType {
         return '定制单';
       case GuideServiceType.errandHelp:
         return '帮忙单';
+      case GuideServiceType.foodie:
+        return '老吃家';
+      case GuideServiceType.cityWalk:
+        return '城市漫步';
+      case GuideServiceType.storeVisit:
+        return '打卡探店';
+      case GuideServiceType.localPlay:
+        return '本地陪玩';
+      case GuideServiceType.movieShow:
+        return '观影赏剧';
+      case GuideServiceType.campingDrive:
+        return '露营自驾';
+      case GuideServiceType.amusementPark:
+        return '游乐园';
+      case GuideServiceType.boardGame:
+        return '桌游娱乐';
+      case GuideServiceType.escapeRoom:
+        return '剧本密室';
+      case GuideServiceType.billiards:
+        return '桌球陪练';
+      case GuideServiceType.gamePartner:
+        return '开黑搭子';
+      case GuideServiceType.shoppingQueue:
+        return '代排购物';
+      case GuideServiceType.hiking:
+        return '徒步爬山';
+      case GuideServiceType.jogging:
+        return '轻氧慢跑';
+      case GuideServiceType.fitness:
+        return '健身陪同';
+      case GuideServiceType.wellness:
+        return '养生气功';
+      case GuideServiceType.cycling:
+        return '骑行竞走';
+      case GuideServiceType.surfing:
+        return '滑板冲浪';
+      case GuideServiceType.badminton:
+        return '羽毛球';
+      case GuideServiceType.tennis:
+        return '网球';
+      case GuideServiceType.golf:
+        return '高尔夫';
+      case GuideServiceType.swimming:
+        return '游泳';
+      case GuideServiceType.archery:
+        return '射箭击靶';
+      case GuideServiceType.climbing:
+        return '攀岩登壁';
+      case GuideServiceType.drinks:
+        return '微醺小酌';
+      case GuideServiceType.karaoke:
+        return '欢乐K歌';
+      case GuideServiceType.businessReception:
+        return '商务接待';
+      case GuideServiceType.performance:
+        return '乐器表演';
+      case GuideServiceType.etiquetteExpo:
+        return '礼仪展会';
+      case GuideServiceType.listening:
+        return '树洞倾诉';
+      case GuideServiceType.eventHost:
+        return '会务主持';
+      case GuideServiceType.translation:
+        return '专业翻译';
+      case GuideServiceType.medicalEscort:
+        return '医疗陪同';
+      case GuideServiceType.teaArt:
+        return '茶艺师';
+      case GuideServiceType.assistant:
+        return '秘书助理';
+      case GuideServiceType.businessDriver:
+        return '商务司机';
     }
   }
 
@@ -67,6 +175,8 @@ extension GuideServiceTypeX on GuideServiceType {
         return '定制单为客户提供“定制陪同”服务，单价高';
       case GuideServiceType.errandHelp:
         return '为客户提供“帮忙”服务，可帮忙“代排”等更多服务类型';
+      default:
+        return '展示在地陪主页与服务列表中，方便用户按具体服务能力筛选和下单。';
     }
   }
 
@@ -78,10 +188,82 @@ extension GuideServiceTypeX on GuideServiceType {
         return Icons.sell_rounded;
       case GuideServiceType.errandHelp:
         return Icons.volunteer_activism_rounded;
+      case GuideServiceType.foodie:
+        return Icons.restaurant_outlined;
+      case GuideServiceType.cityWalk:
+        return Icons.directions_walk;
+      case GuideServiceType.storeVisit:
+        return Icons.storefront_outlined;
+      case GuideServiceType.localPlay:
+        return Icons.map_outlined;
+      case GuideServiceType.movieShow:
+        return Icons.palette_outlined;
+      case GuideServiceType.campingDrive:
+        return Icons.directions_car_outlined;
+      case GuideServiceType.amusementPark:
+        return Icons.attractions_outlined;
+      case GuideServiceType.boardGame:
+        return Icons.dashboard_customize_outlined;
+      case GuideServiceType.escapeRoom:
+        return Icons.rocket_launch_outlined;
+      case GuideServiceType.billiards:
+        return Icons.sports_baseball_outlined;
+      case GuideServiceType.gamePartner:
+        return Icons.sports_esports_outlined;
+      case GuideServiceType.shoppingQueue:
+        return Icons.shopping_bag_outlined;
+      case GuideServiceType.hiking:
+        return Icons.hiking_outlined;
+      case GuideServiceType.jogging:
+        return Icons.directions_run;
+      case GuideServiceType.fitness:
+        return Icons.fitness_center;
+      case GuideServiceType.wellness:
+        return Icons.self_improvement_outlined;
+      case GuideServiceType.cycling:
+        return Icons.pedal_bike_outlined;
+      case GuideServiceType.surfing:
+        return Icons.surfing_outlined;
+      case GuideServiceType.badminton:
+        return Icons.sports_tennis_outlined;
+      case GuideServiceType.tennis:
+        return Icons.sports_baseball_outlined;
+      case GuideServiceType.golf:
+        return Icons.golf_course_outlined;
+      case GuideServiceType.swimming:
+        return Icons.pool_outlined;
+      case GuideServiceType.archery:
+        return Icons.ads_click_outlined;
+      case GuideServiceType.climbing:
+        return Icons.filter_hdr_outlined;
+      case GuideServiceType.drinks:
+        return Icons.sports_bar_outlined;
+      case GuideServiceType.karaoke:
+        return Icons.mic_external_on_outlined;
+      case GuideServiceType.businessReception:
+        return Icons.record_voice_over_outlined;
+      case GuideServiceType.performance:
+        return Icons.music_note_outlined;
+      case GuideServiceType.etiquetteExpo:
+        return Icons.apartment_outlined;
+      case GuideServiceType.listening:
+        return Icons.favorite_border;
+      case GuideServiceType.eventHost:
+        return Icons.support_agent_outlined;
+      case GuideServiceType.translation:
+        return Icons.translate_outlined;
+      case GuideServiceType.medicalEscort:
+        return Icons.local_hospital_outlined;
+      case GuideServiceType.teaArt:
+        return Icons.spa_outlined;
+      case GuideServiceType.assistant:
+        return Icons.badge_outlined;
+      case GuideServiceType.businessDriver:
+        return Icons.local_taxi_outlined;
     }
   }
 
-  bool get isLocked => this != GuideServiceType.localCompanion;
+  bool get isLocked => false;
 }
 
 enum GuideOrderStage {

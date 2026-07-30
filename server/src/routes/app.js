@@ -298,28 +298,42 @@ appRouter.put('/users/me', async (req, res) => {
   const userId = await requireSessionUser(req, res);
   if (!userId) return;
   const payload = req.body ?? {};
+  const currentUser = await findUserById(pool, userId);
+  if (!currentUser) return fail(res, 404, '用户不存在');
   const updated = await upsertUser(pool, {
     id: userId,
-    nickname: payload.nickname ?? '新用户',
-    avatar: payload.avatar ?? '',
-    bio: payload.bio ?? '',
-    gender: payload.gender ?? '',
-    city: payload.city ?? '',
-    birthday: payload.birthday ?? '',
-    wechat: payload.wechat ?? '',
-    occupation: payload.occupation ?? '',
-    guide_introduction: payload.guide_introduction ?? '',
-    guide_tags: payload.guide_tags ?? [],
-    vip_level: payload.vip_level ?? 1,
-    title: payload.title ?? '初级旅行家',
-    balance: payload.balance ?? 0,
-    coupon_count: payload.coupon_count ?? 0,
-    follow_count: payload.follow_count ?? 0,
-    fans_count: payload.fans_count ?? 0,
-    is_banned: payload.is_banned ?? false,
-    cancel_count: payload.cancel_count ?? 0,
-    is_admin: payload.is_admin ?? false,
+    phone: currentUser.phone,
+    nickname: payload.nickname ?? currentUser.nickname ?? '新用户',
+    avatar: payload.avatar ?? currentUser.avatar ?? '',
+    bio: payload.bio ?? currentUser.bio ?? '',
+    gender: payload.gender ?? currentUser.gender ?? '',
+    city: payload.city ?? currentUser.city ?? '',
+    birthday: payload.birthday ?? currentUser.birthday ?? '',
+    wechat: payload.wechat ?? currentUser.wechat ?? '',
+    occupation: payload.occupation ?? currentUser.occupation ?? '',
+    guide_introduction:
+      payload.guide_introduction ?? currentUser.guide_introduction ?? '',
+    guide_tags: payload.guide_tags ?? currentUser.guide_tags ?? [],
+    vip_level: currentUser.vip_level ?? 0,
+    title: payload.title ?? currentUser.title ?? '',
+    balance: currentUser.balance ?? 0,
+    coupon_count: currentUser.coupon_count ?? 0,
+    follow_count: currentUser.follow_count ?? 0,
+    fans_count: currentUser.fans_count ?? 0,
+    is_banned: currentUser.is_banned ?? false,
+    cancel_count: currentUser.cancel_count ?? 0,
+    is_admin: currentUser.is_admin ?? false,
   });
+  if (updated?.id && (payload.guide_tags ?? payload.guideTags)) {
+    await pool.query(
+      `
+        update public.guides
+        set tags = $2::text[]
+        where id = $1
+      `,
+      [updated.id, payload.guide_tags ?? payload.guideTags ?? []],
+    );
+  }
   return ok(res, { data: updated });
 });
 
@@ -361,10 +375,20 @@ appRouter.get('/users/:id/interactions', async (req, res) => {
     `,
     [userId],
   );
+  const followingGuides = await pool.query(
+    `
+      select followed_id
+      from public.follows f
+      join public.guides g on g.id = f.followed_id
+      where f.follower_id = $1
+    `,
+    [userId],
+  );
   return ok(res, {
     data: {
       favorite_ids: favoriteIds.rows.map((row) => row.guide_id),
       liked_ids: likedIds.rows.map((row) => row.guide_id),
+      following_guide_ids: followingGuides.rows.map((row) => row.followed_id),
       footprints: footprints.rows,
     },
   });
@@ -375,9 +399,19 @@ appRouter.get('/users/me/following', async (req, res) => {
   if (!userId) return;
   const result = await pool.query(
     `
-      select u.*
+      select
+        u.*,
+        true as is_guide,
+        coalesce((
+          select status
+          from public.guide_applications
+          where user_id = u.id
+          order by created_at desc
+          limit 1
+        ), 'approved') as guide_application_status
       from public.follows f
       join public.users u on u.id = f.followed_id
+      join public.guides g on g.id = f.followed_id
       where f.follower_id = $1
       order by f.created_at desc
     `,

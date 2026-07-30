@@ -1,15 +1,14 @@
-import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:provider/provider.dart';
 
 import '../../config/app_theme.dart';
 import '../../models/order.dart';
-import '../../models/travel_post.dart';
+import '../../providers/guide_provider.dart';
 import '../../providers/order_provider.dart';
-import '../../providers/post_provider.dart';
 import '../../providers/user_provider.dart';
 import '../../models/user.dart' as app_model;
+import '../../widgets/service_guide_card.dart';
 
 class ProfilePage extends StatefulWidget {
   const ProfilePage({super.key});
@@ -19,14 +18,11 @@ class ProfilePage extends StatefulWidget {
 }
 
 class _ProfilePageState extends State<ProfilePage> {
-  int _contentTab = 0;
   bool _isDebugPaying = false;
-  late Future<List<TravelPost>> _contentFuture;
 
   @override
   void initState() {
     super.initState();
-    _contentFuture = Future.value(const <TravelPost>[]);
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (!mounted) return;
       _refreshPage();
@@ -34,29 +30,10 @@ class _ProfilePageState extends State<ProfilePage> {
   }
 
   Future<void> _refreshPage() async {
-    await context.read<OrderProvider>().loadOrders();
-    _reloadContent();
-  }
-
-  void _reloadContent() {
-    final provider = context.read<PostProvider>();
-    late Future<List<TravelPost>> future;
-    switch (_contentTab) {
-      case 0:
-        future = provider.fetchFollowingPosts();
-        break;
-      case 1:
-        future = provider.fetchLikedPosts();
-        break;
-      case 2:
-        future = provider.fetchFavoritedPosts();
-        break;
-      default:
-        future = provider.fetchFootprints();
-    }
-    setState(() {
-      _contentFuture = future;
-    });
+    await Future.wait([
+      context.read<OrderProvider>().loadOrders(),
+      context.read<GuideProvider>().loadGuides(),
+    ]);
   }
 
   Future<void> _startDebugPayment() async {
@@ -117,8 +94,7 @@ class _ProfilePageState extends State<ProfilePage> {
                     _buildMyDemandEntry(),
                     _buildCouponBanner(user),
                     _buildMenuPanel(user),
-                    _buildPostCategoryTabs(),
-                    _buildContentSection(),
+                    _buildFollowingGuidesSection(),
                   ],
                 ),
               ),
@@ -702,271 +678,121 @@ class _ProfilePageState extends State<ProfilePage> {
     );
   }
 
-  Widget _buildPostCategoryTabs() {
-    const labels = ['关注', '赞过', '收藏', '足迹'];
-
-    return Padding(
-      padding: const EdgeInsets.fromLTRB(16, 2, 16, 12),
-      child: Row(
-        children: List.generate(labels.length, (index) {
-          final active = _contentTab == index;
-          return Padding(
-            padding: EdgeInsets.only(
-              right: index == labels.length - 1 ? 0 : 10,
-            ),
-            child: GestureDetector(
-              onTap: () {
-                if (_contentTab == index) return;
-                setState(() => _contentTab = index);
-                _reloadContent();
-              },
-              child: Container(
-                padding: const EdgeInsets.symmetric(
-                  horizontal: 16,
-                  vertical: 6,
-                ),
-                decoration: BoxDecoration(
-                  color: active ? AppColors.primary : Colors.white,
-                  borderRadius: BorderRadius.circular(999),
-                ),
-                child: Text(
-                  labels[index],
-                  style: const TextStyle(
-                    fontSize: 14,
-                    fontWeight: FontWeight.w800,
-                    color: AppColors.textPrimary,
+  Widget _buildFollowingGuidesSection() {
+    return Consumer<GuideProvider>(
+      builder: (context, provider, _) {
+        final guides = provider.followingGuides;
+        return Container(
+          margin: const EdgeInsets.fromLTRB(16, 2, 16, 0),
+          padding: const EdgeInsets.fromLTRB(14, 14, 14, 14),
+          decoration: BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.circular(18),
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                children: [
+                  const Text(
+                    '我关注的地陪',
+                    style: TextStyle(
+                      fontSize: 17,
+                      fontWeight: FontWeight.w800,
+                      color: AppColors.textPrimary,
+                    ),
                   ),
-                ),
+                  const Spacer(),
+                  GestureDetector(
+                    onTap: () => context.push('/following'),
+                    child: const Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Text(
+                          '全部',
+                          style: TextStyle(
+                            fontSize: 12,
+                            color: AppColors.textHint,
+                          ),
+                        ),
+                        SizedBox(width: 2),
+                        Icon(
+                          Icons.chevron_right,
+                          size: 18,
+                          color: AppColors.textHint,
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
               ),
-            ),
-          );
-        }),
-      ),
-    );
-  }
-
-  Widget _buildContentTabs() {
-    const labels = ['关注', '喜欢', '足迹'];
-
-    return Padding(
-      padding: const EdgeInsets.fromLTRB(16, 2, 16, 12),
-      child: Row(
-        children: List.generate(labels.length, (index) {
-          final active = _contentTab == index;
-          return Padding(
-            padding: EdgeInsets.only(
-              right: index == labels.length - 1 ? 0 : 10,
-            ),
-            child: GestureDetector(
-              onTap: () {
-                if (_contentTab == index) return;
-                setState(() => _contentTab = index);
-                _reloadContent();
-              },
-              child: Container(
-                padding: const EdgeInsets.symmetric(
-                  horizontal: 16,
-                  vertical: 6,
-                ),
-                decoration: BoxDecoration(
-                  color: active ? AppColors.primary : Colors.white,
-                  borderRadius: BorderRadius.circular(999),
-                ),
-                child: Text(
-                  labels[index],
-                  style: const TextStyle(
-                    fontSize: 14,
-                    fontWeight: FontWeight.w800,
-                    color: AppColors.textPrimary,
+              const SizedBox(height: 14),
+              if (provider.isLoading && guides.isEmpty)
+                const Padding(
+                  padding: EdgeInsets.symmetric(vertical: 28),
+                  child: Center(
+                    child: CircularProgressIndicator(color: AppColors.primary),
+                  ),
+                )
+              else if (guides.isEmpty)
+                _emptyFollowingGuides()
+              else
+                ...List.generate(
+                  guides.length > 3 ? 3 : guides.length,
+                  (index) => Padding(
+                    padding: EdgeInsets.only(bottom: index == guides.length - 1 ? 0 : 12),
+                    child: ServiceGuideCard(
+                      guide: guides[index],
+                      statusLabel: '已关注，可直接下单',
+                    ),
                   ),
                 ),
-              ),
-            ),
-          );
-        }),
-      ),
-    );
-  }
-
-  Widget _buildContentSection() {
-    return FutureBuilder<List<TravelPost>>(
-      future: _contentFuture,
-      builder: (context, snapshot) {
-        if (snapshot.connectionState == ConnectionState.waiting) {
-          return const Padding(
-            padding: EdgeInsets.only(top: 40),
-            child: Center(
-              child: CircularProgressIndicator(color: AppColors.primary),
-            ),
-          );
-        }
-
-        final posts = snapshot.data ?? const <TravelPost>[];
-        if (posts.isEmpty) {
-          return Container(
-            margin: const EdgeInsets.symmetric(horizontal: 16),
-            padding: const EdgeInsets.symmetric(vertical: 36),
-            decoration: BoxDecoration(
-              color: Colors.white,
-              borderRadius: BorderRadius.circular(18),
-            ),
-            child: const Column(
-              children: [
-                Icon(
-                  Icons.image_not_supported_outlined,
-                  size: 40,
-                  color: AppColors.textHint,
-                ),
-                SizedBox(height: 12),
-                Text(
-                  '这里暂无内容',
-                  style: TextStyle(
-                    fontSize: 14,
-                    color: AppColors.textSecondary,
-                  ),
-                ),
-              ],
-            ),
-          );
-        }
-
-        return Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 16),
-          child: GridView.builder(
-            shrinkWrap: true,
-            physics: const NeverScrollableScrollPhysics(),
-            itemCount: posts.length > 4 ? 4 : posts.length,
-            gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-              crossAxisCount: 2,
-              crossAxisSpacing: 10,
-              mainAxisSpacing: 10,
-              childAspectRatio: 0.61,
-            ),
-            itemBuilder: (context, index) =>
-                _ProfilePostCard(post: posts[index]),
+            ],
           ),
         );
       },
     );
   }
 
-  void _showSnack(String msg) {
-    ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(msg)));
-  }
-}
-
-class _ProfilePostCard extends StatelessWidget {
-  final TravelPost post;
-
-  const _ProfilePostCard({required this.post});
-
-  @override
-  Widget build(BuildContext context) {
-    return GestureDetector(
-      onTap: () => context.push('/post/${post.id}'),
+  Widget _emptyFollowingGuides() {
+    return InkWell(
+      onTap: () => context.push('/following'),
+      borderRadius: BorderRadius.circular(16),
       child: Container(
+        width: double.infinity,
+        padding: const EdgeInsets.symmetric(vertical: 30, horizontal: 16),
         decoration: BoxDecoration(
-          color: Colors.white,
+          color: AppColors.surfaceMuted,
           borderRadius: BorderRadius.circular(16),
         ),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
+        child: const Column(
           children: [
-            Expanded(
-              child: ClipRRect(
-                borderRadius: const BorderRadius.vertical(
-                  top: Radius.circular(16),
-                ),
-                child: Image.network(
-                  post.coverImage,
-                  width: double.infinity,
-                  fit: BoxFit.cover,
-                  errorBuilder: (context, error, stackTrace) => Container(
-                    color: AppColors.surfaceMuted,
-                    alignment: Alignment.center,
-                    child: const Icon(
-                      Icons.image_outlined,
-                      color: AppColors.textHint,
-                    ),
-                  ),
-                ),
+            Icon(
+              Icons.people_alt_outlined,
+              size: 40,
+              color: AppColors.textHint,
+            ),
+            SizedBox(height: 10),
+            Text(
+              '还没有关注地陪',
+              style: TextStyle(
+                fontSize: 14,
+                fontWeight: FontWeight.w800,
+                color: AppColors.textPrimary,
               ),
             ),
-            Padding(
-              padding: const EdgeInsets.fromLTRB(10, 10, 10, 10),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    post.title,
-                    maxLines: 2,
-                    overflow: TextOverflow.ellipsis,
-                    style: const TextStyle(
-                      fontSize: 15,
-                      fontWeight: FontWeight.w700,
-                      color: AppColors.textPrimary,
-                    ),
-                  ),
-                  const SizedBox(height: 6),
-                  Text(
-                    post.subtitle?.isNotEmpty == true
-                        ? post.subtitle!
-                        : '这里是内容摘要',
-                    maxLines: 2,
-                    overflow: TextOverflow.ellipsis,
-                    style: const TextStyle(
-                      fontSize: 13,
-                      color: AppColors.textPrimary,
-                      height: 1.4,
-                    ),
-                  ),
-                  const SizedBox(height: 8),
-                  Row(
-                    children: [
-                      CircleAvatar(
-                        radius: 9,
-                        backgroundImage: post.authorAvatar.isNotEmpty
-                            ? NetworkImage(post.authorAvatar)
-                            : null,
-                        child: post.authorAvatar.isEmpty
-                            ? const Icon(Icons.person, size: 10)
-                            : null,
-                      ),
-                      const SizedBox(width: 4),
-                      Expanded(
-                        child: Text(
-                          post.authorName,
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                          style: const TextStyle(
-                            fontSize: 12,
-                            color: AppColors.textHint,
-                          ),
-                        ),
-                      ),
-                      Icon(
-                        post.isLiked ? Icons.favorite : Icons.favorite_border,
-                        size: 15,
-                        color: post.isLiked
-                            ? const Color(0xFFFF6F7A)
-                            : AppColors.textHint,
-                      ),
-                      const SizedBox(width: 2),
-                      Text(
-                        '${post.likes}',
-                        style: const TextStyle(
-                          fontSize: 12,
-                          color: AppColors.textHint,
-                        ),
-                      ),
-                    ],
-                  ),
-                ],
-              ),
+            SizedBox(height: 4),
+            Text(
+              '去服务页找到喜欢的地陪并关注',
+              style: TextStyle(fontSize: 12, color: AppColors.textSecondary),
             ),
           ],
         ),
       ),
     );
+  }
+
+  void _showSnack(String msg) {
+    ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(msg)));
   }
 }

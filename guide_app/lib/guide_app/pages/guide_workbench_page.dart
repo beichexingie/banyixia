@@ -107,7 +107,7 @@ class GuideWorkbenchPage extends StatelessWidget {
                   onTap: onOpenReviewCenter,
                 ),
                 _ShortcutItem(
-                  title: '我的动态',
+                  title: '我的服务',
                   icon: Icons.public_rounded,
                   onTap: onOpenPublish,
                 ),

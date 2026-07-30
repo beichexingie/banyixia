@@ -6,10 +6,8 @@ import 'package:provider/provider.dart';
 
 import '../../config/app_theme.dart';
 import '../../models/guide.dart';
-import '../../models/travel_post.dart';
 import '../../models/user.dart';
 import '../../providers/guide_provider.dart';
-import '../../providers/post_provider.dart';
 import '../../providers/user_provider.dart';
 
 class UserProfilePage extends StatefulWidget {
@@ -24,11 +22,9 @@ class UserProfilePage extends StatefulWidget {
 class _UserProfilePageState extends State<UserProfilePage> {
   User? _profileUser;
   Guide? _guideProfile;
-  List<TravelPost> _userPosts = [];
   bool _isLoading = true;
   bool _isFollowing = false;
   bool _isFollowLoading = false;
-  int _selectedTab = 0;
 
   @override
   void initState() {
@@ -41,12 +37,10 @@ class _UserProfilePageState extends State<UserProfilePage> {
 
     try {
       final userProvider = context.read<UserProvider>();
-      final postProvider = context.read<PostProvider>();
       final guideProvider = context.read<GuideProvider>();
 
       final results = await Future.wait([
         userProvider.fetchUserById(widget.userId),
-        postProvider.fetchPostsByUser(widget.userId),
         userProvider.isFollowing(widget.userId),
       ]);
 
@@ -70,8 +64,7 @@ class _UserProfilePageState extends State<UserProfilePage> {
       setState(() {
         _profileUser = loadedUser;
         _guideProfile = guideProfile;
-        _userPosts = results[1] as List<TravelPost>;
-        _isFollowing = results[2] as bool;
+        _isFollowing = results[1] as bool;
         _isLoading = false;
       });
     } catch (_) {
@@ -153,7 +146,6 @@ class _UserProfilePageState extends State<UserProfilePage> {
     final isSelf = context.read<UserProvider>().user.id == widget.userId;
     final heroImage = _heroImage(user);
     final guideForOrder = _resolvedGuide(user);
-    final displayPosts = _displayPosts(user, heroImage);
 
     return Scaffold(
       backgroundColor: const Color(0xFFF7F7F7),
@@ -178,12 +170,9 @@ class _UserProfilePageState extends State<UserProfilePage> {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    _buildTabSwitcher(user.isGuideApproved),
+                    _buildSectionTitle(user.isGuideApproved ? '服务' : '资料'),
                     const SizedBox(height: 16),
-                    if (user.isGuideApproved && _selectedTab == 0)
-                      _buildServiceTab(user, guideForOrder)
-                    else
-                      _buildDynamicTab(displayPosts),
+                    _buildServiceTab(user, guideForOrder),
                   ],
                 ),
               ),
@@ -343,7 +332,7 @@ class _UserProfilePageState extends State<UserProfilePage> {
                       const SizedBox(width: 42),
                       _heroStat(
                         '${user.followCount == 0 ? 28 : user.followCount}',
-                        '收藏',
+                        '关注',
                       ),
                       const SizedBox(width: 42),
                       _heroStat(
@@ -390,44 +379,28 @@ class _UserProfilePageState extends State<UserProfilePage> {
     );
   }
 
-  Widget _buildTabSwitcher(bool showService) {
-    final tabs = showService ? const ['服务', '动态'] : const ['动态'];
-
-    return Row(
-      children: List.generate(tabs.length, (index) {
-        final selected = _selectedTab == index;
-        return GestureDetector(
-          onTap: () => setState(() => _selectedTab = index),
-          child: Padding(
-            padding: EdgeInsets.only(right: index == tabs.length - 1 ? 0 : 30),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  tabs[index],
-                  style: TextStyle(
-                    fontSize: 20,
-                    fontWeight: selected ? FontWeight.w900 : FontWeight.w700,
-                    color: selected
-                        ? AppColors.textPrimary
-                        : const Color(0xFF8D8D8D),
-                  ),
-                ),
-                const SizedBox(height: 6),
-                AnimatedContainer(
-                  duration: const Duration(milliseconds: 180),
-                  width: selected ? 24 : 0,
-                  height: 4,
-                  decoration: BoxDecoration(
-                    color: AppColors.primary,
-                    borderRadius: BorderRadius.circular(999),
-                  ),
-                ),
-              ],
-            ),
+  Widget _buildSectionTitle(String title) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          title,
+          style: const TextStyle(
+            fontSize: 20,
+            fontWeight: FontWeight.w900,
+            color: AppColors.textPrimary,
           ),
-        );
-      }),
+        ),
+        const SizedBox(height: 6),
+        Container(
+          width: 24,
+          height: 4,
+          decoration: BoxDecoration(
+            color: AppColors.primary,
+            borderRadius: BorderRadius.circular(999),
+          ),
+        ),
+      ],
     );
   }
 
@@ -474,46 +447,6 @@ class _UserProfilePageState extends State<UserProfilePage> {
         const SizedBox(height: 16),
         _buildReviewsCard(),
       ],
-    );
-  }
-
-  Widget _buildDynamicTab(List<TravelPost> posts) {
-    if (posts.isEmpty) {
-      return Container(
-        width: double.infinity,
-        padding: const EdgeInsets.symmetric(vertical: 54),
-        decoration: BoxDecoration(
-          color: Colors.white,
-          borderRadius: BorderRadius.circular(26),
-        ),
-        child: const Column(
-          children: [
-            Icon(
-              Icons.image_not_supported_outlined,
-              size: 44,
-              color: AppColors.textHint,
-            ),
-            SizedBox(height: 12),
-            Text(
-              '还没有发布动态',
-              style: TextStyle(fontSize: 15, color: AppColors.textSecondary),
-            ),
-          ],
-        ),
-      );
-    }
-
-    return GridView.builder(
-      shrinkWrap: true,
-      physics: const NeverScrollableScrollPhysics(),
-      itemCount: posts.length,
-      gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-        crossAxisCount: 2,
-        mainAxisSpacing: 14,
-        crossAxisSpacing: 14,
-        childAspectRatio: 0.66,
-      ),
-      itemBuilder: (context, index) => _PostCard(post: posts[index]),
     );
   }
 
@@ -967,28 +900,6 @@ class _UserProfilePageState extends State<UserProfilePage> {
         );
   }
 
-  List<TravelPost> _displayPosts(User user, String heroImage) {
-    if (_userPosts.isNotEmpty) {
-      return _userPosts;
-    }
-
-    return List.generate(
-      4,
-      (index) => TravelPost(
-        id: 'mock_profile_$index',
-        title: '川西徒步带队2.0，爬升1.5km',
-        subtitle: '超级收获大大的。',
-        content: '超级收获大大的。',
-        coverImage: heroImage,
-        authorId: user.id,
-        authorName: _displayName(user),
-        authorAvatar: user.avatar,
-        likes: 12,
-        commentCount: 0,
-      ),
-    );
-  }
-
   List<String> _defaultServiceTags() {
     return const ['休闲游玩', '商务陪同'];
   }
@@ -1094,140 +1005,3 @@ class _UserProfilePageState extends State<UserProfilePage> {
   }
 }
 
-class _PostCard extends StatelessWidget {
-  final TravelPost post;
-
-  const _PostCard({required this.post});
-
-  @override
-  Widget build(BuildContext context) {
-    final isMock = post.id.startsWith('mock_profile_');
-
-    return GestureDetector(
-      onTap: isMock ? null : () => context.push('/post/${post.id}'),
-      child: Container(
-        decoration: BoxDecoration(
-          color: Colors.white,
-          borderRadius: BorderRadius.circular(20),
-          boxShadow: [
-            BoxShadow(
-              color: Colors.black.withValues(alpha: 0.035),
-              blurRadius: 14,
-              offset: const Offset(0, 6),
-            ),
-          ],
-        ),
-        clipBehavior: Clip.hardEdge,
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            AspectRatio(
-              aspectRatio: 0.88,
-              child: CachedNetworkImage(
-                imageUrl: post.coverImage,
-                fit: BoxFit.cover,
-                placeholder: (context, url) =>
-                    Container(color: AppColors.surfaceMuted),
-                errorWidget: (context, url, error) => Container(
-                  color: AppColors.surfaceMuted,
-                  alignment: Alignment.center,
-                  child: const Icon(
-                    Icons.image_outlined,
-                    color: AppColors.textHint,
-                  ),
-                ),
-              ),
-            ),
-            Padding(
-              padding: const EdgeInsets.fromLTRB(12, 12, 12, 12),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    post.title,
-                    maxLines: 2,
-                    overflow: TextOverflow.ellipsis,
-                    style: const TextStyle(
-                      fontSize: 16,
-                      fontWeight: FontWeight.w800,
-                      color: AppColors.textPrimary,
-                      height: 1.35,
-                    ),
-                  ),
-                  const SizedBox(height: 6),
-                  Text(
-                    (post.subtitle?.isNotEmpty == true)
-                        ? post.subtitle!
-                        : (post.content?.isNotEmpty == true
-                              ? post.content!
-                              : '超级收获大大的。'),
-                    maxLines: 2,
-                    overflow: TextOverflow.ellipsis,
-                    style: const TextStyle(
-                      fontSize: 14,
-                      color: AppColors.textPrimary,
-                      height: 1.45,
-                    ),
-                  ),
-                  const SizedBox(height: 12),
-                  Row(
-                    children: [
-                      ClipOval(
-                        child: CachedNetworkImage(
-                          imageUrl: post.authorAvatar,
-                          width: 24,
-                          height: 24,
-                          fit: BoxFit.cover,
-                          errorWidget: (context, url, error) => Container(
-                            width: 24,
-                            height: 24,
-                            color: AppColors.surfaceMuted,
-                            alignment: Alignment.center,
-                            child: const Icon(
-                              Icons.person,
-                              size: 12,
-                              color: AppColors.textHint,
-                            ),
-                          ),
-                        ),
-                      ),
-                      const SizedBox(width: 6),
-                      Expanded(
-                        child: Text(
-                          post.authorName.isEmpty ? '用户昵称' : post.authorName,
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                          style: const TextStyle(
-                            fontSize: 13,
-                            color: AppColors.textHint,
-                          ),
-                        ),
-                      ),
-                      Icon(
-                        post.isLiked
-                            ? Icons.favorite_rounded
-                            : Icons.favorite_border_rounded,
-                        size: 20,
-                        color: post.isLiked
-                            ? const Color(0xFFFF6F7A)
-                            : AppColors.textHint,
-                      ),
-                      const SizedBox(width: 4),
-                      Text(
-                        '${post.likes == 0 ? 12 : post.likes}',
-                        style: const TextStyle(
-                          fontSize: 13,
-                          color: AppColors.textHint,
-                        ),
-                      ),
-                    ],
-                  ),
-                ],
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-}
