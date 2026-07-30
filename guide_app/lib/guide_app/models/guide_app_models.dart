@@ -286,6 +286,7 @@ extension GuideOrderStageX on GuideOrderStage {
 }
 
 enum GuideOrderAction {
+  accept,
   goToService,
   arrived,
   navigate,
@@ -294,6 +295,8 @@ enum GuideOrderAction {
 extension GuideOrderActionX on GuideOrderAction {
   String get label {
     switch (this) {
+      case GuideOrderAction.accept:
+        return '接单';
       case GuideOrderAction.goToService:
         return '前往服务地点';
       case GuideOrderAction.arrived:
@@ -305,6 +308,8 @@ extension GuideOrderActionX on GuideOrderAction {
 
   IconData get icon {
     switch (this) {
+      case GuideOrderAction.accept:
+        return Icons.check_circle_rounded;
       case GuideOrderAction.goToService:
         return Icons.near_me_rounded;
       case GuideOrderAction.arrived:

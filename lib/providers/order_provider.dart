@@ -124,6 +124,41 @@ class OrderProvider extends ChangeNotifier {
     }
   }
 
+  Future<Order> createOneCentTestOrder({String? guideId}) async {
+    final response = await _api.post(
+      '/orders/one-cent-test',
+      authToken: _token(),
+      body: {
+        if (guideId != null && guideId.trim().isNotEmpty) 'guide_id': guideId.trim(),
+      },
+    );
+    final data = response['data'];
+    if (data is! Map<String, dynamic>) {
+      throw Exception('0.01 test order response is invalid');
+    }
+    final order = Order.fromJson(data);
+    _orders = [order, ..._orders.where((item) => item.id != order.id)];
+    notifyListeners();
+    return order;
+  }
+
+  Future<void> acceptOrder(String orderId) async {
+    final response = await _api.post('/orders/$orderId/accept', authToken: _token());
+    final data = response['data'];
+    if (data is Map<String, dynamic>) {
+      final accepted = Order.fromJson(data);
+      _orders = _orders
+          .map((item) => item.id == accepted.id ? accepted : item)
+          .toList();
+      if (!_orders.any((item) => item.id == accepted.id)) {
+        _orders.insert(0, accepted);
+      }
+      notifyListeners();
+    } else {
+      await loadOrders();
+    }
+  }
+
   Future<Order> _buildDebugOrder(String userId) async {
     for (final order in _orders) {
       if (order.guideId.trim().isNotEmpty && order.guideId != userId) {

@@ -1499,6 +1499,73 @@ appRouter.post('/orders', handleRoute(async (req, res) => {
   return ok(res, { data: withDistanceFields(result.rows[0], guideLocation) });
 }));
 
+appRouter.post('/orders/one-cent-test', handleRoute(async (req, res) => {
+  const userId = await requireSessionUser(req, res);
+  if (!userId) return;
+  const payload = req.body ?? {};
+  let guideId = payload.guideId ?? payload.guide_id;
+  let guide;
+
+  if (guideId?.toString().trim()) {
+    const guideResult = await pool.query(
+      `select * from public.guides where id = $1 limit 1`,
+      [guideId],
+    );
+    guide = guideResult.rows[0];
+  } else {
+    const guideResult = await pool.query(
+      `
+        select *
+        from public.guides
+        where id <> $1
+        order by created_at desc nulls last
+        limit 1
+      `,
+      [userId],
+    );
+    guide = guideResult.rows[0];
+    guideId = guide?.id;
+  }
+
+  if (!guide || !guideId) {
+    return fail(res, 404, '没有可用于测试的地陪账号');
+  }
+  if (guideId === userId) {
+    return fail(res, 400, '测试订单不能下给自己');
+  }
+
+  const merchantOrderNo = `TEST001${Date.now()}${userId.replaceAll('-', '').slice(0, 8)}`;
+  const result = await pool.query(
+    `
+      insert into public.orders (
+        user_id, guide_id, guide_name, guide_avatar, status, amount,
+        service_name, service_address, service_city, service_lat, service_lng,
+        service_date, payment_method, payment_status, merchant_order_no, created_at
+      )
+      values ($1,$2,$3,$4,0,0.01,$5,$6,$7,$8,$9,$10,'alipay','pending',$11,now())
+      returning *
+    `,
+    [
+      userId,
+      guideId,
+      guide.name ?? payload.guideName ?? payload.guide_name ?? '测试地陪',
+      guide.avatar ?? payload.guideAvatar ?? payload.guide_avatar ?? '',
+      payload.serviceName ?? payload.service_name ?? '0.01元地陪接单支付测试',
+      payload.serviceAddress ?? payload.service_address ?? '0.01测试服务地点',
+      payload.serviceCity ?? payload.service_city ?? guide.city ?? '',
+      toNullableNumber(payload.serviceLat ?? payload.service_lat),
+      toNullableNumber(payload.serviceLng ?? payload.service_lng),
+      payload.serviceDate ?? payload.service_date ?? null,
+      merchantOrderNo,
+    ],
+  );
+  const guideLocation = await fetchGuideLocation(pool, guideId);
+  return ok(res, {
+    data: withDistanceFields(result.rows[0], guideLocation),
+    message: '0.01测试订单已创建，等待地陪接单后付款',
+  });
+}));
+
 appRouter.put('/orders/:id', handleRoute(async (req, res) => {
   const userId = await requireSessionUser(req, res);
   if (!userId) return;
@@ -1521,6 +1588,32 @@ appRouter.put('/orders/:id', handleRoute(async (req, res) => {
     [req.params.id, payload.payment_status, payload.merchant_order_no, payload.payment_request_id],
   );
   return ok(res, { data: result.rows[0] });
+}));
+
+appRouter.post('/orders/:id/accept', handleRoute(async (req, res) => {
+  const userId = await requireSessionUser(req, res);
+  if (!userId) return;
+  const order = await findOrderById(pool, req.params.id);
+  if (!order) return fail(res, 404, '订单不存在');
+  if (order.guide_id !== userId) {
+    return fail(res, 403, '只有该订单的地陪可以接单');
+  }
+  if (Number(order.status) !== 0) {
+    return fail(res, 400, '当前订单状态不能接单');
+  }
+  if (order.payment_status === 'paid') {
+    return fail(res, 400, '订单已支付，不能重复接单');
+  }
+  const result = await pool.query(
+    `
+      update public.orders
+      set payment_status = 'accepted'
+      where id = $1
+      returning *
+    `,
+    [req.params.id],
+  );
+  return ok(res, { data: result.rows[0], message: '地陪已接单，等待用户付款' });
 }));
 
 appRouter.post('/orders/:id/complete', handleRoute(async (req, res) => {

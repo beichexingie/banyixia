@@ -12,7 +12,10 @@ import {
   findOrderByMerchantOrderNo,
   updateOrderPayment,
 } from '../repositories/orders.js';
-import { incrementPendingBalance } from '../repositories/wallets.js';
+import {
+  incrementPendingBalance,
+  recordWalletTransaction,
+} from '../repositories/wallets.js';
 import { fail, ok } from '../utils/http.js';
 
 export const paymentsRouter = express.Router();
@@ -135,6 +138,15 @@ paymentsRouter.post(
             latestOrder.guide_id,
             Number(latestOrder.amount),
           );
+
+          await recordWalletTransaction(client, {
+            userId: latestOrder.guide_id,
+            orderId: latestOrder.id,
+            type: 'income_pending',
+            amount: Number(latestOrder.amount),
+            actualAmount: Number(latestOrder.amount),
+            description: `订单收入托管到账：${latestOrder.service_name ?? '地陪服务订单'}`,
+          });
 
           await ensureChatRoom(client, latestOrder.id, [
             latestOrder.user_id,

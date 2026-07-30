@@ -388,7 +388,7 @@ class GuideConsoleProvider extends ChangeNotifier {
       };
       final primaryAction = switch (stage) {
         GuideOrderStage.newOrder => GuideOrderAction.goToService,
-        GuideOrderStage.pendingPayment => GuideOrderAction.goToService,
+        GuideOrderStage.pendingPayment => GuideOrderAction.accept,
         GuideOrderStage.inProgress => GuideOrderAction.arrived,
       };
       return GuideOrderCardData(

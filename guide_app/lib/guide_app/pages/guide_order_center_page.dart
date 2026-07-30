@@ -137,7 +137,11 @@ class _GuideOrderCenterPageState extends State<GuideOrderCenterPage> {
                           onChatTap: () => _contactCustomer(order),
                           onPrimaryTap: order.primaryAction == GuideOrderAction.navigate
                               ? () => widget.onOpenRoute(order)
-                              : () {
+                              : () async {
+                                  if (order.primaryAction == GuideOrderAction.accept) {
+                                    await _acceptOrder(order);
+                                    return;
+                                  }
                                   if (order.primaryAction == GuideOrderAction.arrived) {
                                     ScaffoldMessenger.of(context).showSnackBar(
                                       const SnackBar(content: Text('已标记到达服务地点')),
@@ -185,6 +189,21 @@ class _GuideOrderCenterPageState extends State<GuideOrderCenterPage> {
         SnackBar(content: Text('虚拟号不可用，已转到消息：$e')),
       );
       widget.onOpenChat();
+    }
+  }
+
+  Future<void> _acceptOrder(GuideOrderCardData order) async {
+    try {
+      await context.read<OrderProvider>().acceptOrder(order.id);
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('已接单，等待用户付款')),
+      );
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('接单失败: $e')),
+      );
     }
   }
 }
