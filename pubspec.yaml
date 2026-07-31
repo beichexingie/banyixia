@@ -70,7 +70,7 @@ flutter:
     - assets/home/tab_mark/image 4.png
 
 alipay_payment:
-  scheme: alipay2021006157637583
+  scheme: alipay2021006167673595
   ios: noutdid
 
   # An image asset can refer to one or more resolution-specific "variants", see
