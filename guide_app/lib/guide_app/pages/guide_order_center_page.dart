@@ -1,4 +1,6 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_application_1/pages/order/voice_call_page.dart';
+import 'package:flutter_application_1/providers/call_provider.dart';
 import 'package:provider/provider.dart';
 
 import '../../config/app_theme.dart';
@@ -188,31 +190,21 @@ class _GuideOrderCenterPageState extends State<GuideOrderCenterPage> {
 
   Future<void> _contactCustomer(GuideOrderCardData order) async {
     try {
-      final virtualNumber = await context
-          .read<OrderProvider>()
-          .getVirtualNumber(order.id);
+      final payload = await context.read<CallProvider>().createVoiceCall(order.id);
       if (!mounted) return;
-      await showDialog<void>(
-        context: context,
-        builder: (context) => AlertDialog(
-          title: const Text('虚拟号联系'),
-          content: Text(
-            '请拨打平台虚拟号联系客户：\n\n$virtualNumber\n\n该号码为隐私保护号码，不会暴露双方真实手机号。',
+      await Navigator.of(context).push(
+        MaterialPageRoute<void>(
+          builder: (_) => VoiceCallPage(
+            callPayload: payload,
+            peerName: '客户',
           ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.of(context).pop(),
-              child: const Text('知道了'),
-            ),
-          ],
         ),
       );
-    } catch (e) {
+    } catch (callError) {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('虚拟号不可用，已转到消息：$e')),
+        SnackBar(content: Text('发起语音通话失败：$callError')),
       );
-      widget.onOpenChat();
     }
   }
 

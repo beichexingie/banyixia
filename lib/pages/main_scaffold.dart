@@ -205,7 +205,7 @@ class _MainScaffoldState extends State<MainScaffold> {
               ),
               const SizedBox(height: 14),
               const Text(
-                '有新的语音联系',
+                '地陪来电',
                 style: TextStyle(
                   fontSize: 20,
                   fontWeight: FontWeight.w900,
@@ -214,7 +214,7 @@ class _MainScaffoldState extends State<MainScaffold> {
               ),
               const SizedBox(height: 8),
               Text(
-                orderId.isEmpty ? '对方正在通过订单联系你' : '订单 $orderId',
+                orderId.isEmpty ? '地陪正在通过订单联系你' : '订单 $orderId',
                 textAlign: TextAlign.center,
                 style: const TextStyle(
                   fontSize: 13,
@@ -231,7 +231,7 @@ class _MainScaffoldState extends State<MainScaffold> {
                         if (callId.isNotEmpty) {
                           await context.read<CallProvider>().endVoiceCall(
                                 callId,
-                                reason: 'rejected',
+                                reason: 'customer_rejected',
                               );
                         }
                       },
@@ -260,7 +260,7 @@ class _MainScaffoldState extends State<MainScaffold> {
                           MaterialPageRoute<void>(
                             builder: (_) => VoiceCallPage(
                               callPayload: payload,
-                              peerName: '订单对方',
+                              peerName: '地陪',
                               incoming: true,
                             ),
                           ),
