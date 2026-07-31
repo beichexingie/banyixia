@@ -837,6 +837,44 @@ alter table if exists public.virtual_number_bindings
 create index if not exists idx_virtual_number_bindings_order_expires
   on public.virtual_number_bindings (order_id, expires_at desc);
 
+create table if not exists public.call_sessions (
+  id uuid primary key default gen_random_uuid(),
+  order_id uuid not null references public.orders(id) on delete cascade,
+  caller_user_id uuid not null references public.users(id) on delete cascade,
+  callee_user_id uuid not null references public.users(id) on delete cascade,
+  room_id integer not null,
+  provider text not null default 'trtc',
+  status text not null default 'created',
+  started_at timestamptz default now(),
+  answered_at timestamptz,
+  ended_at timestamptz,
+  duration_seconds integer,
+  end_reason text,
+  created_at timestamptz default now(),
+  updated_at timestamptz default now()
+);
+
+alter table if exists public.call_sessions
+  add column if not exists order_id uuid references public.orders(id) on delete cascade,
+  add column if not exists caller_user_id uuid references public.users(id) on delete cascade,
+  add column if not exists callee_user_id uuid references public.users(id) on delete cascade,
+  add column if not exists room_id integer,
+  add column if not exists provider text default 'trtc',
+  add column if not exists status text default 'created',
+  add column if not exists started_at timestamptz default now(),
+  add column if not exists answered_at timestamptz,
+  add column if not exists ended_at timestamptz,
+  add column if not exists duration_seconds integer,
+  add column if not exists end_reason text,
+  add column if not exists created_at timestamptz default now(),
+  add column if not exists updated_at timestamptz default now();
+
+create index if not exists idx_call_sessions_order_created
+  on public.call_sessions (order_id, created_at desc);
+
+create index if not exists idx_call_sessions_callee_status
+  on public.call_sessions (callee_user_id, status, created_at desc);
+
 -- ---------------------------------------------------------------------------
 -- Admin console / operation tables
 -- ---------------------------------------------------------------------------

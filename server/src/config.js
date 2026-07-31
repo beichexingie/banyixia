@@ -82,6 +82,10 @@ export const config = {
   aliyunDyplsDomain: process.env.ALIYUN_DYPLS_DOMAIN?.trim() || 'dyplsapi.aliyuncs.com',
   aliyunDyplsRegionId: process.env.ALIYUN_DYPLS_REGION_ID?.trim() || 'cn-hangzhou',
   virtualNumberEnabled: parseBoolean(process.env.VIRTUAL_NUMBER_ENABLED, false),
+  trtcEnabled: parseBoolean(process.env.TRTC_ENABLED, false),
+  trtcSdkAppId: Number(process.env.TRTC_SDK_APP_ID || 0),
+  trtcSecretKey: process.env.TRTC_SECRET_KEY?.trim() || '',
+  trtcUserSigExpireSeconds: Number(process.env.TRTC_USER_SIG_EXPIRE_SECONDS || 86400),
 };
 
 export function hasAlipayConfig() {
@@ -90,5 +94,14 @@ export function hasAlipayConfig() {
         config.alipayPrivateKey &&
         config.alipayPublicKey &&
         config.alipayNotifyUrl,
+  );
+}
+
+export function hasTrtcConfig() {
+  return Boolean(
+    config.trtcEnabled &&
+      config.trtcSdkAppId > 0 &&
+      config.trtcSecretKey &&
+      config.trtcUserSigExpireSeconds > 0,
   );
 }

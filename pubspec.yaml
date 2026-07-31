@@ -46,6 +46,8 @@ dependencies:
   latlong2: ^0.9.1
   http: ^1.2.2
   alipay_payment: ^1.1.2
+  tencent_rtc_sdk: ^13.4.2
+  permission_handler: ^12.0.3
 
 dev_dependencies:
   flutter_test:
