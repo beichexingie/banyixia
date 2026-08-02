@@ -5,6 +5,7 @@ import '../config/app_config.dart';
 import '../config/app_router.dart';
 import '../config/app_theme.dart';
 import '../providers/application_provider.dart';
+import '../providers/call_provider.dart';
 import '../providers/demand_provider.dart';
 import '../providers/guide_provider.dart';
 import '../providers/message_provider.dart';
@@ -50,6 +51,9 @@ class BanyixiaApp extends StatelessWidget {
         ),
         ChangeNotifierProvider(
           create: (_) => ApplicationProvider(sessionService: sessionService),
+        ),
+        ChangeNotifierProvider(
+          create: (_) => CallProvider(sessionService: sessionService),
         ),
       ],
       child: Builder(

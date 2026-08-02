@@ -25,9 +25,15 @@ import {
 } from '../repositories/wallets.js';
 import { assertPayloadAllowed, assertTextAllowed, reviewImage } from '../services/moderation.js';
 import {
+<<<<<<< HEAD
   queryAlipayTransfer,
   transferToAlipayAccount,
 } from '../services/alipay.js';
+=======
+  buildTrtcCredential,
+  buildTrtcRoomId,
+} from '../services/trtc.js';
+>>>>>>> 1e5ad028f5e0b90337f2104f67e1407bcd6bc096
 import { bindAxbVirtualNumber } from '../services/virtual_number.js';
 
 export const appRouter = express.Router();
@@ -1772,6 +1778,166 @@ appRouter.post('/orders/:id/virtual-number', handleRoute(async (req, res) => {
     },
     message: '已获取虚拟号',
   });
+}));
+
+async function findOrderContactContext(orderId) {
+  const result = await pool.query(
+    `
+      select
+        o.id,
+        o.user_id,
+        o.guide_id,
+        o.status,
+        o.payment_status,
+        customer.phone as customer_phone,
+        guide_user.phone as guide_phone
+      from public.orders o
+      join public.users customer on customer.id = o.user_id
+      join public.users guide_user on guide_user.id = o.guide_id
+      where o.id = $1
+      limit 1
+    `,
+    [orderId],
+  );
+  return result.rows[0] ?? null;
+}
+
+function buildCallPayload(call, credential) {
+  return {
+    call_id: call.id,
+    order_id: call.order_id,
+    caller_user_id: call.caller_user_id,
+    callee_user_id: call.callee_user_id,
+    room_id: call.room_id,
+    provider: call.provider,
+    status: call.status,
+    started_at: call.started_at,
+    answered_at: call.answered_at,
+    ended_at: call.ended_at,
+    duration_seconds: call.duration_seconds,
+    end_reason: call.end_reason,
+    trtc: credential,
+  };
+}
+
+appRouter.post('/orders/:id/calls', handleRoute(async (req, res) => {
+  const userId = await requireSessionUser(req, res);
+  if (!userId) return;
+
+  const order = await findOrderContactContext(req.params.id);
+  if (!order) return fail(res, 404, '订单不存在');
+  if (order.user_id !== userId && order.guide_id !== userId) {
+    return fail(res, 403, '无权联系该订单用户');
+  }
+
+  const calleeUserId = order.user_id === userId ? order.guide_id : order.user_id;
+  const recent = await pool.query(
+    `
+      select *
+      from public.call_sessions
+      where order_id = $1
+        and status in ('created', 'ringing', 'answered')
+        and created_at > now() - interval '30 minutes'
+      order by created_at desc
+      limit 1
+    `,
+    [order.id],
+  );
+  if (recent.rows[0]) {
+    const credential = buildTrtcCredential(userId);
+    return ok(res, {
+      data: buildCallPayload(recent.rows[0], credential),
+      message: '已有进行中的语音通话',
+    });
+  }
+
+  const roomId = buildTrtcRoomId(`${order.id}:${Date.now()}`);
+  const created = await pool.query(
+    `
+      insert into public.call_sessions (
+        order_id, caller_user_id, callee_user_id, room_id, provider, status, started_at, updated_at
+      ) values ($1,$2,$3,$4,'trtc','ringing',now(),now())
+      returning *
+    `,
+    [order.id, userId, calleeUserId, roomId],
+  );
+  const credential = buildTrtcCredential(userId);
+  return ok(res, {
+    data: buildCallPayload(created.rows[0], credential),
+    message: '语音通话已创建',
+  });
+}));
+
+appRouter.get('/calls/incoming', handleRoute(async (req, res) => {
+  const userId = await requireSessionUser(req, res);
+  if (!userId) return;
+  const result = await pool.query(
+    `
+      select *
+      from public.call_sessions
+      where callee_user_id = $1
+        and status = 'ringing'
+        and created_at > now() - interval '2 minutes'
+      order by created_at desc
+      limit 10
+    `,
+    [userId],
+  );
+  return ok(res, { data: result.rows });
+}));
+
+appRouter.post('/calls/:id/join', handleRoute(async (req, res) => {
+  const userId = await requireSessionUser(req, res);
+  if (!userId) return;
+  const result = await pool.query(
+    `
+      update public.call_sessions
+      set
+        status = 'answered',
+        answered_at = coalesce(answered_at, now()),
+        updated_at = now()
+      where id = $1
+        and (caller_user_id = $2 or callee_user_id = $2)
+        and status in ('ringing', 'answered')
+      returning *
+    `,
+    [req.params.id, userId],
+  );
+  const call = result.rows[0];
+  if (!call) return fail(res, 404, '通话不存在或已结束');
+  const credential = buildTrtcCredential(userId);
+  return ok(res, {
+    data: buildCallPayload(call, credential),
+    message: '已加入语音通话',
+  });
+}));
+
+appRouter.post('/calls/:id/end', handleRoute(async (req, res) => {
+  const userId = await requireSessionUser(req, res);
+  if (!userId) return;
+  const reason = req.body?.reason?.toString().trim() || 'ended';
+  const result = await pool.query(
+    `
+      update public.call_sessions
+      set
+        status = 'ended',
+        ended_at = now(),
+        duration_seconds = case
+          when answered_at is null then 0
+          else greatest(0, floor(extract(epoch from (now() - answered_at)))::integer)
+        end,
+        end_reason = $3,
+        updated_at = now()
+      where id = $1
+        and (caller_user_id = $2 or callee_user_id = $2)
+        and status in ('created', 'ringing', 'answered')
+      returning *
+    `,
+    [req.params.id, userId, reason],
+  );
+  const call = result.rows[0];
+  if (!call) return fail(res, 404, '通话不存在或已结束');
+  return ok(res, { data: call, message: '语音通话已结束' });
 }));
 
 appRouter.get('/wallet', async (req, res) => {

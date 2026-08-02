@@ -46,6 +46,8 @@ dependencies:
   latlong2: ^0.9.1
   http: ^1.2.2
   alipay_payment: ^1.1.2
+  tencent_rtc_sdk: ^13.4.2
+  permission_handler: ^12.0.3
 
 dev_dependencies:
   flutter_test:
@@ -70,7 +72,7 @@ flutter:
     - assets/home/tab_mark/image 4.png
 
 alipay_payment:
-  scheme: alipay2021006157637583
+  scheme: alipay2021006167673595
   ios: noutdid
 
   # An image asset can refer to one or more resolution-specific "variants", see

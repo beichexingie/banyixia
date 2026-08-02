@@ -3,7 +3,9 @@ import 'package:provider/provider.dart';
 
 import '../../config/app_theme.dart';
 import '../../models/order.dart';
+import '../../providers/call_provider.dart';
 import '../../providers/order_provider.dart';
+import '../order/voice_call_page.dart';
 
 class OrderDetailPage extends StatefulWidget {
   final String orderId;
@@ -113,6 +115,47 @@ class _OrderDetailPageState extends State<OrderDetailPage> {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     const Text(
+                      '联系对方',
+                      style: TextStyle(
+                        fontSize: 16,
+                        fontWeight: FontWeight.w800,
+                      ),
+                    ),
+                    const SizedBox(height: 10),
+                    const Text(
+                      '使用腾讯云 TRTC 语音通话，不直接暴露双方手机号。',
+                      style: TextStyle(
+                        fontSize: 13,
+                        color: AppColors.textSecondary,
+                        height: 1.4,
+                      ),
+                    ),
+                    const SizedBox(height: 14),
+                    SizedBox(
+                      width: double.infinity,
+                      child: FilledButton.icon(
+                        onPressed: () => _startVoiceCall(order!),
+                        icon: const Icon(Icons.call_rounded),
+                        label: const Text('语音联系'),
+                        style: FilledButton.styleFrom(
+                          backgroundColor: AppColors.textPrimary,
+                          foregroundColor: Colors.white,
+                          padding: const EdgeInsets.symmetric(vertical: 14),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(16),
+                          ),
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(height: 12),
+              _card(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const Text(
                       '状态说明',
                       style: TextStyle(
                         fontSize: 16,
@@ -133,6 +176,26 @@ class _OrderDetailPageState extends State<OrderDetailPage> {
         },
       ),
     );
+  }
+
+  Future<void> _startVoiceCall(Order order) async {
+    final messenger = ScaffoldMessenger.of(context);
+    try {
+      final payload = await context.read<CallProvider>().createVoiceCall(order.id);
+      if (!mounted) return;
+      await Navigator.of(context).push(
+        MaterialPageRoute<void>(
+          builder: (_) => VoiceCallPage(
+            callPayload: payload,
+            peerName: order.guideName.isEmpty ? '订单对方' : order.guideName,
+          ),
+        ),
+      );
+    } catch (error) {
+      messenger.showSnackBar(
+        SnackBar(content: Text('发起语音通话失败：$error')),
+      );
+    }
   }
 
   Widget _card({required Widget child}) {
