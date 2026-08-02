@@ -12,6 +12,7 @@ class GuideProfilePage extends StatelessWidget {
   final VoidCallback onOpenCityPicker;
   final VoidCallback onOpenCertification;
   final VoidCallback onOpenPlatformRules;
+  final VoidCallback onOpenWallet;
 
   const GuideProfilePage({
     super.key,
@@ -20,6 +21,7 @@ class GuideProfilePage extends StatelessWidget {
     required this.onOpenCityPicker,
     required this.onOpenCertification,
     required this.onOpenPlatformRules,
+    required this.onOpenWallet,
   });
 
   @override
@@ -136,6 +138,12 @@ class GuideProfilePage extends StatelessWidget {
                   icon: Icons.policy_outlined,
                   title: '平台规则',
                   onTap: onOpenPlatformRules,
+                ),
+                const Divider(height: 1),
+                _ProfileRow(
+                  icon: Icons.account_balance_wallet_outlined,
+                  title: '钱包与提现',
+                  onTap: onOpenWallet,
                 ),
               ],
             ),

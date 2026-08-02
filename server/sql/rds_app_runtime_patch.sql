@@ -810,6 +810,9 @@ create index if not exists idx_withdrawal_requests_user_id
 create index if not exists idx_withdrawal_requests_status_created
   on public.withdrawal_requests (status, created_at desc);
 
+comment on column public.withdrawal_requests.status is
+  'pending=待审核, approved=已审核, transferring=支付宝打款中, transfer_failed=打款失败可重试, paid=已打款, rejected=已驳回';
+
 create table if not exists public.virtual_number_bindings (
   id uuid primary key default gen_random_uuid(),
   order_id uuid not null references public.orders(id) on delete cascade,

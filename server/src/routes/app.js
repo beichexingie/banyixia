@@ -24,6 +24,10 @@ import {
   releasePendingBalance,
 } from '../repositories/wallets.js';
 import { assertPayloadAllowed, assertTextAllowed, reviewImage } from '../services/moderation.js';
+import {
+  queryAlipayTransfer,
+  transferToAlipayAccount,
+} from '../services/alipay.js';
 import { bindAxbVirtualNumber } from '../services/virtual_number.js';
 
 export const appRouter = express.Router();
@@ -205,6 +209,20 @@ async function requireAdminUser(req, res) {
   const user = await hydrateUser(pool, userId);
   if (!user?.is_admin) {
     fail(res, 403, '无管理员权限');
+    return null;
+  }
+  return userId;
+}
+
+async function requireGuideUser(req, res) {
+  const userId = await requireSessionUser(req, res);
+  if (!userId) return null;
+  const result = await pool.query(
+    `select exists(select 1 from public.guides where id = $1) as is_guide`,
+    [userId],
+  );
+  if (!result.rows[0]?.is_guide) {
+    fail(res, 403, '只有已通过地陪申请的账号才能操作钱包提现');
     return null;
   }
   return userId;
@@ -1780,7 +1798,7 @@ appRouter.get('/wallet', async (req, res) => {
 });
 
 appRouter.put('/wallet/payout-account', handleRoute(async (req, res) => {
-  const userId = await requireSessionUser(req, res);
+  const userId = await requireGuideUser(req, res);
   if (!userId) return;
   const payload = req.body ?? {};
   const alipayAccount = payload.alipay_account?.toString().trim() ?? '';
@@ -1810,7 +1828,7 @@ appRouter.put('/wallet/payout-account', handleRoute(async (req, res) => {
 }));
 
 appRouter.post('/wallet/withdraw', handleRoute(async (req, res) => {
-  const userId = await requireSessionUser(req, res);
+  const userId = await requireGuideUser(req, res);
   if (!userId) return;
   const amount = Number(req.body?.amount ?? 0);
   if (!(amount > 0)) return fail(res, 400, '提现金额必须大于0');
@@ -1871,6 +1889,60 @@ appRouter.get('/admin/withdrawals', handleRoute(async (req, res) => {
   return ok(res, { data: result.rows });
 }));
 
+appRouter.get('/admin/payout-accounts', handleRoute(async (req, res) => {
+  const adminId = await requireAdminUser(req, res);
+  if (!adminId) return;
+  const status = req.query.status?.toString().trim();
+  const result = await pool.query(
+    `
+      select
+        gpa.*,
+        u.phone,
+        u.nickname
+      from public.guide_payout_accounts gpa
+      join public.users u on u.id = gpa.user_id
+      where ($1::text is null or gpa.status = $1)
+      order by gpa.updated_at desc
+      limit 200
+    `,
+    [status || null],
+  );
+  return ok(res, { data: result.rows });
+}));
+
+appRouter.post('/admin/payout-accounts/:userId/approve', handleRoute(async (req, res) => {
+  const adminId = await requireAdminUser(req, res);
+  if (!adminId) return;
+  const result = await pool.query(
+    `
+      update public.guide_payout_accounts
+      set status = 'approved', reject_reason = null, verified_at = now(), updated_at = now()
+      where user_id = $1 and status = 'pending'
+      returning *
+    `,
+    [req.params.userId],
+  );
+  if (!result.rows[0]) return fail(res, 404, '收款账号不存在或当前状态不能审核');
+  return ok(res, { data: result.rows[0], message: '支付宝收款账号已审核通过' });
+}));
+
+appRouter.post('/admin/payout-accounts/:userId/reject', handleRoute(async (req, res) => {
+  const adminId = await requireAdminUser(req, res);
+  if (!adminId) return;
+  const reason = req.body?.reason?.toString().trim() || '支付宝收款账号审核未通过';
+  const result = await pool.query(
+    `
+      update public.guide_payout_accounts
+      set status = 'rejected', reject_reason = $2, verified_at = null, updated_at = now()
+      where user_id = $1 and status = 'pending'
+      returning *
+    `,
+    [req.params.userId, reason],
+  );
+  if (!result.rows[0]) return fail(res, 404, '收款账号不存在或当前状态不能驳回');
+  return ok(res, { data: result.rows[0], message: '支付宝收款账号已驳回' });
+}));
+
 appRouter.post('/admin/withdrawals/:id/approve', handleRoute(async (req, res) => {
   const adminId = await requireAdminUser(req, res);
   if (!adminId) return;
@@ -1896,7 +1968,7 @@ appRouter.post('/admin/withdrawals/:id/reject', handleRoute(async (req, res) => 
       `
         update public.withdrawal_requests
         set status = 'rejected', reject_reason = $2, reviewed_at = now(), updated_at = now()
-        where id = $1 and status in ('pending','approved')
+        where id = $1 and status in ('pending','approved','transfer_failed')
         returning *
       `,
       [req.params.id, reason],
@@ -1918,6 +1990,230 @@ appRouter.post('/admin/withdrawals/:id/reject', handleRoute(async (req, res) => 
   return ok(res, { data: rejected, message: '提现申请已驳回并退回余额' });
 }));
 
+appRouter.post('/admin/withdrawals/:id/transfer', handleRoute(async (req, res) => {
+  const adminId = await requireAdminUser(req, res);
+  if (!adminId) return;
+  const remark = req.body?.remark?.toString().trim() ?? '';
+
+  const withdrawal = await withTransaction(async (client) => {
+    const query = await client.query(
+      `
+        update public.withdrawal_requests
+        set
+          status = 'transferring',
+          reject_reason = null,
+          updated_at = now()
+        where id = $1 and status in ('approved','transfer_failed')
+        returning *
+      `,
+      [req.params.id],
+    );
+    return query.rows[0] ?? null;
+  });
+
+  if (!withdrawal) {
+    return fail(res, 404, '提现申请不存在，或当前状态不能自动打款');
+  }
+
+  const account = withdrawal.payout_account_snapshot ?? {};
+  try {
+    const transfer = await transferToAlipayAccount({
+      withdrawalId: withdrawal.id,
+      amount: Number(withdrawal.amount),
+      alipayAccount: account.alipay_account,
+      alipayUserId: account.alipay_user_id,
+      realName: account.real_name,
+      remark: remark || `一点伴提现 ${withdrawal.id}`,
+    });
+
+    const transferStatus = transfer.status?.toString().trim().toUpperCase() || 'SUCCESS';
+    if (transferStatus !== 'SUCCESS') {
+      await pool.query(
+        `
+          update public.withdrawal_requests
+          set
+            status = 'transferring',
+            provider_order_no = coalesce($2, provider_order_no),
+            reject_reason = $3,
+            updated_at = now()
+          where id = $1 and status = 'transferring'
+        `,
+        [
+          withdrawal.id,
+          transfer.orderId || transfer.payFundOrderId || transfer.outBizNo,
+          `支付宝返回状态：${transfer.status}`,
+        ],
+      );
+      return ok(res, {
+        data: { withdrawal, transfer },
+        message: `支付宝已受理，当前状态：${transfer.status}，请稍后查询`,
+      });
+    }
+
+    const paid = await withTransaction(async (client) => {
+      const query = await client.query(
+        `
+          update public.withdrawal_requests
+          set
+            status = 'paid',
+            provider_order_no = $2,
+            reject_reason = null,
+            paid_at = now(),
+            updated_at = now()
+          where id = $1 and status = 'transferring'
+          returning *
+        `,
+        [withdrawal.id, transfer.orderId || transfer.payFundOrderId || transfer.outBizNo],
+      );
+      const item = query.rows[0];
+      if (!item) return null;
+      await recordWalletTransaction(client, {
+        userId: item.user_id,
+        orderId: null,
+        type: 'withdraw_paid',
+        amount: -Number(item.amount),
+        actualAmount: -Number(item.amount),
+        description: `提现已通过支付宝自动打款，流水：${transfer.orderId || transfer.outBizNo}`,
+      });
+      return item;
+    });
+
+    return ok(res, {
+      data: {
+        withdrawal: paid,
+        transfer,
+      },
+      message: '支付宝自动打款成功',
+    });
+  } catch (error) {
+    const uncertain = error.remoteAttempted === true;
+    const reason = error.message || '支付宝自动打款失败';
+    await pool.query(
+      `
+        update public.withdrawal_requests
+        set status = $2, reject_reason = $3, updated_at = now()
+        where id = $1 and status = 'transferring'
+      `,
+      [
+        withdrawal.id,
+        uncertain ? 'transferring' : 'transfer_failed',
+        `${uncertain ? '支付宝已请求但结果未知，请查询：' : ''}${reason}`.slice(0, 500),
+      ],
+    );
+    return fail(
+      res,
+      502,
+      uncertain
+        ? `支付宝返回结果未知，请点击“查询转账状态”：${reason}`
+        : `支付宝自动打款失败：${reason}`,
+    );
+  }
+}));
+
+appRouter.post('/admin/withdrawals/:id/query-transfer', handleRoute(async (req, res) => {
+  const adminId = await requireAdminUser(req, res);
+  if (!adminId) return;
+  const result = await pool.query(
+    `select * from public.withdrawal_requests where id = $1 limit 1`,
+    [req.params.id],
+  );
+  const withdrawal = result.rows[0];
+  if (!withdrawal) return fail(res, 404, '提现申请不存在');
+  if (!['transferring', 'transfer_failed'].includes(withdrawal.status)) {
+    return fail(res, 400, '当前提现状态不需要查询支付宝');
+  }
+
+  try {
+    const transfer = await queryAlipayTransfer({ withdrawalId: withdrawal.id });
+    const transferStatus = transfer.status?.toString().trim().toUpperCase() || 'DEALING';
+
+    if (transferStatus === 'SUCCESS') {
+      const paid = await withTransaction(async (client) => {
+        const update = await client.query(
+          `
+            update public.withdrawal_requests
+            set
+              status = 'paid',
+              provider_order_no = coalesce($2, provider_order_no),
+              reject_reason = null,
+              paid_at = now(),
+              updated_at = now()
+            where id = $1 and status <> 'paid'
+            returning *
+          `,
+          [
+            withdrawal.id,
+            transfer.orderId || transfer.payFundOrderId || transfer.outBizNo,
+          ],
+        );
+        const item = update.rows[0];
+        if (!item) return withdrawal;
+        await recordWalletTransaction(client, {
+          userId: item.user_id,
+          orderId: null,
+          type: 'withdraw_paid',
+          amount: -Number(item.amount),
+          actualAmount: -Number(item.amount),
+          description: `查询确认支付宝提现成功，流水：${transfer.orderId || transfer.outBizNo}`,
+        });
+        return item;
+      });
+      return ok(res, {
+        data: { withdrawal: paid, transfer },
+        message: '查询确认：支付宝已打款成功',
+      });
+    }
+
+    if (transferStatus === 'FAIL' || transferStatus === 'FAILED') {
+      const failed = await pool.query(
+        `
+          update public.withdrawal_requests
+          set
+            status = 'transfer_failed',
+            provider_order_no = coalesce($2, provider_order_no),
+            reject_reason = $3,
+            updated_at = now()
+          where id = $1
+          returning *
+        `,
+        [
+          withdrawal.id,
+          transfer.orderId || transfer.payFundOrderId || transfer.outBizNo,
+          transfer.failReason || '支付宝转账失败',
+        ],
+      );
+      return ok(res, {
+        data: { withdrawal: failed.rows[0], transfer },
+        message: '查询确认：支付宝转账失败，可重试或驳回提现',
+      });
+    }
+
+    const pending = await pool.query(
+      `
+        update public.withdrawal_requests
+        set
+          status = 'transferring',
+          provider_order_no = coalesce($2, provider_order_no),
+          reject_reason = $3,
+          updated_at = now()
+        where id = $1
+        returning *
+      `,
+      [
+        withdrawal.id,
+        transfer.orderId || transfer.payFundOrderId || transfer.outBizNo,
+        `支付宝当前状态：${transfer.status}`,
+      ],
+    );
+    return ok(res, {
+      data: { withdrawal: pending.rows[0], transfer },
+      message: `支付宝当前状态：${transfer.status}，请稍后再次查询`,
+    });
+  } catch (error) {
+    return fail(res, 502, `查询支付宝转账失败：${error.message}`);
+  }
+}));
+
 appRouter.post('/admin/withdrawals/:id/mark-paid', handleRoute(async (req, res) => {
   const adminId = await requireAdminUser(req, res);
   if (!adminId) return;
@@ -1929,9 +2225,10 @@ appRouter.post('/admin/withdrawals/:id/mark-paid', handleRoute(async (req, res) 
         set
           status = 'paid',
           provider_order_no = coalesce($2, provider_order_no),
+          reject_reason = null,
           paid_at = now(),
           updated_at = now()
-        where id = $1 and status = 'approved'
+        where id = $1 and status in ('approved','transfer_failed')
         returning *
       `,
       [req.params.id, providerOrderNo || null],

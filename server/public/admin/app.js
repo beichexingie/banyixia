@@ -10,6 +10,7 @@ const navItems = [
   { id: 'dashboard', label: '数据概览', icon: '▥', permission: 'stats' },
   { id: 'users', label: '用户管理', icon: '♙', permission: 'users' },
   { id: 'orders', label: '订单管理', icon: '🛒', permission: 'orders' },
+  { id: 'withdrawals', label: '提现打款', icon: '¥', permission: 'orders' },
   { id: 'activities', label: '活动管理', icon: '☊', permission: 'activity' },
   { id: 'coupons', label: '优惠券', icon: '券', permission: 'coupon' },
   { id: 'chat', label: '客服工作台', icon: '☎', permission: 'chat' },
@@ -51,12 +52,22 @@ function statusPill(value) {
   const v = text(value, 'unknown');
   const cls = /paid|approved|active|published|3|完成/.test(v)
     ? 'green'
-    : /pending|draft|open|0|1/.test(v)
+    : /pending|draft|open|transferring|0|1/.test(v)
       ? 'orange'
-      : /reject|ban|cancel|offline|4/.test(v)
+      : /reject|failed|ban|cancel|offline|4/.test(v)
         ? 'red'
         : '';
   return `<span class="pill ${cls}">${v}</span>`;
+}
+
+function parseSnapshot(value) {
+  if (!value) return {};
+  if (typeof value === 'object') return value;
+  try {
+    return JSON.parse(value);
+  } catch (_error) {
+    return {};
+  }
 }
 
 function can(permission) {
@@ -552,6 +563,164 @@ async function renderStaff() {
   });
 }
 
+async function renderWithdrawals() {
+  const status = localStorage.getItem('admin_withdrawal_status') || '';
+  const [rows, payoutAccounts] = await Promise.all([
+    api(`/api/admin/withdrawals${status ? `?status=${status}` : ''}`),
+    api('/api/admin/payout-accounts?status=pending'),
+  ]);
+  els.content.innerHTML = `
+    ${pageHead('提现打款', '地陪提现先审核，再调用支付宝商家转账；失败的单可以重试或手动兜底。')}
+    <div class="card table-wrap" style="margin-bottom:18px">
+      <div class="section-head"><h2>待审核收款账号</h2><span class="hint">${payoutAccounts.length} 条</span></div>
+      ${payoutAccounts.length ? `
+        <table>
+          <thead><tr><th>地陪</th><th>实名</th><th>支付宝账号</th><th>User ID</th><th>更新时间</th><th>操作</th></tr></thead>
+          <tbody>
+            ${payoutAccounts.map((row) => `
+              <tr>
+                <td>${text(row.nickname, '未命名')}<br><small>${text(row.phone)}</small></td>
+                <td>${text(row.real_name)}</td>
+                <td>${text(row.alipay_account)}</td>
+                <td>${text(row.alipay_user_id)}</td>
+                <td>${fmtDate(row.updated_at)}</td>
+                <td class="action-cell">
+                  <button class="primary-btn" data-payout-action="approve" data-user-id="${row.user_id}">通过</button>
+                  <button class="danger-btn" data-payout-action="reject" data-user-id="${row.user_id}">驳回</button>
+                </td>
+              </tr>
+            `).join('')}
+          </tbody>
+        </table>
+      ` : emptyHtml('暂无待审核收款账号')}
+    </div>
+    <div class="toolbar">
+      <select id="withdrawalStatus">
+        <option value="" ${status === '' ? 'selected' : ''}>全部状态</option>
+        <option value="pending" ${status === 'pending' ? 'selected' : ''}>待审核</option>
+        <option value="approved" ${status === 'approved' ? 'selected' : ''}>待打款</option>
+        <option value="transferring" ${status === 'transferring' ? 'selected' : ''}>打款中</option>
+        <option value="transfer_failed" ${status === 'transfer_failed' ? 'selected' : ''}>打款失败</option>
+        <option value="paid" ${status === 'paid' ? 'selected' : ''}>已打款</option>
+        <option value="rejected" ${status === 'rejected' ? 'selected' : ''}>已驳回</option>
+      </select>
+    </div>
+    <div class="card table-wrap">
+      ${rows.length ? `
+        <table class="wide-table">
+          <thead><tr><th>地陪</th><th>金额</th><th>收款账号</th><th>状态</th><th>流水/原因</th><th>时间</th><th>操作</th></tr></thead>
+          <tbody>
+            ${rows.map((row) => {
+              const account = parseSnapshot(row.payout_account_snapshot);
+              const canApprove = row.status === 'pending';
+              const canTransfer = row.status === 'approved' || row.status === 'transfer_failed';
+              const canReject = row.status === 'pending' || row.status === 'approved' || row.status === 'transfer_failed';
+              const canQuery = row.status === 'transferring' || row.status === 'transfer_failed';
+              return `
+                <tr>
+                  <td><strong>${text(row.nickname, '未命名')}</strong><br><small>${text(row.phone)}</small><br><small>${row.user_id}</small></td>
+                  <td><strong>${money(row.amount)}</strong></td>
+                  <td>
+                    <div>${text(account.real_name, '未填实名')}</div>
+                    <small>账号：${text(account.alipay_account)}</small><br>
+                    <small>User ID：${text(account.alipay_user_id)}</small>
+                  </td>
+                  <td>${statusPill(row.status)}</td>
+                  <td>
+                    <div class="truncate">${text(row.provider_order_no, '暂无支付宝流水')}</div>
+                    ${row.reject_reason ? `<small class="danger-text">${text(row.reject_reason)}</small>` : ''}
+                  </td>
+                  <td><small>申请：${fmtDate(row.created_at)}</small><br><small>审核：${fmtDate(row.reviewed_at)}</small><br><small>打款：${fmtDate(row.paid_at)}</small></td>
+                  <td class="action-cell">
+                    ${canApprove ? `<button class="primary-btn" data-withdrawal-action="approve" data-id="${row.id}">审核通过</button>` : ''}
+                    ${canTransfer ? `<button class="primary-btn" data-withdrawal-action="transfer" data-id="${row.id}">自动打款</button>` : ''}
+                    ${canQuery ? `<button class="soft-btn" data-withdrawal-action="query" data-id="${row.id}">查询状态</button>` : ''}
+                    ${canReject ? `<button class="danger-btn" data-withdrawal-action="reject" data-id="${row.id}">驳回</button>` : ''}
+                    ${canTransfer ? `<button class="soft-btn" data-withdrawal-action="mark-paid" data-id="${row.id}">手动标记</button>` : ''}
+                  </td>
+                </tr>
+              `;
+            }).join('')}
+          </tbody>
+        </table>
+      ` : emptyHtml('暂无提现申请')}
+    </div>
+  `;
+
+  document.querySelector('#withdrawalStatus').addEventListener('change', (event) => {
+    localStorage.setItem('admin_withdrawal_status', event.target.value);
+    renderWithdrawals();
+  });
+
+  els.content.querySelectorAll('[data-payout-action]').forEach((button) => {
+    button.addEventListener('click', async () => {
+      const { payoutAction: action, userId } = button.dataset;
+      try {
+        button.disabled = true;
+        if (action === 'approve') {
+          await api(`/api/admin/payout-accounts/${userId}/approve`, { method: 'POST' });
+          toast('收款账号已通过');
+        } else {
+          const reason = window.prompt('填写驳回原因，可留空') || '';
+          await api(`/api/admin/payout-accounts/${userId}/reject`, {
+            method: 'POST',
+            body: JSON.stringify({ reason }),
+          });
+          toast('收款账号已驳回');
+        }
+        renderWithdrawals();
+      } catch (error) {
+        toast(`收款账号操作失败：${error.message}`);
+      } finally {
+        button.disabled = false;
+      }
+    });
+  });
+
+  els.content.querySelectorAll('[data-withdrawal-action]').forEach((button) => {
+    button.addEventListener('click', async () => {
+      const { withdrawalAction: action, id } = button.dataset;
+      try {
+        button.disabled = true;
+        if (action === 'approve') {
+          await api(`/api/admin/withdrawals/${id}/approve`, { method: 'POST' });
+          toast('提现已审核通过');
+        } else if (action === 'transfer') {
+          const confirmed = window.confirm('确认调用支付宝商家转账？成功后会真实打款到地陪支付宝。');
+          if (!confirmed) return;
+          await api(`/api/admin/withdrawals/${id}/transfer`, {
+            method: 'POST',
+            body: JSON.stringify({ remark: '一点伴地陪提现' }),
+          });
+          toast('支付宝自动打款成功');
+        } else if (action === 'reject') {
+          const reason = window.prompt('填写驳回原因，可留空') || '';
+          await api(`/api/admin/withdrawals/${id}/reject`, {
+            method: 'POST',
+            body: JSON.stringify({ reason }),
+          });
+          toast('提现已驳回，余额已退回');
+        } else if (action === 'query') {
+          await api(`/api/admin/withdrawals/${id}/query-transfer`, { method: 'POST' });
+          toast('支付宝转账状态已更新');
+        } else if (action === 'mark-paid') {
+          const providerOrderNo = window.prompt('填写线下/支付宝流水号，可留空') || '';
+          await api(`/api/admin/withdrawals/${id}/mark-paid`, {
+            method: 'POST',
+            body: JSON.stringify({ provider_order_no: providerOrderNo }),
+          });
+          toast('已手动标记为打款完成');
+        }
+        renderWithdrawals();
+      } catch (error) {
+        toast(`操作失败：${error.message}`);
+      } finally {
+        button.disabled = false;
+      }
+    });
+  });
+}
+
 async function renderLogs() {
   const rows = await api('/api/admin/logs');
   els.content.innerHTML = `
@@ -605,6 +774,7 @@ async function render() {
     if (state.page === 'dashboard') return renderDashboard();
     if (state.page === 'users') return renderUsers();
     if (state.page === 'orders') return renderOrders();
+    if (state.page === 'withdrawals') return renderWithdrawals();
     if (state.page === 'reviews') return renderReviews();
     if (state.page === 'chat') return renderChat();
     if (state.page === 'tickets') return renderTickets();

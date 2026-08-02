@@ -17,6 +17,11 @@ function parseBoolean(value, defaultValue = false) {
   return ['1', 'true', 'yes', 'on'].includes(value.trim().toLowerCase());
 }
 
+function parseNumber(value, defaultValue = 0) {
+  const parsed = Number(value);
+  return Number.isFinite(parsed) ? parsed : defaultValue;
+}
+
 function parseList(value) {
   return (value ?? '')
       .split(',')
@@ -55,6 +60,11 @@ export const config = {
   alipayPrivateKey: process.env.ALIPAY_PRIVATE_KEY?.trim() || '',
   alipayPublicKey: process.env.ALIPAY_PUBLIC_KEY?.trim() || '',
   alipayNotifyUrl: process.env.ALIPAY_NOTIFY_URL?.trim() || '',
+  alipayApiBaseUrl:
+    process.env.ALIPAY_API_BASE_URL?.trim() ||
+    'https://openapi.alipay.com',
+  alipayTransferEnabled: parseBoolean(process.env.ALIPAY_TRANSFER_ENABLED, false),
+  alipayTransferMaxAmount: parseNumber(process.env.ALIPAY_TRANSFER_MAX_AMOUNT, 5000),
   paymentDebugEnabled: parseBoolean(process.env.PAYMENT_DEBUG_ENABLED, false),
   corsOrigins: parseList(process.env.CORS_ORIGINS),
   authWhitelistEnabled: parseBoolean(process.env.AUTH_WHITELIST_ENABLED, false),
@@ -91,4 +101,8 @@ export function hasAlipayConfig() {
         config.alipayPublicKey &&
         config.alipayNotifyUrl,
   );
+}
+
+export function hasAlipayTransferConfig() {
+  return Boolean(config.alipayTransferEnabled && hasAlipayConfig());
 }

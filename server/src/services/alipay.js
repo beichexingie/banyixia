@@ -1,6 +1,6 @@
 import crypto from 'crypto';
 
-import { config, hasAlipayConfig } from '../config.js';
+import { config, hasAlipayConfig, hasAlipayTransferConfig } from '../config.js';
 
 export function formatChinaTimestamp(date = new Date()) {
   const formatter = new Intl.DateTimeFormat('zh-CN', {
@@ -101,6 +101,67 @@ function signWithRsa2(message) {
   );
 }
 
+function buildV3Authorization(method, requestPath, body) {
+  const timestamp = Math.floor(Date.now() / 1000).toString();
+  const nonce = crypto.randomUUID();
+  const signContent =
+    `${method} ${requestPath}\n` +
+    `${config.alipayAppId}.${timestamp}.${nonce}.${body}`;
+  const signature = encodeURIComponent(signWithRsa2(signContent));
+  return {
+    authorization:
+      `ALIPAY-SHA256withRSA app_id=${config.alipayAppId},` +
+      `timestamp=${timestamp},nonce=${nonce},expired_seconds=600,sign=${signature}`,
+    'alipay-request-id': crypto.randomUUID(),
+  };
+}
+
+async function requestAlipayV3(method, requestPath, body = '') {
+  if (!hasAlipayConfig()) {
+    throw new Error('支付宝环境变量未配置完整');
+  }
+
+  const baseUrl = config.alipayApiBaseUrl.replace(/\/+$/, '');
+  const bodyText = body || '';
+  let response;
+  try {
+    response = await fetch(`${baseUrl}${requestPath}`, {
+      method,
+      headers: {
+        ...buildV3Authorization(method, requestPath, bodyText),
+        Accept: 'application/json',
+        'Content-Type': 'application/json',
+      },
+      body: method === 'GET' ? undefined : bodyText,
+      signal: AbortSignal.timeout(15000),
+    });
+  } catch (error) {
+    error.remoteAttempted = true;
+    throw error;
+  }
+
+  const text = await response.text();
+  let payload;
+  try {
+    payload = JSON.parse(text);
+  } catch (error) {
+    const parseError = new Error(`支付宝返回非 JSON：${text.slice(0, 200)}`);
+    parseError.remoteAttempted = true;
+    throw parseError;
+  }
+
+  if (!response.ok) {
+    const message = payload.sub_msg || payload.msg || text.slice(0, 300);
+    const code = payload.sub_code || payload.code || response.status;
+    const httpError = new Error(`支付宝 API 错误：${message}${code ? `（${code}）` : ''}`);
+    httpError.alipayPayload = payload;
+    httpError.remoteAttempted = true;
+    throw httpError;
+  }
+
+  return payload;
+}
+
 export function buildOrderString({ orderId, merchantOrderNo, amount, subject }) {
   if (!hasAlipayConfig()) {
     throw new Error('支付宝环境变量未配置完整');
@@ -144,6 +205,105 @@ export function buildOrderString({ orderId, merchantOrderNo, amount, subject }) 
       timestamp: params.timestamp,
       sandbox: false,
     },
+  };
+}
+
+export function buildWithdrawalOutBizNo(withdrawalId) {
+  const normalized = withdrawalId
+      .toString()
+      .replace(/[^0-9A-Za-z]/g, '')
+      .slice(0, 54);
+  if (!normalized) {
+    throw new Error('提现单号无效');
+  }
+  return `wd${normalized}`;
+}
+
+export async function transferToAlipayAccount({
+  withdrawalId,
+  amount,
+  alipayAccount,
+  alipayUserId,
+  realName,
+  remark = '',
+}) {
+  if (!hasAlipayTransferConfig()) {
+    throw new Error('支付宝商家转账未开启或环境变量未配置完整');
+  }
+
+  const finalAmount = Number(amount);
+  if (!(finalAmount > 0)) {
+    throw new Error('转账金额必须大于 0');
+  }
+  if (config.alipayTransferMaxAmount > 0 && finalAmount > config.alipayTransferMaxAmount) {
+    throw new Error(`单笔转账金额超过当前安全上限 ${config.alipayTransferMaxAmount} 元`);
+  }
+
+  const identity = (alipayUserId || alipayAccount || '').toString().trim();
+  if (!identity) {
+    throw new Error('缺少地陪支付宝收款账号或支付宝 user_id');
+  }
+
+  const payeeInfo = {
+    identity,
+    identity_type: alipayUserId ? 'ALIPAY_USER_ID' : 'ALIPAY_LOGON_ID',
+  };
+  const name = realName?.toString().trim();
+  if (name) {
+    payeeInfo.name = name;
+  }
+
+  const outBizNo = buildWithdrawalOutBizNo(withdrawalId);
+  const bizContent = {
+    out_biz_no: outBizNo,
+    trans_amount: finalAmount.toFixed(2),
+    product_code: 'TRANS_ACCOUNT_NO_PWD',
+    biz_scene: 'DIRECT_TRANSFER',
+    order_title: '一点伴地陪提现',
+    remark: remark || '一点伴地陪提现',
+    payee_info: payeeInfo,
+  };
+
+  const payload = await requestAlipayV3(
+    'POST',
+    '/v3/alipay/fund/trans/uni/transfer',
+    JSON.stringify(bizContent),
+  );
+
+  return {
+    outBizNo,
+    orderId: payload.order_id || '',
+    payFundOrderId: payload.pay_fund_order_id || '',
+    status: payload.status || 'SUCCESS',
+    transDate: payload.trans_date || '',
+    raw: payload,
+  };
+}
+
+export async function queryAlipayTransfer({ withdrawalId }) {
+  if (!hasAlipayTransferConfig()) {
+    throw new Error('支付宝商家转账未开启或环境变量未配置完整');
+  }
+
+  const outBizNo = buildWithdrawalOutBizNo(withdrawalId);
+  const query = new URLSearchParams({
+    product_code: 'TRANS_ACCOUNT_NO_PWD',
+    biz_scene: 'DIRECT_TRANSFER',
+    out_biz_no: outBizNo,
+  });
+  const payload = await requestAlipayV3(
+    'GET',
+    `/v3/alipay/fund/trans/common/query?${query.toString()}`,
+  );
+
+  return {
+    outBizNo,
+    orderId: payload.order_id || '',
+    payFundOrderId: payload.pay_fund_order_id || '',
+    status: payload.status || 'DEALING',
+    failReason: payload.fail_reason || '',
+    transDate: payload.trans_date || '',
+    raw: payload,
   };
 }
 

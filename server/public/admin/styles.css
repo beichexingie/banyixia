@@ -350,6 +350,29 @@ td {
   white-space: nowrap;
 }
 
+.wide-table {
+  min-width: 1180px;
+}
+
+.action-cell {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  min-width: 180px;
+}
+
+.action-cell button {
+  white-space: nowrap;
+}
+
+.danger-text {
+  display: block;
+  max-width: 280px;
+  margin-top: 4px;
+  color: var(--red);
+  line-height: 1.45;
+}
+
 .pill {
   display: inline-flex;
   align-items: center;

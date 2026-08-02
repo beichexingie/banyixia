@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import 'package:flutter_application_1/pages/profile/wallet_page.dart';
 
 import '../bootstrap/app_bootstrap.dart';
 import '../config/app_theme.dart';
@@ -248,6 +249,7 @@ class _GuideMainShellState extends State<_GuideMainShell> {
         onOpenCityPicker: _openCityPage,
         onOpenCertification: _openCertificationPage,
         onOpenPlatformRules: _openPlatformRulesPage,
+        onOpenWallet: _openWallet,
       ),
     ];
 
@@ -483,6 +485,12 @@ class _GuideMainShellState extends State<_GuideMainShell> {
           icon: Icons.policy_outlined,
         ),
       ),
+    );
+  }
+
+  Future<void> _openWallet() async {
+    await Navigator.of(context).push(
+      MaterialPageRoute(builder: (_) => const WalletPage()),
     );
   }
 }
