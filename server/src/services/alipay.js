@@ -208,6 +208,76 @@ export function buildOrderString({ orderId, merchantOrderNo, amount, subject }) 
   };
 }
 
+export async function queryAlipayTrade({ merchantOrderNo, tradeNo = '' }) {
+  if (!hasAlipayConfig()) {
+    throw new Error('支付宝环境变量未配置完整');
+  }
+
+  const bizContent = {};
+  if (tradeNo?.toString().trim()) {
+    bizContent.trade_no = tradeNo.toString().trim();
+  } else if (merchantOrderNo?.toString().trim()) {
+    bizContent.out_trade_no = merchantOrderNo.toString().trim();
+  } else {
+    throw new Error('缺少支付宝订单号');
+  }
+
+  const params = {
+    app_id: config.alipayAppId,
+    method: 'alipay.trade.query',
+    format: 'JSON',
+    charset: 'utf-8',
+    sign_type: 'RSA2',
+    timestamp: formatChinaTimestamp(new Date()),
+    version: '1.0',
+    biz_content: JSON.stringify(bizContent),
+  };
+  const sign = signWithRsa2(buildSignContent(params));
+  const body = new URLSearchParams({ ...params, sign }).toString();
+
+  let response;
+  try {
+    response = await fetch(`${config.alipayApiBaseUrl.replace(/\/+$/, '')}/gateway.do`, {
+      method: 'POST',
+      headers: {
+        Accept: 'application/json',
+        'Content-Type': 'application/x-www-form-urlencoded;charset=utf-8',
+      },
+      body,
+      signal: AbortSignal.timeout(15000),
+    });
+  } catch (error) {
+    error.remoteAttempted = true;
+    throw error;
+  }
+
+  const text = await response.text();
+  let payload;
+  try {
+    payload = JSON.parse(text);
+  } catch (_error) {
+    const parseError = new Error(`支付宝返回非 JSON：${text.slice(0, 200)}`);
+    parseError.remoteAttempted = true;
+    throw parseError;
+  }
+
+  const result = payload.alipay_trade_query_response ?? payload;
+  if (!response.ok || result.code !== '10000') {
+    const error = new Error(
+      `支付宝订单查询失败：${result.sub_msg || result.msg || text.slice(0, 300)}`,
+    );
+    error.remoteAttempted = true;
+    throw error;
+  }
+
+  return {
+    tradeStatus: result.trade_status || '',
+    tradeNo: result.trade_no || tradeNo || '',
+    totalAmount: Number(result.total_amount || 0),
+    raw: payload,
+  };
+}
+
 export function buildWithdrawalOutBizNo(withdrawalId) {
   const normalized = withdrawalId
       .toString()

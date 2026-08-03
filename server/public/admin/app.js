@@ -27,6 +27,7 @@ const els = {
   loginPanel: document.querySelector('#loginPanel'),
   adminUserIdInput: document.querySelector('#adminUserIdInput'),
   loginBtn: document.querySelector('#loginBtn'),
+  loginError: document.querySelector('#loginError'),
   refreshBtn: document.querySelector('#refreshBtn'),
   switchAccountBtn: document.querySelector('#switchAccountBtn'),
   roleBadge: document.querySelector('#roleBadge'),
@@ -101,11 +102,21 @@ function toast(message) {
 function showLogin() {
   els.loginPanel.classList.add('show');
   els.adminUserIdInput.value = state.userId;
+  if (els.loginError) {
+    els.loginError.hidden = true;
+    els.loginError.textContent = '';
+  }
   setTimeout(() => els.adminUserIdInput.focus(), 0);
 }
 
 function hideLogin() {
   els.loginPanel.classList.remove('show');
+}
+
+function showLoginError(message) {
+  if (!els.loginError) return;
+  els.loginError.hidden = false;
+  els.loginError.textContent = message;
 }
 
 function renderNav() {
@@ -809,8 +820,19 @@ async function boot() {
 
 els.loginBtn.addEventListener('click', async () => {
   state.userId = els.adminUserIdInput.value.trim();
+  if (!state.userId) {
+    showLoginError('请先填写管理员或客服用户 ID。');
+    return;
+  }
   localStorage.setItem('admin_user_id', state.userId);
-  await boot();
+  els.loginBtn.disabled = true;
+  els.loginBtn.textContent = '正在验证...';
+  try {
+    await boot();
+  } finally {
+    els.loginBtn.disabled = false;
+    els.loginBtn.textContent = '进入后台';
+  }
 });
 
 els.switchAccountBtn.addEventListener('click', () => {

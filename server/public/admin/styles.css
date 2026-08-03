@@ -216,6 +216,17 @@ button {
   background: var(--blue);
 }
 
+.login-error {
+  margin-top: 12px;
+  padding: 10px 12px;
+  border: 1px solid rgba(239, 68, 68, 0.24);
+  border-radius: 8px;
+  color: #b42318;
+  background: #fff1f0;
+  font-size: 13px;
+  line-height: 1.5;
+}
+
 .danger-btn {
   color: white;
   background: var(--red);

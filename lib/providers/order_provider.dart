@@ -58,6 +58,13 @@ class OrderProvider extends ChangeNotifier {
     try {
       debugPrint('Pay order start: orderId=$orderId');
       final order = _orders.firstWhere((o) => o.id == orderId);
+      if (order.paymentStatus == 'paid') {
+        return const PaymentResult(
+          outcome: PaymentOutcome.success,
+          success: true,
+          message: '该订单已经支付成功',
+        );
+      }
       final merchantOrderNo = order.merchantOrderNo ?? _buildMerchantOrderNo(order);
       debugPrint(
         'Pay order request: merchantOrderNo=$merchantOrderNo, amount=${order.amount}',
@@ -73,28 +80,75 @@ class OrderProvider extends ChangeNotifier {
         ),
       );
 
-      final paymentStatus = switch (result.outcome) {
-        PaymentOutcome.success => 'processing',
-        PaymentOutcome.cancelled => 'cancelled',
-        PaymentOutcome.failed => 'failed',
-      };
-
-      await _api.put(
-        '/orders/$orderId',
-        authToken: _token(),
-        body: {
-          'payment_status': paymentStatus,
-          'merchant_order_no': merchantOrderNo,
-          if (result.transactionId != null) 'payment_request_id': result.transactionId,
-        },
-      );
-
+      final confirmed = await _waitForPaymentConfirmation(orderId);
       await loadOrders();
-      return result;
+
+      final latest = _orders.cast<Order?>().firstWhere(
+        (item) => item?.id == orderId,
+        orElse: () => null,
+      );
+      if (confirmed?['payment_status'] == 'paid' ||
+          latest?.paymentStatus == 'paid') {
+        return PaymentResult(
+          outcome: PaymentOutcome.success,
+          success: true,
+          message: '支付成功，订单已确认',
+          transactionId: confirmed?['provider_trade_no']?.toString() ??
+              result.transactionId,
+          orderString: result.orderString,
+        );
+      }
+
+      if (result.outcome == PaymentOutcome.cancelled) {
+        return result;
+      }
+
+      if (result.outcome == PaymentOutcome.success) {
+        return PaymentResult(
+          outcome: PaymentOutcome.success,
+          success: true,
+          message: '支付宝已受理，服务器正在确认支付结果，请稍后刷新订单',
+          transactionId: result.transactionId,
+          orderString: result.orderString,
+        );
+      }
+
+      return PaymentResult(
+        outcome: PaymentOutcome.failed,
+        success: false,
+        message: '支付结果暂未确认。若支付宝已经扣款，请不要重复支付，稍后刷新订单。',
+        transactionId: result.transactionId,
+        orderString: result.orderString,
+      );
     } catch (e) {
       debugPrint('Pay order error: $e');
       throw Exception('Pay order failed: $e');
     }
+  }
+
+  Future<Map<String, dynamic>?> _waitForPaymentConfirmation(String orderId) async {
+    for (var attempt = 0; attempt < 6; attempt += 1) {
+      try {
+        final response = await _api.get(
+          '/alipay-status/$orderId',
+          authToken: _token(),
+        );
+        final data = response['data'];
+        if (data is Map<String, dynamic>) {
+          final status = data['payment_status']?.toString();
+          if (status == 'paid' || status == 'closed') {
+            return data;
+          }
+        }
+      } catch (error) {
+        debugPrint('Payment status check attempt ${attempt + 1} failed: $error');
+      }
+
+      if (attempt < 5) {
+        await Future<void>.delayed(Duration(seconds: attempt == 0 ? 1 : 2));
+      }
+    }
+    return null;
   }
 
   Future<void> completeOrder(String orderId) async {

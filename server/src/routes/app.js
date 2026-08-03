@@ -1972,6 +1972,15 @@ appRouter.put('/wallet/payout-account', handleRoute(async (req, res) => {
   if (!alipayAccount && !alipayUserId) {
     return fail(res, 400, '支付宝账号或支付宝 user_id 至少填写一个');
   }
+  if (realName.length < 2 || realName.length > 40) {
+    return fail(res, 400, '请填写有效的支付宝实名');
+  }
+  if (alipayAccount && !/^(1\d{10}|[^@\s]+@[^@\s]+\.[^@\s]+)$/.test(alipayAccount)) {
+    return fail(res, 400, '支付宝账号应填写手机号或邮箱');
+  }
+  if (alipayUserId && !/^\d{8,32}$/.test(alipayUserId)) {
+    return fail(res, 400, '支付宝 user_id 应为数字');
+  }
   const result = await pool.query(
     `
       insert into public.guide_payout_accounts (

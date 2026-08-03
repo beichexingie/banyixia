@@ -4,6 +4,7 @@ import { config, hasAlipayConfig } from '../config.js';
 import { pool, withTransaction } from '../db.js';
 import {
   buildOrderString,
+  queryAlipayTrade,
   verifyAlipaySignature,
 } from '../services/alipay.js';
 import {
@@ -19,6 +20,61 @@ import {
 import { fail, ok } from '../utils/http.js';
 
 export const paymentsRouter = express.Router();
+
+function getRequestUserId(req) {
+  return (
+    req.headers['x-user-id']?.toString().trim() ||
+    req.headers.authorization?.toString().replace(/^Bearer\s+/i, '').trim() ||
+    ''
+  );
+}
+
+async function settlePaidOrder(orderId, tradeNo) {
+  return withTransaction(async (client) => {
+    const latestOrder = await findOrderById(client, orderId);
+    if (!latestOrder) {
+      throw new Error('订单不存在');
+    }
+
+    if (latestOrder.payment_status === 'paid') {
+      return latestOrder;
+    }
+
+    await updateOrderPayment(client, latestOrder.id, {
+      payment_status: 'paid',
+      status: 1,
+      payment_request_id: latestOrder.payment_request_id ?? latestOrder.id,
+      provider_trade_no: tradeNo,
+      paid_at: new Date().toISOString(),
+    });
+
+    await incrementPendingBalance(
+      client,
+      latestOrder.guide_id,
+      Number(latestOrder.amount),
+    );
+
+    await recordWalletTransaction(client, {
+      userId: latestOrder.guide_id,
+      orderId: latestOrder.id,
+      type: 'income_pending',
+      amount: Number(latestOrder.amount),
+      actualAmount: Number(latestOrder.amount),
+      description: `订单收入托管到账：${latestOrder.service_name ?? '地陪服务订单'}`,
+    });
+
+    await ensureChatRoom(client, latestOrder.id, [
+      latestOrder.user_id,
+      latestOrder.guide_id,
+    ]);
+
+    return {
+      ...latestOrder,
+      payment_status: 'paid',
+      provider_trade_no: tradeNo,
+    };
+  });
+}
 
 paymentsRouter.post('/alipay-create-order', async (req, res) => {
   const { order_id: orderId, merchant_order_no: merchantOrderNo, amount, subject } =
@@ -36,6 +92,9 @@ paymentsRouter.post('/alipay-create-order', async (req, res) => {
     const order = await findOrderById(pool, String(orderId));
     if (!order) {
       return fail(res, 404, '订单不存在');
+    }
+    if (order.payment_status === 'paid') {
+      return fail(res, 409, '订单已支付，请刷新订单状态');
     }
 
     const built = buildOrderString({
@@ -110,49 +169,7 @@ paymentsRouter.post(
       }
 
       if (tradeStatus === 'TRADE_SUCCESS' || tradeStatus === 'TRADE_FINISHED') {
-        await withTransaction(async (client) => {
-          const latestOrder = await findOrderByMerchantOrderNo(client, merchantOrderNo);
-          if (!latestOrder) {
-            throw new Error('订单不存在');
-          }
-
-          const alreadyPaid =
-              latestOrder.payment_status === 'paid' &&
-              latestOrder.provider_trade_no === tradeNo;
-
-          if (alreadyPaid) {
-            return;
-          }
-
-          await updateOrderPayment(client, latestOrder.id, {
-            payment_status: 'paid',
-            status: 1,
-            payment_request_id:
-                latestOrder.payment_request_id ?? latestOrder.id,
-            provider_trade_no: tradeNo,
-            paid_at: new Date().toISOString(),
-          });
-
-          await incrementPendingBalance(
-            client,
-            latestOrder.guide_id,
-            Number(latestOrder.amount),
-          );
-
-          await recordWalletTransaction(client, {
-            userId: latestOrder.guide_id,
-            orderId: latestOrder.id,
-            type: 'income_pending',
-            amount: Number(latestOrder.amount),
-            actualAmount: Number(latestOrder.amount),
-            description: `订单收入托管到账：${latestOrder.service_name ?? '地陪服务订单'}`,
-          });
-
-          await ensureChatRoom(client, latestOrder.id, [
-            latestOrder.user_id,
-            latestOrder.guide_id,
-          ]);
-        });
+        await settlePaidOrder(order.id, tradeNo);
 
         return res.type('text/plain').send('success');
       }
@@ -178,3 +195,44 @@ paymentsRouter.post(
     }
   },
 );
+
+paymentsRouter.get('/alipay-status/:id', async (req, res) => {
+  const userId = getRequestUserId(req);
+  if (!userId) return fail(res, 401, '请先登录');
+
+  try {
+    const order = await findOrderById(pool, req.params.id);
+    if (!order) return fail(res, 404, '订单不存在');
+    if (order.user_id !== userId && order.guide_id !== userId) {
+      return fail(res, 403, '无权查看该订单');
+    }
+
+    if (order.payment_status !== 'paid' && order.merchant_order_no) {
+      const alipay = await queryAlipayTrade({
+        merchantOrderNo: order.merchant_order_no,
+        tradeNo: order.provider_trade_no,
+      });
+      if (
+        (alipay.tradeStatus === 'TRADE_SUCCESS' ||
+          alipay.tradeStatus === 'TRADE_FINISHED') &&
+        alipay.totalAmount.toFixed(2) === Number(order.amount).toFixed(2)
+      ) {
+        await settlePaidOrder(order.id, alipay.tradeNo);
+      }
+    }
+
+    const latest = await findOrderById(pool, order.id);
+    return ok(res, {
+      data: {
+        order_id: latest.id,
+        payment_status: latest.payment_status,
+        status: latest.status,
+        payment_request_id: latest.payment_request_id,
+        merchant_order_no: latest.merchant_order_no,
+        provider_trade_no: latest.provider_trade_no,
+      },
+    });
+  } catch (error) {
+    return fail(res, 502, `查询支付宝支付状态失败：${error.message}`);
+  }
+});
