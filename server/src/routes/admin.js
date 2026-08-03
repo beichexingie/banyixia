@@ -128,7 +128,7 @@ async function resolveAdminUser(userId) {
   const user = result.rows[0];
   if (!user) return null;
   const role = user.is_admin ? 'admin' : user.staff_role;
-  if (!role || user.is_active === false) return null;
+  if (!role || (user.is_admin !== true && user.is_active === false)) return null;
   const basePermissions = ROLE_PERMISSIONS[role] ?? [];
   const extraPermissions = Array.isArray(user.permissions) ? user.permissions : [];
   return {
