@@ -25,15 +25,13 @@ import {
 } from '../repositories/wallets.js';
 import { assertPayloadAllowed, assertTextAllowed, reviewImage } from '../services/moderation.js';
 import {
-<<<<<<< HEAD
   queryAlipayTransfer,
   transferToAlipayAccount,
 } from '../services/alipay.js';
-=======
+import {
   buildTrtcCredential,
   buildTrtcRoomId,
 } from '../services/trtc.js';
->>>>>>> 1e5ad028f5e0b90337f2104f67e1407bcd6bc096
 import { bindAxbVirtualNumber } from '../services/virtual_number.js';
 
 export const appRouter = express.Router();

@@ -107,10 +107,10 @@ export function hasAlipayConfig() {
   );
 }
 
-<<<<<<< HEAD
 export function hasAlipayTransferConfig() {
   return Boolean(config.alipayTransferEnabled && hasAlipayConfig());
-=======
+}
+
 export function hasTrtcConfig() {
   return Boolean(
     config.trtcEnabled &&
@@ -118,5 +118,4 @@ export function hasTrtcConfig() {
       config.trtcSecretKey &&
       config.trtcUserSigExpireSeconds > 0,
   );
->>>>>>> 1e5ad028f5e0b90337f2104f67e1407bcd6bc096
 }
