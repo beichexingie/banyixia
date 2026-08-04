@@ -815,6 +815,7 @@ async function boot() {
   } catch (error) {
     showLogin();
     els.operatorRole.textContent = error.message;
+    showLoginError(error.message || '后台账号验证失败');
   }
 }
 
