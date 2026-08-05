@@ -41,6 +41,7 @@ cp .env.example .env
 - `ALIPAY_PUBLIC_KEY`
 - `ALIPAY_APP_CERT_SN`（商家转账/地陪提现必填）
 - `ALIPAY_ROOT_CERT_SN`（商家转账/地陪提现必填）
+- `ALIPAY_TRANSFER_SCENE_NAME`（支付宝后台已创建的转账场景名称）
 - `ALIPAY_NOTIFY_URL`
 - `CORS_ORIGINS`
 
