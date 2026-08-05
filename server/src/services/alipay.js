@@ -334,6 +334,12 @@ export async function transferToAlipayAccount({
     product_code: 'TRANS_ACCOUNT_NO_PWD',
     biz_scene: 'DIRECT_TRANSFER',
     transfer_scene_name: config.alipayTransferSceneName,
+    transfer_scene_report_infos: [
+      {
+        info_type: config.alipayTransferReportInfoType,
+        info_content: config.alipayTransferReportInfoContent,
+      },
+    ],
     order_title: '一点伴地陪提现',
     remark: remark || '一点伴地陪提现',
     payee_info: payeeInfo,

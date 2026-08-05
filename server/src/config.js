@@ -68,7 +68,11 @@ export const config = {
   alipayTransferEnabled: parseBoolean(process.env.ALIPAY_TRANSFER_ENABLED, false),
   alipayTransferMaxAmount: parseNumber(process.env.ALIPAY_TRANSFER_MAX_AMOUNT, 5000),
   alipayTransferSceneName:
-    process.env.ALIPAY_TRANSFER_SCENE_NAME?.trim() || '',
+    process.env.ALIPAY_TRANSFER_SCENE_NAME?.trim() || '佣金报酬',
+  alipayTransferReportInfoType:
+    process.env.ALIPAY_TRANSFER_REPORT_INFO_TYPE?.trim() || '佣金报酬说明',
+  alipayTransferReportInfoContent:
+    process.env.ALIPAY_TRANSFER_REPORT_INFO_CONTENT?.trim() || '地陪服务报酬',
   paymentDebugEnabled: parseBoolean(process.env.PAYMENT_DEBUG_ENABLED, false),
   corsOrigins: parseList(process.env.CORS_ORIGINS),
   authWhitelistEnabled: parseBoolean(process.env.AUTH_WHITELIST_ENABLED, false),
