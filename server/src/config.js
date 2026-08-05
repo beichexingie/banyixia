@@ -59,6 +59,8 @@ export const config = {
   alipayAppId: process.env.ALIPAY_APP_ID?.trim() || '',
   alipayPrivateKey: process.env.ALIPAY_PRIVATE_KEY?.trim() || '',
   alipayPublicKey: process.env.ALIPAY_PUBLIC_KEY?.trim() || '',
+  alipayAppCertSn: process.env.ALIPAY_APP_CERT_SN?.trim() || '',
+  alipayRootCertSn: process.env.ALIPAY_ROOT_CERT_SN?.trim() || '',
   alipayNotifyUrl: process.env.ALIPAY_NOTIFY_URL?.trim() || '',
   alipayApiBaseUrl:
     process.env.ALIPAY_API_BASE_URL?.trim() ||
@@ -108,7 +110,12 @@ export function hasAlipayConfig() {
 }
 
 export function hasAlipayTransferConfig() {
-  return Boolean(config.alipayTransferEnabled && hasAlipayConfig());
+  return Boolean(
+    config.alipayTransferEnabled &&
+      hasAlipayConfig() &&
+      config.alipayAppCertSn &&
+      config.alipayRootCertSn,
+  );
 }
 
 export function hasTrtcConfig() {

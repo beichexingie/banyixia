@@ -39,6 +39,8 @@ cp .env.example .env
 - `ALIPAY_APP_ID`
 - `ALIPAY_PRIVATE_KEY`
 - `ALIPAY_PUBLIC_KEY`
+- `ALIPAY_APP_CERT_SN`（商家转账/地陪提现必填）
+- `ALIPAY_ROOT_CERT_SN`（商家转账/地陪提现必填）
 - `ALIPAY_NOTIFY_URL`
 - `CORS_ORIGINS`
 

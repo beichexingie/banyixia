@@ -102,16 +102,20 @@ function signWithRsa2(message) {
 }
 
 function buildV3Authorization(method, requestPath, body) {
-  const timestamp = Math.floor(Date.now() / 1000).toString();
   const nonce = crypto.randomUUID();
-  const signContent =
-    `${method} ${requestPath}\n` +
-    `${config.alipayAppId}.${timestamp}.${nonce}.${body}`;
-  const signature = encodeURIComponent(signWithRsa2(signContent));
+  const timestamp = Date.now().toString();
+  let authString = `app_id=${config.alipayAppId}`;
+  if (config.alipayAppCertSn) {
+    authString += `,app_cert_sn=${config.alipayAppCertSn}`;
+  }
+  authString += `,nonce=${nonce},timestamp=${timestamp}`;
+  const signContent = `${authString}\n${method}\n${requestPath}\n${body}\n`;
+  const signature = signWithRsa2(signContent);
   return {
-    authorization:
-      `ALIPAY-SHA256withRSA app_id=${config.alipayAppId},` +
-      `timestamp=${timestamp},nonce=${nonce},expired_seconds=600,sign=${signature}`,
+    authorization: `ALIPAY-SHA256withRSA ${authString},sign=${signature}`,
+    ...(config.alipayRootCertSn
+      ? { 'alipay-root-cert-sn': config.alipayRootCertSn }
+      : {}),
     'alipay-request-id': crypto.randomUUID(),
   };
 }
