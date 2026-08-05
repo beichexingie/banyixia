@@ -5,6 +5,7 @@ import 'package:provider/provider.dart';
 
 import '../../config/app_theme.dart';
 import '../../providers/order_provider.dart';
+import '../../providers/user_provider.dart';
 import '../models/guide_app_models.dart';
 import '../providers/guide_console_provider.dart';
 import '../widgets/guide_app_shell.dart';
@@ -35,8 +36,14 @@ class _GuideOrderCenterPageState extends State<GuideOrderCenterPage> {
   Widget build(BuildContext context) {
     final console = context.watch<GuideConsoleProvider>();
     final orderProvider = context.watch<OrderProvider>();
-    final orders = console.buildGuideOrders(orderProvider.orders);
-    final filtered = orders.where((item) => item.stage == _selectedStage).toList();
+    final currentUser = context.watch<UserProvider>().user;
+    final orders = console.buildGuideOrders(
+      orderProvider.orders,
+      guideId: currentUser.id,
+    );
+    final filtered = orders
+        .where((item) => item.stage == _selectedStage)
+        .toList();
 
     return GuideAppScaffold(
       backgroundColor: const Color(0xFFF0F1F3),
@@ -51,7 +58,8 @@ class _GuideOrderCenterPageState extends State<GuideOrderCenterPage> {
                   GuideConsoleHeader(
                     onSettingsTap: widget.onOpenSettings,
                     onServiceOperationTap: widget.onOpenServiceOps,
-                    onToggleOnlineTap: () => console.setOnline(!console.isOnline),
+                    onToggleOnlineTap: () =>
+                        console.setOnline(!console.isOnline),
                   ),
                   const SizedBox(height: 22),
                   Wrap(
@@ -111,7 +119,9 @@ class _GuideOrderCenterPageState extends State<GuideOrderCenterPage> {
                     icon: Icons.keyboard_arrow_down_rounded,
                     onTap: () {
                       ScaffoldMessenger.of(context).showSnackBar(
-                        const SnackBar(content: Text('当前为默认排序，后续可切换按距离/佣金/时间排序')),
+                        const SnackBar(
+                          content: Text('当前为默认排序，后续可切换按距离/佣金/时间排序'),
+                        ),
                       );
                     },
                     color: Colors.white,
@@ -155,22 +165,30 @@ class _GuideOrderCenterPageState extends State<GuideOrderCenterPage> {
                         child: _GuideOrderCard(
                           data: order,
                           onChatTap: () => _contactCustomer(order),
-                          onPrimaryTap: order.primaryAction == GuideOrderAction.navigate
+                          onPrimaryTap:
+                              order.primaryAction == GuideOrderAction.navigate
                               ? () => widget.onOpenRoute(order)
                               : () async {
-                                  if (order.primaryAction == GuideOrderAction.accept) {
+                                  if (order.primaryAction ==
+                                      GuideOrderAction.accept) {
                                     await _acceptOrder(order);
                                     return;
                                   }
-                                  if (order.primaryAction == GuideOrderAction.waitingPayment) {
+                                  if (order.primaryAction ==
+                                      GuideOrderAction.waitingPayment) {
                                     ScaffoldMessenger.of(context).showSnackBar(
-                                      const SnackBar(content: Text('已接单，等待用户付款')),
+                                      const SnackBar(
+                                        content: Text('已接单，等待用户付款'),
+                                      ),
                                     );
                                     return;
                                   }
-                                  if (order.primaryAction == GuideOrderAction.arrived) {
+                                  if (order.primaryAction ==
+                                      GuideOrderAction.arrived) {
                                     ScaffoldMessenger.of(context).showSnackBar(
-                                      const SnackBar(content: Text('已标记到达服务地点')),
+                                      const SnackBar(
+                                        content: Text('已标记到达服务地点'),
+                                      ),
                                     );
                                   } else {
                                     widget.onOpenRoute(order);
@@ -190,21 +208,20 @@ class _GuideOrderCenterPageState extends State<GuideOrderCenterPage> {
 
   Future<void> _contactCustomer(GuideOrderCardData order) async {
     try {
-      final payload = await context.read<CallProvider>().createVoiceCall(order.id);
+      final payload = await context.read<CallProvider>().createVoiceCall(
+        order.id,
+      );
       if (!mounted) return;
       await Navigator.of(context).push(
         MaterialPageRoute<void>(
-          builder: (_) => VoiceCallPage(
-            callPayload: payload,
-            peerName: '客户',
-          ),
+          builder: (_) => VoiceCallPage(callPayload: payload, peerName: '客户'),
         ),
       );
     } catch (callError) {
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('发起语音通话失败：$callError')),
-      );
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text('发起语音通话失败：$callError')));
     }
   }
 
@@ -212,14 +229,14 @@ class _GuideOrderCenterPageState extends State<GuideOrderCenterPage> {
     try {
       await context.read<OrderProvider>().acceptOrder(order.id);
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('已接单，等待用户付款')),
-      );
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(const SnackBar(content: Text('已接单，等待用户付款')));
     } catch (e) {
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('接单失败: $e')),
-      );
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text('接单失败: $e')));
     }
   }
 }
@@ -297,7 +314,10 @@ class _GuideOrderCard extends StatelessWidget {
             crossAxisAlignment: WrapCrossAlignment.center,
             children: [
               Container(
-                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 10,
+                  vertical: 8,
+                ),
                 decoration: BoxDecoration(
                   color: labelColor,
                   borderRadius: BorderRadius.circular(10),
@@ -418,7 +438,11 @@ class _GuideOrderCard extends StatelessWidget {
           const SizedBox(height: 16),
           Row(
             children: [
-              const Icon(Icons.location_on_rounded, color: AppColors.primaryDark, size: 24),
+              const Icon(
+                Icons.location_on_rounded,
+                color: AppColors.primaryDark,
+                size: 24,
+              ),
               const SizedBox(width: 8),
               Expanded(
                 child: Text(
@@ -433,7 +457,10 @@ class _GuideOrderCard extends StatelessWidget {
               ),
               const SizedBox(width: 10),
               Container(
-                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 10,
+                  vertical: 6,
+                ),
                 decoration: BoxDecoration(
                   color: const Color(0xFFF7F7F2),
                   borderRadius: BorderRadius.circular(999),
@@ -636,10 +663,7 @@ class _OrderInfoChip extends StatelessWidget {
   final IconData icon;
   final String label;
 
-  const _OrderInfoChip({
-    required this.icon,
-    required this.label,
-  });
+  const _OrderInfoChip({required this.icon, required this.label});
 
   @override
   Widget build(BuildContext context) {

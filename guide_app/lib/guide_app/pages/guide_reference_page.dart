@@ -3,6 +3,7 @@ import 'package:provider/provider.dart';
 
 import '../../config/app_theme.dart';
 import '../../providers/order_provider.dart';
+import '../../providers/user_provider.dart';
 import '../models/guide_app_models.dart';
 import '../providers/guide_console_provider.dart';
 import '../widgets/guide_app_shell.dart';
@@ -25,7 +26,11 @@ class GuideReferencePage extends StatelessWidget {
   Widget build(BuildContext context) {
     final console = context.watch<GuideConsoleProvider>();
     final orders = context.watch<OrderProvider>().orders;
-    final guideOrders = console.buildGuideOrders(orders);
+    final currentUser = context.watch<UserProvider>().user;
+    final guideOrders = console.buildGuideOrders(
+      orders,
+      guideId: currentUser.id,
+    );
     final currentOrder = guideOrders.isNotEmpty ? guideOrders.first : null;
 
     return GuideAppScaffold(
@@ -73,10 +78,7 @@ class GuideReferencePage extends StatelessWidget {
                 children: [
                   const Text(
                     '快捷入口',
-                    style: TextStyle(
-                      fontSize: 18,
-                      fontWeight: FontWeight.w900,
-                    ),
+                    style: TextStyle(fontSize: 18, fontWeight: FontWeight.w900),
                   ),
                   const SizedBox(height: 14),
                   Wrap(
@@ -115,20 +117,29 @@ class GuideReferencePage extends StatelessWidget {
                 children: [
                   const Text(
                     '接单概览',
-                    style: TextStyle(
-                      fontSize: 18,
-                      fontWeight: FontWeight.w900,
-                    ),
+                    style: TextStyle(fontSize: 18, fontWeight: FontWeight.w900),
                   ),
                   const SizedBox(height: 14),
                   Wrap(
                     spacing: 12,
                     runSpacing: 12,
                     children: [
-                      _RefStatCard(label: '累计接单', value: '${console.stats.totalOrders}'),
-                      _RefStatCard(label: '已完成', value: '${console.stats.completedOrders}'),
-                      _RefStatCard(label: '好评', value: '${console.stats.positiveReviews}'),
-                      _RefStatCard(label: '近30天退单率', value: '${console.stats.cancellationRate}%'),
+                      _RefStatCard(
+                        label: '累计接单',
+                        value: '${console.stats.totalOrders}',
+                      ),
+                      _RefStatCard(
+                        label: '已完成',
+                        value: '${console.stats.completedOrders}',
+                      ),
+                      _RefStatCard(
+                        label: '好评',
+                        value: '${console.stats.positiveReviews}',
+                      ),
+                      _RefStatCard(
+                        label: '近30天退单率',
+                        value: '${console.stats.cancellationRate}%',
+                      ),
                     ],
                   ),
                 ],
@@ -141,10 +152,7 @@ class GuideReferencePage extends StatelessWidget {
                 children: [
                   const Text(
                     '当前定位',
-                    style: TextStyle(
-                      fontSize: 18,
-                      fontWeight: FontWeight.w900,
-                    ),
+                    style: TextStyle(fontSize: 18, fontWeight: FontWeight.w900),
                   ),
                   const SizedBox(height: 10),
                   Text(
@@ -173,18 +181,17 @@ class GuideReferencePage extends StatelessWidget {
                 children: [
                   const Text(
                     '服务地址',
-                    style: TextStyle(
-                      fontSize: 18,
-                      fontWeight: FontWeight.w900,
-                    ),
+                    style: TextStyle(fontSize: 18, fontWeight: FontWeight.w900),
                   ),
                   const SizedBox(height: 14),
-                  ...console.serviceAddresses.take(3).map(
-                    (item) => Padding(
-                      padding: const EdgeInsets.only(bottom: 12),
-                      child: _RefAddressTile(address: item),
-                    ),
-                  ),
+                  ...console.serviceAddresses
+                      .take(3)
+                      .map(
+                        (item) => Padding(
+                          padding: const EdgeInsets.only(bottom: 12),
+                          child: _RefAddressTile(address: item),
+                        ),
+                      ),
                 ],
               ),
             ),
@@ -260,10 +267,7 @@ class _RefStatCard extends StatelessWidget {
   final String label;
   final String value;
 
-  const _RefStatCard({
-    required this.label,
-    required this.value,
-  });
+  const _RefStatCard({required this.label, required this.value});
 
   @override
   Widget build(BuildContext context) {
@@ -364,7 +368,10 @@ class _RefOrderPreview extends StatelessWidget {
             crossAxisAlignment: WrapCrossAlignment.center,
             children: [
               Container(
-                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 10,
+                  vertical: 6,
+                ),
                 decoration: BoxDecoration(
                   color: AppColors.primary,
                   borderRadius: BorderRadius.circular(999),

@@ -20,16 +20,15 @@ class EcsApiClient {
 
   EcsApiClient({http.Client? client}) : _client = client ?? http.Client();
 
-  String get baseUrl => AppConfig.apiBaseUrl.trim().replaceAll(RegExp(r'/$'), '');
+  String get baseUrl =>
+      AppConfig.apiBaseUrl.trim().replaceAll(RegExp(r'/$'), '');
 
   Map<String, String> _buildHeaders({
     String? authToken,
     String? userId,
     bool jsonBody = true,
   }) {
-    final headers = <String, String>{
-      'Accept': 'application/json',
-    };
+    final headers = <String, String>{'Accept': 'application/json'};
     if (jsonBody) {
       headers['Content-Type'] = 'application/json';
     }
@@ -50,11 +49,17 @@ class EcsApiClient {
     Map<String, dynamic>? query,
   }) async {
     final uri = Uri.parse('$baseUrl$path').replace(
-      queryParameters: query?.map((key, value) => MapEntry(key, value.toString())),
+      queryParameters: query?.map(
+        (key, value) => MapEntry(key, value.toString()),
+      ),
     );
     final response = await _client.get(
       uri,
-      headers: _buildHeaders(authToken: authToken, userId: userId, jsonBody: false),
+      headers: _buildHeaders(
+        authToken: authToken,
+        userId: userId,
+        jsonBody: false,
+      ),
     );
     return _decode(response, uri);
   }

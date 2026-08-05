@@ -55,7 +55,12 @@ function handleRoute(handler) {
 }
 
 function getSessionUserId(req) {
-  return req.sessionUserId || req.headers['x-user-id']?.toString().trim() || '';
+  return (
+    req.sessionUserId ||
+    req.headers['x-user-id']?.toString().trim() ||
+    req.authToken ||
+    ''
+  );
 }
 
 function normalizePhone(phone) {
@@ -1495,7 +1500,15 @@ appRouter.get('/orders', handleRoute(async (req, res) => {
     `
       select *
       from public.orders
-      where user_id = $1 or guide_id = $1
+      where user_id = $1
+         or (
+           guide_id = $1
+           and exists (
+             select 1
+             from public.guides
+             where id = $1
+           )
+         )
       order by created_at desc
     `,
     [userId],
@@ -1564,10 +1577,11 @@ appRouter.post('/orders/one-cent-test', handleRoute(async (req, res) => {
   } else {
     const guideResult = await pool.query(
       `
-        select *
-        from public.guides
-        where id <> $1
-        order by created_at desc nulls last
+        select g.*
+        from public.guides g
+        join public.users u on u.id = g.id
+        where u.phone = '13900010003'
+          and g.id <> $1
         limit 1
       `,
       [userId],

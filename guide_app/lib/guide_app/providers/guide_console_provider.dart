@@ -59,7 +59,8 @@ class GuideConsoleProvider extends ChangeNotifier {
       name: '城市漫步陪同',
       description: '适合半日或一日轻松出行，含路线建议、景点串联与拍照打卡陪同。',
       pricePerDay: 400,
-      imageUrl: 'https://images.unsplash.com/photo-1506744038136-46273834b3fb?auto=format&fit=crop&w=320&q=80',
+      imageUrl:
+          'https://images.unsplash.com/photo-1506744038136-46273834b3fb?auto=format&fit=crop&w=320&q=80',
       count: 1,
     ),
     GuideServiceOption(
@@ -67,7 +68,8 @@ class GuideConsoleProvider extends ChangeNotifier {
       name: '美食探店陪同',
       description: '根据客户口味与时间安排本地探店路线，适合情侣、朋友和亲子出行。',
       pricePerDay: 400,
-      imageUrl: 'https://images.unsplash.com/photo-1500530855697-b586d89ba3ee?auto=format&fit=crop&w=320&q=80',
+      imageUrl:
+          'https://images.unsplash.com/photo-1500530855697-b586d89ba3ee?auto=format&fit=crop&w=320&q=80',
       count: 1,
     ),
     GuideServiceOption(
@@ -75,7 +77,8 @@ class GuideConsoleProvider extends ChangeNotifier {
       name: '夜游行程陪同',
       description: '偏向夜景、散步、拍照与轻社交氛围，适合晚间短时段服务。',
       pricePerDay: 400,
-      imageUrl: 'https://images.unsplash.com/photo-1493246507139-91e8fad9978e?auto=format&fit=crop&w=320&q=80',
+      imageUrl:
+          'https://images.unsplash.com/photo-1493246507139-91e8fad9978e?auto=format&fit=crop&w=320&q=80',
       count: 1,
     ),
     GuideServiceOption(
@@ -83,7 +86,8 @@ class GuideConsoleProvider extends ChangeNotifier {
       name: '定制陪同服务',
       description: '根据客户目的地、节奏和人数做个性化安排，适合高客单定制单。',
       pricePerDay: 400,
-      imageUrl: 'https://images.unsplash.com/photo-1469474968028-56623f02e42e?auto=format&fit=crop&w=320&q=80',
+      imageUrl:
+          'https://images.unsplash.com/photo-1469474968028-56623f02e42e?auto=format&fit=crop&w=320&q=80',
       count: 1,
     ),
   ];
@@ -117,55 +121,55 @@ class GuideConsoleProvider extends ChangeNotifier {
   GuideWorkbenchStats get stats => _stats;
 
   List<GuideDashboardShortcut> get shortcuts => const [
-        GuideDashboardShortcut(
-          title: '时间管理',
-          subtitle: '灵活排班',
-          icon: Icons.calendar_month_outlined,
-          color: Color(0xFFE8FFF3),
-        ),
-        GuideDashboardShortcut(
-          title: '服务项目',
-          subtitle: '配置上架项目',
-          icon: Icons.handshake_outlined,
-          color: Color(0xFFFFF7E3),
-        ),
-        GuideDashboardShortcut(
-          title: '客户评价',
-          subtitle: '查看口碑',
-          icon: Icons.sticky_note_2_outlined,
-          color: Color(0xFFF1F4FF),
-        ),
-        GuideDashboardShortcut(
-          title: '需求大厅',
-          subtitle: '查看并报名',
-          icon: Icons.assignment_turned_in_outlined,
-          color: Color(0xFFFFF1E9),
-        ),
-      ];
+    GuideDashboardShortcut(
+      title: '时间管理',
+      subtitle: '灵活排班',
+      icon: Icons.calendar_month_outlined,
+      color: Color(0xFFE8FFF3),
+    ),
+    GuideDashboardShortcut(
+      title: '服务项目',
+      subtitle: '配置上架项目',
+      icon: Icons.handshake_outlined,
+      color: Color(0xFFFFF7E3),
+    ),
+    GuideDashboardShortcut(
+      title: '客户评价',
+      subtitle: '查看口碑',
+      icon: Icons.sticky_note_2_outlined,
+      color: Color(0xFFF1F4FF),
+    ),
+    GuideDashboardShortcut(
+      title: '需求大厅',
+      subtitle: '查看并报名',
+      icon: Icons.assignment_turned_in_outlined,
+      color: Color(0xFFFFF1E9),
+    ),
+  ];
 
   List<GuideTaskCard> get taskCards => const [
-        GuideTaskCard(
-          title: '拉新赚钱',
-          subtitle: '空闲拉新，动动手指日日赚现',
-          icon: Icons.savings_outlined,
-          backgroundColor: Color(0xFFB8FF1A),
-          foregroundColor: Color(0xFF171717),
-        ),
-        GuideTaskCard(
-          title: '任务中心',
-          subtitle: '做任务·领福利',
-          icon: Icons.inventory_2_outlined,
-          backgroundColor: Color(0xFFFFE37B),
-          foregroundColor: Color(0xFF171717),
-        ),
-        GuideTaskCard(
-          title: '培训中心',
-          subtitle: '操作流程一点通',
-          icon: Icons.school_outlined,
-          backgroundColor: Color(0xFFFFB547),
-          foregroundColor: Color(0xFF171717),
-        ),
-      ];
+    GuideTaskCard(
+      title: '拉新赚钱',
+      subtitle: '空闲拉新，动动手指日日赚现',
+      icon: Icons.savings_outlined,
+      backgroundColor: Color(0xFFB8FF1A),
+      foregroundColor: Color(0xFF171717),
+    ),
+    GuideTaskCard(
+      title: '任务中心',
+      subtitle: '做任务·领福利',
+      icon: Icons.inventory_2_outlined,
+      backgroundColor: Color(0xFFFFE37B),
+      foregroundColor: Color(0xFF171717),
+    ),
+    GuideTaskCard(
+      title: '培训中心',
+      subtitle: '操作流程一点通',
+      icon: Icons.school_outlined,
+      backgroundColor: Color(0xFFFFB547),
+      foregroundColor: Color(0xFF171717),
+    ),
+  ];
 
   Future<void> initialize(UserProvider userProvider) async {
     if (_isInitialized) {
@@ -174,7 +178,9 @@ class GuideConsoleProvider extends ChangeNotifier {
     }
     final prefs = await SharedPreferences.getInstance();
     final modeIndex = prefs.getInt(_modeKey);
-    if (modeIndex != null && modeIndex >= 0 && modeIndex < GuideDutyMode.values.length) {
+    if (modeIndex != null &&
+        modeIndex >= 0 &&
+        modeIndex < GuideDutyMode.values.length) {
       _mode = GuideDutyMode.values[modeIndex];
     }
     final savedCity = prefs.getString(_cityKey);
@@ -233,9 +239,15 @@ class GuideConsoleProvider extends ChangeNotifier {
     if (city.trim().isEmpty) return;
     _selectedCity = city.trim();
     if (!_serviceCities.contains(_selectedCity)) {
-      _serviceCities = [_selectedCity, ..._serviceCities.where((item) => item != _selectedCity)];
+      _serviceCities = [
+        _selectedCity,
+        ..._serviceCities.where((item) => item != _selectedCity),
+      ];
     }
-    _historyCities = [_selectedCity, ..._historyCities.where((item) => item != _selectedCity)];
+    _historyCities = [
+      _selectedCity,
+      ..._historyCities.where((item) => item != _selectedCity),
+    ];
     notifyListeners();
     final prefs = await SharedPreferences.getInstance();
     await prefs.setString(_cityKey, _selectedCity);
@@ -374,8 +386,19 @@ class GuideConsoleProvider extends ChangeNotifier {
     notifyListeners();
   }
 
-  List<GuideOrderCardData> buildGuideOrders(List<Order> orders) {
-    final guideSideOrders = orders.where((item) => item.guideId.isNotEmpty).toList();
+  List<GuideOrderCardData> buildGuideOrders(
+    List<Order> orders, {
+    String? guideId,
+  }) {
+    final currentGuideId = guideId?.trim() ?? '';
+    if (currentGuideId.isEmpty) {
+      return const [];
+    }
+    final guideSideOrders = orders
+        .where(
+          (item) => item.guideId.isNotEmpty && item.guideId == currentGuideId,
+        )
+        .toList();
     if (guideSideOrders.isEmpty) {
       return const [];
     }
@@ -383,14 +406,16 @@ class GuideConsoleProvider extends ChangeNotifier {
       final stage = switch (order.status) {
         OrderStatus.pendingPayment => GuideOrderStage.pendingPayment,
         OrderStatus.inProgress => GuideOrderStage.inProgress,
-        OrderStatus.pendingReview || OrderStatus.completed => GuideOrderStage.inProgress,
+        OrderStatus.pendingReview ||
+        OrderStatus.completed => GuideOrderStage.inProgress,
         OrderStatus.cancelled => GuideOrderStage.newOrder,
       };
       final primaryAction = switch (stage) {
         GuideOrderStage.newOrder => GuideOrderAction.goToService,
-        GuideOrderStage.pendingPayment => order.paymentStatus == 'accepted'
-            ? GuideOrderAction.waitingPayment
-            : GuideOrderAction.accept,
+        GuideOrderStage.pendingPayment =>
+          order.paymentStatus == 'accepted'
+              ? GuideOrderAction.waitingPayment
+              : GuideOrderAction.accept,
         GuideOrderStage.inProgress => GuideOrderAction.arrived,
       };
       return GuideOrderCardData(
@@ -409,45 +434,46 @@ class GuideConsoleProvider extends ChangeNotifier {
         serviceLng: order.serviceLng,
         imageUrls: _mockOrderImages,
         primaryAction: primaryAction,
-        serviceTime: order.serviceDate ?? order.createdAt.add(const Duration(hours: 6)),
+        serviceTime:
+            order.serviceDate ?? order.createdAt.add(const Duration(hours: 6)),
       );
     }).toList();
   }
 
   List<GuideOrderCardData> get _mockGuideOrders => [
-        GuideOrderCardData(
-          id: 'guide_order_1',
-          stage: GuideOrderStage.inProgress,
-          serviceLabel: '地陪',
-          etaText: '剩余：5小时23分钟',
-          distanceText: '距服务地 2.3km',
-          amount: 480,
-          content: '苏州平江路半日陪同，客户希望安排轻松路线，含拍照打卡与晚餐建议。',
-          address: '苏州市姑苏区平江路历史街区游客中心',
-          serviceCity: '苏州',
-          serviceLat: 31.3202,
-          serviceLng: 120.6336,
-          imageUrls: _mockOrderImages,
-          primaryAction: GuideOrderAction.arrived,
-          serviceTime: DateTime.now().add(const Duration(hours: 5)),
-        ),
-        GuideOrderCardData(
-          id: 'guide_order_2',
-          stage: GuideOrderStage.newOrder,
-          serviceLabel: '定制',
-          etaText: '剩余：5小时23分钟',
-          distanceText: '距服务地 8.6km',
-          amount: 480,
-          content: '金鸡湖夜游定制单，客户两人出行，希望包含拍照点和夜景路线建议。',
-          address: '苏州市工业园区金鸡湖音乐喷泉广场',
-          serviceCity: '苏州',
-          serviceLat: 31.3148,
-          serviceLng: 120.7072,
-          imageUrls: _mockOrderImages,
-          primaryAction: GuideOrderAction.goToService,
-          serviceTime: DateTime.now().add(const Duration(hours: 7)),
-        ),
-      ];
+    GuideOrderCardData(
+      id: 'guide_order_1',
+      stage: GuideOrderStage.inProgress,
+      serviceLabel: '地陪',
+      etaText: '剩余：5小时23分钟',
+      distanceText: '距服务地 2.3km',
+      amount: 480,
+      content: '苏州平江路半日陪同，客户希望安排轻松路线，含拍照打卡与晚餐建议。',
+      address: '苏州市姑苏区平江路历史街区游客中心',
+      serviceCity: '苏州',
+      serviceLat: 31.3202,
+      serviceLng: 120.6336,
+      imageUrls: _mockOrderImages,
+      primaryAction: GuideOrderAction.arrived,
+      serviceTime: DateTime.now().add(const Duration(hours: 5)),
+    ),
+    GuideOrderCardData(
+      id: 'guide_order_2',
+      stage: GuideOrderStage.newOrder,
+      serviceLabel: '定制',
+      etaText: '剩余：5小时23分钟',
+      distanceText: '距服务地 8.6km',
+      amount: 480,
+      content: '金鸡湖夜游定制单，客户两人出行，希望包含拍照点和夜景路线建议。',
+      address: '苏州市工业园区金鸡湖音乐喷泉广场',
+      serviceCity: '苏州',
+      serviceLat: 31.3148,
+      serviceLng: 120.7072,
+      imageUrls: _mockOrderImages,
+      primaryAction: GuideOrderAction.goToService,
+      serviceTime: DateTime.now().add(const Duration(hours: 7)),
+    ),
+  ];
 
   static const List<String> _mockOrderImages = [
     'https://images.unsplash.com/photo-1506744038136-46273834b3fb?auto=format&fit=crop&w=360&q=80',
@@ -463,7 +489,8 @@ class GuideConsoleProvider extends ChangeNotifier {
   }
 
   String _etaTextForOrder(Order order) {
-    final date = order.serviceDate ?? order.createdAt.add(const Duration(hours: 5));
+    final date =
+        order.serviceDate ?? order.createdAt.add(const Duration(hours: 5));
     final diff = date.difference(DateTime.now());
     final hours = diff.inHours.abs();
     final minutes = diff.inMinutes.abs() % 60;
@@ -502,8 +529,11 @@ class GuideConsoleProvider extends ChangeNotifier {
     if (orderProvider.orders.isEmpty) {
       await orderProvider.loadOrders();
     }
-    _stats = _buildStats(orderProvider.orders);
-    final derivedAddresses = _buildServiceAddresses(orderProvider.orders);
+    final guideOrders = orderProvider.orders
+        .where((item) => item.guideId == userProvider.user.id)
+        .toList();
+    _stats = _buildStats(guideOrders);
+    final derivedAddresses = _buildServiceAddresses(guideOrders);
     if (derivedAddresses.isNotEmpty) {
       _serviceAddresses = derivedAddresses;
     }
@@ -553,7 +583,9 @@ class GuideConsoleProvider extends ChangeNotifier {
       seen.add(address);
       result.add(
         GuideAddress(
-          city: order.serviceCity.isNotEmpty ? order.serviceCity : _selectedCity,
+          city: order.serviceCity.isNotEmpty
+              ? order.serviceCity
+              : _selectedCity,
           title: address,
           detail: order.serviceName.isNotEmpty ? order.serviceName : '订单服务地点',
           contactName: order.guideName.isNotEmpty ? order.guideName : '客户',

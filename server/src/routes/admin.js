@@ -254,7 +254,11 @@ adminRouter.get('/users', requirePermission('users'), handleRoute(async (req, re
         u.is_admin,
         u.created_at,
         exists(select 1 from public.guides g where g.id = u.id) as is_guide,
-        coalesce((select count(*) from public.orders o where o.user_id = u.id), 0)::int as order_count
+        coalesce((
+          select count(*)
+          from public.orders o
+          where o.user_id = u.id or o.guide_id = u.id
+        ), 0)::int as order_count
       from public.users u
       where $1 = ''
         or u.phone ilike '%' || $1 || '%'
