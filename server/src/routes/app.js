@@ -59,7 +59,17 @@ function getSessionUserId(req) {
 }
 
 function normalizePhone(phone) {
-  return phone.replace(/\s+/g, '');
+  const compact = phone.replace(/\s+/g, '');
+  if (compact.startsWith('+86')) {
+    return compact.slice(3);
+  }
+  if (compact.startsWith('0086')) {
+    return compact.slice(4);
+  }
+  if (compact.startsWith('86') && compact.length === 13) {
+    return compact.slice(2);
+  }
+  return compact;
 }
 
 function readWhitelistCode(phone) {
