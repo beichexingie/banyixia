@@ -1591,7 +1591,7 @@ appRouter.post('/orders/one-cent-test', handleRoute(async (req, res) => {
         service_name, service_address, service_city, service_lat, service_lng,
         service_date, payment_method, payment_status, merchant_order_no, created_at
       )
-      values ($1,$2,$3,$4,0,0.01,$5,$6,$7,$8,$9,$10,'alipay','pending',$11,now())
+      values ($1,$2,$3,$4,0,0.10,$5,$6,$7,$8,$9,$10,'alipay','pending',$11,now())
       returning *
     `,
     [
@@ -1599,8 +1599,8 @@ appRouter.post('/orders/one-cent-test', handleRoute(async (req, res) => {
       guideId,
       guide.name ?? payload.guideName ?? payload.guide_name ?? '测试地陪',
       guide.avatar ?? payload.guideAvatar ?? payload.guide_avatar ?? '',
-      payload.serviceName ?? payload.service_name ?? '0.01元地陪接单支付测试',
-      payload.serviceAddress ?? payload.service_address ?? '0.01测试服务地点',
+      payload.serviceName ?? payload.service_name ?? '0.10元地陪接单支付测试',
+      payload.serviceAddress ?? payload.service_address ?? '0.10测试服务地点',
       payload.serviceCity ?? payload.service_city ?? guide.city ?? '',
       toNullableNumber(payload.serviceLat ?? payload.service_lat),
       toNullableNumber(payload.serviceLng ?? payload.service_lng),
@@ -1611,7 +1611,7 @@ appRouter.post('/orders/one-cent-test', handleRoute(async (req, res) => {
   const guideLocation = await fetchGuideLocation(pool, guideId);
   return ok(res, {
     data: withDistanceFields(result.rows[0], guideLocation),
-    message: '0.01测试订单已创建，等待地陪接单后付款',
+    message: '0.10测试订单已创建，等待地陪接单后付款',
   });
 }));
 

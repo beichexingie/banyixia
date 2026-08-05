@@ -39,7 +39,7 @@ class _ProfilePageState extends State<ProfilePage> {
   Future<void> _createOneCentTestOrder() async {
     final userProvider = context.read<UserProvider>();
     if (!userProvider.isLoggedIn) {
-      _showSnack('请先登录后再创建 0.01 测试订单');
+      _showSnack('请先登录后再创建 0.10 测试订单');
       return;
     }
     if (_isCreatingTestOrder) return;
@@ -48,11 +48,11 @@ class _ProfilePageState extends State<ProfilePage> {
     try {
       final order = await context.read<OrderProvider>().createOneCentTestOrder();
       if (!mounted) return;
-      _showSnack('0.01 测试订单已创建，等待地陪接单');
+      _showSnack('0.10 测试订单已创建，等待地陪接单');
       context.push('/profile/orders?tab=1', extra: order);
     } catch (e) {
       if (!mounted) return;
-      _showSnack('创建 0.01 测试订单失败: $e');
+      _showSnack('创建 0.10 测试订单失败: $e');
     } finally {
       if (mounted) {
         setState(() => _isCreatingTestOrder = false);
@@ -428,7 +428,7 @@ class _ProfilePageState extends State<ProfilePage> {
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         Text(
-                          '创建 0.01 测试订单',
+                          '创建 0.10 测试订单',
                           style: TextStyle(
                             fontSize: 14,
                             fontWeight: FontWeight.w800,

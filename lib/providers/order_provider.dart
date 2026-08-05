@@ -188,7 +188,7 @@ class OrderProvider extends ChangeNotifier {
     );
     final data = response['data'];
     if (data is! Map<String, dynamic>) {
-      throw Exception('0.01 test order response is invalid');
+      throw Exception('0.10 test order response is invalid');
     }
     final order = Order.fromJson(data);
     _orders = [order, ..._orders.where((item) => item.id != order.id)];
@@ -223,8 +223,8 @@ class OrderProvider extends ChangeNotifier {
           guideName: order.guideName,
           guideAvatar: order.guideAvatar,
           status: OrderStatus.pendingPayment,
-          amount: 0.01,
-          serviceName: '0.01元支付联调测试订单',
+          amount: 0.10,
+          serviceName: '0.10元支付联调测试订单',
           paymentMethod: 'alipay',
           paymentStatus: 'pending',
           merchantOrderNo:
@@ -257,8 +257,8 @@ class OrderProvider extends ChangeNotifier {
       guideName: firstGuide['name']?.toString() ?? '测试地陪',
       guideAvatar: firstGuide['avatar']?.toString() ?? '',
       status: OrderStatus.pendingPayment,
-      amount: 0.01,
-      serviceName: '0.01元支付联调测试订单',
+      amount: 0.10,
+      serviceName: '0.10元支付联调测试订单',
       paymentMethod: 'alipay',
       paymentStatus: 'pending',
       merchantOrderNo:

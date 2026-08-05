@@ -265,7 +265,8 @@ class _OrdersPageState extends State<OrdersPage>
   Widget _buildOrderCard(Order order) {
     final (statusText, statusColor) = _statusMeta(order.status);
     final isDebugOrder =
-        order.serviceName.contains('0.01') ||
+        (order.serviceName.contains('0.01') ||
+            order.serviceName.contains('0.10')) ||
         (order.merchantOrderNo?.startsWith('DBG') ?? false) ||
         (order.merchantOrderNo?.startsWith('TEST001') ?? false);
     final waitingGuideAccept = isDebugOrder &&
