@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import '../../config/app_config.dart';
 import '../../config/app_theme.dart';
 import '../../providers/order_provider.dart';
 import '../../providers/user_provider.dart';
@@ -232,9 +233,12 @@ class _WalletPageState extends State<WalletPage> {
           FilledButton(
             onPressed: () async {
               final amount = double.tryParse(amountController.text.trim()) ?? 0;
-              if (amount <= 0 || amount > _availableBalance) {
+              if (amount < AppConfig.minimumWithdrawalAmount ||
+                  amount > _availableBalance) {
                 ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(content: Text('请输入不超过可提现余额的有效金额')),
+                  const SnackBar(
+                    content: Text('提现金额最低为 0.10 元，且不能超过可提现余额'),
+                  ),
                 );
                 return;
               }

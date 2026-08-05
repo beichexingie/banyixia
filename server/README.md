@@ -44,6 +44,7 @@ cp .env.example .env
 - `ALIPAY_TRANSFER_SCENE_NAME`（支付宝后台已创建的转账场景名称）
 - `ALIPAY_TRANSFER_REPORT_INFO_TYPE`（与转账场景匹配的报备信息类型）
 - `ALIPAY_TRANSFER_REPORT_INFO_CONTENT`（本次转账的报备信息内容）
+- `ALIPAY_TRANSFER_MIN_AMOUNT`（默认 `0.10` 元）
 - `ALIPAY_NOTIFY_URL`
 - `CORS_ORIGINS`
 

@@ -1,6 +1,8 @@
 class AppConfig {
   const AppConfig._();
 
+  static const double minimumWithdrawalAmount = 0.10;
+
   static const String appName = '伴一下';
 
   static const String apiBaseUrlOverride = String.fromEnvironment(

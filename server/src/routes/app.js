@@ -2015,6 +2015,16 @@ appRouter.post('/wallet/withdraw', handleRoute(async (req, res) => {
   if (!userId) return;
   const amount = Number(req.body?.amount ?? 0);
   if (!(amount > 0)) return fail(res, 400, '提现金额必须大于0');
+  if (
+    config.alipayTransferMinAmount > 0 &&
+    amount < config.alipayTransferMinAmount
+  ) {
+    return fail(
+      res,
+      400,
+      `支付宝单笔最低提现金额为 ${config.alipayTransferMinAmount.toFixed(2)} 元`,
+    );
+  }
   const accountResult = await pool.query(
     `select * from public.guide_payout_accounts where user_id = $1 limit 1`,
     [userId],

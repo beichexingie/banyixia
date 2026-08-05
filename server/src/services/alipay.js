@@ -309,6 +309,14 @@ export async function transferToAlipayAccount({
   if (!(finalAmount > 0)) {
     throw new Error('转账金额必须大于 0');
   }
+  if (
+    config.alipayTransferMinAmount > 0 &&
+    finalAmount < config.alipayTransferMinAmount
+  ) {
+    throw new Error(
+      `支付宝单笔最低转账金额为 ${config.alipayTransferMinAmount.toFixed(2)} 元`,
+    );
+  }
   if (config.alipayTransferMaxAmount > 0 && finalAmount > config.alipayTransferMaxAmount) {
     throw new Error(`单笔转账金额超过当前安全上限 ${config.alipayTransferMaxAmount} 元`);
   }

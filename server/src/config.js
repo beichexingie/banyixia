@@ -66,6 +66,10 @@ export const config = {
     process.env.ALIPAY_API_BASE_URL?.trim() ||
     'https://openapi.alipay.com',
   alipayTransferEnabled: parseBoolean(process.env.ALIPAY_TRANSFER_ENABLED, false),
+  alipayTransferMinAmount: parseNumber(
+    process.env.ALIPAY_TRANSFER_MIN_AMOUNT,
+    0.1,
+  ),
   alipayTransferMaxAmount: parseNumber(process.env.ALIPAY_TRANSFER_MAX_AMOUNT, 5000),
   alipayTransferSceneName:
     process.env.ALIPAY_TRANSFER_SCENE_NAME?.trim() || '佣金报酬',
