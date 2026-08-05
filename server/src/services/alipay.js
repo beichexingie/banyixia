@@ -81,6 +81,16 @@ function buildSignContent(params) {
       .join('&');
 }
 
+function addCertificateParams(params) {
+  if (config.alipayAppCertSn) {
+    params.app_cert_sn = config.alipayAppCertSn;
+  }
+  if (config.alipayRootCertSn) {
+    params.alipay_root_cert_sn = config.alipayRootCertSn;
+  }
+  return params;
+}
+
 function signWithRsa2(message) {
   const candidates = normalizePrivateKeyCandidates(config.alipayPrivateKey);
   const errors = [];
@@ -180,7 +190,7 @@ export function buildOrderString({ orderId, merchantOrderNo, amount, subject }) 
     product_code: 'QUICK_MSECURITY_PAY',
   };
 
-  const params = {
+  const params = addCertificateParams({
     app_id: config.alipayAppId,
     method: 'alipay.trade.app.pay',
     format: 'JSON',
@@ -190,7 +200,7 @@ export function buildOrderString({ orderId, merchantOrderNo, amount, subject }) 
     version: '1.0',
     notify_url: config.alipayNotifyUrl,
     biz_content: JSON.stringify(bizContent),
-  };
+  });
 
   const signingString = buildSignContent(params);
   const signature = signWithRsa2(signingString);
@@ -226,7 +236,7 @@ export async function queryAlipayTrade({ merchantOrderNo, tradeNo = '' }) {
     throw new Error('缺少支付宝订单号');
   }
 
-  const params = {
+  const params = addCertificateParams({
     app_id: config.alipayAppId,
     method: 'alipay.trade.query',
     format: 'JSON',
@@ -235,7 +245,7 @@ export async function queryAlipayTrade({ merchantOrderNo, tradeNo = '' }) {
     timestamp: formatChinaTimestamp(new Date()),
     version: '1.0',
     biz_content: JSON.stringify(bizContent),
-  };
+  });
   const sign = signWithRsa2(buildSignContent(params));
   const body = new URLSearchParams({ ...params, sign }).toString();
 
