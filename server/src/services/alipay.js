@@ -159,7 +159,7 @@ async function requestAlipayV3(method, requestPath, body = '') {
     const code = payload.sub_code || payload.code || response.status;
     const httpError = new Error(`支付宝 API 错误：${message}${code ? `（${code}）` : ''}`);
     httpError.alipayPayload = payload;
-    httpError.remoteAttempted = true;
+    httpError.remoteAttempted = response.status >= 500;
     throw httpError;
   }
 
