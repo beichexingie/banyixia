@@ -1,4 +1,7 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:permission_handler/permission_handler.dart';
 import 'package:provider/provider.dart';
 import 'package:tencent_rtc_sdk/trtc_cloud.dart';
@@ -25,9 +28,13 @@ class VoiceCallPage extends StatefulWidget {
   State<VoiceCallPage> createState() => _VoiceCallPageState();
 }
 
-class _VoiceCallPageState extends State<VoiceCallPage> {
+class _VoiceCallPageState extends State<VoiceCallPage>
+    with WidgetsBindingObserver, SingleTickerProviderStateMixin {
   TRTCCloud? _trtcCloud;
   TRTCCloudListener? _listener;
+  Timer? _statusTimer;
+  Timer? _durationTimer;
+  late final AnimationController _pulseController;
 
   bool _initializing = true;
   bool _enteredRoom = false;
@@ -35,21 +42,68 @@ class _VoiceCallPageState extends State<VoiceCallPage> {
   bool _muted = false;
   bool _speakerOn = false;
   bool _ending = false;
+  bool _closed = false;
+  bool _checkingStatus = false;
   String? _error;
-  String? _remoteUserId;
+  String? _terminalMessage;
+  DateTime? _answeredAt;
+  Duration _duration = Duration.zero;
 
   String get _callId => widget.callPayload['call_id']?.toString() ?? '';
+
+  String get _peerName {
+    final payloadName =
+        widget.callPayload['peer_name']?.toString().trim() ?? '';
+    return payloadName.isEmpty ? widget.peerName : payloadName;
+  }
+
+  String get _peerAvatar =>
+      widget.callPayload['peer_avatar']?.toString().trim() ?? '';
 
   @override
   void initState() {
     super.initState();
+    WidgetsBinding.instance.addObserver(this);
+    _pulseController = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 1300),
+    )..repeat(reverse: true);
+    _readInitialAnsweredAt();
     _joinRoom();
+    _statusTimer = Timer.periodic(
+      const Duration(seconds: 2),
+      (_) => _checkServerStatus(),
+    );
+    _durationTimer = Timer.periodic(
+      const Duration(seconds: 1),
+      (_) => _updateDuration(),
+    );
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.resumed) {
+      _checkServerStatus();
+    }
+    if (state == AppLifecycleState.detached && !_closed && !_ending) {
+      unawaited(_endOnServer('app_terminated'));
+    }
   }
 
   @override
   void dispose() {
+    _closed = true;
+    WidgetsBinding.instance.removeObserver(this);
+    _statusTimer?.cancel();
+    _durationTimer?.cancel();
+    _pulseController.dispose();
     _leaveRoom();
     super.dispose();
+  }
+
+  void _readInitialAnsweredAt() {
+    final raw = widget.callPayload['answered_at']?.toString() ?? '';
+    _answeredAt = DateTime.tryParse(raw)?.toLocal();
   }
 
   Future<void> _joinRoom() async {
@@ -58,8 +112,11 @@ class _VoiceCallPageState extends State<VoiceCallPage> {
       if (!mounted) return;
       setState(() {
         _initializing = false;
-        _error = '需要麦克风权限才能进行语音通话';
+        _error = micStatus.isPermanentlyDenied
+            ? '麦克风权限已被关闭，请到系统设置中允许后重试'
+            : '需要麦克风权限才能进行语音通话';
       });
+      unawaited(_endOnServer('microphone_permission_denied'));
       return;
     }
 
@@ -74,16 +131,17 @@ class _VoiceCallPageState extends State<VoiceCallPage> {
       }
 
       final cloud = await TRTCCloud.sharedInstance();
+      if (!mounted || _closed) return;
       _listener = TRTCCloudListener(
         onError: (code, message) {
-          if (!mounted) return;
+          if (!mounted || _closed) return;
           setState(() {
             _initializing = false;
             _error = '通话连接失败：$code $message';
           });
         },
         onEnterRoom: (result) {
-          if (!mounted) return;
+          if (!mounted || _closed) return;
           setState(() {
             _initializing = false;
             _enteredRoom = result > 0;
@@ -92,29 +150,16 @@ class _VoiceCallPageState extends State<VoiceCallPage> {
             }
           });
         },
-        onRemoteUserEnterRoom: (userId) {
-          if (!mounted) return;
-          setState(() {
-            _remoteJoined = true;
-            _remoteUserId = userId;
-          });
+        onRemoteUserEnterRoom: (_) => _markRemoteJoined(),
+        onUserAudioAvailable: (_, available) {
+          if (available) _markRemoteJoined();
         },
-        onUserAudioAvailable: (userId, available) {
-          if (!mounted) return;
-          setState(() {
-            _remoteJoined = available || _remoteJoined;
-            _remoteUserId = userId;
-          });
-        },
-        onRemoteUserLeaveRoom: (userId, reason) {
-          if (!mounted) return;
-          setState(() {
-            _remoteJoined = false;
-            _remoteUserId = null;
-          });
+        onRemoteUserLeaveRoom: (_, reason) {
+          if (!mounted || _closed || _ending) return;
+          unawaited(_handlePeerLeft());
         },
         onExitRoom: (_) {
-          if (!mounted) return;
+          if (!mounted || _closed) return;
           setState(() {
             _enteredRoom = false;
             _remoteJoined = false;
@@ -137,12 +182,79 @@ class _VoiceCallPageState extends State<VoiceCallPage> {
       );
       cloud.startLocalAudio(TRTCAudioQuality.speech);
     } catch (error) {
-      if (!mounted) return;
+      if (!mounted || _closed) return;
       setState(() {
         _initializing = false;
-        _error = error.toString();
+        _error = '无法启动语音通话：$error';
       });
+      unawaited(_endOnServer('trtc_start_failed'));
     }
+  }
+
+  void _markRemoteJoined() {
+    if (!mounted || _closed) return;
+    setState(() {
+      _remoteJoined = true;
+      _answeredAt ??= DateTime.now();
+      _error = null;
+    });
+    HapticFeedback.lightImpact();
+  }
+
+  Future<void> _checkServerStatus() async {
+    if (_checkingStatus || _callId.isEmpty || _closed || _ending) return;
+    _checkingStatus = true;
+    try {
+      final call = await context.read<CallProvider>().fetchVoiceCall(_callId);
+      if (!mounted || _closed) return;
+      final status = call['status']?.toString() ?? '';
+      if (status == 'answered' && _answeredAt == null) {
+        final raw = call['answered_at']?.toString() ?? '';
+        setState(() {
+          _answeredAt = DateTime.tryParse(raw)?.toLocal() ?? DateTime.now();
+        });
+      } else if (status == 'ended') {
+        await _handleRemoteEnd(call['end_reason']?.toString() ?? 'ended');
+      }
+    } catch (_) {
+      // TRTC audio may remain healthy during a temporary API interruption.
+    } finally {
+      _checkingStatus = false;
+    }
+  }
+
+  Future<void> _handlePeerLeft() async {
+    try {
+      final call = await context.read<CallProvider>().fetchVoiceCall(_callId);
+      final reason = call['end_reason']?.toString() ?? 'peer_left';
+      if (call['status']?.toString() != 'ended') {
+        await _endOnServer('peer_left');
+      }
+      await _handleRemoteEnd(reason == 'ended' ? 'peer_left' : reason);
+    } catch (_) {
+      await _endOnServer('peer_left');
+      await _handleRemoteEnd('peer_left');
+    }
+  }
+
+  Future<void> _handleRemoteEnd(String reason) async {
+    if (_ending || _closed || !mounted) return;
+    _ending = true;
+    _statusTimer?.cancel();
+    _terminalMessage = _endReasonText(reason);
+    setState(() {});
+    _leaveRoom();
+    await Future<void>.delayed(const Duration(milliseconds: 1300));
+    if (mounted && !_closed) {
+      Navigator.of(context).pop();
+    }
+  }
+
+  void _updateDuration() {
+    final answeredAt = _answeredAt;
+    if (!mounted || answeredAt == null || _ending) return;
+    final next = DateTime.now().difference(answeredAt);
+    setState(() => _duration = next.isNegative ? Duration.zero : next);
   }
 
   void _leaveRoom() {
@@ -151,166 +263,172 @@ class _VoiceCallPageState extends State<VoiceCallPage> {
     if (cloud == null) return;
     try {
       cloud.stopLocalAudio();
-      cloud.exitRoom();
       if (listener != null) {
         cloud.unRegisterListener(listener);
       }
+      cloud.exitRoom();
       TRTCCloud.destroySharedInstance();
     } catch (_) {}
     _trtcCloud = null;
     _listener = null;
   }
 
-  Future<void> _finishCall({String reason = 'ended'}) async {
-    if (_ending) return;
-    setState(() => _ending = true);
+  Future<void> _endOnServer(String reason) async {
+    if (_callId.isEmpty) return;
     try {
-      if (_callId.isNotEmpty) {
-        await context.read<CallProvider>().endVoiceCall(
-              _callId,
-              reason: reason,
-            );
-      }
-    } catch (_) {
-      // Even if the server update fails, release the local audio room first.
-    } finally {
-      _leaveRoom();
-      if (mounted) {
-        Navigator.of(context).pop();
-      }
+      await context.read<CallProvider>().endVoiceCall(_callId, reason: reason);
+    } catch (_) {}
+  }
+
+  Future<void> _finishCall({String reason = 'hangup'}) async {
+    if (_ending || _closed) return;
+    setState(() {
+      _ending = true;
+      _terminalMessage = '通话已结束';
+    });
+    await _endOnServer(reason);
+    _leaveRoom();
+    if (mounted && !_closed) {
+      Navigator.of(context).pop();
     }
   }
 
-  Future<void> _toggleMute() async {
+  Future<void> _confirmHangup() async {
+    if (_ending) return;
+    final shouldHangup = await showDialog<bool>(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        title: const Text('结束语音通话？'),
+        content: const Text('返回将同时挂断当前通话。'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(dialogContext).pop(false),
+            child: const Text('继续通话'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.of(dialogContext).pop(true),
+            child: const Text('结束'),
+          ),
+        ],
+      ),
+    );
+    if (shouldHangup == true) {
+      await _finishCall(reason: 'back');
+    }
+  }
+
+  void _toggleMute() {
     final next = !_muted;
     _trtcCloud?.muteLocalAudio(next);
     setState(() => _muted = next);
   }
 
-  Future<void> _toggleSpeaker() async {
+  void _toggleSpeaker() {
     final next = !_speakerOn;
     _trtcCloud?.getDeviceManager().setAudioRoute(
-          next ? TXAudioRoute.speakerPhone : TXAudioRoute.earpiece,
-        );
+      next ? TXAudioRoute.speakerPhone : TXAudioRoute.earpiece,
+    );
     setState(() => _speakerOn = next);
   }
 
   @override
   Widget build(BuildContext context) {
-    final title = widget.incoming ? '正在接听' : '语音联系';
-    final status = _statusText;
-
     return PopScope(
       canPop: false,
       onPopInvokedWithResult: (didPop, _) {
-        if (!didPop) {
-          _finishCall(reason: 'back');
-        }
+        if (!didPop) unawaited(_confirmHangup());
       },
       child: Scaffold(
-        backgroundColor: const Color(0xFFF7F7F2),
-        body: SafeArea(
-          child: Container(
-            width: double.infinity,
-            decoration: const BoxDecoration(
-              gradient: LinearGradient(
-                colors: [
-                  Color(0xFFF5FFE2),
-                  Color(0xFFE5FF9F),
-                  Color(0xFFF7F7F2),
-                ],
-                begin: Alignment.topCenter,
-                end: Alignment.bottomCenter,
-              ),
+        backgroundColor: const Color(0xFF171B15),
+        body: Container(
+          decoration: const BoxDecoration(
+            gradient: LinearGradient(
+              colors: [Color(0xFF303A2B), Color(0xFF11140F)],
+              begin: Alignment.topCenter,
+              end: Alignment.bottomCenter,
             ),
+          ),
+          child: SafeArea(
             child: Column(
               children: [
-                Padding(
-                  padding: const EdgeInsets.fromLTRB(8, 8, 16, 0),
-                  child: Row(
-                    children: [
-                      IconButton(
-                        onPressed: _ending ? null : () => _finishCall(reason: 'back'),
-                        icon: const Icon(Icons.keyboard_arrow_down_rounded),
-                      ),
-                      Expanded(
-                        child: Text(
-                          title,
-                          textAlign: TextAlign.center,
-                          style: const TextStyle(
-                            fontSize: 16,
-                            fontWeight: FontWeight.w800,
-                          ),
+                Align(
+                  alignment: Alignment.centerLeft,
+                  child: IconButton(
+                    onPressed: _ending ? null : _confirmHangup,
+                    icon: const Icon(Icons.close_rounded, color: Colors.white),
+                  ),
+                ),
+                const Spacer(flex: 2),
+                AnimatedBuilder(
+                  animation: _pulseController,
+                  builder: (_, child) => Container(
+                    width:
+                        118 + (!_remoteJoined ? _pulseController.value * 8 : 0),
+                    height:
+                        118 + (!_remoteJoined ? _pulseController.value * 8 : 0),
+                    padding: const EdgeInsets.all(5),
+                    decoration: BoxDecoration(
+                      shape: BoxShape.circle,
+                      border: Border.all(
+                        width: 7,
+                        color: AppColors.primary.withValues(
+                          alpha: _remoteJoined
+                              ? 0.18
+                              : 0.12 + _pulseController.value * 0.16,
                         ),
                       ),
-                      const SizedBox(width: 48),
-                    ],
+                    ),
+                    child: child,
                   ),
+                  child: _avatar(),
                 ),
-                const Spacer(),
-                Container(
-                  width: 108,
-                  height: 108,
-                  decoration: BoxDecoration(
-                    color: Colors.white,
-                    shape: BoxShape.circle,
-                    boxShadow: [
-                      BoxShadow(
-                        color: Colors.black.withValues(alpha: 0.08),
-                        blurRadius: 22,
-                        offset: const Offset(0, 10),
-                      ),
-                    ],
-                  ),
-                  alignment: Alignment.center,
+                const SizedBox(height: 24),
+                Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 28),
                   child: Text(
-                    _avatarText(widget.peerName),
+                    _peerName,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
                     style: const TextStyle(
-                      fontSize: 34,
-                      fontWeight: FontWeight.w900,
-                      color: AppColors.textPrimary,
+                      color: Colors.white,
+                      fontSize: 27,
+                      fontWeight: FontWeight.w700,
                     ),
                   ),
                 ),
-                const SizedBox(height: 22),
-                Text(
-                  widget.peerName,
-                  style: const TextStyle(
-                    fontSize: 24,
-                    fontWeight: FontWeight.w900,
-                    color: AppColors.textPrimary,
-                  ),
-                ),
-                const SizedBox(height: 10),
-                Text(
-                  status,
-                  style: TextStyle(
-                    fontSize: 14,
-                    fontWeight: FontWeight.w600,
-                    color: _error == null
-                        ? AppColors.textSecondary
-                        : AppColors.warning,
-                  ),
-                ),
-                if (_remoteUserId != null) ...[
-                  const SizedBox(height: 8),
-                  Text(
-                    '对方已加入',
+                const SizedBox(height: 11),
+                Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 26),
+                  child: Text(
+                    _statusText,
+                    textAlign: TextAlign.center,
                     style: TextStyle(
-                      fontSize: 12,
-                      color: AppColors.textSecondary.withValues(alpha: 0.75),
+                      color: _error == null
+                          ? Colors.white70
+                          : const Color(0xFFFFA7A7),
+                      fontSize: 15,
                     ),
+                  ),
+                ),
+                if (_error != null) ...[
+                  const SizedBox(height: 12),
+                  TextButton(
+                    onPressed: openAppSettings,
+                    child: const Text('打开系统设置'),
                   ),
                 ],
-                const Spacer(),
+                const Spacer(flex: 3),
                 Padding(
-                  padding: const EdgeInsets.fromLTRB(28, 0, 28, 36),
+                  padding: const EdgeInsets.fromLTRB(24, 0, 24, 38),
                   child: Row(
                     mainAxisAlignment: MainAxisAlignment.spaceEvenly,
                     children: [
                       _roundAction(
-                        icon: _muted ? Icons.mic_off_rounded : Icons.mic_rounded,
-                        label: _muted ? '已静音' : '静音',
+                        icon: _muted
+                            ? Icons.mic_off_rounded
+                            : Icons.mic_rounded,
+                        label: _muted ? '取消静音' : '静音',
+                        active: _muted,
                         onTap: _enteredRoom && !_ending ? _toggleMute : null,
                       ),
                       _hangupButton(),
@@ -319,6 +437,7 @@ class _VoiceCallPageState extends State<VoiceCallPage> {
                             ? Icons.volume_up_rounded
                             : Icons.hearing_rounded,
                         label: _speakerOn ? '扬声器' : '听筒',
+                        active: _speakerOn,
                         onTap: _enteredRoom && !_ending ? _toggleSpeaker : null,
                       ),
                     ],
@@ -333,17 +452,71 @@ class _VoiceCallPageState extends State<VoiceCallPage> {
   }
 
   String get _statusText {
+    if (_terminalMessage != null) return _terminalMessage!;
     if (_error != null) return _error!;
     if (_ending) return '正在结束通话...';
     if (_initializing) return '正在连接语音服务...';
-    if (!_enteredRoom) return '等待进入房间...';
-    if (_remoteJoined) return '通话中';
-    return widget.incoming ? '已接听，等待对方加入...' : '正在呼叫对方...';
+    if (!_enteredRoom) return '正在进入通话...';
+    if (_remoteJoined) return _formatDuration(_duration);
+    if (_answeredAt != null) return '对方已接听，正在建立连接...';
+    return widget.incoming ? '正在接通...' : '正在等待对方接听...';
+  }
+
+  String _endReasonText(String reason) {
+    return switch (reason) {
+      'timeout' => '对方暂时无人接听',
+      'customer_rejected' || 'guide_rejected' || 'rejected' => '对方已拒绝',
+      'peer_left' || 'hangup' || 'back' => '对方已挂断',
+      'busy' => '对方正在通话中',
+      _ => '通话已结束',
+    };
+  }
+
+  String _formatDuration(Duration value) {
+    final hours = value.inHours;
+    final minutes = value.inMinutes.remainder(60).toString().padLeft(2, '0');
+    final seconds = value.inSeconds.remainder(60).toString().padLeft(2, '0');
+    return hours > 0
+        ? '${hours.toString().padLeft(2, '0')}:$minutes:$seconds'
+        : '$minutes:$seconds';
+  }
+
+  Widget _avatar() {
+    if (_peerAvatar.isNotEmpty) {
+      return ClipOval(
+        child: Image.network(
+          _peerAvatar,
+          fit: BoxFit.cover,
+          errorBuilder: (_, error, stackTrace) => _avatarFallback(),
+        ),
+      );
+    }
+    return _avatarFallback();
+  }
+
+  Widget _avatarFallback() {
+    final text = _peerName.trim();
+    return Container(
+      decoration: const BoxDecoration(
+        color: Color(0xFFF0F4E8),
+        shape: BoxShape.circle,
+      ),
+      alignment: Alignment.center,
+      child: Text(
+        text.isEmpty ? '伴' : text.characters.first,
+        style: const TextStyle(
+          color: Color(0xFF263022),
+          fontSize: 38,
+          fontWeight: FontWeight.w800,
+        ),
+      ),
+    );
   }
 
   Widget _roundAction({
     required IconData icon,
     required String label,
+    required bool active,
     required VoidCallback? onTap,
   }) {
     final enabled = onTap != null;
@@ -351,28 +524,28 @@ class _VoiceCallPageState extends State<VoiceCallPage> {
       children: [
         InkWell(
           onTap: onTap,
-          borderRadius: BorderRadius.circular(999),
+          customBorder: const CircleBorder(),
           child: Container(
-            width: 62,
-            height: 62,
+            width: 64,
+            height: 64,
             decoration: BoxDecoration(
-              color: enabled ? Colors.white : Colors.white.withValues(alpha: 0.5),
+              color: active
+                  ? Colors.white
+                  : Colors.white.withValues(alpha: enabled ? 0.16 : 0.08),
               shape: BoxShape.circle,
             ),
             alignment: Alignment.center,
             child: Icon(
               icon,
-              color: enabled ? AppColors.textPrimary : AppColors.textHint,
+              color: active ? const Color(0xFF171B15) : Colors.white,
+              size: 27,
             ),
           ),
         ),
-        const SizedBox(height: 8),
+        const SizedBox(height: 9),
         Text(
           label,
-          style: TextStyle(
-            fontSize: 12,
-            color: enabled ? AppColors.textSecondary : AppColors.textHint,
-          ),
+          style: const TextStyle(color: Colors.white70, fontSize: 12),
         ),
       ],
     );
@@ -382,32 +555,25 @@ class _VoiceCallPageState extends State<VoiceCallPage> {
     return Column(
       children: [
         InkWell(
-          onTap: _ending ? null : () => _finishCall(),
-          borderRadius: BorderRadius.circular(999),
+          onTap: _ending ? null : _finishCall,
+          customBorder: const CircleBorder(),
           child: Container(
             width: 72,
             height: 72,
             decoration: const BoxDecoration(
-              color: Color(0xFFFF5A5A),
+              color: Color(0xFFE94F4F),
               shape: BoxShape.circle,
             ),
             alignment: Alignment.center,
             child: const Icon(
               Icons.call_end_rounded,
               color: Colors.white,
-              size: 30,
+              size: 32,
             ),
           ),
         ),
-        const SizedBox(height: 8),
-        const Text(
-          '挂断',
-          style: TextStyle(
-            fontSize: 12,
-            fontWeight: FontWeight.w700,
-            color: AppColors.textSecondary,
-          ),
-        ),
+        const SizedBox(height: 9),
+        const Text('挂断', style: TextStyle(color: Colors.white70, fontSize: 12)),
       ],
     );
   }
@@ -424,11 +590,5 @@ class _VoiceCallPageState extends State<VoiceCallPage> {
     if (value is int) return value;
     if (value is num) return value.toInt();
     return int.tryParse(value?.toString() ?? '') ?? 0;
-  }
-
-  String _avatarText(String value) {
-    final trimmed = value.trim();
-    if (trimmed.isEmpty) return '伴';
-    return trimmed.characters.first;
   }
 }

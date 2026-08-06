@@ -2,7 +2,6 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../../config/app_config.dart';
 import '../../config/app_theme.dart';
-import '../../providers/order_provider.dart';
 import '../../providers/user_provider.dart';
 import '../../services/ecs_api_client.dart';
 
@@ -14,7 +13,11 @@ class WalletPage extends StatefulWidget {
 }
 
 class _WalletPageState extends State<WalletPage> {
-  Map<String, dynamic> _walletData = {'balance': 0.0, 'pending_balance': 0.0, 'total_earned': 0.0};
+  Map<String, dynamic> _walletData = {
+    'balance': 0.0,
+    'pending_balance': 0.0,
+    'total_earned': 0.0,
+  };
   Map<String, dynamic> _payoutAccount = {};
   List<dynamic> _transactions = [];
   List<dynamic> _withdrawals = [];
@@ -28,16 +31,23 @@ class _WalletPageState extends State<WalletPage> {
   }
 
   Future<void> _loadData() async {
+    if (!mounted) return;
     setState(() => _isLoading = true);
     try {
-      final userId = context.read<UserProvider>().user.id;
-      if (userId == null) return;
+      final userProvider = context.read<UserProvider>();
+      final userId = userProvider.user.id;
+      if (userId.isEmpty) return;
 
-      final response = await _api.get('/wallet', authToken: context.read<UserProvider>().accessToken);
+      final response = await _api.get(
+        '/wallet',
+        authToken: userProvider.accessToken,
+      );
       final data = response['data'];
       if (data is Map<String, dynamic>) {
-        _walletData = (data['wallet'] as Map?)?.cast<String, dynamic>() ?? _walletData;
-        _payoutAccount = (data['payout_account'] as Map?)?.cast<String, dynamic>() ?? {};
+        _walletData =
+            (data['wallet'] as Map?)?.cast<String, dynamic>() ?? _walletData;
+        _payoutAccount =
+            (data['payout_account'] as Map?)?.cast<String, dynamic>() ?? {};
         _transactions = (data['transactions'] as List?) ?? [];
         _withdrawals = (data['withdrawals'] as List?) ?? [];
       }
@@ -53,23 +63,30 @@ class _WalletPageState extends State<WalletPage> {
     return Scaffold(
       backgroundColor: const Color(0xFFF8F9FA),
       appBar: AppBar(
-        title: const Text('我的钱包', style: TextStyle(fontWeight: FontWeight.bold)),
+        title: const Text(
+          '我的钱包',
+          style: TextStyle(fontWeight: FontWeight.bold),
+        ),
         backgroundColor: Colors.white,
         foregroundColor: AppColors.textPrimary,
         elevation: 0,
         actions: [
-          TextButton(
-            onPressed: _showPayoutAccountDialog,
-            child: const Text('收款设置', style: TextStyle(color: AppColors.textSecondary, fontSize: 13)),
+          PopupMenuButton<String>(
+            onSelected: (value) {
+              if (value == 'payout') _showPayoutAccountDialog();
+              if (value == 'help') _showIncomeHelp();
+            },
+            itemBuilder: (_) => const [
+              PopupMenuItem(value: 'payout', child: Text('收款设置')),
+              PopupMenuItem(value: 'help', child: Text('收支说明')),
+            ],
           ),
-          TextButton(
-            onPressed: () {},
-            child: const Text('收支说明', style: TextStyle(color: AppColors.textSecondary, fontSize: 13)),
-          )
         ],
       ),
-      body: _isLoading 
-          ? const Center(child: CircularProgressIndicator(color: AppColors.primary))
+      body: _isLoading
+          ? const Center(
+              child: CircularProgressIndicator(color: AppColors.primary),
+            )
           : RefreshIndicator(
               onRefresh: _loadData,
               child: CustomScrollView(
@@ -81,9 +98,21 @@ class _WalletPageState extends State<WalletPage> {
                       padding: const EdgeInsets.fromLTRB(20, 24, 20, 12),
                       child: Row(
                         children: [
-                          const Text('收支明细', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
+                          const Text(
+                            '收支明细',
+                            style: TextStyle(
+                              fontSize: 16,
+                              fontWeight: FontWeight.bold,
+                            ),
+                          ),
                           const Spacer(),
-                          Text('近30天', style: TextStyle(color: AppColors.textHint, fontSize: 12)),
+                          Text(
+                            '近30天',
+                            style: TextStyle(
+                              color: AppColors.textHint,
+                              fontSize: 12,
+                            ),
+                          ),
                         ],
                       ),
                     ),
@@ -95,12 +124,21 @@ class _WalletPageState extends State<WalletPage> {
     );
   }
 
-  double get _availableBalance => double.tryParse('${_walletData['balance'] ?? 0}') ?? 0;
+  double get _availableBalance =>
+      double.tryParse('${_walletData['balance'] ?? 0}') ?? 0;
 
   Future<void> _showPayoutAccountDialog() async {
-    final realNameController = TextEditingController(text: _payoutAccount['real_name']?.toString() ?? '');
-    final accountController = TextEditingController(text: _payoutAccount['alipay_account']?.toString() ?? '');
-    final userIdController = TextEditingController(text: _payoutAccount['alipay_user_id']?.toString() ?? '');
+    final authToken = context.read<UserProvider>().accessToken;
+    final realNameController = TextEditingController(
+      text: _payoutAccount['real_name']?.toString() ?? '',
+    );
+    final accountController = TextEditingController(
+      text: _payoutAccount['alipay_account']?.toString() ?? '',
+    );
+    final userIdController = TextEditingController(
+      text: _payoutAccount['alipay_user_id']?.toString() ?? '',
+    );
+    var submitted = false;
     await showDialog<void>(
       context: context,
       builder: (dialogContext) {
@@ -116,7 +154,10 @@ class _WalletPageState extends State<WalletPage> {
                     alignment: Alignment.centerLeft,
                     child: Text(
                       '用于平台订单完成后的提现收款，请填写本人支付宝信息。',
-                      style: TextStyle(color: AppColors.textSecondary, fontSize: 13),
+                      style: TextStyle(
+                        color: AppColors.textSecondary,
+                        fontSize: 13,
+                      ),
                     ),
                   ),
                   const SizedBox(height: 12),
@@ -148,7 +189,11 @@ class _WalletPageState extends State<WalletPage> {
                   const SizedBox(height: 10),
                   const Text(
                     '支付宝账号和 user_id 至少填写一个。提交后进入平台审核；审核通过后，提现申请才会允许自动转账。',
-                    style: TextStyle(color: AppColors.textHint, fontSize: 12, height: 1.45),
+                    style: TextStyle(
+                      color: AppColors.textHint,
+                      fontSize: 12,
+                      height: 1.45,
+                    ),
                   ),
                 ],
               ),
@@ -173,7 +218,9 @@ class _WalletPageState extends State<WalletPage> {
                         }
                         if (account.isEmpty && userId.isEmpty) {
                           ScaffoldMessenger.of(this.context).showSnackBar(
-                            const SnackBar(content: Text('请至少填写支付宝账号或 user_id')),
+                            const SnackBar(
+                              content: Text('请至少填写支付宝账号或 user_id'),
+                            ),
                           );
                           return;
                         }
@@ -181,20 +228,18 @@ class _WalletPageState extends State<WalletPage> {
                         try {
                           await _api.put(
                             '/wallet/payout-account',
-                            authToken: this.context.read<UserProvider>().accessToken,
+                            authToken: authToken,
                             body: {
                               'real_name': realName,
                               'alipay_account': account,
                               'alipay_user_id': userId,
                             },
                           );
-                          if (!mounted) return;
-                          Navigator.pop(dialogContext);
-                          ScaffoldMessenger.of(this.context).showSnackBar(
-                            const SnackBar(content: Text('收款账号已提交，等待管理员审核')),
-                          );
-                          await _loadData();
+                          if (!dialogContext.mounted) return;
+                          submitted = true;
+                          Navigator.of(dialogContext).pop();
                         } catch (error) {
+                          if (!dialogContext.mounted) return;
                           setDialogState(() => saving = false);
                           if (!mounted) return;
                           ScaffoldMessenger.of(this.context).showSnackBar(
@@ -212,61 +257,51 @@ class _WalletPageState extends State<WalletPage> {
     realNameController.dispose();
     accountController.dispose();
     userIdController.dispose();
+    if (!mounted || !submitted) return;
+    ScaffoldMessenger.of(
+      context,
+    ).showSnackBar(const SnackBar(content: Text('收款账号已提交，等待管理员审核')));
+    await _loadData();
   }
 
   Future<void> _showWithdrawDialog() async {
-    final amountController = TextEditingController();
-    await showDialog<void>(
+    final amount = await showDialog<double>(
       context: context,
-      builder: (dialogContext) => AlertDialog(
-        title: const Text('申请提现'),
-        content: TextField(
-          controller: amountController,
-          keyboardType: const TextInputType.numberWithOptions(decimal: true),
-          decoration: InputDecoration(
-            labelText: '提现金额',
-            hintText: '可提现余额 ¥${_availableBalance.toStringAsFixed(2)}',
-          ),
-        ),
-        actions: [
-          TextButton(onPressed: () => Navigator.pop(dialogContext), child: const Text('取消')),
-          FilledButton(
-            onPressed: () async {
-              final amount = double.tryParse(amountController.text.trim()) ?? 0;
-              if (amount < AppConfig.minimumWithdrawalAmount ||
-                  amount > _availableBalance) {
-                ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(
-                    content: Text('提现金额最低为 0.10 元，且不能超过可提现余额'),
-                  ),
-                );
-                return;
-              }
-              try {
-                await _api.post(
-                  '/wallet/withdraw',
-                  authToken: context.read<UserProvider>().accessToken,
-                  body: {'amount': amount},
-                );
-                if (!mounted) return;
-                Navigator.pop(dialogContext);
-                ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(content: Text('提现申请已提交，等待管理员审核打款')),
-                );
-                _loadData();
-              } catch (error) {
-                if (!mounted) return;
-                ScaffoldMessenger.of(context).showSnackBar(
-                  SnackBar(content: Text(error.toString())),
-                );
-              }
-            },
-            child: const Text('提交提现'),
-          ),
-        ],
+      builder: (_) => _WithdrawAmountDialog(
+        availableBalance: _availableBalance,
+        minimumAmount: AppConfig.minimumWithdrawalAmount,
       ),
     );
-    amountController.dispose();
+    if (!mounted || amount == null) return;
+
+    try {
+      final userProvider = context.read<UserProvider>();
+      await _api.post(
+        '/wallet/withdraw',
+        authToken: userProvider.accessToken,
+        body: {'amount': amount},
+      );
+      if (!mounted) return;
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(const SnackBar(content: Text('提现申请已提交，等待管理员审核打款')));
+      await _loadData();
+    } catch (error) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text(error.toString())));
+    }
+  }
+
+  void _showIncomeHelp() {
+    showDialog<void>(
+      context: context,
+      builder: (dialogContext) => const AlertDialog(
+        title: Text('收支说明'),
+        content: Text('订单完成后的地陪收入会先进入托管余额，管理员审核后可申请提现。'),
+      ),
+    );
   }
 
   Widget _buildPayoutSummary() {
@@ -274,10 +309,10 @@ class _WalletPageState extends State<WalletPage> {
     final label = status == 'approved'
         ? '已审核'
         : status == 'pending'
-            ? '审核中'
-            : status == 'rejected'
-                ? '已驳回'
-                : '未绑定';
+        ? '审核中'
+        : status == 'rejected'
+        ? '已驳回'
+        : '未绑定';
     final withdrawalCount = _withdrawals.length;
     return Padding(
       padding: const EdgeInsets.fromLTRB(20, 0, 20, 8),
@@ -295,16 +330,25 @@ class _WalletPageState extends State<WalletPage> {
                 children: [
                   Text(
                     '支付宝收款：$label',
-                    style: const TextStyle(color: AppColors.textPrimary, fontSize: 13, fontWeight: FontWeight.w700),
+                    style: const TextStyle(
+                      color: AppColors.textPrimary,
+                      fontSize: 13,
+                      fontWeight: FontWeight.w700,
+                    ),
                   ),
                   const SizedBox(height: 4),
                   Text(
                     _payoutAccount.isEmpty
                         ? '未绑定收款账号'
                         : '${_maskedPayoutAccount()}${withdrawalCount > 0 ? ' · 提现记录 $withdrawalCount 条' : ''}',
-                    style: const TextStyle(color: AppColors.textSecondary, fontSize: 12),
+                    style: const TextStyle(
+                      color: AppColors.textSecondary,
+                      fontSize: 12,
+                    ),
                   ),
-                  if (status == 'rejected' && (_payoutAccount['reject_reason']?.toString().isNotEmpty ?? false))
+                  if (status == 'rejected' &&
+                      (_payoutAccount['reject_reason']?.toString().isNotEmpty ??
+                          false))
                     Padding(
                       padding: const EdgeInsets.only(top: 4),
                       child: Text(
@@ -348,11 +392,16 @@ class _WalletPageState extends State<WalletPage> {
       decoration: BoxDecoration(
         gradient: const LinearGradient(
           colors: [Color(0xFF2D2E32), Color(0xFF43454B)],
-          begin: Alignment.topLeft, end: Alignment.bottomRight,
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
         ),
         borderRadius: BorderRadius.circular(24),
         boxShadow: [
-          BoxShadow(color: Colors.black.withValues(alpha: 0.1), blurRadius: 20, offset: const Offset(0, 10)),
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.1),
+            blurRadius: 20,
+            offset: const Offset(0, 10),
+          ),
         ],
       ),
       child: Column(
@@ -360,7 +409,10 @@ class _WalletPageState extends State<WalletPage> {
         children: [
           Row(
             children: [
-              const Text('总余额 (元)', style: TextStyle(color: Colors.white70, fontSize: 13)),
+              const Text(
+                '总余额 (元)',
+                style: TextStyle(color: Colors.white70, fontSize: 13),
+              ),
               const SizedBox(width: 8),
               const Icon(Icons.help_outline, size: 14, color: Colors.white70),
             ],
@@ -368,14 +420,31 @@ class _WalletPageState extends State<WalletPage> {
           const SizedBox(height: 8),
           Text(
             _walletData['balance']?.toString() ?? '0.00',
-            style: const TextStyle(color: Colors.white, fontSize: 32, fontWeight: FontWeight.bold),
+            style: const TextStyle(
+              color: Colors.white,
+              fontSize: 32,
+              fontWeight: FontWeight.bold,
+            ),
           ),
           const SizedBox(height: 24),
           Row(
             children: [
-              _buildMiniStat('托管中', _walletData['pending_balance']?.toString() ?? '0.00'),
-              Container(width: 1, height: 24, color: Colors.white12, margin: const EdgeInsets.symmetric(horizontal: 24)),
-              _buildMiniStat('累计收益', _walletData['total_earned']?.toString() ?? '0.00'),
+              Expanded(
+                child: _buildMiniStat(
+                  '托管中',
+                  _walletData['pending_balance']?.toString() ?? '0.00',
+                ),
+              ),
+              Container(width: 1, height: 24, color: Colors.white12),
+              Expanded(
+                child: Padding(
+                  padding: const EdgeInsets.only(left: 24),
+                  child: _buildMiniStat(
+                    '累计收益',
+                    _walletData['total_earned']?.toString() ?? '0.00',
+                  ),
+                ),
+              ),
             ],
           ),
           const SizedBox(height: 32),
@@ -384,15 +453,32 @@ class _WalletPageState extends State<WalletPage> {
               Expanded(
                 child: ElevatedButton(
                   onPressed: _showWithdrawDialog,
-                  style: ElevatedButton.styleFrom(backgroundColor: AppColors.primary, foregroundColor: Colors.white, shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)), padding: const EdgeInsets.symmetric(vertical: 14)),
-                  child: const Text('提现', style: TextStyle(fontWeight: FontWeight.bold)),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: AppColors.primary,
+                    foregroundColor: Colors.white,
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    padding: const EdgeInsets.symmetric(vertical: 14),
+                  ),
+                  child: const Text(
+                    '提现',
+                    style: TextStyle(fontWeight: FontWeight.bold),
+                  ),
                 ),
               ),
               const SizedBox(width: 16),
               Expanded(
                 child: OutlinedButton(
                   onPressed: _showPayoutAccountDialog,
-                  style: OutlinedButton.styleFrom(side: const BorderSide(color: Colors.white24), foregroundColor: Colors.white, shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)), padding: const EdgeInsets.symmetric(vertical: 14)),
+                  style: OutlinedButton.styleFrom(
+                    side: const BorderSide(color: Colors.white24),
+                    foregroundColor: Colors.white,
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    padding: const EdgeInsets.symmetric(vertical: 14),
+                  ),
                   child: const Text('收款设置'),
                 ),
               ),
@@ -407,9 +493,19 @@ class _WalletPageState extends State<WalletPage> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text(label, style: const TextStyle(color: Colors.white60, fontSize: 11)),
+        Text(
+          label,
+          style: const TextStyle(color: Colors.white60, fontSize: 11),
+        ),
         const SizedBox(height: 4),
-        Text('¥$value', style: const TextStyle(color: Colors.white, fontSize: 15, fontWeight: FontWeight.bold)),
+        Text(
+          '¥$value',
+          style: const TextStyle(
+            color: Colors.white,
+            fontSize: 15,
+            fontWeight: FontWeight.bold,
+          ),
+        ),
       ],
     );
   }
@@ -418,55 +514,176 @@ class _WalletPageState extends State<WalletPage> {
     if (_transactions.isEmpty) {
       return const SliverFillRemaining(
         hasScrollBody: false,
-        child: Center(child: Text('暂无明细记录', style: TextStyle(color: AppColors.textHint))),
+        child: Center(
+          child: Text('暂无明细记录', style: TextStyle(color: AppColors.textHint)),
+        ),
       );
     }
 
     return SliverList(
-      delegate: SliverChildBuilderDelegate(
-        (context, index) {
-          final tx = _transactions[index];
-          final type = tx['type']?.toString() ?? '';
-          final isIncome = type.startsWith('income') || (double.tryParse('${tx['actual_amount'] ?? 0}') ?? 0) > 0;
-          return Container(
-            margin: const EdgeInsets.symmetric(horizontal: 20, vertical: 6),
-            padding: const EdgeInsets.all(16),
-            decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(16)),
-            child: Row(
-              children: [
-                Container(
-                  width: 44, height: 44,
-                  decoration: BoxDecoration(color: (isIncome ? Colors.green : Colors.orange).withValues(alpha: 0.1), shape: BoxShape.circle),
-                  child: Icon(isIncome ? Icons.add_card : Icons.account_balance_wallet, color: isIncome ? Colors.green : Colors.orange, size: 20),
-                ),
-                const SizedBox(width: 16),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(tx['description'] ?? '交易记录', style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14)),
-                      const SizedBox(height: 4),
-                      Text(DateTime.parse(tx['created_at']).toString().substring(0, 16), style: TextStyle(color: AppColors.textHint, fontSize: 11)),
-                    ],
+      delegate: SliverChildBuilderDelegate((context, index) {
+        final tx = _transactions[index];
+        final type = tx['type']?.toString() ?? '';
+        final isIncome =
+            type.startsWith('income') ||
+            (double.tryParse('${tx['actual_amount'] ?? 0}') ?? 0) > 0;
+        return Container(
+          margin: const EdgeInsets.symmetric(horizontal: 20, vertical: 6),
+          padding: const EdgeInsets.all(16),
+          decoration: BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.circular(16),
+          ),
+          child: Row(
+            children: [
+              Container(
+                width: 44,
+                height: 44,
+                decoration: BoxDecoration(
+                  color: (isIncome ? Colors.green : Colors.orange).withValues(
+                    alpha: 0.1,
                   ),
+                  shape: BoxShape.circle,
                 ),
-                Column(
-                  crossAxisAlignment: CrossAxisAlignment.end,
+                child: Icon(
+                  isIncome ? Icons.add_card : Icons.account_balance_wallet,
+                  color: isIncome ? Colors.green : Colors.orange,
+                  size: 20,
+                ),
+              ),
+              const SizedBox(width: 16),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(
-                      '${isIncome ? "+" : "-"}${tx['actual_amount']}',
-                      style: TextStyle(color: isIncome ? Colors.green : AppColors.textPrimary, fontWeight: FontWeight.bold, fontSize: 16),
+                      tx['description'] ?? '交易记录',
+                      style: const TextStyle(
+                        fontWeight: FontWeight.bold,
+                        fontSize: 14,
+                      ),
                     ),
-                    if (isIncome && (tx['platform_fee'] ?? 0) > 0)
-                      Text('费: ¥${tx['platform_fee']}', style: const TextStyle(color: AppColors.textHint, fontSize: 10)),
+                    const SizedBox(height: 4),
+                    Text(
+                      _formatTransactionTime(tx['created_at']),
+                      style: TextStyle(color: AppColors.textHint, fontSize: 11),
+                    ),
                   ],
                 ),
-              ],
+              ),
+              Column(
+                crossAxisAlignment: CrossAxisAlignment.end,
+                children: [
+                  Text(
+                    '${isIncome ? "+" : "-"}${tx['actual_amount']}',
+                    style: TextStyle(
+                      color: isIncome ? Colors.green : AppColors.textPrimary,
+                      fontWeight: FontWeight.bold,
+                      fontSize: 16,
+                    ),
+                  ),
+                  if (isIncome &&
+                      (double.tryParse('${tx['platform_fee'] ?? 0}') ?? 0) > 0)
+                    Text(
+                      '费: ¥${tx['platform_fee']}',
+                      style: const TextStyle(
+                        color: AppColors.textHint,
+                        fontSize: 10,
+                      ),
+                    ),
+                ],
+              ),
+            ],
+          ),
+        );
+      }, childCount: _transactions.length),
+    );
+  }
+
+  String _formatTransactionTime(dynamic value) {
+    final date = DateTime.tryParse(value?.toString() ?? '')?.toLocal();
+    if (date == null) return '时间未知';
+    return '${date.year}-${date.month.toString().padLeft(2, '0')}-'
+        '${date.day.toString().padLeft(2, '0')} '
+        '${date.hour.toString().padLeft(2, '0')}:${date.minute.toString().padLeft(2, '0')}';
+  }
+}
+
+class _WithdrawAmountDialog extends StatefulWidget {
+  final double availableBalance;
+  final double minimumAmount;
+
+  const _WithdrawAmountDialog({
+    required this.availableBalance,
+    required this.minimumAmount,
+  });
+
+  @override
+  State<_WithdrawAmountDialog> createState() => _WithdrawAmountDialogState();
+}
+
+class _WithdrawAmountDialogState extends State<_WithdrawAmountDialog> {
+  final _controller = TextEditingController();
+  String? _error;
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  void _submit() {
+    final amount = double.tryParse(_controller.text.trim()) ?? 0;
+    if (amount < widget.minimumAmount || amount > widget.availableBalance) {
+      setState(() {
+        _error =
+            '提现金额最低为 ${widget.minimumAmount.toStringAsFixed(2)} 元，且不能超过可提现余额';
+      });
+      return;
+    }
+    Navigator.of(context).pop(amount);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return AlertDialog(
+      title: const Text('申请提现'),
+      content: SingleChildScrollView(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              '可提现余额 ¥${widget.availableBalance.toStringAsFixed(2)}',
+              style: const TextStyle(
+                color: AppColors.textSecondary,
+                fontSize: 13,
+              ),
             ),
-          );
-        },
-        childCount: _transactions.length,
+            const SizedBox(height: 10),
+            TextField(
+              controller: _controller,
+              autofocus: true,
+              keyboardType: const TextInputType.numberWithOptions(
+                decimal: true,
+              ),
+              decoration: InputDecoration(
+                labelText: '提现金额',
+                suffixText: '元',
+                errorText: _error,
+              ),
+              onSubmitted: (_) => _submit(),
+            ),
+          ],
+        ),
       ),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.of(context).pop(),
+          child: const Text('取消'),
+        ),
+        FilledButton(onPressed: _submit, child: const Text('提交提现')),
+      ],
     );
   }
 }

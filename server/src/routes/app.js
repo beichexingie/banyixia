@@ -1825,6 +1825,10 @@ async function findOrderContactContext(orderId) {
 }
 
 function buildCallPayload(call, credential) {
+  const currentUserId = credential?.current_user_id?.toString() || '';
+  const isCaller = currentUserId && call.caller_user_id === currentUserId;
+  const peerName = isCaller ? call.callee_name : call.caller_name;
+  const peerAvatar = isCaller ? call.callee_avatar : call.caller_avatar;
   return {
     call_id: call.id,
     order_id: call.order_id,
@@ -1838,7 +1842,64 @@ function buildCallPayload(call, credential) {
     ended_at: call.ended_at,
     duration_seconds: call.duration_seconds,
     end_reason: call.end_reason,
-    trtc: credential,
+    peer_name: peerName || '订单对方',
+    peer_avatar: peerAvatar || '',
+    is_caller: Boolean(isCaller),
+    ...(credential?.user_sig
+      ? {
+          trtc: {
+            sdk_app_id: credential.sdk_app_id,
+            user_id: credential.user_id,
+            user_sig: credential.user_sig,
+            expires_in: credential.expires_in,
+          },
+        }
+      : {}),
+  };
+}
+
+async function expireTimedOutCalls(db = pool) {
+  await db.query(
+    `
+      update public.call_sessions
+      set
+        status = 'ended',
+        ended_at = now(),
+        duration_seconds = 0,
+        end_reason = 'timeout',
+        updated_at = now()
+      where status = 'ringing'
+        and created_at <= now() - ($1 * interval '1 second')
+    `,
+    [config.trtcRingTimeoutSeconds],
+  );
+}
+
+async function findCallForUser(db, callId, userId) {
+  const result = await db.query(
+    `
+      select
+        calls.*,
+        coalesce(nullif(caller.nickname, ''), caller.phone, '用户') as caller_name,
+        coalesce(caller.avatar, '') as caller_avatar,
+        coalesce(nullif(callee.nickname, ''), callee.phone, '用户') as callee_name,
+        coalesce(callee.avatar, '') as callee_avatar
+      from public.call_sessions calls
+      join public.users caller on caller.id = calls.caller_user_id
+      join public.users callee on callee.id = calls.callee_user_id
+      where calls.id = $1
+        and (calls.caller_user_id = $2 or calls.callee_user_id = $2)
+      limit 1
+    `,
+    [callId, userId],
+  );
+  return result.rows[0] ?? null;
+}
+
+function credentialForUser(userId) {
+  return {
+    ...buildTrtcCredential(userId),
+    current_user_id: userId,
   };
 }
 
@@ -1853,39 +1914,69 @@ appRouter.post('/orders/:id/calls', handleRoute(async (req, res) => {
   }
 
   const calleeUserId = order.user_id === userId ? order.guide_id : order.user_id;
-  const recent = await pool.query(
-    `
-      select *
-      from public.call_sessions
-      where order_id = $1
-        and status in ('created', 'ringing', 'answered')
-        and created_at > now() - interval '30 minutes'
-      order by created_at desc
-      limit 1
-    `,
-    [order.id],
-  );
-  if (recent.rows[0]) {
-    const credential = buildTrtcCredential(userId);
-    return ok(res, {
-      data: buildCallPayload(recent.rows[0], credential),
-      message: '已有进行中的语音通话',
-    });
-  }
+  const call = await withTransaction(async (client) => {
+    const lockKey = [userId, calleeUserId].sort().join(':');
+    await client.query('select pg_advisory_xact_lock(hashtext($1))', [lockKey]);
+    await expireTimedOutCalls(client);
 
-  const roomId = buildTrtcRoomId(`${order.id}:${Date.now()}`);
-  const created = await pool.query(
-    `
-      insert into public.call_sessions (
-        order_id, caller_user_id, callee_user_id, room_id, provider, status, started_at, updated_at
-      ) values ($1,$2,$3,$4,'trtc','ringing',now(),now())
-      returning *
-    `,
-    [order.id, userId, calleeUserId, roomId],
-  );
-  const credential = buildTrtcCredential(userId);
+    const ownExisting = await client.query(
+      `
+        select id
+        from public.call_sessions
+        where order_id = $1
+          and caller_user_id = $2
+          and callee_user_id = $3
+          and status in ('ringing', 'answered')
+        order by created_at desc
+        limit 1
+      `,
+      [order.id, userId, calleeUserId],
+    );
+    if (ownExisting.rows[0]) {
+      return findCallForUser(client, ownExisting.rows[0].id, userId);
+    }
+
+    const active = await client.query(
+      `
+        select id, caller_user_id, callee_user_id
+        from public.call_sessions
+        where status in ('ringing', 'answered')
+          and (
+            caller_user_id in ($1, $2)
+            or callee_user_id in ($1, $2)
+          )
+        order by created_at desc
+        limit 1
+      `,
+      [userId, calleeUserId],
+    );
+    if (active.rows[0]) {
+      const error = new Error(
+        active.rows[0].callee_user_id === userId
+          ? '对方正在呼叫你，请先接听或拒绝'
+          : '你或对方正在通话中，请稍后再试',
+      );
+      error.statusCode = 409;
+      throw error;
+    }
+
+    const roomId = buildTrtcRoomId(
+      `${order.id}:${userId}:${calleeUserId}:${Date.now()}:${crypto.randomUUID()}`,
+    );
+    const created = await client.query(
+      `
+        insert into public.call_sessions (
+          order_id, caller_user_id, callee_user_id, room_id, provider, status, started_at, updated_at
+        ) values ($1,$2,$3,$4,'trtc','ringing',now(),now())
+        returning id
+      `,
+      [order.id, userId, calleeUserId, roomId],
+    );
+    return findCallForUser(client, created.rows[0].id, userId);
+  });
+  const credential = credentialForUser(userId);
   return ok(res, {
-    data: buildCallPayload(created.rows[0], credential),
+    data: buildCallPayload(call, credential),
     message: '语音通话已创建',
   });
 }));
@@ -1893,19 +1984,39 @@ appRouter.post('/orders/:id/calls', handleRoute(async (req, res) => {
 appRouter.get('/calls/incoming', handleRoute(async (req, res) => {
   const userId = await requireSessionUser(req, res);
   if (!userId) return;
+  await expireTimedOutCalls();
   const result = await pool.query(
     `
-      select *
-      from public.call_sessions
-      where callee_user_id = $1
-        and status = 'ringing'
-        and created_at > now() - interval '2 minutes'
-      order by created_at desc
+      select
+        calls.*,
+        coalesce(nullif(caller.nickname, ''), caller.phone, '用户') as caller_name,
+        coalesce(caller.avatar, '') as caller_avatar,
+        coalesce(nullif(callee.nickname, ''), callee.phone, '用户') as callee_name,
+        coalesce(callee.avatar, '') as callee_avatar
+      from public.call_sessions calls
+      join public.users caller on caller.id = calls.caller_user_id
+      join public.users callee on callee.id = calls.callee_user_id
+      where calls.callee_user_id = $1
+        and calls.status = 'ringing'
+      order by calls.created_at desc
       limit 10
     `,
     [userId],
   );
-  return ok(res, { data: result.rows });
+  return ok(res, {
+    data: result.rows.map((call) => buildCallPayload(call, {
+      current_user_id: userId,
+    })),
+  });
+}));
+
+appRouter.get('/calls/:id', handleRoute(async (req, res) => {
+  const userId = await requireSessionUser(req, res);
+  if (!userId) return;
+  await expireTimedOutCalls();
+  const call = await findCallForUser(pool, req.params.id, userId);
+  if (!call) return fail(res, 404, '通话不存在');
+  return ok(res, { data: buildCallPayload(call, { current_user_id: userId }) });
 }));
 
 appRouter.post('/calls/:id/join', handleRoute(async (req, res) => {
@@ -1919,15 +2030,15 @@ appRouter.post('/calls/:id/join', handleRoute(async (req, res) => {
         answered_at = coalesce(answered_at, now()),
         updated_at = now()
       where id = $1
-        and (caller_user_id = $2 or callee_user_id = $2)
-        and status in ('ringing', 'answered')
-      returning *
+        and callee_user_id = $2
+        and status = 'ringing'
+      returning id
     `,
     [req.params.id, userId],
   );
-  const call = result.rows[0];
-  if (!call) return fail(res, 404, '通话不存在或已结束');
-  const credential = buildTrtcCredential(userId);
+  if (!result.rows[0]) return fail(res, 409, '来电已结束或已被处理');
+  const call = await findCallForUser(pool, result.rows[0].id, userId);
+  const credential = credentialForUser(userId);
   return ok(res, {
     data: buildCallPayload(call, credential),
     message: '已加入语音通话',
@@ -1957,8 +2068,11 @@ appRouter.post('/calls/:id/end', handleRoute(async (req, res) => {
     `,
     [req.params.id, userId, reason],
   );
-  const call = result.rows[0];
-  if (!call) return fail(res, 404, '通话不存在或已结束');
+  let call = result.rows[0];
+  if (!call) {
+    call = await findCallForUser(pool, req.params.id, userId);
+  }
+  if (!call) return fail(res, 404, '通话不存在');
   return ok(res, { data: call, message: '语音通话已结束' });
 }));
 

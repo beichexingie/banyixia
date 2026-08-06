@@ -11,6 +11,7 @@ import '../providers/user_provider.dart';
 import 'companion/companion_page.dart';
 import 'home/home_page.dart';
 import 'messages/messages_page.dart';
+import 'order/incoming_voice_call_dialog.dart';
 import 'order/voice_call_page.dart';
 import 'profile/profile_page.dart';
 
@@ -27,7 +28,8 @@ class MainScaffold extends StatefulWidget {
   State<MainScaffold> createState() => _MainScaffoldState();
 }
 
-class _MainScaffoldState extends State<MainScaffold> {
+class _MainScaffoldState extends State<MainScaffold>
+    with WidgetsBindingObserver {
   int _currentIndex = 0;
   Timer? _incomingCallTimer;
   bool _checkingIncomingCall = false;
@@ -43,11 +45,12 @@ class _MainScaffoldState extends State<MainScaffold> {
   @override
   void initState() {
     super.initState();
+    WidgetsBinding.instance.addObserver(this);
     appTabNotifier.addListener(_handleExternalTabChange);
     WidgetsBinding.instance.addPostFrameCallback((_) {
       _checkIncomingCalls();
       _incomingCallTimer = Timer.periodic(
-        const Duration(seconds: 8),
+        const Duration(seconds: 2),
         (_) => _checkIncomingCalls(),
       );
     });
@@ -56,8 +59,16 @@ class _MainScaffoldState extends State<MainScaffold> {
   @override
   void dispose() {
     _incomingCallTimer?.cancel();
+    WidgetsBinding.instance.removeObserver(this);
     appTabNotifier.removeListener(_handleExternalTabChange);
     super.dispose();
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.resumed) {
+      _checkIncomingCalls();
+    }
   }
 
   void _handleExternalTabChange() {
@@ -145,7 +156,9 @@ class _MainScaffoldState extends State<MainScaffold> {
 
     _checkingIncomingCall = true;
     try {
-      final calls = await context.read<CallProvider>().fetchIncomingVoiceCalls();
+      final calls = await context
+          .read<CallProvider>()
+          .fetchIncomingVoiceCalls();
       if (!mounted || calls.isEmpty || _showingIncomingCall) return;
       await _showIncomingCallSheet(calls.first);
     } catch (_) {
@@ -158,134 +171,44 @@ class _MainScaffoldState extends State<MainScaffold> {
   Future<void> _showIncomingCallSheet(Map<String, dynamic> call) async {
     _showingIncomingCall = true;
     final callId = call['id']?.toString() ?? call['call_id']?.toString() ?? '';
-    final orderId = call['order_id']?.toString() ?? '';
-
-    await showModalBottomSheet<void>(
-      context: context,
-      isDismissible: false,
-      enableDrag: false,
-      backgroundColor: Colors.transparent,
-      builder: (sheetContext) {
-        return Container(
-          decoration: const BoxDecoration(
-            color: Colors.white,
-            borderRadius: BorderRadius.vertical(top: Radius.circular(30)),
+    final callProvider = context.read<CallProvider>();
+    try {
+      if (callId.isEmpty) return;
+      final action = await showIncomingVoiceCallDialog(
+        context,
+        call: call,
+        callProvider: callProvider,
+        fallbackPeerName: '地陪',
+      );
+      if (!mounted ||
+          action == null ||
+          action == IncomingCallAction.cancelled) {
+        return;
+      }
+      if (action == IncomingCallAction.reject) {
+        await callProvider.endVoiceCall(callId, reason: 'customer_rejected');
+        return;
+      }
+      final payload = await callProvider.joinVoiceCall(callId);
+      if (!mounted) return;
+      await Navigator.of(context).push(
+        MaterialPageRoute<void>(
+          builder: (_) => VoiceCallPage(
+            callPayload: payload,
+            peerName: '地陪',
+            incoming: true,
           ),
-          padding: EdgeInsets.fromLTRB(
-            22,
-            18,
-            22,
-            22 + MediaQuery.paddingOf(sheetContext).bottom,
-          ),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Container(
-                width: 42,
-                height: 4,
-                decoration: BoxDecoration(
-                  color: AppColors.divider,
-                  borderRadius: BorderRadius.circular(999),
-                ),
-              ),
-              const SizedBox(height: 18),
-              Container(
-                width: 70,
-                height: 70,
-                decoration: const BoxDecoration(
-                  color: AppColors.primarySoft,
-                  shape: BoxShape.circle,
-                ),
-                alignment: Alignment.center,
-                child: const Icon(
-                  Icons.call_rounded,
-                  size: 34,
-                  color: AppColors.textPrimary,
-                ),
-              ),
-              const SizedBox(height: 14),
-              const Text(
-                '地陪来电',
-                style: TextStyle(
-                  fontSize: 20,
-                  fontWeight: FontWeight.w900,
-                  color: AppColors.textPrimary,
-                ),
-              ),
-              const SizedBox(height: 8),
-              Text(
-                orderId.isEmpty ? '地陪正在通过订单联系你' : '订单 $orderId',
-                textAlign: TextAlign.center,
-                style: const TextStyle(
-                  fontSize: 13,
-                  color: AppColors.textSecondary,
-                ),
-              ),
-              const SizedBox(height: 20),
-              Row(
-                children: [
-                  Expanded(
-                    child: OutlinedButton(
-                      onPressed: () async {
-                        Navigator.of(sheetContext).pop();
-                        if (callId.isNotEmpty) {
-                          await context.read<CallProvider>().endVoiceCall(
-                                callId,
-                                reason: 'customer_rejected',
-                              );
-                        }
-                      },
-                      style: OutlinedButton.styleFrom(
-                        foregroundColor: AppColors.textPrimary,
-                        side: const BorderSide(color: AppColors.divider),
-                        padding: const EdgeInsets.symmetric(vertical: 14),
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(16),
-                        ),
-                      ),
-                      child: const Text('拒绝'),
-                    ),
-                  ),
-                  const SizedBox(width: 12),
-                  Expanded(
-                    child: FilledButton(
-                      onPressed: () async {
-                        if (callId.isEmpty) return;
-                        Navigator.of(sheetContext).pop();
-                        final payload = await context
-                            .read<CallProvider>()
-                            .joinVoiceCall(callId);
-                        if (!mounted) return;
-                        await Navigator.of(context).push(
-                          MaterialPageRoute<void>(
-                            builder: (_) => VoiceCallPage(
-                              callPayload: payload,
-                              peerName: '地陪',
-                              incoming: true,
-                            ),
-                          ),
-                        );
-                      },
-                      style: FilledButton.styleFrom(
-                        backgroundColor: AppColors.textPrimary,
-                        foregroundColor: Colors.white,
-                        padding: const EdgeInsets.symmetric(vertical: 14),
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(16),
-                        ),
-                      ),
-                      child: const Text('接听'),
-                    ),
-                  ),
-                ],
-              ),
-            ],
-          ),
-        );
-      },
-    );
-
-    _showingIncomingCall = false;
+        ),
+      );
+    } catch (error) {
+      if (mounted) {
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text('处理来电失败：$error')));
+      }
+    } finally {
+      _showingIncomingCall = false;
+    }
   }
 
   Widget _publishItem({
@@ -354,16 +277,11 @@ class _MainScaffoldState extends State<MainScaffold> {
     final pageIndex = _pageIndexForNav(_currentIndex);
 
     return Scaffold(
-      body: IndexedStack(
-        index: pageIndex,
-        children: _pages,
-      ),
+      body: IndexedStack(index: pageIndex, children: _pages),
       bottomNavigationBar: Container(
         decoration: const BoxDecoration(
           color: Colors.white,
-          border: Border(
-            top: BorderSide(color: Color(0xFFF0F0F0)),
-          ),
+          border: Border(top: BorderSide(color: Color(0xFFF0F0F0))),
         ),
         padding: EdgeInsets.only(bottom: MediaQuery.paddingOf(context).bottom),
         child: SizedBox(
@@ -466,9 +384,7 @@ class _MainScaffoldState extends State<MainScaffold> {
               style: TextStyle(
                 fontSize: 10.5,
                 fontWeight: active ? FontWeight.w700 : FontWeight.w500,
-                color: active
-                    ? AppColors.textPrimary
-                    : const Color(0xFFD0D5E2),
+                color: active ? AppColors.textPrimary : const Color(0xFFD0D5E2),
               ),
             ),
           ],
@@ -495,11 +411,7 @@ class _MainScaffoldState extends State<MainScaffold> {
           ],
         ),
         alignment: Alignment.center,
-        child: const Icon(
-          Icons.add,
-          size: 30,
-          color: AppColors.textPrimary,
-        ),
+        child: const Icon(Icons.add, size: 30, color: AppColors.textPrimary),
       ),
     );
   }

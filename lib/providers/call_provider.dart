@@ -8,7 +8,7 @@ class CallProvider extends ChangeNotifier {
   final SessionService _sessionService;
 
   CallProvider({SessionService? sessionService})
-      : _sessionService = sessionService ?? EcsSessionService();
+    : _sessionService = sessionService ?? EcsSessionService();
 
   String? _token() => _sessionService.currentSession?.accessToken;
 
@@ -43,6 +43,15 @@ class CallProvider extends ChangeNotifier {
       return data;
     }
     throw Exception('Voice call join response is invalid');
+  }
+
+  Future<Map<String, dynamic>> fetchVoiceCall(String callId) async {
+    final response = await _api.get('/calls/$callId', authToken: _token());
+    final data = response['data'];
+    if (data is Map<String, dynamic>) {
+      return data;
+    }
+    throw Exception('Voice call status response is invalid');
   }
 
   Future<Map<String, dynamic>> endVoiceCall(

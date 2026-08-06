@@ -108,6 +108,10 @@ export const config = {
   trtcSdkAppId: Number(process.env.TRTC_SDK_APP_ID || 0),
   trtcSecretKey: process.env.TRTC_SECRET_KEY?.trim() || '',
   trtcUserSigExpireSeconds: Number(process.env.TRTC_USER_SIG_EXPIRE_SECONDS || 86400),
+  trtcRingTimeoutSeconds: Math.max(
+    20,
+    parseNumber(process.env.TRTC_RING_TIMEOUT_SECONDS, 60),
+  ),
 };
 
 export function hasAlipayConfig() {

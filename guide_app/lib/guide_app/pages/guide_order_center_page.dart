@@ -436,27 +436,32 @@ class _GuideOrderCard extends StatelessWidget {
             ),
           ),
           const SizedBox(height: 16),
-          Row(
-            children: [
-              const Icon(
-                Icons.location_on_rounded,
-                color: AppColors.primaryDark,
-                size: 24,
-              ),
-              const SizedBox(width: 8),
-              Expanded(
-                child: Text(
-                  data.address,
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  style: const TextStyle(
-                    fontSize: 16,
-                    color: AppColors.textSecondary,
+          LayoutBuilder(
+            builder: (context, constraints) {
+              final narrow = constraints.maxWidth < 390;
+              final address = Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const Icon(
+                    Icons.location_on_rounded,
+                    color: AppColors.primaryDark,
+                    size: 24,
                   ),
-                ),
-              ),
-              const SizedBox(width: 10),
-              Container(
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: Text(
+                      data.address,
+                      maxLines: narrow ? 3 : 2,
+                      overflow: TextOverflow.fade,
+                      style: const TextStyle(
+                        fontSize: 16,
+                        color: AppColors.textSecondary,
+                      ),
+                    ),
+                  ),
+                ],
+              );
+              final distance = Container(
                 padding: const EdgeInsets.symmetric(
                   horizontal: 10,
                   vertical: 6,
@@ -473,8 +478,22 @@ class _GuideOrderCard extends StatelessWidget {
                     color: AppColors.textPrimary,
                   ),
                 ),
-              ),
-            ],
+              );
+              if (narrow) {
+                return Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [address, const SizedBox(height: 8), distance],
+                );
+              }
+              return Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Expanded(child: address),
+                  const SizedBox(width: 10),
+                  distance,
+                ],
+              );
+            },
           ),
           const SizedBox(height: 18),
           LayoutBuilder(

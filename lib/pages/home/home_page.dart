@@ -66,10 +66,7 @@ class _HomePageState extends State<HomePage>
   Future<void> _pickCityWithLocationPicker() async {
     final result = await context.push<Map<String, dynamic>>(
       '/demand/location',
-      extra: {
-        'city': _selectedCity,
-        'address': _selectedCity,
-      },
+      extra: {'city': _selectedCity, 'address': _selectedCity},
     );
     if (result == null || !mounted) {
       return;
@@ -107,18 +104,18 @@ class _HomePageState extends State<HomePage>
 
   void _showSignInFeedback() {
     if (_signedToday) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('今天已经签到过了')),
-      );
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(const SnackBar(content: Text('今天已经签到过了')));
       return;
     }
 
     setState(() {
       _signedToday = true;
     });
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(content: Text('签到成功，获得 10 积分')),
-    );
+    ScaffoldMessenger.of(
+      context,
+    ).showSnackBar(const SnackBar(content: Text('签到成功，获得 10 积分')));
   }
 
   @override
@@ -149,9 +146,7 @@ class _HomePageState extends State<HomePage>
           ];
         },
         body: DecoratedBox(
-          decoration: const BoxDecoration(
-            color: Color(0xFFF7F7F2),
-          ),
+          decoration: const BoxDecoration(color: Color(0xFFF7F7F2)),
           child: TabBarView(
             controller: _tabController,
             children: [
@@ -241,7 +236,10 @@ class _HomePageState extends State<HomePage>
                               children: [
                                 Expanded(child: _buildBrandBlock()),
                                 Padding(
-                                  padding: const EdgeInsets.only(top: 4, right: 2),
+                                  padding: const EdgeInsets.only(
+                                    top: 4,
+                                    right: 2,
+                                  ),
                                   child: IconButton(
                                     onPressed: _showSignInFeedback,
                                     iconSize: 22,
@@ -296,8 +294,8 @@ class _HomePageState extends State<HomePage>
                                     large: true,
                                     illustration: _buildFeatureIllustration(
                                       'assets/home/feature_settle/Frame 5.png',
-                                      width: 118,
-                                      height: 118,
+                                      width: 71,
+                                      height: 71,
                                     ),
                                   ),
                                 ),
@@ -310,7 +308,8 @@ class _HomePageState extends State<HomePage>
                                       _featureCard(
                                         title: '入驻',
                                         subtitle: '',
-                                        onTap: () => context.push('/apply/guide'),
+                                        onTap: () =>
+                                            context.push('/apply/guide'),
                                         illustration: _buildFeatureIllustration(
                                           'assets/home/feature_map/Frame 6.png',
                                           width: 96,
@@ -321,12 +320,14 @@ class _HomePageState extends State<HomePage>
                                       _featureCard(
                                         title: '联系我们',
                                         subtitle: '',
-                                        onTap: () => ScaffoldMessenger.of(context)
-                                            .showSnackBar(
-                                          const SnackBar(
-                                            content: Text('客服入口稍后接入'),
-                                          ),
-                                        ),
+                                        onTap: () =>
+                                            ScaffoldMessenger.of(
+                                              context,
+                                            ).showSnackBar(
+                                              const SnackBar(
+                                                content: Text('客服入口稍后接入'),
+                                              ),
+                                            ),
                                         illustration: _buildFeatureIllustration(
                                           'assets/home/feature_contact/Frame 5.png',
                                           width: 96,
@@ -583,7 +584,9 @@ class _HomePageState extends State<HomePage>
         children: List.generate(labels.length, (index) {
           final selected = _currentTab == index;
           return Padding(
-            padding: EdgeInsets.only(right: index == labels.length - 1 ? 0 : 24),
+            padding: EdgeInsets.only(
+              right: index == labels.length - 1 ? 0 : 24,
+            ),
             child: GestureDetector(
               onTap: () => _tabController.animateTo(index),
               child: AnimatedContainer(
@@ -611,8 +614,12 @@ class _HomePageState extends State<HomePage>
                       labels[index],
                       style: TextStyle(
                         fontSize: 16,
-                        fontWeight: selected ? FontWeight.w900 : FontWeight.w700,
-                        color: selected ? AppColors.textPrimary : AppColors.textSecondary,
+                        fontWeight: selected
+                            ? FontWeight.w900
+                            : FontWeight.w700,
+                        color: selected
+                            ? AppColors.textPrimary
+                            : AppColors.textSecondary,
                       ),
                     ),
                   ],
@@ -635,8 +642,8 @@ class _HomePageState extends State<HomePage>
     final cardHeight = large ? 150.0 : 72.0;
     final cardHorizontalPadding = large ? 18.0 : 14.0;
     final cardVerticalPadding = large ? 18.0 : 12.0;
-    final titleSize = large ? 20.0 : 17.0;
-    final subtitleSize = large ? 14.0 : 12.0;
+    final titleSize = large ? 18.0 : 17.0;
+    final subtitleSize = large ? 11.0 : 12.0;
     final arrowHeight = large ? 28.0 : 25.0;
 
     return InkWell(
@@ -669,7 +676,7 @@ class _HomePageState extends State<HomePage>
                       Text(
                         title,
                         maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
+                        overflow: TextOverflow.fade,
                         style: TextStyle(
                           fontSize: titleSize,
                           fontWeight: FontWeight.w900,
@@ -681,8 +688,8 @@ class _HomePageState extends State<HomePage>
                         const SizedBox(height: 8),
                         Text(
                           subtitle,
-                          maxLines: 2,
-                          overflow: TextOverflow.ellipsis,
+                          maxLines: 1,
+                          overflow: TextOverflow.fade,
                           style: TextStyle(
                             fontSize: subtitleSize,
                             fontWeight: FontWeight.w500,
@@ -713,7 +720,9 @@ class _HomePageState extends State<HomePage>
             const SizedBox(width: 4),
             Flexible(
               child: Align(
-                alignment: large ? Alignment.bottomRight : Alignment.centerRight,
+                alignment: large
+                    ? Alignment.bottomRight
+                    : Alignment.centerRight,
                 child: FittedBox(
                   fit: BoxFit.scaleDown,
                   alignment: Alignment.centerRight,
@@ -763,7 +772,9 @@ class _HomePageState extends State<HomePage>
           });
         } else {
           guides.sort((a, b) {
-            final verifiedCompare = (b.verified ? 1 : 0).compareTo(a.verified ? 1 : 0);
+            final verifiedCompare = (b.verified ? 1 : 0).compareTo(
+              a.verified ? 1 : 0,
+            );
             if (verifiedCompare != 0) return verifiedCompare;
             final ratingCompare = b.rating.compareTo(a.rating);
             if (ratingCompare != 0) return ratingCompare;
@@ -777,7 +788,9 @@ class _HomePageState extends State<HomePage>
             title: '暂时没有地陪',
             subtitle: '可以切换城市或去服务页查看更多认证地陪',
             actionText: showFallbackAction ? '去服务页' : null,
-            onAction: showFallbackAction ? () => MainScaffold.switchTo(1) : null,
+            onAction: showFallbackAction
+                ? () => MainScaffold.switchTo(1)
+                : null,
           );
         }
 

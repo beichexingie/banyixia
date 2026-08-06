@@ -2,6 +2,7 @@ import 'dart:async';
 
 import 'package:flutter/material.dart';
 import 'package:flutter_application_1/pages/order/voice_call_page.dart';
+import 'package:flutter_application_1/pages/order/incoming_voice_call_dialog.dart';
 import 'package:flutter_application_1/providers/call_provider.dart';
 import 'package:provider/provider.dart';
 import 'package:flutter_application_1/pages/profile/wallet_page.dart';
@@ -42,17 +43,18 @@ class GuideApp extends StatelessWidget {
           create: (_) => UserProvider(sessionService: sessionService),
         ),
         ChangeNotifierProvider(
-          create: (_) => DemandProvider(sessionService: sessionService)..loadDemands(),
+          create: (_) =>
+              DemandProvider(sessionService: sessionService)..loadDemands(),
         ),
         ChangeNotifierProvider(
-          create: (_) => OrderProvider(sessionService: sessionService)..loadOrders(),
+          create: (_) =>
+              OrderProvider(sessionService: sessionService)..loadOrders(),
         ),
         ChangeNotifierProvider(
-          create: (_) => MessageProvider(sessionService: sessionService)..loadRooms(),
+          create: (_) =>
+              MessageProvider(sessionService: sessionService)..loadRooms(),
         ),
-        ChangeNotifierProvider(
-          create: (_) => GuideConsoleProvider(),
-        ),
+        ChangeNotifierProvider(create: (_) => GuideConsoleProvider()),
         ChangeNotifierProvider(
           create: (_) => CallProvider(sessionService: sessionService),
         ),
@@ -81,9 +83,9 @@ class _GuideAppBootstrapperState extends State<_GuideAppBootstrapper> {
       final userProvider = context.read<UserProvider>();
       final orderProvider = context.read<OrderProvider>();
       await context.read<GuideConsoleProvider>().syncFromProviders(
-            userProvider: userProvider,
-            orderProvider: orderProvider,
-          );
+        userProvider: userProvider,
+        orderProvider: orderProvider,
+      );
     });
   }
 
@@ -93,6 +95,10 @@ class _GuideAppBootstrapperState extends State<_GuideAppBootstrapper> {
       title: '伴一下地陪端',
       debugShowCheckedModeBanner: false,
       theme: AppTheme.lightTheme,
+      builder: (context, child) => MediaQuery.withClampedTextScaling(
+        maxScaleFactor: 1.15,
+        child: child ?? const SizedBox.shrink(),
+      ),
       home: const _GuideAppGate(),
     );
   }
@@ -120,10 +126,7 @@ class _GuideAppGate extends StatelessWidget {
 class GuideAccessGatePage extends StatelessWidget {
   final String? status;
 
-  const GuideAccessGatePage({
-    super.key,
-    required this.status,
-  });
+  const GuideAccessGatePage({super.key, required this.status});
 
   @override
   Widget build(BuildContext context) {
@@ -132,13 +135,13 @@ class GuideAccessGatePage extends StatelessWidget {
     final title = isPending
         ? '地陪认证审核中'
         : isRejected
-            ? '地陪认证未通过'
-            : '请先完成地陪认证';
+        ? '地陪认证未通过'
+        : '请先完成地陪认证';
     final message = isPending
         ? '你的地陪入驻资料已经提交，平台审核通过后才能进入地陪端接单。'
         : isRejected
-            ? '你的地陪入驻资料暂未通过，请回到客户端补充或重新提交认证资料。'
-            : '当前账号还不是认证地陪。请先在客户端提交地陪入驻申请，通过后再使用地陪端。';
+        ? '你的地陪入驻资料暂未通过，请回到客户端补充或重新提交认证资料。'
+        : '当前账号还不是认证地陪。请先在客户端提交地陪入驻申请，通过后再使用地陪端。';
 
     return Scaffold(
       backgroundColor: const Color(0xFFF0F1F3),
@@ -160,8 +163,8 @@ class GuideAccessGatePage extends StatelessWidget {
                     isRejected
                         ? Icons.error_outline_rounded
                         : isPending
-                            ? Icons.hourglass_top_rounded
-                            : Icons.verified_user_outlined,
+                        ? Icons.hourglass_top_rounded
+                        : Icons.verified_user_outlined,
                     size: 68,
                     color: AppColors.primaryDark,
                   ),
@@ -210,7 +213,8 @@ class _GuideMainShell extends StatefulWidget {
   State<_GuideMainShell> createState() => _GuideMainShellState();
 }
 
-class _GuideMainShellState extends State<_GuideMainShell> {
+class _GuideMainShellState extends State<_GuideMainShell>
+    with WidgetsBindingObserver {
   int _currentIndex = 1;
   Timer? _incomingCallTimer;
   bool _checkingIncomingCall = false;
@@ -219,19 +223,20 @@ class _GuideMainShellState extends State<_GuideMainShell> {
   @override
   void initState() {
     super.initState();
+    WidgetsBinding.instance.addObserver(this);
     WidgetsBinding.instance.addPostFrameCallback((_) async {
       final guideConsoleProvider = context.read<GuideConsoleProvider>();
       final userProvider = context.read<UserProvider>();
       final orderProvider = context.read<OrderProvider>();
       final messageProvider = context.read<MessageProvider>();
       await guideConsoleProvider.syncFromProviders(
-            userProvider: userProvider,
-            orderProvider: orderProvider,
-          );
+        userProvider: userProvider,
+        orderProvider: orderProvider,
+      );
       await messageProvider.loadRooms();
       await _checkIncomingCalls();
       _incomingCallTimer = Timer.periodic(
-        const Duration(seconds: 5),
+        const Duration(seconds: 2),
         (_) => _checkIncomingCalls(),
       );
     });
@@ -240,7 +245,15 @@ class _GuideMainShellState extends State<_GuideMainShell> {
   @override
   void dispose() {
     _incomingCallTimer?.cancel();
+    WidgetsBinding.instance.removeObserver(this);
     super.dispose();
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.resumed) {
+      _checkIncomingCalls();
+    }
   }
 
   @override
@@ -280,10 +293,7 @@ class _GuideMainShellState extends State<_GuideMainShell> {
 
     return Scaffold(
       backgroundColor: const Color(0xFFF0F1F3),
-      body: IndexedStack(
-        index: _currentIndex,
-        children: pages,
-      ),
+      body: IndexedStack(index: _currentIndex, children: pages),
       floatingActionButtonLocation: FloatingActionButtonLocation.centerDocked,
       floatingActionButton: InkWell(
         onTap: _openPublish,
@@ -295,13 +305,15 @@ class _GuideMainShellState extends State<_GuideMainShell> {
             color: AppColors.primary,
             borderRadius: BorderRadius.circular(24),
           ),
-          child: const Icon(Icons.add_rounded, size: 40, color: AppColors.textPrimary),
+          child: const Icon(
+            Icons.add_rounded,
+            size: 40,
+            color: AppColors.textPrimary,
+          ),
         ),
       ),
       bottomNavigationBar: Container(
-        decoration: const BoxDecoration(
-          color: Colors.white,
-        ),
+        decoration: const BoxDecoration(color: Colors.white),
         padding: const EdgeInsets.fromLTRB(8, 8, 8, 8),
         child: SafeArea(
           top: false,
@@ -354,7 +366,9 @@ class _GuideMainShellState extends State<_GuideMainShell> {
 
     _checkingIncomingCall = true;
     try {
-      final calls = await context.read<CallProvider>().fetchIncomingVoiceCalls();
+      final calls = await context
+          .read<CallProvider>()
+          .fetchIncomingVoiceCalls();
       if (!mounted || calls.isEmpty || _showingIncomingCall) return;
       await _showIncomingCallSheet(calls.first);
     } catch (_) {
@@ -367,134 +381,44 @@ class _GuideMainShellState extends State<_GuideMainShell> {
   Future<void> _showIncomingCallSheet(Map<String, dynamic> call) async {
     _showingIncomingCall = true;
     final callId = call['id']?.toString() ?? call['call_id']?.toString() ?? '';
-    final orderId = call['order_id']?.toString() ?? '';
-
-    await showModalBottomSheet<void>(
-      context: context,
-      isDismissible: false,
-      enableDrag: false,
-      backgroundColor: Colors.transparent,
-      builder: (sheetContext) {
-        return Container(
-          decoration: const BoxDecoration(
-            color: Colors.white,
-            borderRadius: BorderRadius.vertical(top: Radius.circular(30)),
+    final callProvider = context.read<CallProvider>();
+    try {
+      if (callId.isEmpty) return;
+      final action = await showIncomingVoiceCallDialog(
+        context,
+        call: call,
+        callProvider: callProvider,
+        fallbackPeerName: '客户',
+      );
+      if (!mounted ||
+          action == null ||
+          action == IncomingCallAction.cancelled) {
+        return;
+      }
+      if (action == IncomingCallAction.reject) {
+        await callProvider.endVoiceCall(callId, reason: 'guide_rejected');
+        return;
+      }
+      final payload = await callProvider.joinVoiceCall(callId);
+      if (!mounted) return;
+      await Navigator.of(context).push(
+        MaterialPageRoute<void>(
+          builder: (_) => VoiceCallPage(
+            callPayload: payload,
+            peerName: '客户',
+            incoming: true,
           ),
-          padding: EdgeInsets.fromLTRB(
-            22,
-            18,
-            22,
-            22 + MediaQuery.paddingOf(sheetContext).bottom,
-          ),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Container(
-                width: 42,
-                height: 4,
-                decoration: BoxDecoration(
-                  color: AppColors.divider,
-                  borderRadius: BorderRadius.circular(999),
-                ),
-              ),
-              const SizedBox(height: 18),
-              Container(
-                width: 72,
-                height: 72,
-                decoration: const BoxDecoration(
-                  color: AppColors.primarySoft,
-                  shape: BoxShape.circle,
-                ),
-                alignment: Alignment.center,
-                child: const Icon(
-                  Icons.call_rounded,
-                  size: 34,
-                  color: AppColors.textPrimary,
-                ),
-              ),
-              const SizedBox(height: 14),
-              const Text(
-                '客户来电',
-                style: TextStyle(
-                  fontSize: 22,
-                  fontWeight: FontWeight.w900,
-                  color: AppColors.textPrimary,
-                ),
-              ),
-              const SizedBox(height: 8),
-              Text(
-                orderId.isEmpty ? '客户正在通过订单联系你' : '订单 $orderId',
-                textAlign: TextAlign.center,
-                style: const TextStyle(
-                  fontSize: 13,
-                  color: AppColors.textSecondary,
-                ),
-              ),
-              const SizedBox(height: 20),
-              Row(
-                children: [
-                  Expanded(
-                    child: OutlinedButton(
-                      onPressed: () async {
-                        Navigator.of(sheetContext).pop();
-                        if (callId.isNotEmpty) {
-                          await context.read<CallProvider>().endVoiceCall(
-                                callId,
-                                reason: 'guide_rejected',
-                              );
-                        }
-                      },
-                      style: OutlinedButton.styleFrom(
-                        foregroundColor: AppColors.textPrimary,
-                        side: const BorderSide(color: AppColors.divider),
-                        padding: const EdgeInsets.symmetric(vertical: 14),
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(16),
-                        ),
-                      ),
-                      child: const Text('拒绝'),
-                    ),
-                  ),
-                  const SizedBox(width: 12),
-                  Expanded(
-                    child: FilledButton(
-                      onPressed: () async {
-                        if (callId.isEmpty) return;
-                        Navigator.of(sheetContext).pop();
-                        final payload = await context
-                            .read<CallProvider>()
-                            .joinVoiceCall(callId);
-                        if (!mounted) return;
-                        await Navigator.of(context).push(
-                          MaterialPageRoute<void>(
-                            builder: (_) => VoiceCallPage(
-                              callPayload: payload,
-                              peerName: '客户',
-                              incoming: true,
-                            ),
-                          ),
-                        );
-                      },
-                      style: FilledButton.styleFrom(
-                        backgroundColor: AppColors.textPrimary,
-                        foregroundColor: Colors.white,
-                        padding: const EdgeInsets.symmetric(vertical: 14),
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(16),
-                        ),
-                      ),
-                      child: const Text('接听'),
-                    ),
-                  ),
-                ],
-              ),
-            ],
-          ),
-        );
-      },
-    );
-
-    _showingIncomingCall = false;
+        ),
+      );
+    } catch (error) {
+      if (mounted) {
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text('处理来电失败：$error')));
+      }
+    } finally {
+      _showingIncomingCall = false;
+    }
   }
 
   Future<void> _openPublish() async {
@@ -502,9 +426,9 @@ class _GuideMainShellState extends State<_GuideMainShell> {
   }
 
   Future<void> _openRoute([GuideOrderCardData? order]) async {
-    await Navigator.of(context).push(
-      MaterialPageRoute(builder: (_) => GuideRoutePage(order: order)),
-    );
+    await Navigator.of(
+      context,
+    ).push(MaterialPageRoute(builder: (_) => GuideRoutePage(order: order)));
   }
 
   Future<void> _openDutySettings() async {
@@ -520,39 +444,39 @@ class _GuideMainShellState extends State<_GuideMainShell> {
   }
 
   Future<void> _openModePage() async {
-    await Navigator.of(context).push(
-      MaterialPageRoute(builder: (_) => const GuideDutyModePage()),
-    );
+    await Navigator.of(
+      context,
+    ).push(MaterialPageRoute(builder: (_) => const GuideDutyModePage()));
   }
 
   Future<void> _openCityPage() async {
-    await Navigator.of(context).push(
-      MaterialPageRoute(builder: (_) => const GuideCityPickerPage()),
-    );
+    await Navigator.of(
+      context,
+    ).push(MaterialPageRoute(builder: (_) => const GuideCityPickerPage()));
   }
 
   Future<void> _openServiceTypePage() async {
-    await Navigator.of(context).push(
-      MaterialPageRoute(builder: (_) => const GuideServiceTypePage()),
-    );
+    await Navigator.of(
+      context,
+    ).push(MaterialPageRoute(builder: (_) => const GuideServiceTypePage()));
   }
 
   Future<void> _openServiceLocationPage() async {
-    await Navigator.of(context).push(
-      MaterialPageRoute(builder: (_) => const GuideServiceLocationPage()),
-    );
+    await Navigator.of(
+      context,
+    ).push(MaterialPageRoute(builder: (_) => const GuideServiceLocationPage()));
   }
 
   Future<void> _openSelectServicePage() async {
-    await Navigator.of(context).push(
-      MaterialPageRoute(builder: (_) => const GuideSelectServicePage()),
-    );
+    await Navigator.of(
+      context,
+    ).push(MaterialPageRoute(builder: (_) => const GuideSelectServicePage()));
   }
 
   Future<void> _openDemandHall() async {
-    await Navigator.of(context).push(
-      MaterialPageRoute(builder: (_) => const GuideDemandHallPage()),
-    );
+    await Navigator.of(
+      context,
+    ).push(MaterialPageRoute(builder: (_) => const GuideDemandHallPage()));
   }
 
   Future<void> _openServiceOperations() async {
@@ -664,9 +588,9 @@ class _GuideMainShellState extends State<_GuideMainShell> {
   }
 
   Future<void> _openWallet() async {
-    await Navigator.of(context).push(
-      MaterialPageRoute(builder: (_) => const WalletPage()),
-    );
+    await Navigator.of(
+      context,
+    ).push(MaterialPageRoute(builder: (_) => const WalletPage()));
   }
 }
 
@@ -706,7 +630,9 @@ class _NavItem extends StatelessWidget {
                 style: TextStyle(
                   fontSize: 12,
                   fontWeight: active ? FontWeight.w900 : FontWeight.w600,
-                  color: active ? AppColors.textPrimary : const Color(0xFFC8CBD3),
+                  color: active
+                      ? AppColors.textPrimary
+                      : const Color(0xFFC8CBD3),
                 ),
               ),
             ],

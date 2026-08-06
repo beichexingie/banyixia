@@ -13,15 +13,11 @@ import '../providers/order_provider.dart';
 import '../providers/user_provider.dart';
 import '../services/payment_service.dart';
 import '../bootstrap/app_bootstrap.dart';
-import '../services/session_service.dart';
 
 class BanyixiaApp extends StatelessWidget {
   final PaymentService? paymentService;
 
-  const BanyixiaApp({
-    super.key,
-    this.paymentService,
-  });
+  const BanyixiaApp({super.key, this.paymentService});
 
   @override
   Widget build(BuildContext context) {
@@ -35,10 +31,12 @@ class BanyixiaApp extends StatelessWidget {
           create: (_) => UserProvider(sessionService: sessionService),
         ),
         ChangeNotifierProvider(
-          create: (_) => GuideProvider(sessionService: sessionService)..loadGuides(),
+          create: (_) =>
+              GuideProvider(sessionService: sessionService)..loadGuides(),
         ),
         ChangeNotifierProvider(
-          create: (_) => DemandProvider(sessionService: sessionService)..loadDemands(),
+          create: (_) =>
+              DemandProvider(sessionService: sessionService)..loadDemands(),
         ),
         ChangeNotifierProvider(
           create: (_) => OrderProvider(
@@ -47,7 +45,8 @@ class BanyixiaApp extends StatelessWidget {
           )..loadOrders(),
         ),
         ChangeNotifierProvider(
-          create: (_) => MessageProvider(sessionService: sessionService)..loadRooms(),
+          create: (_) =>
+              MessageProvider(sessionService: sessionService)..loadRooms(),
         ),
         ChangeNotifierProvider(
           create: (_) => ApplicationProvider(sessionService: sessionService),
@@ -67,6 +66,10 @@ class BanyixiaApp extends StatelessWidget {
             title: AppConfig.appName,
             debugShowCheckedModeBanner: false,
             theme: AppTheme.lightTheme,
+            builder: (context, child) => MediaQuery.withClampedTextScaling(
+              maxScaleFactor: 1.15,
+              child: child ?? const SizedBox.shrink(),
+            ),
             routerConfig: router,
           );
         },

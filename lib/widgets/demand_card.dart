@@ -139,7 +139,7 @@ class DemandCard extends StatelessWidget {
                 Expanded(
                   child: Text(
                     demand.title,
-                    maxLines: 1,
+                    maxLines: 2,
                     overflow: TextOverflow.ellipsis,
                     style: const TextStyle(
                       fontSize: 20,
@@ -268,16 +268,19 @@ class DemandCard extends StatelessWidget {
 
   Widget _metaLine(IconData icon, String text) {
     return Row(
-      mainAxisSize: MainAxisSize.min,
       children: [
         Icon(icon, size: 18, color: AppColors.primaryDeep),
         const SizedBox(width: 6),
-        Text(
-          text,
-          style: const TextStyle(
-            fontSize: 14,
-            fontWeight: FontWeight.w700,
-            color: AppColors.textPrimary,
+        Expanded(
+          child: Text(
+            text,
+            maxLines: 2,
+            overflow: TextOverflow.fade,
+            style: const TextStyle(
+              fontSize: 14,
+              fontWeight: FontWeight.w700,
+              color: AppColors.textPrimary,
+            ),
           ),
         ),
       ],
@@ -309,5 +312,4 @@ class DemandCard extends StatelessWidget {
       ),
     );
   }
-
 }
