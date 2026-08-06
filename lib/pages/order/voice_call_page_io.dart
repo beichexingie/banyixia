@@ -33,6 +33,7 @@ class _VoiceCallPageState extends State<VoiceCallPage>
   TRTCCloud? _trtcCloud;
   TRTCCloudListener? _listener;
   Timer? _statusTimer;
+  Timer? _heartbeatTimer;
   Timer? _durationTimer;
   late final AnimationController _pulseController;
 
@@ -74,6 +75,10 @@ class _VoiceCallPageState extends State<VoiceCallPage>
       const Duration(seconds: 2),
       (_) => _checkServerStatus(),
     );
+    _heartbeatTimer = Timer.periodic(
+      const Duration(seconds: 15),
+      (_) => _sendHeartbeat(),
+    );
     _durationTimer = Timer.periodic(
       const Duration(seconds: 1),
       (_) => _updateDuration(),
@@ -95,6 +100,7 @@ class _VoiceCallPageState extends State<VoiceCallPage>
     _closed = true;
     WidgetsBinding.instance.removeObserver(this);
     _statusTimer?.cancel();
+    _heartbeatTimer?.cancel();
     _durationTimer?.cancel();
     _pulseController.dispose();
     _leaveRoom();
@@ -223,6 +229,27 @@ class _VoiceCallPageState extends State<VoiceCallPage>
     }
   }
 
+  Future<void> _sendHeartbeat() async {
+    if (_answeredAt == null ||
+        _callId.isEmpty ||
+        _closed ||
+        _ending ||
+        !mounted) {
+      return;
+    }
+    try {
+      final result = await context.read<CallProvider>().heartbeatVoiceCall(
+        _callId,
+      );
+      if (!mounted || _closed || _ending) return;
+      if (result['status']?.toString() == 'ended') {
+        await _handleRemoteEnd(result['end_reason']?.toString() ?? 'ended');
+      }
+    } catch (_) {
+      // The status poll will close the page if the server has released the call.
+    }
+  }
+
   Future<void> _handlePeerLeft() async {
     try {
       final call = await context.read<CallProvider>().fetchVoiceCall(_callId);
@@ -241,6 +268,7 @@ class _VoiceCallPageState extends State<VoiceCallPage>
     if (_ending || _closed || !mounted) return;
     _ending = true;
     _statusTimer?.cancel();
+    _heartbeatTimer?.cancel();
     _terminalMessage = _endReasonText(reason);
     setState(() {});
     _leaveRoom();

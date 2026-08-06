@@ -54,6 +54,18 @@ class CallProvider extends ChangeNotifier {
     throw Exception('Voice call status response is invalid');
   }
 
+  Future<Map<String, dynamic>> heartbeatVoiceCall(String callId) async {
+    final response = await _api.post(
+      '/calls/$callId/heartbeat',
+      authToken: _token(),
+    );
+    final data = response['data'];
+    if (data is Map<String, dynamic>) {
+      return data;
+    }
+    throw Exception('Voice call heartbeat response is invalid');
+  }
+
   Future<Map<String, dynamic>> endVoiceCall(
     String callId, {
     String reason = 'ended',

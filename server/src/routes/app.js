@@ -1873,6 +1873,23 @@ async function expireTimedOutCalls(db = pool) {
     `,
     [config.trtcRingTimeoutSeconds],
   );
+  await db.query(
+    `
+      update public.call_sessions
+      set
+        status = 'ended',
+        ended_at = now(),
+        duration_seconds = case
+          when answered_at is null then 0
+          else greatest(0, floor(extract(epoch from (now() - answered_at)))::integer)
+        end,
+        end_reason = 'connection_lost',
+        updated_at = now()
+      where status = 'answered'
+        and coalesce(updated_at, created_at) <= now() - ($1 * interval '1 second')
+    `,
+    [config.trtcHeartbeatTimeoutSeconds],
+  );
 }
 
 async function findCallForUser(db, callId, userId) {
@@ -2074,6 +2091,36 @@ appRouter.post('/calls/:id/end', handleRoute(async (req, res) => {
   }
   if (!call) return fail(res, 404, '通话不存在');
   return ok(res, { data: call, message: '语音通话已结束' });
+}));
+
+appRouter.post('/calls/:id/heartbeat', handleRoute(async (req, res) => {
+  const userId = await requireSessionUser(req, res);
+  if (!userId) return;
+  await expireTimedOutCalls();
+  const result = await pool.query(
+    `
+      update public.call_sessions
+      set updated_at = now()
+      where id = $1
+        and (caller_user_id = $2 or callee_user_id = $2)
+        and status = 'answered'
+      returning id, status, updated_at
+    `,
+    [req.params.id, userId],
+  );
+  if (!result.rows[0]) {
+    const call = await findCallForUser(pool, req.params.id, userId);
+    if (!call) return fail(res, 404, '通话不存在');
+    return ok(res, {
+      data: {
+        call_id: call.id,
+        status: call.status,
+        end_reason: call.end_reason,
+      },
+      message: '通话已结束',
+    });
+  }
+  return ok(res, { data: result.rows[0], message: '通话心跳已更新' });
 }));
 
 appRouter.get('/wallet', async (req, res) => {

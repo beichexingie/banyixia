@@ -112,6 +112,10 @@ export const config = {
     20,
     parseNumber(process.env.TRTC_RING_TIMEOUT_SECONDS, 60),
   ),
+  trtcHeartbeatTimeoutSeconds: Math.max(
+    30,
+    parseNumber(process.env.TRTC_HEARTBEAT_TIMEOUT_SECONDS, 45),
+  ),
 };
 
 export function hasAlipayConfig() {
