@@ -156,6 +156,15 @@ class OrderProvider extends ChangeNotifier {
     await loadOrders();
   }
 
+  Future<void> reviewOrder(String orderId, {required int rating, required String content, bool anonymous = true}) async {
+    await _api.post(
+      '/orders/$orderId/review',
+      authToken: _token(),
+      body: {'rating': rating, 'content': content, 'is_anonymous': anonymous},
+    );
+    await loadOrders();
+  }
+
   Future<void> createOrder(Order order) async {
     try {
       debugPrint(

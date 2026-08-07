@@ -8,6 +8,7 @@ import { healthRouter } from './routes/health.js';
 import { appRouter } from './routes/app.js';
 import { paymentsRouter } from './routes/payments.js';
 import { adminRouter } from './routes/admin.js';
+import { guideRouter } from './routes/guide.js';
 
 const app = express();
 const __filename = fileURLToPath(import.meta.url);
@@ -49,6 +50,7 @@ app.get('/', (_req, res) => {
 app.use('/health', healthRouter);
 app.use('/api/health', healthRouter);
 app.use('/api/admin', adminRouter);
+app.use('/api/guide', guideRouter);
 app.use('/api', appRouter);
 app.use('/api/payments', paymentsRouter);
 app.use('/api', paymentsRouter);

@@ -28,22 +28,20 @@ class _GuideDetailPageState extends State<GuideDetailPage> {
   @override
   void initState() {
     super.initState();
-    if (widget.guide != null) {
-      _guide = widget.guide;
-      _initData();
-    } else if (widget.guideId != null) {
-      _fetchGuide();
-    }
+    _guide = widget.guide;
+    _initData();
+    final id = widget.guideId ?? widget.guide?.id;
+    if (id != null && id.isNotEmpty) _fetchGuide(id, showLoading: widget.guide == null);
   }
 
   void _initData() {
     _checkFollowStatus();
   }
 
-  Future<void> _fetchGuide() async {
-    setState(() => _isLoading = true);
+  Future<void> _fetchGuide(String id, {bool showLoading = true}) async {
+    if (showLoading) setState(() => _isLoading = true);
     try {
-      final data = await context.read<GuideProvider>().getGuideById(widget.guideId!);
+      final data = await context.read<GuideProvider>().getGuideById(id);
       if (!mounted) return;
       if (data == null) throw Exception('未找到该地陪信息');
       setState(() {
@@ -54,7 +52,7 @@ class _GuideDetailPageState extends State<GuideDetailPage> {
     } catch (e) {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(e.toString())));
-      context.pop();
+      if (showLoading) context.pop();
     }
   }
 
@@ -331,6 +329,30 @@ class _GuideDetailPageState extends State<GuideDetailPage> {
         ),
         const SizedBox(height: 14),
         _SectionCard(
+          title: '服务项目',
+          child: guide.serviceItems.isEmpty
+              ? const Text('地陪暂未上架服务项目。', style: TextStyle(color: AppColors.textHint))
+              : Column(
+                  children: guide.serviceItems.map((item) {
+                    final hour = double.tryParse(item['price_per_hour']?.toString() ?? '') ?? 0;
+                    final day = double.tryParse(item['price_per_day']?.toString() ?? '') ?? 0;
+                    return Padding(
+                      padding: const EdgeInsets.only(bottom: 12),
+                      child: Row(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          const Icon(Icons.handshake_outlined, color: AppColors.primaryDark),
+                          const SizedBox(width: 10),
+                          Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [Text(item['name']?.toString() ?? '服务项目', style: const TextStyle(fontWeight: FontWeight.w800)), const SizedBox(height: 4), Text(item['description']?.toString() ?? '', style: const TextStyle(fontSize: 13, color: AppColors.textSecondary))])),
+                          Text('¥${day > 0 ? day.toStringAsFixed(0) + '/天' : hour.toStringAsFixed(0) + '/小时'}', style: const TextStyle(fontWeight: FontWeight.w800, color: Color(0xFFFF5A3C))),
+                        ],
+                      ),
+                    );
+                  }).toList(),
+                ),
+        ),
+        const SizedBox(height: 14),
+        _SectionCard(
           title: '额外费用说明',
           child: Text(
             '地陪暂未填写额外费用说明，下单前请通过订单和聊天确认费用明细。',
@@ -340,7 +362,14 @@ class _GuideDetailPageState extends State<GuideDetailPage> {
         const SizedBox(height: 14),
         _SectionCard(
           title: '用户评价',
-          child: const Text('暂无评价', style: TextStyle(color: AppColors.textHint)),
+          child: guide.reviews.isEmpty
+              ? const Text('暂无评价', style: TextStyle(color: AppColors.textHint))
+              : Column(
+                  children: guide.reviews.map((item) => Padding(
+                    padding: const EdgeInsets.only(bottom: 10),
+                    child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [Text('匿名客户 · ${item['rating'] ?? 0} 分', style: const TextStyle(fontWeight: FontWeight.w800)), const SizedBox(height: 4), Text(item['content']?.toString() ?? ''), if ((item['guide_reply']?.toString() ?? '').isNotEmpty) Padding(padding: const EdgeInsets.only(top: 4), child: Text('地陪回复：${item['guide_reply']}', style: const TextStyle(color: AppColors.textSecondary)))]),
+                  )).toList(),
+                ),
         ),
       ],
     );

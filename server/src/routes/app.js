@@ -23,7 +23,7 @@ import {
   refundWithdrawBalance,
   releasePendingBalance,
 } from '../repositories/wallets.js';
-import { assertPayloadAllowed, assertTextAllowed, reviewImage } from '../services/moderation.js';
+import { assertPayloadAllowed, assertTextAllowed, reviewImage, reviewText } from '../services/moderation.js';
 import {
   queryAlipayTransfer,
   transferToAlipayAccount,
@@ -506,7 +506,33 @@ appRouter.get('/guides', async (_req, res) => {
 });
 
 appRouter.get('/guides/:id', async (req, res) => {
-  const result = await pool.query(`select * from public.guides where id = $1 limit 1`, [req.params.id]);
+  const result = await pool.query(
+    `
+      select
+        g.*,
+        coalesce((
+          select json_agg(item order by item.updated_at desc)
+          from (
+            select id, name, description, price_per_hour, price_per_day, updated_at
+            from public.guide_service_items
+            where guide_id = g.id and enabled = true
+          ) item
+        ), '[]'::json) as service_items,
+        coalesce((
+          select json_agg(review order by review.created_at desc)
+          from (
+            select rating, content, guide_reply, created_at
+            from public.guide_reviews
+            where guide_id = g.id
+            limit 10
+          ) review
+        ), '[]'::json) as reviews
+      from public.guides g
+      where g.id = $1
+      limit 1
+    `,
+    [req.params.id],
+  );
   if (!result.rows[0]) return fail(res, 404, '地陪不存在');
   return ok(res, { data: result.rows[0] });
 });
@@ -1127,7 +1153,19 @@ appRouter.get('/posts/footprints', async (req, res) => {
 appRouter.get('/demands', async (req, res) => {
   const viewerId = getSessionUserId(req);
   const guideLocation = viewerId ? await fetchGuideLocation(pool, viewerId) : null;
-  const result = await pool.query(`select * from public.demands order by created_at desc`);
+  const result = await pool.query(
+    `
+      select d.*
+      from public.demands d
+      where not exists (
+        select 1
+        from public.guide_blocked_users b
+        where b.guide_id = $1 and b.blocked_user_id = d.author_id
+      )
+      order by d.created_at desc
+    `,
+    [viewerId || null],
+  );
   return ok(res, {
     data: result.rows.map((row) => withDistanceFields(row, guideLocation)),
   });
@@ -1269,6 +1307,11 @@ appRouter.post('/demands/:id/apply', async (req, res) => {
   );
   const demand = demandResult.rows[0];
   if (!demand) return fail(res, 404, '需求不存在');
+  const blocked = await pool.query(
+    `select 1 from public.guide_blocked_users where guide_id = $1 and blocked_user_id = $2 limit 1`,
+    [userId, demand.author_id],
+  );
+  if (blocked.rows[0]) return fail(res, 403, '该用户已在你的屏蔽名单中');
   if (demand.author_id === userId) return fail(res, 400, '不能报名自己的需求');
 
   const guideResult = await pool.query(
@@ -1690,8 +1733,11 @@ appRouter.post('/orders/:id/complete', handleRoute(async (req, res) => {
   if (Number(order.status) === 3) {
     return ok(res, { message: '订单已完成' });
   }
+  if (Number(order.status) === 2) {
+    return ok(res, { message: '服务已完成，等待客户评价' });
+  }
   await withTransaction(async (client) => {
-    await client.query(`update public.orders set status = 3 where id = $1`, [req.params.id]);
+    await client.query(`update public.orders set status = 2 where id = $1`, [req.params.id]);
     if (order.payment_status === 'paid') {
       await releasePendingBalance(client, order.guide_id, Number(order.amount));
       await recordWalletTransaction(client, {
@@ -1704,7 +1750,35 @@ appRouter.post('/orders/:id/complete', handleRoute(async (req, res) => {
       });
     }
   });
-  return ok(res, { message: '已完成' });
+  return ok(res, { message: '服务已完成，等待客户评价' });
+}));
+
+appRouter.post('/orders/:id/review', handleRoute(async (req, res) => {
+  const userId = await requireSessionUser(req, res);
+  if (!userId) return;
+  const order = await findOrderById(pool, req.params.id);
+  if (!order) return fail(res, 404, '订单不存在');
+  if (order.user_id !== userId) return fail(res, 403, '只有下单用户可以评价');
+  if (Number(order.status) === 4) return fail(res, 400, '已取消订单不能评价');
+  const rating = Number(req.body?.rating);
+  const content = req.body?.content?.toString().trim() ?? '';
+  if (!Number.isInteger(rating) || rating < 1 || rating > 5) return fail(res, 400, '评分必须是1到5分');
+  if (!content) return fail(res, 400, '请填写评价内容');
+  const moderation = await reviewText(content, { field: '客户评价' });
+  if (!moderation.passed || moderation.reviewStatus === 'pending') return fail(res, 400, '评价内容需要人工审核后才能发布');
+  const result = await pool.query(
+    `insert into public.guide_reviews (order_id,guide_id,customer_id,rating,content,is_anonymous)
+     values ($1,$2,$3,$4,$5,$6)
+     on conflict (order_id) do update set rating=excluded.rating,content=excluded.content,is_anonymous=excluded.is_anonymous
+     returning *`,
+    [order.id, order.guide_id, userId, rating, content, req.body?.is_anonymous !== false],
+  );
+  await pool.query(
+    `update public.guides set rating = coalesce((select round(avg(rating)::numeric, 2) from public.guide_reviews where guide_id = $1), 0) where id = $1`,
+    [order.guide_id],
+  );
+  await pool.query(`update public.orders set status = 3 where id = $1`, [order.id]);
+  return ok(res, { data: result.rows[0], message: '评价已提交' });
 }));
 
 appRouter.post('/orders/:id/cancel', handleRoute(async (req, res) => {
@@ -2309,6 +2383,74 @@ appRouter.post('/admin/payout-accounts/:userId/reject', handleRoute(async (req, 
   );
   if (!result.rows[0]) return fail(res, 404, '收款账号不存在或当前状态不能驳回');
   return ok(res, { data: result.rows[0], message: '支付宝收款账号已驳回' });
+}));
+
+appRouter.get('/admin/guide-insurance', handleRoute(async (req, res) => {
+  const adminId = await requireAdminUser(req, res);
+  if (!adminId) return;
+  const result = await pool.query(
+    `
+      select i.*, u.nickname, u.phone
+      from public.guide_insurance_policies i
+      join public.users u on u.id = i.guide_id
+      order by i.updated_at desc
+      limit 200
+    `,
+  );
+  return ok(res, { data: result.rows });
+}));
+
+appRouter.post('/admin/guide-insurance/:guideId/approve', handleRoute(async (req, res) => {
+  const adminId = await requireAdminUser(req, res);
+  if (!adminId) return;
+  const result = await pool.query(
+    `update public.guide_insurance_policies set status = 'approved', reject_reason = null, updated_at = now() where guide_id = $1 and status = 'pending' returning *`,
+    [req.params.guideId],
+  );
+  if (!result.rows[0]) return fail(res, 404, '保险资料不存在或当前状态不能审核');
+  return ok(res, { data: result.rows[0], message: '保险资料已审核通过' });
+}));
+
+appRouter.post('/admin/guide-insurance/:guideId/reject', handleRoute(async (req, res) => {
+  const adminId = await requireAdminUser(req, res);
+  if (!adminId) return;
+  const reason = req.body?.reason?.toString().trim() || '保险资料审核未通过';
+  const result = await pool.query(
+    `update public.guide_insurance_policies set status = 'rejected', reject_reason = $2, updated_at = now() where guide_id = $1 and status = 'pending' returning *`,
+    [req.params.guideId, reason],
+  );
+  if (!result.rows[0]) return fail(res, 404, '保险资料不存在或当前状态不能审核');
+  return ok(res, { data: result.rows[0], message: '保险资料已驳回' });
+}));
+
+appRouter.get('/admin/guide-support-requests', handleRoute(async (req, res) => {
+  const adminId = await requireAdminUser(req, res);
+  if (!adminId) return;
+  const result = await pool.query(
+    `
+      select r.*, u.nickname, u.phone
+      from public.guide_support_requests r
+      join public.users u on u.id = r.guide_id
+      order by r.created_at desc
+      limit 200
+    `,
+  );
+  return ok(res, { data: result.rows });
+}));
+
+appRouter.post('/admin/guide-support-requests/:id/reply', handleRoute(async (req, res) => {
+  const adminId = await requireAdminUser(req, res);
+  if (!adminId) return;
+  const reply = req.body?.reply?.toString().trim() ?? '';
+  if (!reply) return fail(res, 400, '回复内容不能为空');
+  const moderation = await reviewText(reply, { field: '运营回复' });
+  if (!moderation.passed || moderation.reviewStatus === 'pending') return fail(res, 400, '回复内容需要审核后才能提交');
+  const result = await pool.query(
+    `update public.guide_support_requests set reply = $2, status = 'resolved', updated_at = now() where id = $1 returning *`,
+    [req.params.id, reply],
+  );
+  if (!result.rows[0]) return fail(res, 404, '运营工单不存在');
+  return ok(res, { data: result.rows[0], message: '回复已发送' });
 }));
 
 appRouter.post('/admin/withdrawals/:id/approve', handleRoute(async (req, res) => {

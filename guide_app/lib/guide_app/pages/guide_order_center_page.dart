@@ -191,10 +191,30 @@ class _GuideOrderCenterPageState extends State<GuideOrderCenterPage> {
                                     return;
                                   }
                                   if (order.primaryAction ==
-                                      GuideOrderAction.arrived) {
+                                      GuideOrderAction.complete) {
+                                    try {
+                                      await context
+                                          .read<OrderProvider>()
+                                          .completeOrder(order.id);
+                                      if (!mounted) return;
+                                      ScaffoldMessenger.of(context).showSnackBar(
+                                        const SnackBar(
+                                          content: Text('服务已完成，等待客户评价'),
+                                        ),
+                                      );
+                                    } catch (error) {
+                                      if (!mounted) return;
+                                      ScaffoldMessenger.of(context).showSnackBar(
+                                        SnackBar(content: Text('完成服务失败：$error')),
+                                      );
+                                    }
+                                    return;
+                                  }
+                                  if (order.primaryAction ==
+                                      GuideOrderAction.waitingReview) {
                                     ScaffoldMessenger.of(context).showSnackBar(
                                       const SnackBar(
-                                        content: Text('已标记到达服务地点'),
+                                        content: Text('客户评价后，订单将自动完成'),
                                       ),
                                     );
                                   } else {
@@ -535,7 +555,7 @@ class _GuideOrderCard extends StatelessWidget {
                       child: _PrimaryActionButton(
                         icon: data.primaryAction.icon,
                         label: data.primaryAction.label,
-                        active: data.primaryAction == GuideOrderAction.arrived,
+                        active: data.primaryAction == GuideOrderAction.complete,
                         onTap: onPrimaryTap,
                       ),
                     ),
@@ -564,7 +584,7 @@ class _GuideOrderCard extends StatelessWidget {
                     child: _PrimaryActionButton(
                       icon: data.primaryAction.icon,
                       label: data.primaryAction.label,
-                      active: data.primaryAction == GuideOrderAction.arrived,
+                      active: data.primaryAction == GuideOrderAction.complete,
                       onTap: onPrimaryTap,
                     ),
                   ),

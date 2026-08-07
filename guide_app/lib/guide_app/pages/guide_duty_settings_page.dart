@@ -10,12 +10,18 @@ class GuideDutySettingsPage extends StatelessWidget {
   final VoidCallback onOpenMode;
   final VoidCallback onOpenCity;
   final VoidCallback onOpenServiceTypes;
+  final VoidCallback onOpenInsurance;
+  final VoidCallback onOpenBlockedUsers;
+  final VoidCallback onOpenAuxiliary;
 
   const GuideDutySettingsPage({
     super.key,
     required this.onOpenMode,
     required this.onOpenCity,
     required this.onOpenServiceTypes,
+    required this.onOpenInsurance,
+    required this.onOpenBlockedUsers,
+    required this.onOpenAuxiliary,
   });
 
   @override
@@ -100,10 +106,10 @@ class GuideDutySettingsPage extends StatelessWidget {
           GuideSectionCard(
             child: Row(
               mainAxisAlignment: MainAxisAlignment.spaceAround,
-              children: const [
-                _ToolItem(icon: Icons.verified_user_outlined, label: '地陪保险'),
-                _ToolItem(icon: Icons.person_off_outlined, label: '屏蔽名单'),
-                _ToolItem(icon: Icons.settings_suggest_outlined, label: '辅助设置'),
+              children: [
+                _ToolItem(icon: Icons.verified_user_outlined, label: '地陪保险', onTap: onOpenInsurance),
+                _ToolItem(icon: Icons.person_off_outlined, label: '屏蔽名单', onTap: onOpenBlockedUsers),
+                _ToolItem(icon: Icons.settings_suggest_outlined, label: '辅助设置', onTap: onOpenAuxiliary),
               ],
             ),
           ),
@@ -164,15 +170,20 @@ class _SettingRow extends StatelessWidget {
 class _ToolItem extends StatelessWidget {
   final IconData icon;
   final String label;
+  final VoidCallback onTap;
 
   const _ToolItem({
     required this.icon,
     required this.label,
+    required this.onTap,
   });
 
   @override
   Widget build(BuildContext context) {
-    return Column(
+    return InkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(18),
+      child: Column(
       children: [
         Container(
           width: 78,
@@ -192,6 +203,7 @@ class _ToolItem extends StatelessWidget {
           ),
         ),
       ],
+      ),
     );
   }
 }

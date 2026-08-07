@@ -22,15 +22,15 @@ import 'pages/guide_duty_settings_page.dart';
 import 'pages/guide_demand_hall_page.dart';
 import 'pages/guide_messages_page.dart';
 import 'pages/guide_order_center_page.dart';
-import 'pages/guide_placeholder_pages.dart';
 import 'pages/guide_profile_page.dart';
 import 'pages/guide_route_page.dart';
-import 'pages/guide_select_service_page.dart';
 import 'pages/guide_service_location_page.dart';
 import 'pages/guide_service_type_page.dart';
 import 'pages/guide_workbench_page.dart';
 import 'pages/guide_workspace_pages.dart';
+import 'pages/guide_management_pages.dart';
 import 'providers/guide_console_provider.dart';
+import 'providers/guide_backend_provider.dart';
 
 class GuideApp extends StatelessWidget {
   const GuideApp({super.key});
@@ -56,7 +56,14 @@ class GuideApp extends StatelessWidget {
           create: (_) =>
               MessageProvider(sessionService: sessionService)..loadRooms(),
         ),
-        ChangeNotifierProvider(create: (_) => GuideConsoleProvider()),
+        ChangeNotifierProvider(
+          create: (_) => GuideBackendProvider(sessionService: sessionService),
+        ),
+        ChangeNotifierProvider(
+          create: (providerContext) => GuideConsoleProvider(
+            backend: providerContext.read<GuideBackendProvider>(),
+          ),
+        ),
         ChangeNotifierProvider(
           create: (_) => CallProvider(sessionService: sessionService),
         ),
@@ -88,6 +95,8 @@ class _GuideAppBootstrapperState extends State<_GuideAppBootstrapper> {
         userProvider: userProvider,
         orderProvider: orderProvider,
       );
+      await context.read<GuideBackendProvider>().load();
+      context.read<GuideConsoleProvider>().applyRemoteSettings();
     });
   }
 
@@ -447,6 +456,9 @@ class _GuideMainShellState extends State<_GuideMainShell>
           onOpenMode: _openModePage,
           onOpenCity: _openCityPage,
           onOpenServiceTypes: _openServiceTypePage,
+          onOpenInsurance: _openInsurancePage,
+          onOpenBlockedUsers: _openBlockedUsersPage,
+          onOpenAuxiliary: _openAuxiliarySettingsPage,
         ),
       ),
     );
@@ -479,7 +491,7 @@ class _GuideMainShellState extends State<_GuideMainShell>
   Future<void> _openSelectServicePage() async {
     await Navigator.of(
       context,
-    ).push(MaterialPageRoute(builder: (_) => const GuideSelectServicePage()));
+    ).push(MaterialPageRoute(builder: (_) => const GuideServiceManagementPage()));
   }
 
   Future<void> _openDemandHall() async {
@@ -491,12 +503,7 @@ class _GuideMainShellState extends State<_GuideMainShell>
   Future<void> _openServiceOperations() async {
     await Navigator.of(context).push(
       MaterialPageRoute(
-        builder: (_) => const GuideChecklistPage(
-          title: '专属运营',
-          subtitle: '运营沟通事项',
-          icon: Icons.support_agent_rounded,
-          items: ['查看平台通知', '确认订单服务规范', '遇到纠纷保留证据并联系客服'],
-        ),
+        builder: (_) => const GuideOperationPage(),
       ),
     );
   }
@@ -513,12 +520,7 @@ class _GuideMainShellState extends State<_GuideMainShell>
   Future<void> _openReviewCenter() async {
     await Navigator.of(context).push(
       MaterialPageRoute(
-        builder: (_) => const GuideChecklistPage(
-          title: '客户评价',
-          subtitle: '服务口碑检查',
-          icon: Icons.reviews_outlined,
-          items: ['查看最近订单评分', '确认客户反馈', '发现异常评价后联系客服申诉'],
-        ),
+        builder: (_) => const GuideReviewCenterPage(),
       ),
     );
   }
@@ -526,12 +528,7 @@ class _GuideMainShellState extends State<_GuideMainShell>
   Future<void> _openScheduleCenter() async {
     await Navigator.of(context).push(
       MaterialPageRoute(
-        builder: (_) => const GuideChecklistPage(
-          title: '时间管理',
-          subtitle: '今日接单准备',
-          icon: Icons.calendar_month_outlined,
-          items: ['确认今日可接单', '检查服务地址', '确认已接订单时间'],
-        ),
+        builder: (_) => const GuideSchedulePage(),
       ),
     );
   }
@@ -548,12 +545,7 @@ class _GuideMainShellState extends State<_GuideMainShell>
   Future<void> _openTaskCenter() async {
     await Navigator.of(context).push(
       MaterialPageRoute(
-        builder: (_) => const GuideChecklistPage(
-          title: '任务中心',
-          subtitle: '每日成长任务',
-          icon: Icons.task_alt_rounded,
-          items: ['完成今日签到', '完善服务标签', '处理待办订单'],
-        ),
+        builder: (_) => const GuideTaskCenterPage(),
       ),
     );
   }
@@ -561,12 +553,7 @@ class _GuideMainShellState extends State<_GuideMainShell>
   Future<void> _openTrainingCenter() async {
     await Navigator.of(context).push(
       MaterialPageRoute(
-        builder: (_) => const GuideChecklistPage(
-          title: '培训中心',
-          subtitle: '上岗前学习清单',
-          icon: Icons.school_outlined,
-          items: ['阅读服务规范', '学习订单流程', '了解安全与投诉处理'],
-        ),
+        builder: (_) => const GuideTrainingCenterPage(),
       ),
     );
   }
@@ -594,6 +581,18 @@ class _GuideMainShellState extends State<_GuideMainShell>
     await Navigator.of(
       context,
     ).push(MaterialPageRoute(builder: (_) => const WalletPage()));
+  }
+
+  Future<void> _openInsurancePage() async {
+    await Navigator.of(context).push(MaterialPageRoute(builder: (_) => const GuideInsurancePage()));
+  }
+
+  Future<void> _openBlockedUsersPage() async {
+    await Navigator.of(context).push(MaterialPageRoute(builder: (_) => const GuideBlockedUsersPage()));
+  }
+
+  Future<void> _openAuxiliarySettingsPage() async {
+    await Navigator.of(context).push(MaterialPageRoute(builder: (_) => const GuideAuxiliarySettingsPage()));
   }
 }
 

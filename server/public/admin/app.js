@@ -11,10 +11,11 @@ const navItems = [
   { id: 'users', label: '用户管理', icon: '♙', permission: 'users' },
   { id: 'orders', label: '订单管理', icon: '🛒', permission: 'orders' },
   { id: 'withdrawals', label: '提现打款', icon: '¥', permission: 'orders' },
+  { id: 'insurance', label: '保险审核', icon: '保', permission: 'stats' },
   { id: 'activities', label: '活动管理', icon: '☊', permission: 'activity' },
   { id: 'coupons', label: '优惠券', icon: '券', permission: 'coupon' },
   { id: 'chat', label: '客服工作台', icon: '☎', permission: 'chat' },
-  { id: 'tickets', label: '工单管理', icon: '票', permission: 'chat' },
+  { id: 'tickets', label: '运营工单', icon: '票', permission: 'stats' },
   { id: 'reviews', label: '内容审核', icon: '盾', permission: 'review' },
   { id: 'staff', label: '管理员管理', icon: '管', permission: 'staff' },
   { id: 'logs', label: '操作日志', icon: '志', permission: 'logs' },
@@ -732,6 +733,56 @@ async function renderWithdrawals() {
   });
 }
 
+async function renderInsurance() {
+  const rows = await api('/api/admin/guide-insurance');
+  els.content.innerHTML = `
+    ${pageHead('地陪保险审核', '审核地陪提交的保险资料。通过后，地陪端会显示已保障状态。')}
+    <div class="card table-wrap">
+      ${rows.length ? `
+        <table>
+          <thead><tr><th>地陪</th><th>保险公司</th><th>保单号</th><th>到期日</th><th>状态</th><th>原因</th><th>操作</th></tr></thead>
+          <tbody>
+            ${rows.map((row) => `
+              <tr>
+                <td><strong>${text(row.nickname, '未命名')}</strong><br><small>${text(row.phone)}</small></td>
+                <td>${text(row.provider)}</td>
+                <td>${text(row.policy_no)}</td>
+                <td>${text(row.expires_at)}</td>
+                <td>${statusPill(row.status)}</td>
+                <td>${text(row.reject_reason)}</td>
+                <td class="action-cell">
+                  ${row.status === 'pending' ? `<button class="primary-btn" data-insurance-action="approve" data-guide-id="${row.guide_id}">通过</button><button class="danger-btn" data-insurance-action="reject" data-guide-id="${row.guide_id}">驳回</button>` : '-'}
+                </td>
+              </tr>
+            `).join('')}
+          </tbody>
+        </table>
+      ` : emptyHtml('暂无保险资料')}
+    </div>
+  `;
+  els.content.querySelectorAll('[data-insurance-action]').forEach((button) => {
+    button.addEventListener('click', async () => {
+      const { insuranceAction: action, guideId } = button.dataset;
+      try {
+        button.disabled = true;
+        const body = action === 'reject'
+          ? { reason: window.prompt('填写驳回原因，可留空') || '' }
+          : {};
+        await api(`/api/admin/guide-insurance/${guideId}/${action}`, {
+          method: 'POST',
+          body: JSON.stringify(body),
+        });
+        toast(action === 'approve' ? '保险资料已通过' : '保险资料已驳回');
+        renderInsurance();
+      } catch (error) {
+        toast(`操作失败：${error.message}`);
+      } finally {
+        button.disabled = false;
+      }
+    });
+  });
+}
+
 async function renderLogs() {
   const rows = await api('/api/admin/logs');
   els.content.innerHTML = `
@@ -747,17 +798,49 @@ async function renderLogs() {
   `;
 }
 
-function renderTickets() {
+async function renderTickets() {
+  const rows = await api('/api/admin/guide-support-requests');
   els.content.innerHTML = `
-    ${pageHead('工单管理', '第一版先复用客服会话；后续可把投诉、退款、异常订单沉淀成独立工单。')}
-    <div class="card">
-      <p class="hint">当前数据库已新增 <code>customer_service_tickets</code> 表。等客户端/地陪端增加“投诉/求助”入口后，工单会从这里进入。</p>
-      <button class="primary-btn" id="goChatBtn">前往客服工作台</button>
+    ${pageHead('运营工单', '展示地陪端提交的运营咨询、订单协助、活动报名和申诉。')}
+    <div class="card table-wrap">
+      ${rows.length ? `
+        <table>
+          <thead><tr><th>地陪</th><th>类型</th><th>问题</th><th>运营回复</th><th>状态</th><th>时间</th><th>操作</th></tr></thead>
+          <tbody>
+            ${rows.map((row) => `
+              <tr>
+                <td><strong>${text(row.nickname, '未命名')}</strong><br><small>${text(row.phone)}</small></td>
+                <td>${text(row.category)}</td>
+                <td><div class="truncate">${text(row.content)}</div></td>
+                <td><div class="truncate">${text(row.reply)}</div></td>
+                <td>${statusPill(row.status)}</td>
+                <td>${fmtDate(row.created_at)}</td>
+                <td>${row.status === 'open' ? `<button class="primary-btn" data-guide-ticket="${row.id}">回复</button>` : '-'}</td>
+              </tr>
+            `).join('')}
+          </tbody>
+        </table>
+      ` : emptyHtml('暂无地陪运营工单')}
     </div>
   `;
-  document.querySelector('#goChatBtn').addEventListener('click', () => {
-    state.page = 'chat';
-    render();
+  els.content.querySelectorAll('[data-guide-ticket]').forEach((button) => {
+    button.addEventListener('click', async () => {
+      const reply = window.prompt('填写给地陪的运营回复') || '';
+      if (!reply) return;
+      try {
+        button.disabled = true;
+        await api(`/api/admin/guide-support-requests/${button.dataset.guideTicket}/reply`, {
+          method: 'POST',
+          body: JSON.stringify({ reply }),
+        });
+        toast('运营回复已发送');
+        renderTickets();
+      } catch (error) {
+        toast(`回复失败：${error.message}`);
+      } finally {
+        button.disabled = false;
+      }
+    });
   });
 }
 
@@ -786,6 +869,7 @@ async function render() {
     if (state.page === 'users') return renderUsers();
     if (state.page === 'orders') return renderOrders();
     if (state.page === 'withdrawals') return renderWithdrawals();
+    if (state.page === 'insurance') return renderInsurance();
     if (state.page === 'reviews') return renderReviews();
     if (state.page === 'chat') return renderChat();
     if (state.page === 'tickets') return renderTickets();

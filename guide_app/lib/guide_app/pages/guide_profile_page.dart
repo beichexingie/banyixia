@@ -4,6 +4,7 @@ import 'package:provider/provider.dart';
 import '../../config/app_theme.dart';
 import '../../providers/user_provider.dart';
 import '../providers/guide_console_provider.dart';
+import '../providers/guide_backend_provider.dart';
 import '../widgets/guide_app_shell.dart';
 
 class GuideProfilePage extends StatelessWidget {
@@ -30,7 +31,13 @@ class GuideProfilePage extends StatelessWidget {
   Widget build(BuildContext context) {
     final user = context.watch<UserProvider>().user;
     final console = context.watch<GuideConsoleProvider>();
+    final backend = context.watch<GuideBackendProvider>();
     final stats = console.stats;
+    final positiveReviews = backend.reviews.where((item) {
+      final value = item['rating'];
+      final rating = value is num ? value.toDouble() : double.tryParse(value?.toString() ?? '') ?? 0;
+      return rating >= 4;
+    }).length;
 
     return GuideAppScaffold(
       backgroundColor: const Color(0xFFF0F1F3),
@@ -99,7 +106,7 @@ class GuideProfilePage extends StatelessWidget {
               children: [
                 _ProfileStat(label: '接单量', value: '${stats.totalOrders}'),
                 _ProfileStat(label: '完单量', value: '${stats.completedOrders}'),
-                _ProfileStat(label: '好评数', value: '${stats.positiveReviews}'),
+                _ProfileStat(label: '好评数', value: '$positiveReviews'),
                 _ProfileStat(label: '退单量', value: '${stats.cancelOrders}'),
               ],
             ),

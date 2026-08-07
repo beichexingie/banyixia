@@ -13,6 +13,8 @@ class Guide {
   final int likes;
   final int fans;
   final String city;
+  final List<Map<String, dynamic>> serviceItems;
+  final List<Map<String, dynamic>> reviews;
 
   Guide({
     required this.id,
@@ -28,6 +30,8 @@ class Guide {
     this.likes = 0,
     this.fans = 0,
     this.city = '',
+    this.serviceItems = const [],
+    this.reviews = const [],
   });
 
   static double _asDouble(dynamic value, {double fallback = 0}) {
@@ -50,6 +54,8 @@ class Guide {
       likes: json['likes'] ?? 0,
       fans: json['fans'] ?? 0,
       city: json['city'] ?? '',
+      serviceItems: _maps(json['service_items']),
+      reviews: _maps(json['reviews']),
     );
   }
 
@@ -68,6 +74,8 @@ class Guide {
       'likes': likes,
       'fans': fans,
       'city': city,
+      'service_items': serviceItems,
+      'reviews': reviews,
     };
   }
 
@@ -76,5 +84,13 @@ class Guide {
     if (value is int) return value.toDouble();
     if (value is num) return value.toDouble();
     return double.tryParse(value?.toString() ?? '');
+  }
+
+  static List<Map<String, dynamic>> _maps(dynamic raw) {
+    if (raw is! List) return const [];
+    return raw
+        .whereType<Map>()
+        .map((item) => Map<String, dynamic>.from(item))
+        .toList();
   }
 }

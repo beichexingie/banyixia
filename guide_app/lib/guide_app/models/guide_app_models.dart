@@ -288,8 +288,9 @@ extension GuideOrderStageX on GuideOrderStage {
 enum GuideOrderAction {
   accept,
   waitingPayment,
+  waitingReview,
   goToService,
-  arrived,
+  complete,
   navigate,
 }
 
@@ -300,10 +301,12 @@ extension GuideOrderActionX on GuideOrderAction {
         return '接单';
       case GuideOrderAction.waitingPayment:
         return '等待付款';
+      case GuideOrderAction.waitingReview:
+        return '等待评价';
       case GuideOrderAction.goToService:
         return '前往服务地点';
-      case GuideOrderAction.arrived:
-        return '到达服务地点';
+      case GuideOrderAction.complete:
+        return '完成服务';
       case GuideOrderAction.navigate:
         return '查看路线';
     }
@@ -315,10 +318,12 @@ extension GuideOrderActionX on GuideOrderAction {
         return Icons.check_circle_rounded;
       case GuideOrderAction.waitingPayment:
         return Icons.hourglass_top_rounded;
+      case GuideOrderAction.waitingReview:
+        return Icons.rate_review_outlined;
       case GuideOrderAction.goToService:
         return Icons.near_me_rounded;
-      case GuideOrderAction.arrived:
-        return Icons.location_on_rounded;
+      case GuideOrderAction.complete:
+        return Icons.task_alt_rounded;
       case GuideOrderAction.navigate:
         return Icons.alt_route_rounded;
     }

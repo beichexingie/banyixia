@@ -119,6 +119,53 @@ class _OrdersPageState extends State<OrdersPage>
     }
   }
 
+  Future<void> _reviewOrder(Order order) async {
+    var rating = 5;
+    final controller = TextEditingController();
+    final result = await showDialog<Map<String, dynamic>>(
+      context: context,
+      builder: (context) => StatefulBuilder(
+        builder: (context, setState) => AlertDialog(
+          title: const Text('评价本次服务'),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Row(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: List.generate(5, (index) => IconButton(
+                  onPressed: () => setState(() => rating = index + 1),
+                  icon: Icon(index < rating ? Icons.star : Icons.star_border),
+                  color: const Color(0xFFE28B24),
+                )),
+              ),
+              TextField(
+                controller: controller,
+                maxLines: 4,
+                decoration: const InputDecoration(hintText: '说说这次服务的感受'),
+              ),
+              const SizedBox(height: 8),
+              const Text('默认匿名展示，地陪只能看到匿名反馈。', style: TextStyle(fontSize: 12, color: AppColors.textHint)),
+            ],
+          ),
+          actions: [
+            TextButton(onPressed: () => Navigator.pop(context), child: const Text('取消')),
+            FilledButton(onPressed: () => Navigator.pop(context, {'rating': rating, 'content': controller.text.trim()}), child: const Text('提交')),
+          ],
+        ),
+      ),
+    );
+    final content = result?['content']?.toString() ?? '';
+    final selectedRating = result?['rating'] as int?;
+    controller.dispose();
+    if (!mounted || selectedRating == null || content.isEmpty) return;
+    try {
+      await context.read<OrderProvider>().reviewOrder(order.id, rating: selectedRating, content: content);
+      if (mounted) _showSimpleMessage('评价已提交');
+    } catch (error) {
+      if (mounted) _showSimpleMessage('评价提交失败：$error');
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -458,7 +505,7 @@ class _OrdersPageState extends State<OrdersPage>
                 const SizedBox(width: 8),
                 _outlineAction(
                   label: '待评价',
-                  onTap: () => _showSimpleMessage('评价入口稍后接入'),
+                  onTap: () => _reviewOrder(order),
                 ),
               ] else if (order.status == OrderStatus.completed) ...[
                 _outlineAction(

@@ -8,8 +8,12 @@ import '../../models/user.dart';
 import '../../providers/order_provider.dart';
 import '../../providers/user_provider.dart';
 import '../models/guide_app_models.dart';
+import 'guide_backend_provider.dart';
 
 class GuideConsoleProvider extends ChangeNotifier {
+  final GuideBackendProvider? _backend;
+
+  GuideConsoleProvider({GuideBackendProvider? backend}) : _backend = backend;
   static const _modeKey = 'guide_console_mode';
   static const _cityKey = 'guide_console_city';
   static const _nearbyOnlyKey = 'guide_console_nearby_only';
@@ -239,6 +243,20 @@ class GuideConsoleProvider extends ChangeNotifier {
     notifyListeners();
   }
 
+  void applyRemoteSettings() {
+    final settings = _backend?.settings;
+    if (settings == null || settings.isEmpty) return;
+    final modeName = settings['duty_mode']?.toString() ?? '';
+    for (final item in GuideDutyMode.values) {
+      if (item.name == modeName) _mode = item;
+    }
+    final city = settings['city']?.toString().trim() ?? '';
+    if (city.isNotEmpty) _selectedCity = city;
+    if (settings['online'] is bool) _isOnline = settings['online'] as bool;
+    if (settings['nearby_only'] is bool) _nearbyOnly = settings['nearby_only'] as bool;
+    notifyListeners();
+  }
+
   void _syncEnabledTypesFromUser(User user) {
     if (user.guideTags.isEmpty) return;
     final parsed = user.guideTags
@@ -255,6 +273,7 @@ class GuideConsoleProvider extends ChangeNotifier {
     notifyListeners();
     final prefs = await SharedPreferences.getInstance();
     await prefs.setInt(_modeKey, mode.index);
+    await _backend?.saveSettings(dutyMode: mode.name);
   }
 
   Future<void> setSelectedCity(String city) async {
@@ -273,6 +292,7 @@ class GuideConsoleProvider extends ChangeNotifier {
     notifyListeners();
     final prefs = await SharedPreferences.getInstance();
     await prefs.setString(_cityKey, _selectedCity);
+    await _backend?.saveSettings(city: _selectedCity);
   }
 
   Future<void> setNearbyOnly(bool value) async {
@@ -280,6 +300,7 @@ class GuideConsoleProvider extends ChangeNotifier {
     notifyListeners();
     final prefs = await SharedPreferences.getInstance();
     await prefs.setBool(_nearbyOnlyKey, value);
+    await _backend?.saveSettings(nearbyOnly: value);
   }
 
   Future<void> setOnline(bool value) async {
@@ -287,6 +308,7 @@ class GuideConsoleProvider extends ChangeNotifier {
     notifyListeners();
     final prefs = await SharedPreferences.getInstance();
     await prefs.setBool(_onlineKey, value);
+    await _backend?.saveSettings(online: value);
   }
 
   Future<void> toggleServiceType(GuideServiceType type) async {
@@ -303,6 +325,7 @@ class GuideConsoleProvider extends ChangeNotifier {
       _enabledTypesKey,
       _enabledTypes.map((item) => item.name).toList(),
     );
+    await _backend?.saveSettings();
   }
 
   Future<void> saveServiceTypesToProfile(UserProvider userProvider) async {
@@ -457,14 +480,15 @@ class GuideConsoleProvider extends ChangeNotifier {
         OrderStatus.completed => GuideOrderStage.inProgress,
         OrderStatus.cancelled => GuideOrderStage.newOrder,
       };
-      final primaryAction = switch (stage) {
-        GuideOrderStage.newOrder => GuideOrderAction.goToService,
-        GuideOrderStage.pendingPayment =>
-          order.paymentStatus == 'accepted'
-              ? GuideOrderAction.waitingPayment
-              : GuideOrderAction.accept,
-        GuideOrderStage.inProgress => GuideOrderAction.arrived,
-      };
+      final primaryAction = order.status == OrderStatus.pendingReview
+          ? GuideOrderAction.waitingReview
+          : switch (stage) {
+              GuideOrderStage.newOrder => GuideOrderAction.goToService,
+              GuideOrderStage.pendingPayment => order.paymentStatus == 'accepted'
+                  ? GuideOrderAction.waitingPayment
+                  : GuideOrderAction.accept,
+              GuideOrderStage.inProgress => GuideOrderAction.complete,
+            };
       return GuideOrderCardData(
         id: order.id,
         stage: stage,
@@ -501,7 +525,7 @@ class GuideConsoleProvider extends ChangeNotifier {
       serviceLat: 31.3202,
       serviceLng: 120.6336,
       imageUrls: _mockOrderImages,
-      primaryAction: GuideOrderAction.arrived,
+      primaryAction: GuideOrderAction.complete,
       serviceTime: DateTime.now().add(const Duration(hours: 5)),
     ),
     GuideOrderCardData(

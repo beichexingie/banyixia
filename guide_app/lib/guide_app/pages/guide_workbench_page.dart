@@ -3,6 +3,7 @@ import 'package:provider/provider.dart';
 
 import '../../config/app_theme.dart';
 import '../providers/guide_console_provider.dart';
+import '../providers/guide_backend_provider.dart';
 import '../widgets/guide_app_shell.dart';
 import '../widgets/guide_console_header.dart';
 
@@ -39,7 +40,13 @@ class GuideWorkbenchPage extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final console = context.watch<GuideConsoleProvider>();
+    final backend = context.watch<GuideBackendProvider>();
     final stats = console.stats;
+    final positiveReviews = backend.reviews.where((item) {
+      final value = item['rating'];
+      final rating = value is num ? value.toDouble() : double.tryParse(value?.toString() ?? '') ?? 0;
+      return rating >= 4;
+    }).length;
 
     return GuideAppScaffold(
       backgroundColor: const Color(0xFFF0F1F3),
@@ -57,7 +64,7 @@ class GuideWorkbenchPage extends StatelessWidget {
             _StatsCard(
               totalOrders: stats.totalOrders,
               completedOrders: stats.completedOrders,
-              positiveReviews: stats.positiveReviews,
+              positiveReviews: positiveReviews,
               cancelOrders: stats.cancelOrders,
               cancellationRate: stats.cancellationRate,
             ),
