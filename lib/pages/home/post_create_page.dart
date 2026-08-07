@@ -3,8 +3,10 @@ import 'dart:io';
 
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
+import 'package:go_router/go_router.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:provider/provider.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 import '../../config/app_theme.dart';
 import '../../providers/post_provider.dart';
@@ -26,11 +28,19 @@ class _PostCreatePageState extends State<PostCreatePage> {
   final List<XFile> _selectedImages = [];
   final ImagePicker _picker = ImagePicker();
   String _tag = '';
+  String _location = '';
   bool _isUploading = false;
 
   bool get _isRecruitMode => widget.mode == 'recruit';
   String get _pageTitle => _isRecruitMode ? '发布招募/自荐' : '发布动态';
   String get _defaultTag => _isRecruitMode ? '招募' : '分享';
+  String get _draftKey => 'post_draft_${widget.mode}';
+
+  @override
+  void initState() {
+    super.initState();
+    _loadDraft();
+  }
 
   @override
   void dispose() {
@@ -107,7 +117,10 @@ class _PostCreatePageState extends State<PostCreatePage> {
             authorName: user.nickname,
             authorAvatar: user.avatar,
             tag: _tag.isNotEmpty ? _tag : _defaultTag,
+            location: _location,
           );
+
+      await _clearDraft();
 
       if (!mounted) return;
       Navigator.of(context).maybePop();
@@ -117,6 +130,85 @@ class _PostCreatePageState extends State<PostCreatePage> {
     } finally {
       if (mounted) setState(() => _isUploading = false);
     }
+  }
+
+  Future<void> _loadDraft() async {
+    final prefs = await SharedPreferences.getInstance();
+    if (!mounted) return;
+    final title = prefs.getString('${_draftKey}_title') ?? '';
+    final content = prefs.getString('${_draftKey}_content') ?? '';
+    final tag = prefs.getString('${_draftKey}_tag') ?? '';
+    final location = prefs.getString('${_draftKey}_location') ?? '';
+    if (title.isEmpty && content.isEmpty && tag.isEmpty && location.isEmpty) return;
+    _titleController.text = title;
+    _contentController.text = content;
+    setState(() {
+      _tag = tag;
+      _location = location;
+    });
+  }
+
+  Future<void> _saveDraft() async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setString('${_draftKey}_title', _titleController.text);
+    await prefs.setString('${_draftKey}_content', _contentController.text);
+    await prefs.setString('${_draftKey}_tag', _tag);
+    await prefs.setString('${_draftKey}_location', _location);
+    if (mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('草稿已保存到本机')),
+      );
+    }
+  }
+
+  Future<void> _clearDraft() async {
+    final prefs = await SharedPreferences.getInstance();
+    await Future.wait([
+      prefs.remove('${_draftKey}_title'),
+      prefs.remove('${_draftKey}_content'),
+      prefs.remove('${_draftKey}_tag'),
+      prefs.remove('${_draftKey}_location'),
+    ]);
+  }
+
+  Future<void> _pickLocation() async {
+    final result = await context.push<Map<String, dynamic>>(
+      '/order/location',
+      extra: _location.isEmpty ? null : {'address': _location},
+    );
+    if (!mounted || result == null) return;
+    final address = result['summary']?.toString().trim() ?? '';
+    if (address.isNotEmpty) setState(() => _location = address);
+  }
+
+  Future<void> _showPreview() async {
+    final title = _titleController.text.trim();
+    final content = _contentController.text.trim();
+    await showModalBottomSheet<void>(
+      context: context,
+      showDragHandle: true,
+      isScrollControlled: true,
+      builder: (context) => SafeArea(
+        child: SingleChildScrollView(
+          padding: const EdgeInsets.fromLTRB(20, 4, 20, 28),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(title.isEmpty ? '未填写标题' : title,
+                  style: const TextStyle(fontSize: 22, fontWeight: FontWeight.w800)),
+              const SizedBox(height: 12),
+              if (_location.isNotEmpty)
+                Text('位置：$_location', style: const TextStyle(color: AppColors.textSecondary)),
+              if (_tag.isNotEmpty)
+                Text('话题：$_tag', style: const TextStyle(color: AppColors.textSecondary)),
+              const SizedBox(height: 14),
+              Text(content.isEmpty ? '未填写正文' : content,
+                  style: const TextStyle(fontSize: 16, height: 1.6)),
+            ],
+          ),
+        ),
+      ),
+    );
   }
 
   Widget _buildSelectedImage(XFile file) {
@@ -253,9 +345,9 @@ class _PostCreatePageState extends State<PostCreatePage> {
                     children: [
                       _ActionChip(
                         icon: Icons.location_on_outlined,
-                        label: '添加位置',
+                        label: _location.isEmpty ? '添加位置' : _location,
                         dark: true,
-                        onTap: () {},
+                        onTap: _pickLocation,
                       ),
                       _ActionChip(
                         icon: Icons.tag,
@@ -290,9 +382,9 @@ class _PostCreatePageState extends State<PostCreatePage> {
           ),
           child: Row(
             children: [
-              _BottomMiniAction(icon: Icons.visibility_outlined, label: '预览', onTap: () {}),
+              _BottomMiniAction(icon: Icons.visibility_outlined, label: '预览', onTap: _showPreview),
               const SizedBox(width: 18),
-              _BottomMiniAction(icon: Icons.save_outlined, label: '存草稿', onTap: () {}),
+              _BottomMiniAction(icon: Icons.save_outlined, label: '存草稿', onTap: _saveDraft),
               const Spacer(),
               ElevatedButton(
                 onPressed: _isUploading ? null : _submitPost,

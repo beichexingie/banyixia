@@ -32,6 +32,12 @@ class GuideOrderCenterPage extends StatefulWidget {
 class _GuideOrderCenterPageState extends State<GuideOrderCenterPage> {
   GuideOrderStage _selectedStage = GuideOrderStage.inProgress;
 
+  void _showSupportNotice() {
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(content: Text('客服入口暂未接入，请先通过订单聊天联系客户')),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final console = context.watch<GuideConsoleProvider>();
@@ -507,7 +513,7 @@ class _GuideOrderCard extends StatelessWidget {
                           child: _OutlineActionButton(
                             icon: Icons.support_agent_rounded,
                             label: '客服',
-                            onTap: () {},
+                            onTap: _showSupportNotice,
                           ),
                         ),
                         const SizedBox(width: 10),
@@ -539,7 +545,7 @@ class _GuideOrderCard extends StatelessWidget {
                     child: _OutlineActionButton(
                       icon: Icons.support_agent_rounded,
                       label: '客服',
-                      onTap: () {},
+                      onTap: _showSupportNotice,
                     ),
                   ),
                   const SizedBox(width: 10),

@@ -52,6 +52,7 @@ class _LocationPickerPageState extends State<LocationPickerPage> {
   String? _locationSummary;
   bool _searching = false;
   bool _locatingFromMap = false;
+  bool _showAllHistory = false;
   double _mapZoom = _defaultZoom;
   LatLng _mapTarget = _defaultLatLng;
   Offset _mapDragOffset = Offset.zero;
@@ -1237,19 +1238,30 @@ class _LocationPickerPageState extends State<LocationPickerPage> {
             ),
             const Spacer(),
             TextButton(
-              onPressed: () {},
+              onPressed: () => setState(() => _showAllHistory = !_showAllHistory),
               style: TextButton.styleFrom(
                 padding: EdgeInsets.zero,
                 minimumSize: Size.zero,
                 tapTargetSize: MaterialTapTargetSize.shrinkWrap,
               ),
-              child: const Text(
-                '展开更多',
-                style: TextStyle(color: AppColors.textHint),
+              child: Text(
+                _showAllHistory ? '收起' : '展开更多',
+                style: const TextStyle(color: AppColors.textHint),
               ),
             ),
           ],
         ),
+        if (_showAllHistory) ...[
+          const SizedBox(height: 10),
+          Wrap(
+            spacing: 10,
+            runSpacing: 10,
+            children: [
+              for (final city in const ['杭州', '南京', '无锡', '常州'])
+                _cityPill(city),
+            ],
+          ),
+        ],
       ],
     );
   }

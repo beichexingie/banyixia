@@ -22,16 +22,16 @@ class ServiceGuideCard extends StatelessWidget {
     final avatar = guide.avatar.isNotEmpty
         ? guide.avatar
         : (guide.images.isNotEmpty ? guide.images.first : '');
-    final likes = guide.likes == 0 ? 10 : guide.likes;
-    final comments = guide.views == 0 ? 209 : guide.views;
-    final favorites = guide.fans == 0 ? 900 : guide.fans;
+    final likes = guide.likes;
+    final comments = guide.views;
+    final favorites = guide.fans;
     final rating = guide.rating == 0
-        ? '4.8分'
+        ? '暂无评分'
         : '${guide.rating.toStringAsFixed(1)}分';
     final name = guide.name.trim().isEmpty ? '本地导游' : guide.name.trim();
     final description = guide.description.trim().isNotEmpty
         ? guide.description.trim()
-        : '这是详情这是详情这是详情这是详情这是详情这是详情这是详情这是详情这是详情...';
+        : '暂未填写服务介绍';
 
     return GestureDetector(
       onTap: () => context.push('/guide/${guide.id}'),

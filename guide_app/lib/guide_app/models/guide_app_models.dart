@@ -357,6 +357,24 @@ class GuideAddress {
   });
 
   String get summary => '$city$title';
+
+  Map<String, String> toJson() => {
+        'city': city,
+        'title': title,
+        'detail': detail,
+        'contactName': contactName,
+        'maskedPhone': maskedPhone,
+      };
+
+  factory GuideAddress.fromJson(Map<String, dynamic> json) {
+    return GuideAddress(
+      city: json['city']?.toString() ?? '',
+      title: json['title']?.toString() ?? '',
+      detail: json['detail']?.toString() ?? '',
+      contactName: json['contactName']?.toString() ?? '',
+      maskedPhone: json['maskedPhone']?.toString() ?? '',
+    );
+  }
 }
 
 class GuideServiceOption {

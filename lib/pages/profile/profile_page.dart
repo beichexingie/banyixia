@@ -132,7 +132,7 @@ class _ProfilePageState extends State<ProfilePage> {
               ),
               const SizedBox(height: 6),
               GestureDetector(
-                onTap: () {},
+                onTap: () => context.push('/settings/profile'),
                 child: Row(
                   children: [
                     CircleAvatar(

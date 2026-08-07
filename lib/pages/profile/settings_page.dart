@@ -23,7 +23,7 @@ class SettingsPage extends StatelessWidget {
           _buildSection(
             children: [
               _settingsItem(context, Icons.person_outline, '编辑资料', () {
-                _showSnack(context, '资料编辑页稍后完善');
+                context.push('/settings/profile');
               }),
               const Divider(height: 1, indent: 48),
               _settingsItem(context, Icons.notifications_outlined, '消息通知设置', () {

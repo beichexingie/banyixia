@@ -16,6 +16,75 @@ class GuideServiceLocationPage extends StatefulWidget {
 class _GuideServiceLocationPageState extends State<GuideServiceLocationPage> {
   bool _expanded = false;
 
+  Future<void> _addAddress() async {
+    final titleController = TextEditingController();
+    final detailController = TextEditingController();
+    final result = await showDialog<Map<String, String>>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('新增服务地址'),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            TextField(controller: titleController, decoration: const InputDecoration(labelText: '地点名称')),
+            TextField(controller: detailController, decoration: const InputDecoration(labelText: '详细地址')),
+          ],
+        ),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(context), child: const Text('取消')),
+          FilledButton(
+            onPressed: () => Navigator.pop(context, {
+              'title': titleController.text.trim(),
+              'detail': detailController.text.trim(),
+            }),
+            child: const Text('保存'),
+          ),
+        ],
+      ),
+    );
+    titleController.dispose();
+    detailController.dispose();
+    if (!mounted || result == null || result['title']!.isEmpty) return;
+    context.read<GuideConsoleProvider>().addServiceAddress(
+      GuideAddress(
+        city: context.read<GuideConsoleProvider>().selectedCity,
+        title: result['title']!,
+        detail: result['detail']!.isEmpty ? '待补充详细地址' : result['detail']!,
+        contactName: '本人',
+        maskedPhone: '当前账号',
+      ),
+    );
+    setState(() => _expanded = true);
+  }
+
+  Future<void> _manageAddresses() async {
+    final console = context.read<GuideConsoleProvider>();
+    if (console.serviceAddresses.isEmpty) return;
+    await showModalBottomSheet<void>(
+      context: context,
+      showDragHandle: true,
+      builder: (context) => SafeArea(
+        child: ListView(
+          shrinkWrap: true,
+          padding: const EdgeInsets.fromLTRB(16, 0, 16, 20),
+          children: console.serviceAddresses.map((address) {
+            return ListTile(
+              title: Text('${address.city}${address.title}'),
+              subtitle: Text(address.detail),
+              trailing: IconButton(
+                icon: const Icon(Icons.delete_outline, color: Colors.red),
+                onPressed: () {
+                  console.removeServiceAddress(address);
+                  Navigator.pop(context);
+                },
+              ),
+            );
+          }).toList(),
+        ),
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final console = context.watch<GuideConsoleProvider>();
@@ -107,11 +176,14 @@ class _GuideServiceLocationPageState extends State<GuideServiceLocationPage> {
                     ],
                   ),
                 ),
-                const Spacer(),
-                GuideSectionCard(
-                  margin: const EdgeInsets.fromLTRB(0, 0, 0, 0),
-                  padding: const EdgeInsets.fromLTRB(18, 20, 18, 26),
-                  child: Column(
+                Expanded(
+                  child: Align(
+                    alignment: Alignment.bottomCenter,
+                    child: SingleChildScrollView(
+                      child: GuideSectionCard(
+                        margin: const EdgeInsets.fromLTRB(0, 0, 0, 0),
+                        padding: const EdgeInsets.fromLTRB(18, 20, 18, 26),
+                        child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       const Text(
@@ -179,22 +251,14 @@ class _GuideServiceLocationPageState extends State<GuideServiceLocationPage> {
                             label: '新增',
                             icon: Icons.add,
                             onTap: () {
-                              context.read<GuideConsoleProvider>().addMockServiceAddress();
-                              setState(() => _expanded = true);
-                              ScaffoldMessenger.of(context).showSnackBar(
-                                const SnackBar(content: Text('已新增一条模拟服务地址')),
-                              );
+                              _addAddress();
                             },
                           ),
                           const SizedBox(width: 10),
                           _SmallActionButton(
                             label: '管理',
                             icon: Icons.edit_outlined,
-                            onTap: () {
-                              ScaffoldMessenger.of(context).showSnackBar(
-                                const SnackBar(content: Text('地址管理能力已预留，后续接编辑/删除')),
-                              );
-                            },
+                            onTap: _manageAddresses,
                           ),
                         ],
                       ),
@@ -228,6 +292,9 @@ class _GuideServiceLocationPageState extends State<GuideServiceLocationPage> {
                         ),
                       ],
                     ],
+                        ),
+                      ),
+                    ),
                   ),
                 ),
               ],

@@ -306,7 +306,7 @@ class _DemandListPageState extends State<DemandListPage> {
               },
             ),
             GestureDetector(
-              onTap: () {},
+              onTap: () => context.push('/demand/create'),
               child: SizedBox(
                 width: 66,
                 child: Column(

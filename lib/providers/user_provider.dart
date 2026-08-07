@@ -20,6 +20,7 @@ class UserProvider extends ChangeNotifier {
   bool get isGuide => _user.isGuideApproved;
   bool get isBanned => _user.isBanned;
   String? get accessToken => _sessionService.currentSession?.accessToken;
+  String get phoneNumber => _sessionService.currentSession?.phone ?? '';
 
   UserProvider({
     required SessionService sessionService,

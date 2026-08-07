@@ -749,7 +749,7 @@ appRouter.post('/posts', async (req, res) => {
     author_avatar: payload.author_avatar ?? '',
     content: `${payload.title ?? ''}\n${payload.content ?? ''}`.trim(),
     images: payload.images ?? [],
-    location: payload.tag ?? '',
+    location: payload.location ?? payload.tag ?? '',
     review_status: moderation.reviewStatus,
     reject_reason: moderation.reviewStatus === 'pending'
       ? `命中审核规则: ${moderation.hits.join(', ')}`

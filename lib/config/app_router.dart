@@ -27,6 +27,7 @@ import '../pages/demand/my_demand_list_page.dart';
 import '../pages/common/state_notice_page.dart';
 import '../models/guide.dart';
 import '../pages/profile/order_detail_page.dart';
+import '../pages/profile/edit_profile_page.dart';
 
 class AppRouter {
   final UserProvider userProvider;
@@ -59,6 +60,10 @@ class AppRouter {
       GoRoute(
         path: '/settings',
         builder: (context, state) => const SettingsPage(),
+      ),
+      GoRoute(
+        path: '/settings/profile',
+        builder: (context, state) => const EditProfilePage(),
       ),
       GoRoute(
         path: '/settings/notifications',

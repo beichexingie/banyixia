@@ -63,6 +63,62 @@ class _ChatRoomPageState extends State<ChatRoomPage> {
     }
   }
 
+  Future<void> _showRoomMenu() async {
+    await showModalBottomSheet<void>(
+      context: context,
+      showDragHandle: true,
+      builder: (context) => SafeArea(
+        child: Wrap(
+          children: [
+            ListTile(
+              leading: const Icon(Icons.person_outline),
+              title: const Text('查看对方资料'),
+              onTap: () => Navigator.pop(context),
+            ),
+            ListTile(
+              leading: const Icon(Icons.notifications_off_outlined),
+              title: const Text('消息免打扰'),
+              onTap: () {
+                Navigator.pop(context);
+                ScaffoldMessenger.of(this.context).showSnackBar(
+                  const SnackBar(content: Text('消息免打扰暂未接入')),
+                );
+              },
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Future<void> _showAttachmentOptions() async {
+    await showModalBottomSheet<void>(
+      context: context,
+      showDragHandle: true,
+      builder: (context) => SafeArea(
+        child: Wrap(
+          children: [
+            ListTile(
+              leading: const Icon(Icons.photo_library_outlined),
+              title: const Text('发送图片'),
+              onTap: () {
+                Navigator.pop(context);
+                ScaffoldMessenger.of(this.context).showSnackBar(
+                  const SnackBar(content: Text('图片消息接口暂未接入')),
+                );
+              },
+            ),
+            ListTile(
+              leading: const Icon(Icons.close),
+              title: const Text('取消'),
+              onTap: () => Navigator.pop(context),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final myId = context.read<UserProvider>().user.id;
@@ -82,7 +138,7 @@ class _ChatRoomPageState extends State<ChatRoomPage> {
           onPressed: () => Navigator.pop(context),
         ),
         actions: [
-          IconButton(icon: const Icon(Icons.more_horiz), onPressed: () {}),
+          IconButton(icon: const Icon(Icons.more_horiz), onPressed: _showRoomMenu),
         ],
       ),
       body: Column(
@@ -123,7 +179,7 @@ class _ChatRoomPageState extends State<ChatRoomPage> {
       ),
       child: Row(
         children: [
-          IconButton(icon: const Icon(Icons.add_circle_outline, color: AppColors.textSecondary), onPressed: () {}),
+          IconButton(icon: const Icon(Icons.add_circle_outline, color: AppColors.textSecondary), onPressed: _showAttachmentOptions),
           Expanded(
             child: Container(
               padding: const EdgeInsets.symmetric(horizontal: 16),

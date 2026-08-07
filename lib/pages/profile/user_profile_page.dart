@@ -283,7 +283,9 @@ class _UserProfilePageState extends State<UserProfilePage> {
                                 ),
                                 if (user.isGuideApproved) _buildGuideBadge(),
                                 Text(
-                                  '${_displayRating().toStringAsFixed(1)}分',
+                                  _displayRating() <= 0
+                                      ? '暂无评分'
+                                      : '${_displayRating().toStringAsFixed(1)}分',
                                   style: const TextStyle(
                                     fontSize: 22,
                                     fontWeight: FontWeight.w800,
@@ -326,17 +328,17 @@ class _UserProfilePageState extends State<UserProfilePage> {
                   Row(
                     children: [
                       _heroStat(
-                        '${user.fansCount == 0 ? 12 : user.fansCount}',
+                        '${user.fansCount}',
                         '粉丝',
                       ),
                       const SizedBox(width: 42),
                       _heroStat(
-                        '${user.followCount == 0 ? 28 : user.followCount}',
+                        '${user.followCount}',
                         '关注',
                       ),
                       const SizedBox(width: 42),
                       _heroStat(
-                        '${_guideProfile?.views == 0 || _guideProfile == null ? 105 : _guideProfile!.views}',
+                        '${_guideProfile?.views ?? 0}',
                         '接单',
                       ),
                     ],
@@ -406,7 +408,7 @@ class _UserProfilePageState extends State<UserProfilePage> {
 
   Widget _buildServiceTab(User user, Guide guide) {
     final intro = _guideIntroduction(user);
-    final tags = guide.tags.isNotEmpty ? guide.tags : _defaultServiceTags();
+    final tags = guide.tags;
 
     return Column(
       children: [
@@ -426,17 +428,19 @@ class _UserProfilePageState extends State<UserProfilePage> {
         const SizedBox(height: 12),
         _buildInfoSection(
           title: '服务类型说明：',
-          child: Wrap(
-            spacing: 12,
-            runSpacing: 12,
-            children: tags.take(4).map(_buildServiceTagChip).toList(),
-          ),
+          child: tags.isEmpty
+              ? const Text('地陪暂未设置服务类型', style: TextStyle(color: AppColors.textHint))
+              : Wrap(
+                  spacing: 12,
+                  runSpacing: 12,
+                  children: tags.take(4).map(_buildServiceTagChip).toList(),
+                ),
         ),
         const SizedBox(height: 12),
         _buildInfoSection(
           title: '额外费用说明：',
           child: const Text(
-            '这是额外说明这是额外说明这是额外说明这是额外说明这是额外说明这是额外说明这是额外说明',
+            '地陪暂未填写额外费用说明，下单前请通过订单和聊天确认费用明细。',
             style: TextStyle(
               fontSize: 15,
               height: 1.55,
@@ -466,17 +470,19 @@ class _UserProfilePageState extends State<UserProfilePage> {
         crossAxisSpacing: 8,
         childAspectRatio: 0.9,
         children: [
-          _metricCell('${_guideProfile?.likes ?? 123}', '入驻'),
+          _metricCell('${_guideProfile?.likes ?? 0}', '获赞'),
           _metricCell(
-            '${(_displayRating() * 20.8).clamp(80, 99.8).toStringAsFixed(1)}%',
+            _displayRating() == 0
+                ? '暂无'
+                : '${(_displayRating() * 20.8).clamp(0, 100).toStringAsFixed(1)}%',
             '好评率',
           ),
-          _metricCell('${(_guideProfile?.fans ?? 80).clamp(80, 99)}%', '回购率'),
-          _metricCell('汉', '民族'),
+          _metricCell('${_guideProfile?.fans ?? 0}', '粉丝'),
+          _metricCell('未填写', '民族'),
           _metricCell(_zodiacLabel(user), '星座'),
-          _metricCell(user.occupation.isEmpty ? '本科' : user.occupation, '学历'),
-          _metricCell('${170 + ((_guideProfile?.likes ?? 13) % 18)}', '身高'),
-          _metricCell('${48 + ((_guideProfile?.fans ?? 32) % 36)}kg', '体重'),
+          _metricCell(user.occupation.isEmpty ? '未填写' : user.occupation, '职业'),
+          _metricCell('未填写', '身高'),
+          _metricCell('未填写', '体重'),
         ],
       ),
     );
@@ -521,7 +527,7 @@ class _UserProfilePageState extends State<UserProfilePage> {
           Row(
             children: [
               const Text(
-                '用户评价（10）',
+                '用户评价',
                 style: TextStyle(
                   fontSize: 18,
                   fontWeight: FontWeight.w900,
@@ -545,19 +551,12 @@ class _UserProfilePageState extends State<UserProfilePage> {
             ],
           ),
           const SizedBox(height: 14),
-          _reviewCard(
-            name: '用户1028er',
-            content:
-                '这是评论内容，这是评论内容。这是评论内容，这是评论内容这是评论内容，这是评论内容这是评论内容，这是评论内容这是评论内容。',
-          ),
-          _reviewCard(
-            name: '用户1028er',
-            content: '这是评论内容，这是评论内容。这是评论内容，这是评论内容这是评论内容，这是评论内容这是评论内容，这是评论内容。',
-            imageCount: 3,
-          ),
-          _reviewCard(
-            name: '用户1028er',
-            content: '这是评论内容，这是评论内容。这是评论内容，这是评论内容这是评论内容，这是评论内容这是评论内容，这是评论内容。',
+          const Padding(
+            padding: EdgeInsets.fromLTRB(0, 8, 0, 18),
+            child: Align(
+              alignment: Alignment.centerLeft,
+              child: Text('暂无评价', style: TextStyle(color: AppColors.textHint)),
+            ),
           ),
         ],
       ),
@@ -900,10 +899,6 @@ class _UserProfilePageState extends State<UserProfilePage> {
         );
   }
 
-  List<String> _defaultServiceTags() {
-    return const ['休闲游玩', '商务陪同'];
-  }
-
   IconData _serviceTagIcon(String label) {
     if (label.contains('商务') || label.contains('公务')) {
       return Icons.people_outline_rounded;
@@ -922,7 +917,7 @@ class _UserProfilePageState extends State<UserProfilePage> {
     if (digits.isNotEmpty) {
       return digits;
     }
-    return '109283';
+    return '未设置';
   }
 
   String _displayName(User user) {
@@ -937,7 +932,7 @@ class _UserProfilePageState extends State<UserProfilePage> {
     if ((_guideProfile?.city ?? '').trim().isNotEmpty) {
       return _guideProfile!.city.trim();
     }
-    return '苏州';
+    return '未填写';
   }
 
   String _guideIntroduction(User user) {
@@ -947,7 +942,7 @@ class _UserProfilePageState extends State<UserProfilePage> {
       user.bio,
     ].firstWhere(
       (item) => item.trim().isNotEmpty,
-      orElse: () => '这是个人介绍这是个人介绍这是个人介绍这是个人介绍这是个人介绍这是个人介绍这是个人介绍',
+      orElse: () => '地陪暂未填写个人介绍',
     );
   }
 
@@ -963,13 +958,13 @@ class _UserProfilePageState extends State<UserProfilePage> {
 
   double _displayRating() {
     final rating = _guideProfile?.rating ?? 0;
-    return rating <= 0 ? 4.8 : rating;
+    return rating;
   }
 
   String _ageLabel(User user) {
     final birthday = DateTime.tryParse(user.birthday);
     if (birthday == null) {
-      return user.gender.isEmpty ? '女·26' : '${user.gender}·26';
+      return user.gender.isEmpty ? '未填写' : user.gender;
     }
     final now = DateTime.now();
     var age = now.year - birthday.year;
@@ -986,7 +981,7 @@ class _UserProfilePageState extends State<UserProfilePage> {
   String _zodiacLabel(User user) {
     final birthday = DateTime.tryParse(user.birthday);
     if (birthday == null) {
-      return '水瓶座';
+      return '未填写';
     }
     final month = birthday.month;
     final day = birthday.day;

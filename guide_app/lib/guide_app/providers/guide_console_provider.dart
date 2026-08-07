@@ -1,3 +1,5 @@
+import 'dart:convert';
+
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
@@ -13,6 +15,7 @@ class GuideConsoleProvider extends ChangeNotifier {
   static const _nearbyOnlyKey = 'guide_console_nearby_only';
   static const _enabledTypesKey = 'guide_console_types';
   static const _onlineKey = 'guide_console_online';
+  static const _addressesKeyPrefix = 'guide_console_addresses_';
 
   GuideDutyMode _mode = GuideDutyMode.nearby;
   String _selectedCity = '苏州';
@@ -176,6 +179,9 @@ class GuideConsoleProvider extends ChangeNotifier {
       _refreshLoginState(userProvider.user);
       return;
     }
+    _lastUserId = userProvider.user.id.trim().isEmpty
+        ? 'guest'
+        : userProvider.user.id.trim();
     final prefs = await SharedPreferences.getInstance();
     final modeIndex = prefs.getInt(_modeKey);
     if (modeIndex != null &&
@@ -198,6 +204,22 @@ class GuideConsoleProvider extends ChangeNotifier {
       if (parsed.isNotEmpty) {
         _enabledTypes = parsed;
       }
+    }
+    final addressKey = _addressesKey(_lastUserId);
+    final storedAddresses = prefs.getStringList(addressKey);
+    if (storedAddresses != null) {
+      final restored = storedAddresses
+          .map((item) {
+            try {
+              return GuideAddress.fromJson(jsonDecode(item) as Map<String, dynamic>);
+            } catch (_) {
+              return null;
+            }
+          })
+          .whereType<GuideAddress>()
+          .where((item) => item.title.trim().isNotEmpty)
+          .toList();
+      _serviceAddresses = restored;
     }
     _syncEnabledTypesFromUser(userProvider.user);
     _refreshLoginState(userProvider.user);
@@ -384,7 +406,32 @@ class GuideConsoleProvider extends ChangeNotifier {
   void addServiceAddress(GuideAddress address) {
     _serviceAddresses = [address, ..._serviceAddresses];
     notifyListeners();
+    _persistServiceAddresses();
   }
+
+  void removeServiceAddress(GuideAddress address) {
+    _serviceAddresses = _serviceAddresses
+        .where((item) => item != address)
+        .toList(growable: false);
+    notifyListeners();
+    _persistServiceAddresses();
+  }
+
+  String _addressesKey(String userId) {
+    final normalized = userId.trim().isEmpty ? 'guest' : userId.trim();
+    return '$_addressesKeyPrefix$normalized';
+  }
+
+  Future<void> _persistServiceAddresses() async {
+    final prefs = await SharedPreferences.getInstance();
+    // Address settings are local UI data until a server endpoint is available.
+    await prefs.setStringList(
+      _addressesKey(_lastUserId),
+      _serviceAddresses.map((item) => jsonEncode(item.toJson())).toList(),
+    );
+  }
+
+  String _lastUserId = 'guest';
 
   List<GuideOrderCardData> buildGuideOrders(
     List<Order> orders, {
@@ -535,7 +582,12 @@ class GuideConsoleProvider extends ChangeNotifier {
     _stats = _buildStats(guideOrders);
     final derivedAddresses = _buildServiceAddresses(guideOrders);
     if (derivedAddresses.isNotEmpty) {
-      _serviceAddresses = derivedAddresses;
+      final existing = <String>{};
+      _serviceAddresses = [
+        ..._serviceAddresses,
+        ...derivedAddresses,
+      ].where((item) => existing.add(item.summary)).toList(growable: false);
+      await _persistServiceAddresses();
     }
     notifyListeners();
   }

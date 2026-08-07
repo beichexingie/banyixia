@@ -13,6 +13,7 @@ class GuideProfilePage extends StatelessWidget {
   final VoidCallback onOpenCertification;
   final VoidCallback onOpenPlatformRules;
   final VoidCallback onOpenWallet;
+  final VoidCallback onOpenProfileEdit;
 
   const GuideProfilePage({
     super.key,
@@ -22,6 +23,7 @@ class GuideProfilePage extends StatelessWidget {
     required this.onOpenCertification,
     required this.onOpenPlatformRules,
     required this.onOpenWallet,
+    required this.onOpenProfileEdit,
   });
 
   @override
@@ -68,14 +70,15 @@ class GuideProfilePage extends StatelessWidget {
                       style: const TextStyle(fontSize: 15, color: AppColors.textSecondary),
                     ),
                     const SizedBox(height: 10),
-                    Row(
+                    Wrap(
+                      spacing: 10,
+                      runSpacing: 8,
                       children: [
                         GuidePillButton(
                           label: console.isOnline ? '在线中' : '下线中',
                           active: console.isOnline,
                           onTap: () => console.setOnline(!console.isOnline),
                         ),
-                        const SizedBox(width: 10),
                         GuidePillButton(
                           label: console.selectedCity,
                           onTap: onOpenCityPicker,
@@ -90,8 +93,9 @@ class GuideProfilePage extends StatelessWidget {
           ),
           const SizedBox(height: 20),
           GuideSectionCard(
-            child: Row(
-              mainAxisAlignment: MainAxisAlignment.spaceAround,
+            child: Wrap(
+              alignment: WrapAlignment.spaceAround,
+              runSpacing: 18,
               children: [
                 _ProfileStat(label: '接单量', value: '${stats.totalOrders}'),
                 _ProfileStat(label: '完单量', value: '${stats.completedOrders}'),
@@ -100,22 +104,17 @@ class GuideProfilePage extends StatelessWidget {
               ],
             ),
           ),
-          if (false) GuideSectionCard(
-            child: Row(
-              mainAxisAlignment: MainAxisAlignment.spaceAround,
-              children: const [
-                _ProfileStat(label: '接单量', value: '1290'),
-                _ProfileStat(label: '完单量', value: '880'),
-                _ProfileStat(label: '好评数', value: '10'),
-                _ProfileStat(label: '退单量', value: '2'),
-              ],
-            ),
-          ),
           const SizedBox(height: 18),
           GuideSectionCard(
             padding: const EdgeInsets.fromLTRB(0, 0, 0, 0),
             child: Column(
               children: [
+                _ProfileRow(
+                  icon: Icons.edit_note_outlined,
+                  title: '编辑地陪资料',
+                  onTap: onOpenProfileEdit,
+                ),
+                const Divider(height: 1),
                 _ProfileRow(
                   icon: Icons.settings_outlined,
                   title: '接单设置',

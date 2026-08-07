@@ -197,7 +197,9 @@ class _LoginPageState extends State<LoginPage> {
                       _buildSmsField(),
                       const SizedBox(height: 12),
                       TextButton(
-                        onPressed: () {},
+                        onPressed: () => _showMessage(
+                          '请确认手机号和区号填写正确；如果仍收不到，请等待60秒后重试，或联系平台客服。',
+                        ),
                         style: TextButton.styleFrom(
                           padding: EdgeInsets.zero,
                           minimumSize: Size.zero,

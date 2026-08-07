@@ -202,6 +202,7 @@ class PostProvider extends ChangeNotifier {
     required String authorName,
     required String authorAvatar,
     String tag = '',
+    String location = '',
   }) async {
     _isLoading = true;
     notifyListeners();
@@ -218,6 +219,7 @@ class PostProvider extends ChangeNotifier {
           'author_name': authorName,
           'author_avatar': authorAvatar,
           'tag': tag,
+          'location': location,
         },
       );
       final data = response['data'];

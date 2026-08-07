@@ -263,8 +263,8 @@ class _GuideDetailPageState extends State<GuideDetailPage> {
                 spacing: 10,
                 runSpacing: 10,
                 children: [
-                  _Pill(text: 'IP：${guide.city.isEmpty ? '苏州' : guide.city}'),
-                  _Pill(text: guide.gender.isEmpty ? '女·26' : guide.gender),
+                  _Pill(text: 'IP：${guide.city.isEmpty ? '未填写' : guide.city}'),
+                  _Pill(text: guide.gender.isEmpty ? '未填写' : guide.gender),
                   const _Pill(text: '已实名'),
                 ],
               ),
@@ -292,15 +292,15 @@ class _GuideDetailPageState extends State<GuideDetailPage> {
             childAspectRatio: 1.1,
             mainAxisSpacing: 10,
             crossAxisSpacing: 10,
-            children: const [
-              _InfoTile(value: '123', label: '入驻'),
-              _InfoTile(value: '99.8%', label: '好评率'),
-              _InfoTile(value: '80%', label: '回购率'),
-              _InfoTile(value: '汉', label: '民族'),
-              _InfoTile(value: '水瓶座', label: '星座'),
-              _InfoTile(value: '本科', label: '学历'),
-              _InfoTile(value: '183', label: '身高'),
-              _InfoTile(value: '80kg', label: '体重'),
+            children: [
+              _InfoTile(value: '${guide.likes}', label: '获赞'),
+              _InfoTile(value: guide.rating <= 0 ? '暂无' : '${(guide.rating * 20.8).clamp(0, 100).toStringAsFixed(1)}%', label: '好评率'),
+              _InfoTile(value: '${guide.fans}', label: '粉丝'),
+              const _InfoTile(value: '未填写', label: '民族'),
+              const _InfoTile(value: '未填写', label: '星座'),
+              const _InfoTile(value: '未填写', label: '职业'),
+              const _InfoTile(value: '未填写', label: '身高'),
+              const _InfoTile(value: '未填写', label: '体重'),
             ],
           ),
         ),
@@ -308,7 +308,7 @@ class _GuideDetailPageState extends State<GuideDetailPage> {
         _SectionCard(
           title: '个人介绍',
           child: Text(
-            guide.description.isNotEmpty ? guide.description : '这里是个人介绍，展示服务风格与经历。'
+            guide.description.isNotEmpty ? guide.description : '地陪暂未填写个人介绍。'
             ,
             style: const TextStyle(
               fontSize: 14,
@@ -324,10 +324,7 @@ class _GuideDetailPageState extends State<GuideDetailPage> {
             spacing: 10,
             runSpacing: 10,
             children: guide.tags.isEmpty
-                ? const [
-                    _Tag(text: '休闲游玩'),
-                    _Tag(text: '商务陪同'),
-                  ]
+                ? const [_Tag(text: '暂未设置服务类型')]
                 : guide.tags.map((t) => _Tag(text: t)).toList(),
           ),
         ),
@@ -335,23 +332,14 @@ class _GuideDetailPageState extends State<GuideDetailPage> {
         _SectionCard(
           title: '额外费用说明',
           child: Text(
-            '餐饮、门票、交通等费用按实际情况协商，服务前确认清楚更安心。',
+            '地陪暂未填写额外费用说明，下单前请通过订单和聊天确认费用明细。',
             style: const TextStyle(fontSize: 14, height: 1.6, color: AppColors.textPrimary),
           ),
         ),
         const SizedBox(height: 14),
         _SectionCard(
-          title: '用户评价（10）',
-          trailing: const Text('查看更多 >', style: TextStyle(color: AppColors.textHint)),
-          child: const Column(
-            children: [
-              _ReviewItem(),
-              SizedBox(height: 18),
-              _ReviewItem(withImages: true),
-              SizedBox(height: 18),
-              _ReviewItem(),
-            ],
-          ),
+          title: '用户评价',
+          child: const Text('暂无评价', style: TextStyle(color: AppColors.textHint)),
         ),
       ],
     );

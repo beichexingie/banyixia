@@ -6,6 +6,7 @@ import 'package:flutter_application_1/pages/order/incoming_voice_call_dialog.dar
 import 'package:flutter_application_1/providers/call_provider.dart';
 import 'package:provider/provider.dart';
 import 'package:flutter_application_1/pages/profile/wallet_page.dart';
+import 'package:flutter_application_1/pages/profile/edit_profile_page.dart';
 
 import '../bootstrap/app_bootstrap.dart';
 import '../config/app_theme.dart';
@@ -28,6 +29,7 @@ import 'pages/guide_select_service_page.dart';
 import 'pages/guide_service_location_page.dart';
 import 'pages/guide_service_type_page.dart';
 import 'pages/guide_workbench_page.dart';
+import 'pages/guide_workspace_pages.dart';
 import 'providers/guide_console_provider.dart';
 
 class GuideApp extends StatelessWidget {
@@ -288,6 +290,7 @@ class _GuideMainShellState extends State<_GuideMainShell>
         onOpenCertification: _openCertificationPage,
         onOpenPlatformRules: _openPlatformRulesPage,
         onOpenWallet: _openWallet,
+        onOpenProfileEdit: _openProfileEdit,
       ),
     ];
 
@@ -425,6 +428,12 @@ class _GuideMainShellState extends State<_GuideMainShell>
     await _openDemandHall();
   }
 
+  Future<void> _openProfileEdit() async {
+    await Navigator.of(context).push(
+      MaterialPageRoute(builder: (_) => const EditProfilePage()),
+    );
+  }
+
   Future<void> _openRoute([GuideOrderCardData? order]) async {
     await Navigator.of(
       context,
@@ -482,10 +491,11 @@ class _GuideMainShellState extends State<_GuideMainShell>
   Future<void> _openServiceOperations() async {
     await Navigator.of(context).push(
       MaterialPageRoute(
-        builder: (_) => const GuidePlaceholderPage(
+        builder: (_) => const GuideChecklistPage(
           title: '专属运营',
-          message: '这里后续可以接运营工单、培训通知、活动权益和客服会话。',
+          subtitle: '运营沟通事项',
           icon: Icons.support_agent_rounded,
+          items: ['查看平台通知', '确认订单服务规范', '遇到纠纷保留证据并联系客服'],
         ),
       ),
     );
@@ -494,10 +504,7 @@ class _GuideMainShellState extends State<_GuideMainShell>
   Future<void> _openEmergencyContacts() async {
     await Navigator.of(context).push(
       MaterialPageRoute(
-        builder: (_) => GuidePlaceholderPage(
-          title: '紧急联系人',
-          message: '这里预留给地陪端配置紧急联系人、保险信息和应急流程。',
-          icon: Icons.emergency_outlined,
+        builder: (_) => const GuideContactPage(
         ),
       ),
     );
@@ -506,10 +513,11 @@ class _GuideMainShellState extends State<_GuideMainShell>
   Future<void> _openReviewCenter() async {
     await Navigator.of(context).push(
       MaterialPageRoute(
-        builder: (_) => const GuidePlaceholderPage(
+        builder: (_) => const GuideChecklistPage(
           title: '客户评价',
-          message: '这里后续可以接真实评价列表、评分申诉和服务口碑分析。',
+          subtitle: '服务口碑检查',
           icon: Icons.reviews_outlined,
+          items: ['查看最近订单评分', '确认客户反馈', '发现异常评价后联系客服申诉'],
         ),
       ),
     );
@@ -518,10 +526,11 @@ class _GuideMainShellState extends State<_GuideMainShell>
   Future<void> _openScheduleCenter() async {
     await Navigator.of(context).push(
       MaterialPageRoute(
-        builder: (_) => const GuidePlaceholderPage(
+        builder: (_) => const GuideChecklistPage(
           title: '时间管理',
-          message: '这里后续可以接日历排班、请假、接单时段和黑名单时间段配置。',
+          subtitle: '今日接单准备',
           icon: Icons.calendar_month_outlined,
+          items: ['确认今日可接单', '检查服务地址', '确认已接订单时间'],
         ),
       ),
     );
@@ -530,10 +539,7 @@ class _GuideMainShellState extends State<_GuideMainShell>
   Future<void> _openPromotionCenter() async {
     await Navigator.of(context).push(
       MaterialPageRoute(
-        builder: (_) => const GuidePlaceholderPage(
-          title: '拉新赚钱',
-          message: '这里后续可以接邀请收益、分佣记录、邀请码和推广素材。',
-          icon: Icons.campaign_outlined,
+        builder: (_) => const GuideInvitePage(
         ),
       ),
     );
@@ -542,10 +548,11 @@ class _GuideMainShellState extends State<_GuideMainShell>
   Future<void> _openTaskCenter() async {
     await Navigator.of(context).push(
       MaterialPageRoute(
-        builder: (_) => const GuidePlaceholderPage(
+        builder: (_) => const GuideChecklistPage(
           title: '任务中心',
-          message: '这里后续可以接签到任务、成长任务、奖励进度和任务明细。',
+          subtitle: '每日成长任务',
           icon: Icons.task_alt_rounded,
+          items: ['完成今日签到', '完善服务标签', '处理待办订单'],
         ),
       ),
     );
@@ -554,10 +561,11 @@ class _GuideMainShellState extends State<_GuideMainShell>
   Future<void> _openTrainingCenter() async {
     await Navigator.of(context).push(
       MaterialPageRoute(
-        builder: (_) => const GuidePlaceholderPage(
+        builder: (_) => const GuideChecklistPage(
           title: '培训中心',
-          message: '这里后续可以接培训课程、考试记录、上岗指南和常见问题。',
+          subtitle: '上岗前学习清单',
           icon: Icons.school_outlined,
+          items: ['阅读服务规范', '学习订单流程', '了解安全与投诉处理'],
         ),
       ),
     );
@@ -566,10 +574,8 @@ class _GuideMainShellState extends State<_GuideMainShell>
   Future<void> _openCertificationPage() async {
     await Navigator.of(context).push(
       MaterialPageRoute(
-        builder: (_) => const GuidePlaceholderPage(
-          title: '认证资料',
-          message: '这里后续可以接实名认证、从业资料、审核进度和补件入口。',
-          icon: Icons.badge_outlined,
+        builder: (_) => GuideCertificationPage(
+          onEditProfile: _openProfileEdit,
         ),
       ),
     );
@@ -578,10 +584,7 @@ class _GuideMainShellState extends State<_GuideMainShell>
   Future<void> _openPlatformRulesPage() async {
     await Navigator.of(context).push(
       MaterialPageRoute(
-        builder: (_) => const GuidePlaceholderPage(
-          title: '平台规则',
-          message: '这里后续可以接接单规则、服务规范、违规说明和申诉指引。',
-          icon: Icons.policy_outlined,
+        builder: (_) => const GuideRulesPage(
         ),
       ),
     );
