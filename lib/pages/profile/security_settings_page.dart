@@ -52,6 +52,7 @@ class SecuritySettingsPage extends StatelessWidget {
           ),
         ],
       ),
+    ),
     );
   }
 

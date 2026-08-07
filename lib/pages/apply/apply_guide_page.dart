@@ -4,6 +4,7 @@ import 'package:go_router/go_router.dart';
 import '../../config/app_theme.dart';
 import '../../models/guide_application.dart';
 import '../../providers/application_provider.dart';
+import '../../providers/guide_provider.dart';
 import '../../providers/user_provider.dart';
 
 class ApplyGuidePage extends StatefulWidget {

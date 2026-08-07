@@ -170,6 +170,7 @@ class _GuideOrderCenterPageState extends State<GuideOrderCenterPage> {
                         padding: const EdgeInsets.only(bottom: 18),
                         child: _GuideOrderCard(
                           data: order,
+                          onSupportTap: _showSupportNotice,
                           onChatTap: () => _contactCustomer(order),
                           onPrimaryTap:
                               order.primaryAction == GuideOrderAction.navigate
@@ -290,11 +291,13 @@ class _OrderStageTab extends StatelessWidget {
 
 class _GuideOrderCard extends StatelessWidget {
   final GuideOrderCardData data;
+  final VoidCallback onSupportTap;
   final VoidCallback onChatTap;
   final VoidCallback onPrimaryTap;
 
   const _GuideOrderCard({
     required this.data,
+    required this.onSupportTap,
     required this.onChatTap,
     required this.onPrimaryTap,
   });
@@ -513,7 +516,7 @@ class _GuideOrderCard extends StatelessWidget {
                           child: _OutlineActionButton(
                             icon: Icons.support_agent_rounded,
                             label: '客服',
-                            onTap: _showSupportNotice,
+                            onTap: onSupportTap,
                           ),
                         ),
                         const SizedBox(width: 10),
@@ -545,7 +548,7 @@ class _GuideOrderCard extends StatelessWidget {
                     child: _OutlineActionButton(
                       icon: Icons.support_agent_rounded,
                       label: '客服',
-                      onTap: _showSupportNotice,
+                      onTap: onSupportTap,
                     ),
                   ),
                   const SizedBox(width: 10),

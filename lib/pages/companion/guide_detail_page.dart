@@ -5,6 +5,7 @@ import 'package:provider/provider.dart';
 
 import '../../config/app_theme.dart';
 import '../../models/guide.dart';
+import '../../providers/guide_provider.dart';
 import '../../providers/message_provider.dart';
 import '../../providers/user_provider.dart';
 
