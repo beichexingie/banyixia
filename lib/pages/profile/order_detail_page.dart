@@ -17,6 +17,8 @@ class OrderDetailPage extends StatefulWidget {
 }
 
 class _OrderDetailPageState extends State<OrderDetailPage> {
+  bool _reviewing = false;
+
   @override
   void initState() {
     super.initState();
@@ -171,6 +173,40 @@ class _OrderDetailPageState extends State<OrderDetailPage> {
                   ],
                 ),
               ),
+              if (order.status == OrderStatus.pendingReview) ...[
+                const SizedBox(height: 12),
+                _card(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      const Text(
+                        '评价本次服务',
+                        style: TextStyle(fontSize: 16, fontWeight: FontWeight.w800),
+                      ),
+                      const SizedBox(height: 6),
+                      const Text(
+                        '你的反馈会匿名展示给地陪，提交后订单将自动完成。',
+                        style: TextStyle(
+                          fontSize: 13,
+                          color: AppColors.textSecondary,
+                          height: 1.45,
+                        ),
+                      ),
+                      const SizedBox(height: 14),
+                      SizedBox(
+                        width: double.infinity,
+                        child: FilledButton.icon(
+                          onPressed: _reviewing
+                              ? null
+                              : () => _reviewOrder(order!),
+                          icon: const Icon(Icons.rate_review_outlined),
+                          label: Text(_reviewing ? '提交中...' : '去评价'),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
             ],
           );
         },
@@ -195,6 +231,86 @@ class _OrderDetailPageState extends State<OrderDetailPage> {
       messenger.showSnackBar(
         SnackBar(content: Text('发起语音通话失败：$error')),
       );
+    }
+  }
+
+  Future<void> _reviewOrder(Order order) async {
+    var rating = 5;
+    final content = TextEditingController();
+    final result = await showDialog<Map<String, dynamic>>(
+      context: context,
+      builder: (dialogContext) => StatefulBuilder(
+        builder: (_, setDialogState) => AlertDialog(
+          title: const Text('评价本次服务'),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Row(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: List.generate(
+                  5,
+                  (index) => IconButton(
+                    onPressed: () => setDialogState(() => rating = index + 1),
+                    icon: Icon(
+                      index < rating ? Icons.star : Icons.star_border,
+                    ),
+                    color: const Color(0xFFE28B24),
+                  ),
+                ),
+              ),
+              TextField(
+                controller: content,
+                minLines: 3,
+                maxLines: 5,
+                maxLength: 160,
+                decoration: const InputDecoration(hintText: '说说这次服务的感受'),
+              ),
+              const Text(
+                '默认匿名展示，地陪只能看到匿名反馈。',
+                style: TextStyle(fontSize: 12, color: AppColors.textHint),
+              ),
+            ],
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(dialogContext).pop(),
+              child: const Text('取消'),
+            ),
+            FilledButton(
+              onPressed: () => Navigator.of(dialogContext).pop({
+                'rating': rating,
+                'content': content.text.trim(),
+              }),
+              child: const Text('提交'),
+            ),
+          ],
+        ),
+      ),
+    );
+    final text = result?['content']?.toString() ?? '';
+    final selectedRating = result?['rating'] as int?;
+    content.dispose();
+    if (!mounted || selectedRating == null || text.isEmpty) return;
+    setState(() => _reviewing = true);
+    try {
+      await context.read<OrderProvider>().reviewOrder(
+        order.id,
+        rating: selectedRating,
+        content: text,
+      );
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('评价已提交，订单已完成')),
+        );
+      }
+    } catch (error) {
+      if (mounted) {
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text('评价提交失败：$error')));
+      }
+    } finally {
+      if (mounted) setState(() => _reviewing = false);
     }
   }
 

@@ -14,6 +14,7 @@ class GuideProvider extends ChangeNotifier {
   Set<String> _favoriteIds = {};
   Set<String> _likedIds = {};
   Set<String> _followingIds = {};
+  List<Guide> _followingGuides = [];
   List<Guide> _footprints = [];
   String? _filterGender;
   double? _filterMaxPrice;
@@ -43,7 +44,9 @@ class GuideProvider extends ChangeNotifier {
   }
 
   List<Guide> get favoriteGuides => _guides.where((g) => _favoriteIds.contains(g.id)).toList();
-  List<Guide> get followingGuides => _guides.where((g) => _followingIds.contains(g.id)).toList();
+  List<Guide> get followingGuides => _followingGuides.isNotEmpty
+      ? _followingGuides
+      : _guides.where((g) => _followingIds.contains(g.id)).toList();
 
   List<Guide> get filteredGuides {
     return _guides.where((g) {
@@ -96,7 +99,10 @@ class GuideProvider extends ChangeNotifier {
       }
       final me = _sessionService.currentSession;
       if (me != null) {
-        await _loadUserInteractions(me.userId);
+        await Future.wait([
+          _loadUserInteractions(me.userId),
+          loadFollowingGuides(notify: false),
+        ]);
       }
     } catch (e) {
       debugPrint('Error loading guides: $e');
@@ -138,6 +144,53 @@ class GuideProvider extends ChangeNotifier {
     } catch (e) {
       debugPrint('Error loading user interactions: $e');
     }
+  }
+
+  /// Followed guides are fetched directly so they do not disappear when the
+  /// normal guide list is filtered to a different city.
+  Future<void> loadFollowingGuides({bool notify = true}) async {
+    final token = _token();
+    if (token == null || token.isEmpty) {
+      _followingGuides = [];
+      if (notify) notifyListeners();
+      return;
+    }
+    try {
+      final response = await _api.get('/users/me/following', authToken: token);
+      final data = response['data'];
+      if (data is List) {
+        _followingGuides = data
+            .whereType<Map<String, dynamic>>()
+            .map(_guideFromFollowingUser)
+            .where((guide) => guide.id.isNotEmpty)
+            .toList();
+        _followingIds = _followingGuides.map((guide) => guide.id).toSet();
+      }
+    } catch (error) {
+      debugPrint('Load following guides error: $error');
+    } finally {
+      if (notify) notifyListeners();
+    }
+  }
+
+  Guide _guideFromFollowingUser(Map<String, dynamic> user) {
+    final rawTags = user['guide_tags'] ?? user['tags'] ?? const [];
+    return Guide(
+      id: user['id']?.toString() ?? '',
+      name: user['nickname']?.toString() ?? user['name']?.toString() ?? '地陪',
+      avatar: user['avatar']?.toString() ?? '',
+      gender: user['gender']?.toString() ?? '',
+      verified: user['is_guide'] == true ||
+          user['guide_application_status']?.toString() == 'approved',
+      tags: rawTags is List
+          ? rawTags.map((item) => item.toString()).toList()
+          : const [],
+      description: user['guide_introduction']?.toString().trim().isNotEmpty ==
+              true
+          ? user['guide_introduction'].toString()
+          : user['bio']?.toString() ?? '',
+      city: user['city']?.toString() ?? '',
+    );
   }
 
   Future<void> toggleFavorite(String guideId) async {

@@ -33,6 +33,7 @@ class _ProfilePageState extends State<ProfilePage> {
     await Future.wait([
       context.read<OrderProvider>().loadOrders(),
       context.read<GuideProvider>().loadGuides(),
+      context.read<GuideProvider>().loadFollowingGuides(notify: false),
     ]);
   }
 
@@ -697,7 +698,11 @@ class _ProfilePageState extends State<ProfilePage> {
                   ),
                   const Spacer(),
                   GestureDetector(
-                    onTap: () => context.push('/following'),
+                    onTap: () {
+                      context.push('/following').then((_) {
+                        if (mounted) _refreshPage();
+                      });
+                    },
                     child: const Row(
                       mainAxisSize: MainAxisSize.min,
                       children: [
@@ -749,7 +754,11 @@ class _ProfilePageState extends State<ProfilePage> {
 
   Widget _emptyFollowingGuides() {
     return InkWell(
-      onTap: () => context.push('/following'),
+      onTap: () {
+        context.push('/following').then((_) {
+          if (mounted) _refreshPage();
+        });
+      },
       borderRadius: BorderRadius.circular(16),
       child: Container(
         width: double.infinity,

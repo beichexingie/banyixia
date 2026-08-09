@@ -88,6 +88,7 @@ class _UserProfilePageState extends State<UserProfilePage> {
       } else {
         await userProvider.followUser(widget.userId);
       }
+      await context.read<GuideProvider>().loadFollowingGuides();
       final following = await userProvider.isFollowing(widget.userId);
       if (!mounted) {
         return;

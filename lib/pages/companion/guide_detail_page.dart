@@ -74,6 +74,7 @@ class _GuideDetailPageState extends State<GuideDetailPage> {
       } else {
         await userProvider.followUser(_guide!.id);
       }
+      await context.read<GuideProvider>().loadFollowingGuides();
       await _checkFollowStatus();
     } catch (e) {
       if (mounted) {

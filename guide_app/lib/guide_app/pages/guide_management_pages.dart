@@ -274,8 +274,21 @@ class GuideSchedulePage extends StatelessWidget {
   }
 }
 
-class GuideReviewCenterPage extends StatelessWidget {
+class GuideReviewCenterPage extends StatefulWidget {
   const GuideReviewCenterPage({super.key});
+
+  @override
+  State<GuideReviewCenterPage> createState() => _GuideReviewCenterPageState();
+}
+
+class _GuideReviewCenterPageState extends State<GuideReviewCenterPage> {
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) context.read<GuideBackendProvider>().load();
+    });
+  }
 
   Future<void> _reply(BuildContext context, Map<String, dynamic> review) async {
     final controller = TextEditingController(text: review['guide_reply']?.toString() ?? '');
@@ -288,7 +301,7 @@ class GuideReviewCenterPage extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final provider = context.watch<GuideBackendProvider>();
-    return GuideAppScaffold(appBar: AppBar(title: const Text('客户评价'), backgroundColor: Colors.white), backgroundColor: const Color(0xFFF0F1F3), body: ListView(padding: const EdgeInsets.all(16), children: [
+    return GuideAppScaffold(appBar: AppBar(title: const Text('客户评价'), backgroundColor: Colors.white, actions: [IconButton(onPressed: provider.load, icon: const Icon(Icons.refresh))]), backgroundColor: const Color(0xFFF0F1F3), body: RefreshIndicator(onRefresh: provider.load, child: ListView(padding: const EdgeInsets.all(16), children: [
       GuideSectionCard(child: Text(provider.reviews.isEmpty ? '暂无客户评价。订单完成后，客户可匿名提交真实反馈。' : '共收到 ${provider.reviews.length} 条匿名客户反馈。', style: const TextStyle(color: AppColors.textSecondary))),
       const SizedBox(height: 12),
       if (provider.reviews.isEmpty) const _EmptyCard(icon: Icons.reviews_outlined, text: '暂无评价')
@@ -297,7 +310,7 @@ class GuideReviewCenterPage extends StatelessWidget {
         const SizedBox(height: 8), Text(review['content']?.toString() ?? ''), const SizedBox(height: 8), Text(review['service_name']?.toString() ?? '地陪服务', style: const TextStyle(fontSize: 12, color: AppColors.textHint)),
         const SizedBox(height: 8), if ((review['guide_reply']?.toString() ?? '').isNotEmpty) Text('我的回复：${review['guide_reply']}', style: const TextStyle(color: AppColors.textSecondary)) else Align(alignment: Alignment.centerRight, child: TextButton.icon(onPressed: () => _reply(context, review), icon: const Icon(Icons.reply), label: const Text('回复'))),
       ])))),
-    ]));
+    ])));
   }
 }
 

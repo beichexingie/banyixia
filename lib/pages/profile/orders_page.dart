@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
@@ -23,6 +25,7 @@ class _OrdersPageState extends State<OrdersPage>
   late final TabController _tabController;
   final Set<String> _payingOrderIds = <String>{};
   final Set<String> _completingOrderIds = <String>{};
+  Timer? _refreshTimer;
 
   @override
   void initState() {
@@ -35,11 +38,15 @@ class _OrdersPageState extends State<OrdersPage>
     WidgetsBinding.instance.addPostFrameCallback((_) {
       context.read<OrderProvider>().loadOrders();
     });
+    _refreshTimer = Timer.periodic(const Duration(seconds: 20), (_) {
+      if (mounted) context.read<OrderProvider>().loadOrders();
+    });
   }
 
   @override
   void dispose() {
     _tabController.dispose();
+    _refreshTimer?.cancel();
     super.dispose();
   }
 
