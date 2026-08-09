@@ -63,6 +63,32 @@ function getSessionUserId(req) {
   );
 }
 
+function mergeGuideUserFields(row) {
+  const firstNonEmpty = (...values) => {
+    for (const value of values) {
+      const text = value?.toString().trim() ?? '';
+      if (text) return text;
+    }
+    return '';
+  };
+  const userTags = Array.isArray(row.user_guide_tags)
+    ? row.user_guide_tags.filter(Boolean).map((tag) => tag.toString())
+    : [];
+  return {
+    ...row,
+    name: firstNonEmpty(row.user_nickname, row.name) || '地陪',
+    avatar: firstNonEmpty(row.user_avatar, row.avatar),
+    gender: firstNonEmpty(row.user_gender, row.gender),
+    city: firstNonEmpty(row.user_city, row.city),
+    description: firstNonEmpty(
+      row.user_guide_introduction,
+      row.user_bio,
+      row.description,
+    ),
+    tags: userTags.length > 0 ? userTags : (row.tags ?? []),
+  };
+}
+
 function normalizePhone(phone) {
   const compact = phone.replace(/\s+/g, '');
   if (compact.startsWith('+86')) {
@@ -310,21 +336,26 @@ appRouter.post('/auth/verify-code', handleRoute(async (req, res) => {
     access_token: userId,
     user_id: userId,
   };
-  await upsertUser(pool, {
-    id: userId,
-    phone,
-    nickname: phone,
-    avatar: 'https://picsum.photos/seed/user/100/100',
-    vip_level: 1,
-    title: '初级旅行家',
-    balance: 0,
-    coupon_count: 0,
-    follow_count: 0,
-    fans_count: 0,
-    is_banned: false,
-    cancel_count: 0,
-    is_admin: false,
-  });
+  // Existing users may have edited their profile in either client. Do not
+  // run the default initialization upsert again at every login, otherwise
+  // the login flow would overwrite their nickname, avatar and guide profile.
+  if (!existingUser) {
+    await upsertUser(pool, {
+      id: userId,
+      phone,
+      nickname: phone,
+      avatar: 'https://picsum.photos/seed/user/100/100',
+      vip_level: 1,
+      title: '初级旅行家',
+      balance: 0,
+      coupon_count: 0,
+      follow_count: 0,
+      fans_count: 0,
+      is_banned: false,
+      cancel_count: 0,
+      is_admin: false,
+    });
+  }
   return ok(res, { message: '登录成功', session });
 }));
 
@@ -378,6 +409,48 @@ appRouter.put('/users/me', async (req, res) => {
     cancel_count: currentUser.cancel_count ?? 0,
     is_admin: currentUser.is_admin ?? false,
   });
+  if (updated?.id) {
+    const guideRole = await pool.query(
+      `
+        select
+          exists(select 1 from public.guides where id = $1) as guide_exists,
+          exists(
+            select 1
+            from public.guide_applications
+            where user_id = $1 and status = 'approved'
+          ) as approved_application
+      `,
+      [updated.id],
+    );
+    const role = guideRole.rows[0] ?? {};
+    if (role.guide_exists || role.approved_application) {
+      await pool.query(
+        `
+          insert into public.guides (
+            id, name, avatar, gender, verified, tags, description, city
+          ) values ($1, $2, $3, $4, true, $5::text[], $6, $7)
+          on conflict (id) do update set
+            name = excluded.name,
+            avatar = excluded.avatar,
+            gender = excluded.gender,
+            verified = true,
+            tags = excluded.tags,
+            description = excluded.description,
+            city = excluded.city
+        `,
+        [
+          updated.id,
+          updated.nickname ?? '',
+          updated.avatar ?? '',
+          updated.gender ?? '',
+          updated.guide_tags ?? [],
+          (updated.guide_introduction ?? '').toString().trim() ||
+            (updated.bio ?? '').toString(),
+          updated.city ?? '',
+        ],
+      );
+    }
+  }
   if (updated?.id && (payload.guide_tags ?? payload.guideTags)) {
     await pool.query(
       `
@@ -503,8 +576,23 @@ appRouter.delete('/users/:id/follow', async (req, res) => {
 });
 
 appRouter.get('/guides', async (_req, res) => {
-  const result = await pool.query(`select * from public.guides order by created_at desc`);
-  return ok(res, { data: result.rows });
+  const result = await pool.query(
+    `
+      select
+        g.*,
+        u.nickname as user_nickname,
+        u.avatar as user_avatar,
+        u.gender as user_gender,
+        u.city as user_city,
+        u.bio as user_bio,
+        u.guide_introduction as user_guide_introduction,
+        u.guide_tags as user_guide_tags
+      from public.guides g
+      left join public.users u on u.id = g.id
+      order by g.created_at desc
+    `,
+  );
+  return ok(res, { data: result.rows.map(mergeGuideUserFields) });
 });
 
 appRouter.get('/guides/:id', async (req, res) => {
@@ -512,6 +600,13 @@ appRouter.get('/guides/:id', async (req, res) => {
     `
       select
         g.*,
+        u.nickname as user_nickname,
+        u.avatar as user_avatar,
+        u.gender as user_gender,
+        u.city as user_city,
+        u.bio as user_bio,
+        u.guide_introduction as user_guide_introduction,
+        u.guide_tags as user_guide_tags,
         coalesce((
           select json_agg(item order by item.updated_at desc)
           from (
@@ -530,13 +625,14 @@ appRouter.get('/guides/:id', async (req, res) => {
           ) review
         ), '[]'::json) as reviews
       from public.guides g
+      left join public.users u on u.id = g.id
       where g.id = $1
       limit 1
     `,
     [req.params.id],
   );
   if (!result.rows[0]) return fail(res, 404, '地陪不存在');
-  return ok(res, { data: result.rows[0] });
+  return ok(res, { data: mergeGuideUserFields(result.rows[0]) });
 });
 
 appRouter.post('/guides/:id/favorite', async (req, res) => {

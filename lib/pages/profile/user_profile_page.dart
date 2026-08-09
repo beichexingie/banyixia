@@ -39,32 +39,35 @@ class _UserProfilePageState extends State<UserProfilePage> {
       final userProvider = context.read<UserProvider>();
       final guideProvider = context.read<GuideProvider>();
 
-      final results = await Future.wait([
-        userProvider.fetchUserById(widget.userId),
-        userProvider.isFollowing(widget.userId),
-      ]);
-
-      final loadedUser = results[0] as User?;
+      final loadedUser = await userProvider.fetchUserById(widget.userId);
       Guide? guideProfile;
-
-      if (loadedUser?.isGuideApproved == true) {
-        for (final guide in guideProvider.guides) {
-          if (guide.id == widget.userId) {
-            guideProfile = guide;
-            break;
+      if (loadedUser?.isGuideApproved == true || loadedUser == null) {
+        // Always fetch the public guide record for guides. It contains service
+        // details, while the user record is the source of truth for identity.
+        guideProfile = await guideProvider.getGuideById(widget.userId);
+        if (guideProfile == null) {
+          for (final guide in guideProvider.guides) {
+            if (guide.id == widget.userId) {
+              guideProfile = guide;
+              break;
+            }
           }
         }
-        guideProfile ??= await guideProvider.getGuideById(widget.userId);
       }
+
+      final profileUser =
+          loadedUser ??
+          (guideProfile == null ? null : _userFromGuide(guideProfile));
+      final isFollowing = await userProvider.isFollowing(widget.userId);
 
       if (!mounted) {
         return;
       }
 
       setState(() {
-        _profileUser = loadedUser;
+        _profileUser = profileUser;
         _guideProfile = guideProfile;
-        _isFollowing = results[1] as bool;
+        _isFollowing = isFollowing;
         _isLoading = false;
       });
     } catch (_) {
@@ -75,6 +78,20 @@ class _UserProfilePageState extends State<UserProfilePage> {
     }
   }
 
+  User _userFromGuide(Guide guide) {
+    return User(
+      id: guide.id,
+      nickname: guide.name,
+      avatar: guide.avatar,
+      gender: guide.gender,
+      city: guide.city,
+      bio: guide.description,
+      guideIntroduction: guide.description,
+      guideTags: guide.tags,
+      isGuide: guide.verified,
+    );
+  }
+
   Future<void> _toggleFollow() async {
     if (_isFollowLoading) {
       return;
@@ -83,12 +100,13 @@ class _UserProfilePageState extends State<UserProfilePage> {
 
     try {
       final userProvider = context.read<UserProvider>();
+      final guideProvider = context.read<GuideProvider>();
       if (_isFollowing) {
         await userProvider.unfollowUser(widget.userId);
       } else {
         await userProvider.followUser(widget.userId);
       }
-      await context.read<GuideProvider>().loadFollowingGuides();
+      await guideProvider.loadFollowingGuides();
       final following = await userProvider.isFollowing(widget.userId);
       if (!mounted) {
         return;
@@ -244,8 +262,8 @@ class _UserProfilePageState extends State<UserProfilePage> {
                         ),
                         child: ClipOval(
                           child: CachedNetworkImage(
-                            imageUrl: user.avatar.isNotEmpty
-                                ? user.avatar
+                            imageUrl: _displayAvatar(user).isNotEmpty
+                                ? _displayAvatar(user)
                                 : heroImage,
                             width: 106,
                             height: 106,
@@ -328,20 +346,11 @@ class _UserProfilePageState extends State<UserProfilePage> {
                   const SizedBox(height: 28),
                   Row(
                     children: [
-                      _heroStat(
-                        '${user.fansCount}',
-                        '粉丝',
-                      ),
+                      _heroStat('${user.fansCount}', '粉丝'),
                       const SizedBox(width: 42),
-                      _heroStat(
-                        '${user.followCount}',
-                        '关注',
-                      ),
+                      _heroStat('${user.followCount}', '关注'),
                       const SizedBox(width: 42),
-                      _heroStat(
-                        '${_guideProfile?.views ?? 0}',
-                        '接单',
-                      ),
+                      _heroStat('${_guideProfile?.views ?? 0}', '接单'),
                     ],
                   ),
                   const SizedBox(height: 20),
@@ -430,7 +439,10 @@ class _UserProfilePageState extends State<UserProfilePage> {
         _buildInfoSection(
           title: '服务类型说明：',
           child: tags.isEmpty
-              ? const Text('地陪暂未设置服务类型', style: TextStyle(color: AppColors.textHint))
+              ? const Text(
+                  '地陪暂未设置服务类型',
+                  style: TextStyle(color: AppColors.textHint),
+                )
               : Wrap(
                   spacing: 12,
                   runSpacing: 12,
@@ -922,7 +934,20 @@ class _UserProfilePageState extends State<UserProfilePage> {
   }
 
   String _displayName(User user) {
-    return user.nickname.trim().isEmpty ? '本地导游' : user.nickname.trim();
+    final userName = user.nickname.trim();
+    if (userName.isNotEmpty) {
+      return userName;
+    }
+    final guideName = _guideProfile?.name.trim() ?? '';
+    return guideName.isNotEmpty ? guideName : '本地导游';
+  }
+
+  String _displayAvatar(User user) {
+    final userAvatar = user.avatar.trim();
+    if (userAvatar.isNotEmpty) {
+      return userAvatar;
+    }
+    return _guideProfile?.avatar.trim() ?? '';
   }
 
   String _displayCity(User user) {
@@ -941,18 +966,16 @@ class _UserProfilePageState extends State<UserProfilePage> {
       user.guideIntroduction,
       _guideProfile?.description ?? '',
       user.bio,
-    ].firstWhere(
-      (item) => item.trim().isNotEmpty,
-      orElse: () => '地陪暂未填写个人介绍',
-    );
+    ].firstWhere((item) => item.trim().isNotEmpty, orElse: () => '地陪暂未填写个人介绍');
   }
 
   String _heroImage(User user) {
     if (_guideProfile?.images.isNotEmpty == true) {
       return _guideProfile!.images.first;
     }
-    if (user.avatar.isNotEmpty) {
-      return user.avatar;
+    final avatar = _displayAvatar(user);
+    if (avatar.isNotEmpty) {
+      return avatar;
     }
     return 'https://picsum.photos/seed/profile-hero-${user.id}/1200/900';
   }
@@ -1000,4 +1023,3 @@ class _UserProfilePageState extends State<UserProfilePage> {
     return '摩羯座';
   }
 }
-
