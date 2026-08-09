@@ -66,7 +66,6 @@ CREATE POLICY "Users can update their own footprints." ON public.footprints FOR 
 INSERT INTO public.guides (name, avatar, rating, gender, verified, tags, description, images, views, likes, fans, city)
 VALUES 
 ('小树', 'https://picsum.photos/seed/guide1/100/100', 4.9, '男', true, ARRAY['今天来过'], '本人02年在京工作，偏i但e性格细腻温柔，共情能力强，可以跟我吐槽您的烦恼哦~', ARRAY['https://picsum.photos/seed/g1img1/200/200'], 902, 1123, 652, '北京'),
-('Allysa艾丽莎', 'https://picsum.photos/seed/guide2/100/100', 4.8, '女', true, ARRAY['今天来过'], '帮助提前规划路线，专车接送，安排拍照打卡，帮忙排队，讲解景点详情，各色建筑…', ARRAY['https://picsum.photos/seed/g2img1/200/200'], 1022, 1523, 863, '苏州'),
 ('小王', 'https://picsum.photos/seed/guide3/100/100', 4.7, '男', false, ARRAY['今天来过'], '北京本地通，带你走遍大街小巷。', ARRAY[]::TEXT[], 500, 800, 300, '北京');
 
 -- ============================================

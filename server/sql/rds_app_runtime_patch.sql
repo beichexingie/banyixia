@@ -19,8 +19,14 @@ create table if not exists public.users (
   birthday text,
   wechat text,
   occupation text,
+  ethnicity text,
+  education text,
+  height_cm double precision default 0,
+  weight_kg double precision default 0,
   guide_introduction text,
   guide_tags text[] default '{}'::text[],
+  service_description text,
+  extra_fee_description text,
   vip_level integer default 1,
   title text default 'Traveler',
   balance double precision default 0.0,
@@ -43,8 +49,14 @@ alter table if exists public.users
   add column if not exists birthday text,
   add column if not exists wechat text,
   add column if not exists occupation text,
+  add column if not exists ethnicity text,
+  add column if not exists education text,
+  add column if not exists height_cm double precision default 0,
+  add column if not exists weight_kg double precision default 0,
   add column if not exists guide_introduction text,
   add column if not exists guide_tags text[] default '{}'::text[],
+  add column if not exists service_description text,
+  add column if not exists extra_fee_description text,
   add column if not exists vip_level integer default 1,
   add column if not exists title text default 'Traveler',
   add column if not exists balance double precision default 0.0,
@@ -1111,8 +1123,10 @@ execute function public.update_chat_room_last_message();
 create or replace function public.sync_guide_on_approval()
 returns trigger as $$
 begin
-  if new.status = 'approved' and old.status is distinct from 'approved' then
-    insert into public.guides (id, name, avatar, gender, city, description, tags, verified)
+  -- Keep guides as the durable projection of every approved application.
+  -- This also handles applications inserted directly with status=approved.
+  if new.status = 'approved' then
+    insert into public.guides (id, name, avatar, gender, city, description, tags, images, verified)
     values (
       new.user_id,
       coalesce(new.full_name, ''),
@@ -1121,6 +1135,7 @@ begin
       new.city,
       new.bio,
       coalesce(new.service_tags, '{}'::text[]),
+      coalesce(new.images, '{}'::text[]),
       true
     )
     on conflict (id) do update set
@@ -1130,7 +1145,20 @@ begin
       city = excluded.city,
       description = excluded.description,
       tags = excluded.tags,
+      images = excluded.images,
       verified = true;
+  elsif not exists (
+    select 1
+    from public.guide_applications
+    where user_id = new.user_id
+      and status = 'approved'
+      and id <> new.id
+  ) then
+    -- Do not delete the row: orders and interactions may still reference it.
+    -- A rejected or pending re-application must not disable an older approval.
+    update public.guides
+    set verified = false
+    where id = new.user_id;
   end if;
   return new;
 end;
@@ -1138,9 +1166,36 @@ $$ language plpgsql;
 
 drop trigger if exists on_guide_application_approved on public.guide_applications;
 create trigger on_guide_application_approved
-after update of status on public.guide_applications
+after insert or update on public.guide_applications
 for each row
 execute function public.sync_guide_on_approval();
+
+-- Repair legacy approved applications that never produced a guides row.
+-- Keep the user id as the guide id so existing relations remain intact.
+insert into public.guides (id, name, avatar, gender, city, description, tags, images, verified, created_at)
+select
+  ga.user_id,
+  coalesce(nullif(ga.full_name, ''), u.nickname, 'guide'),
+  coalesce(nullif(ga.avatar, ''), u.avatar, ''),
+  coalesce(ga.gender, u.gender, ''),
+  coalesce(ga.city, u.city, ''),
+  coalesce(nullif(ga.bio, ''), u.guide_introduction, u.bio, ''),
+  coalesce(ga.service_tags, u.guide_tags, '{}'::text[]),
+  coalesce(ga.images, '{}'::text[]),
+  true,
+  coalesce(ga.created_at, now())
+from public.guide_applications ga
+join public.users u on u.id = ga.user_id
+where ga.status = 'approved'
+on conflict (id) do update set
+  name = excluded.name,
+  avatar = excluded.avatar,
+  gender = excluded.gender,
+  city = excluded.city,
+  description = excluded.description,
+  tags = excluded.tags,
+  images = excluded.images,
+  verified = true;
 
 create or replace function public.create_wallet_for_guide()
 returns trigger as $$
@@ -1156,10 +1211,16 @@ $$ language plpgsql;
 
 drop trigger if exists tr_create_wallet on public.guide_applications;
 create trigger tr_create_wallet
-after update of status on public.guide_applications
+after insert or update of status on public.guide_applications
 for each row
-when (old.status is distinct from new.status and new.status = 'approved')
+when (new.status = 'approved')
 execute function public.create_wallet_for_guide();
+
+insert into public.wallets (user_id)
+select ga.user_id
+from public.guide_applications ga
+where ga.status = 'approved'
+on conflict (user_id) do nothing;
 
 create or replace function public.check_user_ban()
 returns trigger as $$

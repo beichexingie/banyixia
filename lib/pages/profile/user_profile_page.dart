@@ -416,58 +416,82 @@ class _UserProfilePageState extends State<UserProfilePage> {
     );
   }
 
-  Widget _buildServiceTab(User user, Guide guide) {
-    final intro = _guideIntroduction(user);
-    final tags = guide.tags;
-
+  Widget _buildPublicServiceContent(
+    User user,
+    Guide guide,
+    String intro,
+    List<String> tags,
+  ) {
+    final height = guide.heightCm > 0 ? guide.heightCm : user.heightCm;
+    final weight = guide.weightKg > 0 ? guide.weightKg : user.weightKg;
     return Column(
       children: [
-        _buildMetricsCard(user),
+        _buildGuideMetricsCard(user, guide, height, weight),
         const SizedBox(height: 12),
         _buildInfoSection(
-          title: '个人介绍：',
+          title: '个人介绍',
           child: Text(
             intro,
-            style: const TextStyle(
-              fontSize: 15,
-              height: 1.55,
-              color: AppColors.textPrimary,
-            ),
+            style: const TextStyle(fontSize: 15, height: 1.55),
           ),
         ),
         const SizedBox(height: 12),
         _buildInfoSection(
-          title: '服务类型说明：',
-          child: tags.isEmpty
-              ? const Text(
-                  '地陪暂未设置服务类型',
+          title: '服务类型说明',
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              if (guide.serviceDescription.trim().isNotEmpty)
+                Text(
+                  guide.serviceDescription,
+                  style: const TextStyle(fontSize: 15, height: 1.55),
+                ),
+              if (guide.serviceDescription.trim().isNotEmpty)
+                const SizedBox(height: 12),
+              if (tags.isEmpty)
+                const Text(
+                  '暂未设置服务类型',
                   style: TextStyle(color: AppColors.textHint),
                 )
-              : Wrap(
-                  spacing: 12,
-                  runSpacing: 12,
-                  children: tags.take(4).map(_buildServiceTagChip).toList(),
+              else
+                Wrap(
+                  spacing: 10,
+                  runSpacing: 10,
+                  children: tags.map(_buildServiceTagChip).toList(),
                 ),
+            ],
+          ),
         ),
         const SizedBox(height: 12),
-        _buildInfoSection(
-          title: '额外费用说明：',
-          child: const Text(
-            '地陪暂未填写额外费用说明，下单前请通过订单和聊天确认费用明细。',
-            style: TextStyle(
-              fontSize: 15,
-              height: 1.55,
-              color: AppColors.textPrimary,
+        if (guide.serviceItems.isNotEmpty)
+          _buildInfoSection(
+            title: '服务项目',
+            child: Column(
+              children: guide.serviceItems.map(_buildServiceItem).toList(),
             ),
+          ),
+        if (guide.serviceItems.isNotEmpty) const SizedBox(height: 12),
+        _buildInfoSection(
+          title: '额外费用说明',
+          child: Text(
+            guide.extraFeeDescription.trim().isNotEmpty
+                ? guide.extraFeeDescription
+                : '暂未填写额外费用说明，下单前请与地陪确认费用明细。',
+            style: const TextStyle(fontSize: 15, height: 1.55),
           ),
         ),
         const SizedBox(height: 16),
-        _buildReviewsCard(),
+        _buildPublicReviews(guide.reviews),
       ],
     );
   }
 
-  Widget _buildMetricsCard(User user) {
+  Widget _buildGuideMetricsCard(
+    User user,
+    Guide guide,
+    double height,
+    double weight,
+  ) {
     return Container(
       width: double.infinity,
       padding: const EdgeInsets.fromLTRB(16, 18, 16, 18),
@@ -483,22 +507,105 @@ class _UserProfilePageState extends State<UserProfilePage> {
         crossAxisSpacing: 8,
         childAspectRatio: 0.9,
         children: [
-          _metricCell('${_guideProfile?.likes ?? 0}', '获赞'),
+          _metricCell('${guide.totalOrders}', '接单数'),
           _metricCell(
-            _displayRating() == 0
+            guide.goodRate <= 0
                 ? '暂无'
-                : '${(_displayRating() * 20.8).clamp(0, 100).toStringAsFixed(1)}%',
+                : '${guide.goodRate.toStringAsFixed(1)}%',
             '好评率',
           ),
-          _metricCell('${_guideProfile?.fans ?? 0}', '粉丝'),
-          _metricCell('未填写', '民族'),
+          _metricCell('${guide.fans}', '粉丝数'),
+          _metricCell(guide.ethnicity.isEmpty ? '未填写' : guide.ethnicity, '民族'),
           _metricCell(_zodiacLabel(user), '星座'),
-          _metricCell(user.occupation.isEmpty ? '未填写' : user.occupation, '职业'),
-          _metricCell('未填写', '身高'),
-          _metricCell('未填写', '体重'),
+          _metricCell(user.education.isEmpty ? '未填写' : user.education, '学历'),
+          _metricCell(
+            height > 0 ? '${height.toStringAsFixed(0)}cm' : '未填写',
+            '身高',
+          ),
+          _metricCell(
+            weight > 0 ? '${weight.toStringAsFixed(1)}kg' : '未填写',
+            '体重',
+          ),
         ],
       ),
     );
+  }
+
+  Widget _buildServiceItem(Map<String, dynamic> item) {
+    final hour = double.tryParse(item['price_per_hour']?.toString() ?? '') ?? 0;
+    final day = double.tryParse(item['price_per_day']?.toString() ?? '') ?? 0;
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 12),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Icon(Icons.handshake_outlined, color: AppColors.primaryDark),
+          const SizedBox(width: 10),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  item['name']?.toString() ?? '服务项目',
+                  style: const TextStyle(fontWeight: FontWeight.w800),
+                ),
+                if ((item['description']?.toString() ?? '')
+                    .trim()
+                    .isNotEmpty) ...[
+                  const SizedBox(height: 4),
+                  Text(
+                    item['description'].toString(),
+                    style: const TextStyle(
+                      fontSize: 13,
+                      color: AppColors.textSecondary,
+                    ),
+                  ),
+                ],
+              ],
+            ),
+          ),
+          const SizedBox(width: 8),
+          Text(
+            day > 0
+                ? '¥${day.toStringAsFixed(0)}/天'
+                : '¥${hour.toStringAsFixed(0)}/小时',
+            style: const TextStyle(
+              fontWeight: FontWeight.w800,
+              color: Color(0xFFFF5A3C),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildPublicReviews(List<Map<String, dynamic>> reviews) {
+    return _buildInfoSection(
+      title: '用户评价',
+      child: reviews.isEmpty
+          ? const Text('暂无评价', style: TextStyle(color: AppColors.textHint))
+          : Column(
+              children: reviews.map((item) {
+                return Padding(
+                  padding: const EdgeInsets.only(bottom: 12),
+                  child: Align(
+                    alignment: Alignment.centerLeft,
+                    child: Text(
+                      item['content']?.toString() ?? '',
+                      style: const TextStyle(fontSize: 14, height: 1.55),
+                    ),
+                  ),
+                );
+              }).toList(),
+            ),
+    );
+  }
+
+  Widget _buildServiceTab(User user, Guide guide) {
+    final intro = _guideIntroduction(user);
+    final tags = guide.tags;
+
+    return _buildPublicServiceContent(user, guide, intro, tags);
   }
 
   Widget _buildInfoSection({required String title, required Widget child}) {
@@ -522,55 +629,6 @@ class _UserProfilePageState extends State<UserProfilePage> {
           ),
           const SizedBox(height: 12),
           child,
-        ],
-      ),
-    );
-  }
-
-  Widget _buildReviewsCard() {
-    return Container(
-      width: double.infinity,
-      padding: const EdgeInsets.fromLTRB(16, 16, 16, 6),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(24),
-      ),
-      child: Column(
-        children: [
-          Row(
-            children: [
-              const Text(
-                '用户评价',
-                style: TextStyle(
-                  fontSize: 18,
-                  fontWeight: FontWeight.w900,
-                  color: AppColors.textPrimary,
-                ),
-              ),
-              const Spacer(),
-              Text(
-                '查看更多',
-                style: TextStyle(
-                  fontSize: 14,
-                  color: AppColors.textHint.withValues(alpha: 0.85),
-                ),
-              ),
-              const SizedBox(width: 2),
-              const Icon(
-                Icons.chevron_right_rounded,
-                size: 18,
-                color: AppColors.textHint,
-              ),
-            ],
-          ),
-          const SizedBox(height: 14),
-          const Padding(
-            padding: EdgeInsets.fromLTRB(0, 8, 0, 18),
-            child: Align(
-              alignment: Alignment.centerLeft,
-              child: Text('暂无评价', style: TextStyle(color: AppColors.textHint)),
-            ),
-          ),
         ],
       ),
     );
@@ -820,81 +878,6 @@ class _UserProfilePageState extends State<UserProfilePage> {
     );
   }
 
-  Widget _reviewCard({
-    required String name,
-    required String content,
-    int imageCount = 0,
-  }) {
-    return Padding(
-      padding: const EdgeInsets.only(bottom: 20),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            children: [
-              Container(
-                width: 36,
-                height: 36,
-                decoration: const BoxDecoration(
-                  shape: BoxShape.circle,
-                  image: DecorationImage(
-                    image: NetworkImage(
-                      'https://picsum.photos/seed/review-user/80/80',
-                    ),
-                    fit: BoxFit.cover,
-                  ),
-                ),
-              ),
-              const SizedBox(width: 10),
-              Text(
-                name,
-                style: const TextStyle(
-                  fontSize: 15,
-                  color: AppColors.textSecondary,
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 12),
-          Text(
-            content,
-            style: const TextStyle(
-              fontSize: 15,
-              height: 1.7,
-              color: AppColors.textPrimary,
-            ),
-          ),
-          if (imageCount > 0) ...[
-            const SizedBox(height: 14),
-            Row(
-              children: List.generate(
-                imageCount,
-                (index) => Expanded(
-                  child: Padding(
-                    padding: EdgeInsets.only(
-                      right: index == imageCount - 1 ? 0 : 10,
-                    ),
-                    child: ClipRRect(
-                      borderRadius: BorderRadius.circular(14),
-                      child: AspectRatio(
-                        aspectRatio: 1,
-                        child: CachedNetworkImage(
-                          imageUrl:
-                              'https://picsum.photos/seed/review-$index/280/280',
-                          fit: BoxFit.cover,
-                        ),
-                      ),
-                    ),
-                  ),
-                ),
-              ),
-            ),
-          ],
-        ],
-      ),
-    );
-  }
-
   Guide _resolvedGuide(User user) {
     final intro = _guideIntroduction(user);
     return _guideProfile ??
@@ -909,6 +892,12 @@ class _UserProfilePageState extends State<UserProfilePage> {
           gender: user.gender,
           rating: _displayRating(),
           images: _guideProfile?.images ?? const [],
+          ethnicity: user.ethnicity,
+          education: user.education,
+          heightCm: user.heightCm,
+          weightKg: user.weightKg,
+          serviceDescription: user.serviceDescription,
+          extraFeeDescription: user.extraFeeDescription,
         );
   }
 

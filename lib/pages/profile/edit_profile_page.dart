@@ -5,6 +5,7 @@ import 'package:image_picker/image_picker.dart';
 import 'package:provider/provider.dart';
 
 import '../../config/app_theme.dart';
+import '../../config/guide_service_catalog.dart';
 import '../../models/user.dart';
 import '../../providers/user_provider.dart';
 import '../../services/ecs_api_client.dart';
@@ -25,6 +26,13 @@ class _EditProfilePageState extends State<EditProfilePage> {
   late final TextEditingController _occupationController;
   late final TextEditingController _wechatController;
   late final TextEditingController _guideIntroductionController;
+  late final TextEditingController _ethnicityController;
+  late final TextEditingController _educationController;
+  late final TextEditingController _heightController;
+  late final TextEditingController _weightController;
+  late final TextEditingController _serviceDescriptionController;
+  late final TextEditingController _extraFeeDescriptionController;
+  late Set<String> _guideTags;
   String _gender = '';
   XFile? _avatarFile;
   String _avatarUrl = '';
@@ -40,8 +48,24 @@ class _EditProfilePageState extends State<EditProfilePage> {
     _birthdayController = TextEditingController(text: user.birthday);
     _occupationController = TextEditingController(text: user.occupation);
     _wechatController = TextEditingController(text: user.wechat);
-    _guideIntroductionController =
-        TextEditingController(text: user.guideIntroduction);
+    _guideIntroductionController = TextEditingController(
+      text: user.guideIntroduction,
+    );
+    _ethnicityController = TextEditingController(text: user.ethnicity);
+    _educationController = TextEditingController(text: user.education);
+    _heightController = TextEditingController(
+      text: user.heightCm > 0 ? user.heightCm.toStringAsFixed(0) : '',
+    );
+    _weightController = TextEditingController(
+      text: user.weightKg > 0 ? user.weightKg.toStringAsFixed(1) : '',
+    );
+    _serviceDescriptionController = TextEditingController(
+      text: user.serviceDescription,
+    );
+    _extraFeeDescriptionController = TextEditingController(
+      text: user.extraFeeDescription,
+    );
+    _guideTags = user.guideTags.toSet();
     _gender = user.gender;
     _avatarUrl = user.avatar;
   }
@@ -56,6 +80,12 @@ class _EditProfilePageState extends State<EditProfilePage> {
       _occupationController,
       _wechatController,
       _guideIntroductionController,
+      _ethnicityController,
+      _educationController,
+      _heightController,
+      _weightController,
+      _serviceDescriptionController,
+      _extraFeeDescriptionController,
     ]) {
       controller.dispose();
     }
@@ -95,20 +125,26 @@ class _EditProfilePageState extends State<EditProfilePage> {
           birthday: _birthdayController.text.trim(),
           wechat: _wechatController.text.trim(),
           occupation: _occupationController.text.trim(),
+          ethnicity: _ethnicityController.text.trim(),
+          education: _educationController.text.trim(),
+          heightCm: double.tryParse(_heightController.text.trim()) ?? 0,
+          weightKg: double.tryParse(_weightController.text.trim()) ?? 0,
           guideIntroduction: _guideIntroductionController.text.trim(),
-          guideTags: old.guideTags,
+          guideTags: _guideTags.toList(),
+          serviceDescription: _serviceDescriptionController.text.trim(),
+          extraFeeDescription: _extraFeeDescriptionController.text.trim(),
         ),
       );
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('资料已保存')),
-      );
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(const SnackBar(content: Text('资料已保存')));
       Navigator.of(context).maybePop();
     } catch (error) {
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('保存失败：$error')),
-      );
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text('保存失败：$error')));
     } finally {
       if (mounted) setState(() => _saving = false);
     }
@@ -154,6 +190,29 @@ class _EditProfilePageState extends State<EditProfilePage> {
             _field(_occupationController, '职业', maxLength: 30),
             _field(_birthdayController, '生日', hint: '例如：1998-08-18'),
             _genderPicker(),
+            _field(_ethnicityController, '民族', maxLength: 20),
+            _field(_educationController, '学历', maxLength: 30),
+            Row(
+              children: [
+                Expanded(
+                  child: _field(
+                    _heightController,
+                    '身高（cm）',
+                    keyboardType: TextInputType.number,
+                  ),
+                ),
+                const SizedBox(width: 10),
+                Expanded(
+                  child: _field(
+                    _weightController,
+                    '体重（kg）',
+                    keyboardType: const TextInputType.numberWithOptions(
+                      decimal: true,
+                    ),
+                  ),
+                ),
+              ],
+            ),
             _field(_bioController, '个人简介', maxLines: 4, maxLength: 160),
             _field(_wechatController, '微信号', maxLength: 40),
             if (user.isGuideApproved)
@@ -163,6 +222,21 @@ class _EditProfilePageState extends State<EditProfilePage> {
                 maxLines: 5,
                 maxLength: 300,
               ),
+            if (user.isGuideApproved) ...[
+              _serviceTypePicker(),
+              _field(
+                _serviceDescriptionController,
+                '服务类型说明',
+                maxLines: 4,
+                maxLength: 300,
+              ),
+              _field(
+                _extraFeeDescriptionController,
+                '额外费用说明',
+                maxLines: 4,
+                maxLength: 300,
+              ),
+            ],
           ],
         ),
       ),
@@ -176,6 +250,7 @@ class _EditProfilePageState extends State<EditProfilePage> {
     String? hint,
     int maxLines = 1,
     int? maxLength,
+    TextInputType? keyboardType,
   }) {
     return Padding(
       padding: const EdgeInsets.only(bottom: 14),
@@ -183,8 +258,10 @@ class _EditProfilePageState extends State<EditProfilePage> {
         controller: controller,
         maxLines: maxLines,
         maxLength: maxLength,
+        keyboardType: keyboardType,
         validator: required
-            ? (value) => value == null || value.trim().isEmpty ? '请输入$label' : null
+            ? (value) =>
+                  value == null || value.trim().isEmpty ? '请输入$label' : null
             : null,
         decoration: InputDecoration(
           labelText: label,
@@ -217,11 +294,50 @@ class _EditProfilePageState extends State<EditProfilePage> {
         child: Wrap(
           spacing: 10,
           children: ['女', '男', '不透露'].map((value) {
-            final selected = _gender == value || (_gender.isEmpty && value == '不透露');
+            final selected =
+                _gender == value || (_gender.isEmpty && value == '不透露');
             return ChoiceChip(
               label: Text(value),
               selected: selected,
-              onSelected: (_) => setState(() => _gender = value == '不透露' ? '' : value),
+              onSelected: (_) =>
+                  setState(() => _gender = value == '不透露' ? '' : value),
+              selectedColor: AppColors.primary,
+            );
+          }).toList(),
+        ),
+      ),
+    );
+  }
+
+  Widget _serviceTypePicker() {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 14),
+      child: InputDecorator(
+        decoration: InputDecoration(
+          labelText: '服务类型',
+          helperText: '可多选，选择后会显示在地陪主页',
+          filled: true,
+          fillColor: Colors.white,
+          border: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(16),
+            borderSide: BorderSide.none,
+          ),
+        ),
+        child: Wrap(
+          spacing: 8,
+          runSpacing: 8,
+          children: guideServiceCatalog.map((label) {
+            final selected = _guideTags.contains(label);
+            return FilterChip(
+              label: Text(label),
+              selected: selected,
+              onSelected: (value) => setState(() {
+                if (value) {
+                  _guideTags.add(label);
+                } else {
+                  _guideTags.remove(label);
+                }
+              }),
               selectedColor: AppColors.primary,
             );
           }).toList(),
@@ -251,8 +367,13 @@ class _AvatarPreview extends StatelessWidget {
               builder: (context, snapshot) => CircleAvatar(
                 radius: 42,
                 backgroundColor: AppColors.primarySoft,
-                child: snapshot.data ??
-                    const Icon(Icons.person, size: 40, color: AppColors.textHint),
+                child:
+                    snapshot.data ??
+                    const Icon(
+                      Icons.person,
+                      size: 40,
+                      color: AppColors.textHint,
+                    ),
               ),
             ),
           ),
@@ -265,10 +386,20 @@ class _AvatarPreview extends StatelessWidget {
 
   Future<Widget> _image() async {
     if (file != null) {
-      return Image.memory(await file!.readAsBytes(), width: 84, height: 84, fit: BoxFit.cover);
+      return Image.memory(
+        await file!.readAsBytes(),
+        width: 84,
+        height: 84,
+        fit: BoxFit.cover,
+      );
     }
     if (user.avatar.isNotEmpty) {
-      return Image.network(user.avatar, width: 84, height: 84, fit: BoxFit.cover);
+      return Image.network(
+        user.avatar,
+        width: 84,
+        height: 84,
+        fit: BoxFit.cover,
+      );
     }
     return const Icon(Icons.person, size: 40, color: AppColors.textHint);
   }

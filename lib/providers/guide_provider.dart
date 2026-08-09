@@ -22,7 +22,7 @@ class GuideProvider extends ChangeNotifier {
   String _searchQuery = '';
 
   GuideProvider({SessionService? sessionService})
-      : _sessionService = sessionService ?? EcsSessionService();
+    : _sessionService = sessionService ?? EcsSessionService();
 
   List<Guide> get guides => _guides;
   bool get isLoading => _isLoading;
@@ -43,7 +43,8 @@ class GuideProvider extends ChangeNotifier {
     notifyListeners();
   }
 
-  List<Guide> get favoriteGuides => _guides.where((g) => _favoriteIds.contains(g.id)).toList();
+  List<Guide> get favoriteGuides =>
+      _guides.where((g) => _favoriteIds.contains(g.id)).toList();
   List<Guide> get followingGuides => _followingGuides.isNotEmpty
       ? _followingGuides
       : _guides.where((g) => _followingIds.contains(g.id)).toList();
@@ -52,7 +53,8 @@ class GuideProvider extends ChangeNotifier {
     return _guides.where((g) {
       if (_searchQuery.isNotEmpty) {
         final query = _searchQuery.toLowerCase();
-        final matches = g.name.toLowerCase().contains(query) ||
+        final matches =
+            g.name.toLowerCase().contains(query) ||
             g.city.toLowerCase().contains(query) ||
             g.description.toLowerCase().contains(query) ||
             g.tags.join(' ').toLowerCase().contains(query);
@@ -92,10 +94,20 @@ class GuideProvider extends ChangeNotifier {
       final response = await _api.get('/guides', authToken: _token());
       final data = response['data'];
       if (data is List) {
-        _guides = data
-            .whereType<Map<String, dynamic>>()
-            .map(Guide.fromJson)
-            .toList();
+        final loadedGuides = <Guide>[];
+        for (final item in data) {
+          if (item is! Map) continue;
+          try {
+            final guide = Guide.fromJson(Map<String, dynamic>.from(item));
+            if (guide.id.isNotEmpty && !_isLegacyAllysaMock(guide)) {
+              loadedGuides.add(guide);
+            }
+          } catch (error) {
+            // One malformed legacy row must not hide all following guides.
+            debugPrint('Skip malformed guide row: $error');
+          }
+        }
+        _guides = loadedGuides;
       }
       final me = _sessionService.currentSession;
       if (me != null) {
@@ -127,12 +139,21 @@ class GuideProvider extends ChangeNotifier {
 
   Future<void> _loadUserInteractions(String userId) async {
     try {
-      final response = await _api.get('/users/$userId/interactions', authToken: _token());
+      final response = await _api.get(
+        '/users/$userId/interactions',
+        authToken: _token(),
+      );
       final data = response['data'];
       if (data is Map<String, dynamic>) {
-        _favoriteIds = (data['favorite_ids'] as List? ?? const []).map((e) => e.toString()).toSet();
-        _likedIds = (data['liked_ids'] as List? ?? const []).map((e) => e.toString()).toSet();
-        _followingIds = (data['following_guide_ids'] as List? ?? const []).map((e) => e.toString()).toSet();
+        _favoriteIds = (data['favorite_ids'] as List? ?? const [])
+            .map((e) => e.toString())
+            .toSet();
+        _likedIds = (data['liked_ids'] as List? ?? const [])
+            .map((e) => e.toString())
+            .toSet();
+        _followingIds = (data['following_guide_ids'] as List? ?? const [])
+            .map((e) => e.toString())
+            .toSet();
         final footprints = data['footprints'];
         if (footprints is List) {
           _footprints = footprints
@@ -180,13 +201,14 @@ class GuideProvider extends ChangeNotifier {
       name: user['nickname']?.toString() ?? user['name']?.toString() ?? '地陪',
       avatar: user['avatar']?.toString() ?? '',
       gender: user['gender']?.toString() ?? '',
-      verified: user['is_guide'] == true ||
+      verified:
+          user['is_guide'] == true ||
           user['guide_application_status']?.toString() == 'approved',
       tags: rawTags is List
           ? rawTags.map((item) => item.toString()).toList()
           : const [],
-      description: user['guide_introduction']?.toString().trim().isNotEmpty ==
-              true
+      description:
+          user['guide_introduction']?.toString().trim().isNotEmpty == true
           ? user['guide_introduction'].toString()
           : user['bio']?.toString() ?? '',
       city: user['city']?.toString() ?? '',
@@ -255,5 +277,13 @@ class GuideProvider extends ChangeNotifier {
       }
     }
     return city;
+  }
+
+  bool _isLegacyAllysaMock(Guide guide) {
+    final name = guide.name.trim().toLowerCase();
+    return name == 'allysa艾丽莎' ||
+        name.startsWith('allysa艾丽莎游鸭') ||
+        guide.avatar.contains('/guide2/') ||
+        guide.avatar.contains('/guide4/');
   }
 }

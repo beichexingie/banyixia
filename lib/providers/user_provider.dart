@@ -25,8 +25,8 @@ class UserProvider extends ChangeNotifier {
   UserProvider({
     required SessionService sessionService,
     EcsApiClient? apiClient,
-  })  : _sessionService = sessionService,
-        _api = apiClient ?? EcsApiClient() {
+  }) : _sessionService = sessionService,
+       _api = apiClient ?? EcsApiClient() {
     _sessionService.sessionListenable.addListener(_handleSessionChanged);
     _handleSessionChanged();
   }
@@ -56,8 +56,14 @@ class UserProvider extends ChangeNotifier {
       'birthday': json['birthday'] ?? '',
       'wechat': json['wechat'] ?? '',
       'occupation': json['occupation'] ?? '',
+      'ethnicity': json['ethnicity'] ?? '',
+      'education': json['education'] ?? '',
+      'height_cm': json['height_cm'] ?? json['heightCm'] ?? 0,
+      'weight_kg': json['weight_kg'] ?? json['weightKg'] ?? 0,
       'guide_introduction': json['guide_introduction'] ?? '',
       'guide_tags': json['guide_tags'] ?? const [],
+      'service_description': json['service_description'] ?? '',
+      'extra_fee_description': json['extra_fee_description'] ?? '',
       'vip_level': json['vip_level'] ?? 0,
       'title': json['title'] ?? '',
       'balance': json['balance'] ?? 0,
@@ -197,10 +203,7 @@ class UserProvider extends ChangeNotifier {
     if (targetId == user.id) throw Exception('不能关注自己');
 
     try {
-      await _api.post(
-        '/users/$targetId/follow',
-        authToken: _authToken(),
-      );
+      await _api.post('/users/$targetId/follow', authToken: _authToken());
       await _loadCurrentUser(_sessionService.currentSession!);
     } catch (e) {
       throw Exception('关注失败: $e');
@@ -212,10 +215,7 @@ class UserProvider extends ChangeNotifier {
     if (targetId.isEmpty || targetId.startsWith('mock_')) return;
 
     try {
-      await _api.delete(
-        '/users/$targetId/follow',
-        authToken: _authToken(),
-      );
+      await _api.delete('/users/$targetId/follow', authToken: _authToken());
       await _loadCurrentUser(_sessionService.currentSession!);
     } catch (e) {
       throw Exception('取消关注失败: $e');
@@ -248,10 +248,7 @@ class UserProvider extends ChangeNotifier {
       );
       final data = response['data'];
       if (data is! List) return [];
-      return data
-          .whereType<Map<String, dynamic>>()
-          .map(User.fromJson)
-          .toList();
+      return data.whereType<Map<String, dynamic>>().map(User.fromJson).toList();
     } catch (e) {
       debugPrint('getFollowingUsers error: $e');
       return [];

@@ -9,8 +9,14 @@ class User {
   final String birthday;
   final String wechat;
   final String occupation;
+  final String ethnicity;
+  final String education;
+  final double heightCm;
+  final double weightKg;
   final String guideIntroduction;
   final List<String> guideTags;
+  final String serviceDescription;
+  final String extraFeeDescription;
   final int vipLevel;
   final String title;
   final double balance;
@@ -33,8 +39,14 @@ class User {
     this.birthday = '',
     this.wechat = '',
     this.occupation = '',
+    this.ethnicity = '',
+    this.education = '',
+    this.heightCm = 0,
+    this.weightKg = 0,
     this.guideIntroduction = '',
     this.guideTags = const [],
+    this.serviceDescription = '',
+    this.extraFeeDescription = '',
     this.vipLevel = 0,
     this.title = '',
     this.balance = 0.0,
@@ -68,11 +80,19 @@ class User {
       birthday: json['birthday'] ?? '',
       wechat: json['wechat'] ?? '',
       occupation: json['occupation'] ?? '',
+      ethnicity: json['ethnicity'] ?? '',
+      education: json['education'] ?? '',
+      heightCm: _asDouble(json['height_cm'] ?? json['heightCm']),
+      weightKg: _asDouble(json['weight_kg'] ?? json['weightKg']),
       guideIntroduction:
           json['guideIntroduction'] ?? json['guide_introduction'] ?? '',
       guideTags: List<String>.from(
         json['guideTags'] ?? json['guide_tags'] ?? const [],
       ),
+      serviceDescription:
+          json['service_description'] ?? json['serviceDescription'] ?? '',
+      extraFeeDescription:
+          json['extra_fee_description'] ?? json['extraFeeDescription'] ?? '',
       vipLevel: json['vipLevel'] ?? json['vip_level'] ?? 0,
       title: json['title'] ?? '',
       balance: _parseDouble(json['balance']) ?? 0,
@@ -98,8 +118,14 @@ class User {
       'birthday': birthday,
       'wechat': wechat,
       'occupation': occupation,
+      'ethnicity': ethnicity,
+      'education': education,
+      'height_cm': heightCm,
+      'weight_kg': weightKg,
       'guide_introduction': guideIntroduction,
       'guide_tags': guideTags,
+      'service_description': serviceDescription,
+      'extra_fee_description': extraFeeDescription,
       'vip_level': vipLevel,
       'vipLevel': vipLevel,
       'title': title,
@@ -127,8 +153,14 @@ class User {
     String? birthday,
     String? wechat,
     String? occupation,
+    String? ethnicity,
+    String? education,
+    double? heightCm,
+    double? weightKg,
     String? guideIntroduction,
     List<String>? guideTags,
+    String? serviceDescription,
+    String? extraFeeDescription,
   }) {
     return User(
       id: id,
@@ -140,8 +172,14 @@ class User {
       birthday: birthday ?? this.birthday,
       wechat: wechat ?? this.wechat,
       occupation: occupation ?? this.occupation,
+      ethnicity: ethnicity ?? this.ethnicity,
+      education: education ?? this.education,
+      heightCm: heightCm ?? this.heightCm,
+      weightKg: weightKg ?? this.weightKg,
       guideIntroduction: guideIntroduction ?? this.guideIntroduction,
       guideTags: guideTags ?? this.guideTags,
+      serviceDescription: serviceDescription ?? this.serviceDescription,
+      extraFeeDescription: extraFeeDescription ?? this.extraFeeDescription,
       vipLevel: vipLevel,
       title: title,
       balance: balance,

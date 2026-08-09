@@ -15,6 +15,15 @@ class Guide {
   final String city;
   final List<Map<String, dynamic>> serviceItems;
   final List<Map<String, dynamic>> reviews;
+  final int totalOrders;
+  final int completedOrders;
+  final double goodRate;
+  final String ethnicity;
+  final String education;
+  final double heightCm;
+  final double weightKg;
+  final String serviceDescription;
+  final String extraFeeDescription;
 
   Guide({
     required this.id,
@@ -32,30 +41,45 @@ class Guide {
     this.city = '',
     this.serviceItems = const [],
     this.reviews = const [],
+    this.totalOrders = 0,
+    this.completedOrders = 0,
+    this.goodRate = 0,
+    this.ethnicity = '',
+    this.education = '',
+    this.heightCm = 0,
+    this.weightKg = 0,
+    this.serviceDescription = '',
+    this.extraFeeDescription = '',
   });
-
-  static double _asDouble(dynamic value, {double fallback = 0}) {
-    if (value is num) return value.toDouble();
-    return double.tryParse(value?.toString() ?? '') ?? fallback;
-  }
 
   factory Guide.fromJson(Map<String, dynamic> json) {
     return Guide(
-      id: json['id']?.toString() ?? '',
-      name: json['name'] ?? '',
-      avatar: json['avatar'] ?? '',
+      id: _asString(json['id']),
+      name: _asString(json['name']),
+      avatar: _asString(json['avatar']),
       rating: _parseDouble(json['rating']) ?? 0,
-      gender: json['gender'] ?? '',
-      verified: json['verified'] ?? false,
-      tags: List<String>.from(json['tags'] ?? []),
-      description: json['description'] ?? '',
-      images: List<String>.from(json['images'] ?? []),
-      views: json['views'] ?? 0,
-      likes: json['likes'] ?? 0,
-      fans: json['fans'] ?? 0,
-      city: json['city'] ?? '',
+      gender: _asString(json['gender']),
+      verified: _asBool(json['verified']),
+      tags: _strings(json['tags']),
+      description: _asString(json['description']),
+      images: _strings(json['images']),
+      views: _asInt(json['views']),
+      likes: _asInt(json['likes']),
+      fans: _asInt(json['fans']),
+      city: _asString(json['city']),
       serviceItems: _maps(json['service_items']),
       reviews: _maps(json['reviews']),
+      totalOrders: _asInt(json['total_orders'] ?? json['totalOrders']),
+      completedOrders: _asInt(
+        json['completed_orders'] ?? json['completedOrders'],
+      ),
+      goodRate: _parseDouble(json['good_rate'] ?? json['goodRate']) ?? 0,
+      ethnicity: _asString(json['ethnicity']),
+      education: _asString(json['education']),
+      heightCm: _parseDouble(json['height_cm'] ?? json['heightCm']) ?? 0,
+      weightKg: _parseDouble(json['weight_kg'] ?? json['weightKg']) ?? 0,
+      serviceDescription: _asString(json['service_description']),
+      extraFeeDescription: _asString(json['extra_fee_description']),
     );
   }
 
@@ -76,6 +100,15 @@ class Guide {
       'city': city,
       'service_items': serviceItems,
       'reviews': reviews,
+      'total_orders': totalOrders,
+      'completed_orders': completedOrders,
+      'good_rate': goodRate,
+      'ethnicity': ethnicity,
+      'education': education,
+      'height_cm': heightCm,
+      'weight_kg': weightKg,
+      'service_description': serviceDescription,
+      'extra_fee_description': extraFeeDescription,
     };
   }
 
@@ -84,6 +117,32 @@ class Guide {
     if (value is int) return value.toDouble();
     if (value is num) return value.toDouble();
     return double.tryParse(value?.toString() ?? '');
+  }
+
+  static String _asString(dynamic value) => value?.toString() ?? '';
+
+  static int _asInt(dynamic value) {
+    if (value is int) return value;
+    if (value is num) return value.toInt();
+    return int.tryParse(value?.toString() ?? '') ?? 0;
+  }
+
+  static bool _asBool(dynamic value) {
+    if (value is bool) return value;
+    final normalized = value?.toString().trim().toLowerCase();
+    return normalized == 'true' || normalized == '1';
+  }
+
+  static List<String> _strings(dynamic raw) {
+    if (raw is List) {
+      return raw
+          .where((item) => item != null)
+          .map((item) => item.toString())
+          .toList();
+    }
+    if (raw == null) return const [];
+    final value = raw.toString().trim();
+    return value.isEmpty ? const [] : [value];
   }
 
   static List<Map<String, dynamic>> _maps(dynamic raw) {

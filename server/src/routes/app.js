@@ -89,6 +89,15 @@ function mergeGuideUserFields(row) {
   };
 }
 
+function isLegacyAllysaGuide(row) {
+  const name = (row.name ?? '').toString().trim().toLowerCase();
+  const avatar = (row.avatar ?? '').toString();
+  return (
+    name === 'allysa艾丽莎' &&
+    avatar === 'https://picsum.photos/seed/guide2/100/100'
+  );
+}
+
 function normalizePhone(phone) {
   const compact = phone.replace(/\s+/g, '');
   if (compact.startsWith('+86')) {
@@ -396,9 +405,17 @@ appRouter.put('/users/me', async (req, res) => {
     birthday: payload.birthday ?? currentUser.birthday ?? '',
     wechat: payload.wechat ?? currentUser.wechat ?? '',
     occupation: payload.occupation ?? currentUser.occupation ?? '',
+    ethnicity: payload.ethnicity ?? currentUser.ethnicity ?? '',
+    education: payload.education ?? currentUser.education ?? '',
+    height_cm: payload.height_cm ?? currentUser.height_cm ?? 0,
+    weight_kg: payload.weight_kg ?? currentUser.weight_kg ?? 0,
     guide_introduction:
       payload.guide_introduction ?? currentUser.guide_introduction ?? '',
     guide_tags: payload.guide_tags ?? currentUser.guide_tags ?? [],
+    service_description:
+      payload.service_description ?? currentUser.service_description ?? '',
+    extra_fee_description:
+      payload.extra_fee_description ?? currentUser.extra_fee_description ?? '',
     vip_level: currentUser.vip_level ?? 0,
     title: payload.title ?? currentUser.title ?? '',
     balance: currentUser.balance ?? 0,
@@ -576,27 +593,7 @@ appRouter.delete('/users/:id/follow', async (req, res) => {
 });
 
 appRouter.get('/guides', async (_req, res) => {
-  const result = await pool.query(
-    `
-      select
-        g.*,
-        u.nickname as user_nickname,
-        u.avatar as user_avatar,
-        u.gender as user_gender,
-        u.city as user_city,
-        u.bio as user_bio,
-        u.guide_introduction as user_guide_introduction,
-        u.guide_tags as user_guide_tags
-      from public.guides g
-      left join public.users u on u.id = g.id
-      order by g.created_at desc
-    `,
-  );
-  return ok(res, { data: result.rows.map(mergeGuideUserFields) });
-});
-
-appRouter.get('/guides/:id', async (req, res) => {
-  const result = await pool.query(
+  const durableGuides = await pool.query(
     `
       select
         g.*,
@@ -607,6 +604,95 @@ appRouter.get('/guides/:id', async (req, res) => {
         u.bio as user_bio,
         u.guide_introduction as user_guide_introduction,
         u.guide_tags as user_guide_tags,
+        u.ethnicity,
+        u.education,
+        u.height_cm,
+        u.weight_kg,
+        u.service_description,
+        u.extra_fee_description,
+        coalesce((select count(*) from public.orders o where o.guide_id = g.id), 0)::int as total_orders,
+        coalesce((select avg(r.rating) / 5.0 * 100 from public.guide_reviews r where r.guide_id = g.id), 0)::double precision as good_rate
+      from public.guides g
+      left join public.users u on u.id = g.id
+      where g.verified = true
+      order by g.created_at desc
+    `,
+  );
+  return ok(res, {
+    data: durableGuides.rows
+      .filter((row) => !isLegacyAllysaGuide(row))
+      .map(mergeGuideUserFields),
+  });
+
+  /* Legacy application-table fallback removed: guides is the single source of truth.
+  const result = await pool.query(
+    `
+      select
+        u.id,
+        coalesce(nullif(u.nickname, ''), nullif(g.name, ''), nullif(ga.full_name, ''), '地陪') as name,
+        coalesce(nullif(u.avatar, ''), nullif(g.avatar, ''), nullif(ga.avatar, ''), '') as avatar,
+        coalesce(g.rating, 0) as rating,
+        coalesce(nullif(u.gender, ''), nullif(g.gender, ''), nullif(ga.gender, ''), '') as gender,
+        true as verified,
+        case
+          when coalesce(array_length(u.guide_tags, 1), 0) > 0 then u.guide_tags
+          when coalesce(array_length(g.tags, 1), 0) > 0 then g.tags
+          else coalesce(ga.service_tags, '{}'::text[])
+        end as tags,
+        coalesce(
+          nullif(u.guide_introduction, ''),
+          nullif(u.bio, ''),
+          nullif(g.description, ''),
+          nullif(ga.bio, ''),
+          ''
+        ) as description,
+        coalesce(g.images, ga.images, '{}'::text[]) as images,
+        coalesce(g.views, 0) as views,
+        coalesce(g.likes, 0) as likes,
+        coalesce(g.fans, 0) as fans,
+        coalesce(nullif(u.city, ''), nullif(g.city, ''), nullif(ga.city, ''), '') as city,
+        coalesce(g.created_at, u.created_at, ga.created_at) as created_at
+      from public.users u
+      left join public.guides g on g.id = u.id
+      left join lateral (
+        select full_name, avatar, gender, city, bio, service_tags, images, created_at
+        from public.guide_applications
+        where user_id = u.id and status = 'approved'
+        order by created_at desc nulls last
+        limit 1
+      ) ga on true
+      where g.id is not null or ga.created_at is not null
+      order by coalesce(g.created_at, u.created_at, ga.created_at) desc nulls last
+    `,
+  );
+  return ok(res, {
+    data: result.rows
+      .filter((row) => !isLegacyAllysaGuide(row))
+      .map(mergeGuideUserFields),
+  });
+  */
+});
+
+appRouter.get('/guides/:id', async (req, res) => {
+  const durableGuide = await pool.query(
+    `
+      select
+        g.*,
+        u.nickname as user_nickname,
+        u.avatar as user_avatar,
+        u.gender as user_gender,
+        u.city as user_city,
+        u.bio as user_bio,
+        u.guide_introduction as user_guide_introduction,
+        u.guide_tags as user_guide_tags,
+        u.ethnicity,
+        u.education,
+        u.height_cm,
+        u.weight_kg,
+        u.service_description,
+        u.extra_fee_description,
+        coalesce((select count(*) from public.orders o where o.guide_id = g.id), 0)::int as total_orders,
+        coalesce((select avg(r.rating) / 5.0 * 100 from public.guide_reviews r where r.guide_id = g.id), 0)::double precision as good_rate,
         coalesce((
           select json_agg(item order by item.updated_at desc)
           from (
@@ -626,13 +712,79 @@ appRouter.get('/guides/:id', async (req, res) => {
         ), '[]'::json) as reviews
       from public.guides g
       left join public.users u on u.id = g.id
-      where g.id = $1
+      where g.id = $1 and g.verified = true
       limit 1
     `,
     [req.params.id],
   );
-  if (!result.rows[0]) return fail(res, 404, '地陪不存在');
+  if (!durableGuide.rows[0] || isLegacyAllysaGuide(durableGuide.rows[0])) {
+    return fail(res, 404, 'guide not found');
+  }
+  return ok(res, { data: mergeGuideUserFields(durableGuide.rows[0]) });
+
+  /* Legacy application-table fallback removed: guides is the single source of truth.
+  const result = await pool.query(
+    `
+      select
+        u.id,
+        coalesce(nullif(u.nickname, ''), nullif(g.name, ''), nullif(ga.full_name, ''), '地陪') as name,
+        coalesce(nullif(u.avatar, ''), nullif(g.avatar, ''), nullif(ga.avatar, ''), '') as avatar,
+        coalesce(g.rating, 0) as rating,
+        coalesce(nullif(u.gender, ''), nullif(g.gender, ''), nullif(ga.gender, ''), '') as gender,
+        true as verified,
+        case
+          when coalesce(array_length(u.guide_tags, 1), 0) > 0 then u.guide_tags
+          when coalesce(array_length(g.tags, 1), 0) > 0 then g.tags
+          else coalesce(ga.service_tags, '{}'::text[])
+        end as tags,
+        coalesce(
+          nullif(u.guide_introduction, ''),
+          nullif(u.bio, ''),
+          nullif(g.description, ''),
+          nullif(ga.bio, ''),
+          ''
+        ) as description,
+        coalesce(g.images, ga.images, '{}'::text[]) as images,
+        coalesce(g.views, 0) as views,
+        coalesce(g.likes, 0) as likes,
+        coalesce(g.fans, 0) as fans,
+        coalesce(nullif(u.city, ''), nullif(g.city, ''), nullif(ga.city, ''), '') as city,
+        coalesce((
+          select json_agg(item order by item.updated_at desc)
+          from (
+            select id, name, description, price_per_hour, price_per_day, updated_at
+            from public.guide_service_items
+            where guide_id = u.id and enabled = true
+          ) item
+        ), '[]'::json) as service_items,
+        coalesce((
+          select json_agg(review order by review.created_at desc)
+          from (
+            select rating, content, guide_reply, created_at
+            from public.guide_reviews
+            where guide_id = u.id
+            limit 10
+          ) review
+        ), '[]'::json) as reviews
+      from public.users u
+      left join public.guides g on g.id = u.id
+      left join lateral (
+        select full_name, avatar, gender, city, bio, service_tags, images, created_at
+        from public.guide_applications
+        where user_id = u.id and status = 'approved'
+        order by created_at desc nulls last
+        limit 1
+      ) ga on true
+      where u.id = $1 and (g.id is not null or ga.created_at is not null)
+      limit 1
+    `,
+    [req.params.id],
+  );
+  if (!result.rows[0] || isLegacyAllysaGuide(result.rows[0])) {
+    return fail(res, 404, '地陪不存在');
+  }
   return ok(res, { data: mergeGuideUserFields(result.rows[0]) });
+  */
 });
 
 appRouter.post('/guides/:id/favorite', async (req, res) => {

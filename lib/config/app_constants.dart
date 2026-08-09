@@ -64,27 +64,10 @@ class MockData {
       'verified': true,
       'tags': ['今天来过'],
       'description': '本人02年在京工作，偏i但e性格细腻温柔，共情能力强，可以跟我吐槽您的烦恼哦~',
-      'images': [
-        'https://picsum.photos/seed/g1img1/200/200',
-      ],
+      'images': ['https://picsum.photos/seed/g1img1/200/200'],
       'views': 902,
       'likes': 1123,
       'fans': 652,
-    },
-    {
-      'name': 'Allysa艾丽莎',
-      'avatar': 'https://picsum.photos/seed/guide2/100/100',
-      'rating': 4.8,
-      'gender': '女',
-      'verified': true,
-      'tags': ['今天来过'],
-      'description': '帮助提前规划路线，专车接送，安排拍照打卡，帮忙排队，讲解景点详情，各色建筑…',
-      'images': [
-        'https://picsum.photos/seed/g2img1/200/200',
-      ],
-      'views': 1022,
-      'likes': 1523,
-      'fans': 863,
     },
     {
       'name': '小树',
@@ -98,21 +81,6 @@ class MockData {
       'views': 500,
       'likes': 800,
       'fans': 300,
-    },
-    {
-      'name': 'Allysa艾丽莎游鸭YOY…',
-      'avatar': 'https://picsum.photos/seed/guide4/100/100',
-      'rating': 4.6,
-      'gender': '女',
-      'verified': false,
-      'tags': [],
-      'description': '帮助提前规划路线，专车接送，安排拍照打卡，帮忙排队，讲解景点详情，各色建筑…',
-      'images': [
-        'https://picsum.photos/seed/g4img1/200/200',
-      ],
-      'views': 780,
-      'likes': 1200,
-      'fans': 560,
     },
   ];
 

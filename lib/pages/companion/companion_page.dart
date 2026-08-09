@@ -17,7 +17,9 @@ class CompanionPage extends StatefulWidget {
 class _CompanionPageState extends State<CompanionPage> {
   late final TextEditingController _searchController;
 
-  String _selectedCity = '苏州';
+  // Do not hide guides whose city has not been completed in the admin data.
+  // Users can still choose a specific city from the picker when needed.
+  String _selectedCity = '全国';
   bool _sortByTime = true;
 
   @override
@@ -85,11 +87,7 @@ class _CompanionPageState extends State<CompanionPage> {
       ),
       child: Padding(
         padding: const EdgeInsets.fromLTRB(14, 10, 14, 18),
-        child: Column(
-          children: [
-            _buildSearchBar(),
-          ],
-        ),
+        child: Column(children: [_buildSearchBar()]),
       ),
     );
   }
@@ -230,7 +228,33 @@ class _CompanionPageState extends State<CompanionPage> {
   }
 
   List<Guide> _filteredGuides(GuideProvider provider) {
-    final baseList = List<Guide>.of(provider.filteredGuides);
+    // HomePage and CompanionPage share one GuideProvider, but they have
+    // independent city selections. Do not use provider.filteredGuides here,
+    // otherwise the home page can silently filter this list to its city.
+    final query = provider.searchQuery.trim().toLowerCase();
+    final baseList = provider.guides.where((guide) {
+      if (query.isNotEmpty) {
+        final matches =
+            guide.name.toLowerCase().contains(query) ||
+            guide.city.toLowerCase().contains(query) ||
+            guide.description.toLowerCase().contains(query) ||
+            guide.tags.join(' ').toLowerCase().contains(query);
+        if (!matches) return false;
+      }
+      if (_selectedCity != '全国' &&
+          _normalizeCityName(guide.city) != _normalizeCityName(_selectedCity)) {
+        return false;
+      }
+      if (provider.filterGender != null &&
+          guide.gender != provider.filterGender) {
+        return false;
+      }
+      if (provider.filterTag != null &&
+          !guide.tags.contains(provider.filterTag)) {
+        return false;
+      }
+      return true;
+    }).toList();
     if (baseList.isEmpty) {
       return const <Guide>[];
     }
@@ -333,4 +357,3 @@ class _CompanionPageState extends State<CompanionPage> {
     );
   }
 }
-
