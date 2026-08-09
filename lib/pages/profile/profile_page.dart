@@ -224,7 +224,7 @@ class _ProfilePageState extends State<ProfilePage> {
   Widget _buildVipCard(app_model.User user) {
     return Container(
       margin: const EdgeInsets.fromLTRB(16, 0, 16, 12),
-      height: 82,
+      constraints: const BoxConstraints(minHeight: 86),
       decoration: BoxDecoration(
         gradient: const LinearGradient(
           colors: [Color(0xFFFFE6A1), Color(0xFFFFF1C9)],
@@ -248,7 +248,7 @@ class _ProfilePageState extends State<ProfilePage> {
             ),
           ),
           Padding(
-            padding: const EdgeInsets.fromLTRB(16, 12, 16, 12),
+            padding: const EdgeInsets.fromLTRB(16, 11, 16, 11),
             child: Row(
               children: [
                 Expanded(
@@ -269,6 +269,8 @@ class _ProfilePageState extends State<ProfilePage> {
                         user.vipLabel.isNotEmpty
                             ? '当前等级 ${user.vipLabel}，享受更多专属权益'
                             : '开通会员轻松畅聊，享VIP权益',
+                        maxLines: 2,
+                        overflow: TextOverflow.ellipsis,
                         style: const TextStyle(
                           fontSize: 11.5,
                           color: Color(0xFF8E6A18),

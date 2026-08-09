@@ -86,8 +86,7 @@ class _EditProfilePageState extends State<EditProfilePage> {
         _avatarUrl = uploadedUrl;
       }
       await provider.updateUser(
-        User(
-          id: old.id,
+        old.copyWith(
           nickname: _nicknameController.text.trim(),
           avatar: _avatarUrl,
           bio: _bioController.text.trim(),
@@ -98,17 +97,6 @@ class _EditProfilePageState extends State<EditProfilePage> {
           occupation: _occupationController.text.trim(),
           guideIntroduction: _guideIntroductionController.text.trim(),
           guideTags: old.guideTags,
-          vipLevel: old.vipLevel,
-          title: old.title,
-          balance: old.balance,
-          couponCount: old.couponCount,
-          followCount: old.followCount,
-          fansCount: old.fansCount,
-          isBanned: old.isBanned,
-          cancelCount: old.cancelCount,
-          isAdmin: old.isAdmin,
-          isGuide: old.isGuide,
-          guideApplicationStatus: old.guideApplicationStatus,
         ),
       );
       if (!mounted) return;

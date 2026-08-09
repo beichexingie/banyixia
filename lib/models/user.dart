@@ -118,6 +118,44 @@ class User {
     };
   }
 
+  User copyWith({
+    String? nickname,
+    String? avatar,
+    String? bio,
+    String? gender,
+    String? city,
+    String? birthday,
+    String? wechat,
+    String? occupation,
+    String? guideIntroduction,
+    List<String>? guideTags,
+  }) {
+    return User(
+      id: id,
+      nickname: nickname ?? this.nickname,
+      avatar: avatar ?? this.avatar,
+      bio: bio ?? this.bio,
+      gender: gender ?? this.gender,
+      city: city ?? this.city,
+      birthday: birthday ?? this.birthday,
+      wechat: wechat ?? this.wechat,
+      occupation: occupation ?? this.occupation,
+      guideIntroduction: guideIntroduction ?? this.guideIntroduction,
+      guideTags: guideTags ?? this.guideTags,
+      vipLevel: vipLevel,
+      title: title,
+      balance: balance,
+      couponCount: couponCount,
+      followCount: followCount,
+      fansCount: fansCount,
+      isBanned: isBanned,
+      cancelCount: cancelCount,
+      isAdmin: isAdmin,
+      isGuide: isGuide,
+      guideApplicationStatus: guideApplicationStatus,
+    );
+  }
+
   static double? _parseDouble(dynamic value) {
     if (value is double) return value;
     if (value is int) return value.toDouble();

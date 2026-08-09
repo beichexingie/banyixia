@@ -9,41 +9,17 @@ class GuideServiceManagementPage extends StatelessWidget {
   const GuideServiceManagementPage({super.key});
 
   Future<void> _edit(BuildContext context, [GuideServiceItemData? item]) async {
-    final name = TextEditingController(text: item?.name ?? '');
-    final description = TextEditingController(text: item?.description ?? '');
-    final hour = TextEditingController(text: item == null ? '' : item.pricePerHour.toStringAsFixed(0));
-    final day = TextEditingController(text: item == null ? '' : item.pricePerDay.toStringAsFixed(0));
-    var enabled = item?.enabled ?? true;
-    final confirmed = await showDialog<bool>(
+    final result = await showDialog<_GuideServiceEditorResult>(
       context: context,
-      builder: (dialogContext) => StatefulBuilder(
-        builder: (context, setState) => AlertDialog(
-          title: Text(item == null ? '新增服务项目' : '编辑服务项目'),
-          content: SingleChildScrollView(
-            child: Column(mainAxisSize: MainAxisSize.min, children: [
-              TextField(controller: name, decoration: const InputDecoration(labelText: '服务名称')),
-              TextField(controller: description, maxLines: 3, decoration: const InputDecoration(labelText: '服务说明')),
-              TextField(controller: hour, keyboardType: TextInputType.number, decoration: const InputDecoration(labelText: '小时价（可选）')),
-              TextField(controller: day, keyboardType: TextInputType.number, decoration: const InputDecoration(labelText: '日价（可选）')),
-              SwitchListTile(value: enabled, onChanged: (value) => setState(() => enabled = value), title: const Text('上架展示')),
-            ]),
-          ),
-          actions: [TextButton(onPressed: () => Navigator.pop(dialogContext), child: const Text('取消')), FilledButton(onPressed: () => Navigator.pop(dialogContext, true), child: const Text('保存'))],
-        ),
-      ),
+      builder: (_) => _GuideServiceEditorDialog(item: item),
     );
-    final nameValue = name.text.trim();
-    final descriptionValue = description.text.trim();
-    final hourValue = double.tryParse(hour.text.trim()) ?? 0;
-    final dayValue = double.tryParse(day.text.trim()) ?? 0;
-    name.dispose(); description.dispose(); hour.dispose(); day.dispose();
-    if (confirmed != true || !context.mounted) return;
+    if (result == null || !context.mounted) return;
     try {
       final provider = context.read<GuideBackendProvider>();
       if (item == null) {
-        await provider.addServiceItem(name: nameValue, description: descriptionValue, pricePerHour: hourValue, pricePerDay: dayValue);
+        await provider.addServiceItem(name: result.name, description: result.description, pricePerHour: result.pricePerHour, pricePerDay: result.pricePerDay);
       } else {
-        await provider.updateServiceItem(item.id, name: nameValue, description: descriptionValue, pricePerHour: hourValue, pricePerDay: dayValue, enabled: enabled);
+        await provider.updateServiceItem(item.id, name: result.name, description: result.description, pricePerHour: result.pricePerHour, pricePerDay: result.pricePerDay, enabled: result.enabled);
       }
     } catch (error) {
       if (context.mounted) _message(context, '保存失败：$error');
@@ -74,6 +50,176 @@ class GuideServiceManagementPage extends StatelessWidget {
         const SizedBox(height: 88),
       ]),
       floatingActionButton: FloatingActionButton.extended(onPressed: () => _edit(context), icon: const Icon(Icons.add), label: const Text('新增项目')),
+    );
+  }
+}
+
+class _GuideServiceEditorResult {
+  const _GuideServiceEditorResult({
+    required this.name,
+    required this.description,
+    required this.pricePerHour,
+    required this.pricePerDay,
+    required this.enabled,
+  });
+
+  final String name;
+  final String description;
+  final double pricePerHour;
+  final double pricePerDay;
+  final bool enabled;
+}
+
+class _GuideServiceEditorDialog extends StatefulWidget {
+  const _GuideServiceEditorDialog({this.item});
+
+  final GuideServiceItemData? item;
+
+  @override
+  State<_GuideServiceEditorDialog> createState() =>
+      _GuideServiceEditorDialogState();
+}
+
+class _GuideServiceEditorDialogState extends State<_GuideServiceEditorDialog> {
+  late final TextEditingController _name;
+  late final TextEditingController _description;
+  late final TextEditingController _hour;
+  late final TextEditingController _day;
+  late bool _enabled;
+  String? _nameError;
+
+  @override
+  void initState() {
+    super.initState();
+    final item = widget.item;
+    _name = TextEditingController(text: item?.name ?? '');
+    _description = TextEditingController(text: item?.description ?? '');
+    _hour = TextEditingController(
+      text: item == null ? '' : item.pricePerHour.toStringAsFixed(0),
+    );
+    _day = TextEditingController(
+      text: item == null ? '' : item.pricePerDay.toStringAsFixed(0),
+    );
+    _enabled = item?.enabled ?? true;
+  }
+
+  @override
+  void dispose() {
+    _name.dispose();
+    _description.dispose();
+    _hour.dispose();
+    _day.dispose();
+    super.dispose();
+  }
+
+  void _save() {
+    final name = _name.text.trim();
+    if (name.isEmpty) {
+      setState(() => _nameError = '请填写服务名称');
+      return;
+    }
+    Navigator.of(context).pop(
+      _GuideServiceEditorResult(
+        name: name,
+        description: _description.text.trim(),
+        pricePerHour: double.tryParse(_hour.text.trim()) ?? 0,
+        pricePerDay: double.tryParse(_day.text.trim()) ?? 0,
+        enabled: _enabled,
+      ),
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final editing = widget.item != null;
+    return Dialog(
+      insetPadding: const EdgeInsets.symmetric(horizontal: 18, vertical: 24),
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
+      child: SafeArea(
+        child: SingleChildScrollView(
+          padding: const EdgeInsets.fromLTRB(20, 18, 20, 20),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                children: [
+                  Container(
+                    width: 42,
+                    height: 42,
+                    decoration: BoxDecoration(
+                      color: AppColors.primarySoft,
+                      borderRadius: BorderRadius.circular(14),
+                    ),
+                    child: const Icon(Icons.handshake_outlined),
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(editing ? '编辑服务项目' : '新增服务项目', style: const TextStyle(fontSize: 20, fontWeight: FontWeight.w900)),
+                        const SizedBox(height: 2),
+                        const Text('保存后将展示在你的地陪主页', style: TextStyle(fontSize: 12, color: AppColors.textSecondary)),
+                      ],
+                    ),
+                  ),
+                  IconButton(onPressed: () => Navigator.of(context).pop(), icon: const Icon(Icons.close)),
+                ],
+              ),
+              const SizedBox(height: 18),
+              TextField(
+                controller: _name,
+                maxLength: 30,
+                textInputAction: TextInputAction.next,
+                onChanged: (_) {
+                  if (_nameError != null) setState(() => _nameError = null);
+                },
+                decoration: InputDecoration(
+                  labelText: '服务名称',
+                  hintText: '例如：城市陪游、商务陪同',
+                  errorText: _nameError,
+                ),
+              ),
+              const SizedBox(height: 8),
+              TextField(
+                controller: _description,
+                minLines: 3,
+                maxLines: 5,
+                maxLength: 160,
+                decoration: const InputDecoration(labelText: '服务说明', hintText: '说明服务内容、适用场景和注意事项'),
+              ),
+              const SizedBox(height: 8),
+              Row(
+                children: [
+                  Expanded(child: TextField(controller: _hour, keyboardType: const TextInputType.numberWithOptions(decimal: true), decoration: const InputDecoration(labelText: '小时价', prefixText: '¥ '))),
+                  const SizedBox(width: 12),
+                  Expanded(child: TextField(controller: _day, keyboardType: const TextInputType.numberWithOptions(decimal: true), decoration: const InputDecoration(labelText: '日价', prefixText: '¥ '))),
+                ],
+              ),
+              const SizedBox(height: 12),
+              Container(
+                decoration: BoxDecoration(color: const Color(0xFFF7F8F5), borderRadius: BorderRadius.circular(14)),
+                child: SwitchListTile(
+                  value: _enabled,
+                  onChanged: (value) => setState(() => _enabled = value),
+                  title: const Text('上架展示', style: TextStyle(fontWeight: FontWeight.w800)),
+                  subtitle: Text(_enabled ? '用户可在你的主页看到并选择该项目' : '暂不对用户展示，可稍后重新上架'),
+                  activeColor: AppColors.primaryDark,
+                ),
+              ),
+              const SizedBox(height: 20),
+              Row(
+                children: [
+                  Expanded(child: OutlinedButton(onPressed: () => Navigator.of(context).pop(), child: const Text('取消'))),
+                  const SizedBox(width: 12),
+                  Expanded(child: FilledButton(onPressed: _save, child: Text(editing ? '保存修改' : '创建项目'))),
+                ],
+              ),
+            ],
+          ),
+        ),
+      ),
     );
   }
 }

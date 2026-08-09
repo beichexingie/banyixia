@@ -388,7 +388,9 @@ appRouter.put('/users/me', async (req, res) => {
       [updated.id, payload.guide_tags ?? payload.guideTags ?? []],
     );
   }
-  return ok(res, { data: updated });
+  // The raw users row has no guide role columns. Return the hydrated profile so
+  // editing an avatar cannot make an approved guide look like a normal user.
+  return ok(res, { data: await hydrateUser(pool, updated.id) });
 });
 
 appRouter.get('/users/:id', async (req, res) => {

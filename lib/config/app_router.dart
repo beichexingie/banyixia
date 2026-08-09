@@ -175,13 +175,13 @@ class AppRouter {
         builder: (context, state) => const MyDemandListPage(),
       ),
       GoRoute(
+        path: '/demand/create',
+        builder: (context, state) => const DemandCreatePage(),
+      ),
+      GoRoute(
         path: '/demand/:id',
         builder: (context, state) =>
             DemandDetailPage(demandId: state.pathParameters['id']!),
-      ),
-      GoRoute(
-        path: '/demand/create',
-        builder: (context, state) => const DemandCreatePage(),
       ),
       GoRoute(
         path: '/apply/guide',
