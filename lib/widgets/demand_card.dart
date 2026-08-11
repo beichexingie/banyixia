@@ -45,60 +45,70 @@ class DemandCard extends StatelessWidget {
           children: [
             Row(
               children: [
-                ClipOval(
-                  child: CachedNetworkImage(
-                    imageUrl: demand.authorAvatar,
-                    width: 50,
-                    height: 50,
-                    fit: BoxFit.cover,
-                    errorWidget: (context, url, error) => Container(
+                GestureDetector(
+                  onTap: demand.authorId.isEmpty
+                      ? null
+                      : () => context.push('/user/${demand.authorId}'),
+                  child: ClipOval(
+                    child: CachedNetworkImage(
+                      imageUrl: demand.authorAvatar,
                       width: 50,
                       height: 50,
-                      color: AppColors.surfaceMuted,
-                      alignment: Alignment.center,
-                      child: const Icon(
-                        Icons.person,
-                        size: 24,
-                        color: AppColors.textHint,
+                      fit: BoxFit.cover,
+                      errorWidget: (context, url, error) => Container(
+                        width: 50,
+                        height: 50,
+                        color: AppColors.surfaceMuted,
+                        alignment: Alignment.center,
+                        child: const Icon(
+                          Icons.person,
+                          size: 24,
+                          color: AppColors.textHint,
+                        ),
                       ),
                     ),
                   ),
                 ),
                 const SizedBox(width: 10),
                 Expanded(
-                  child: Row(
-                    children: [
-                      Flexible(
-                        child: Text(
-                          demand.authorName,
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                          style: const TextStyle(
-                            fontSize: 20,
-                            fontWeight: FontWeight.w600,
-                            color: AppColors.textPrimary,
+                  child: GestureDetector(
+                    onTap: demand.authorId.isEmpty
+                        ? null
+                        : () => context.push('/user/${demand.authorId}'),
+                    child: Row(
+                      children: [
+                        Flexible(
+                          child: Text(
+                            demand.authorName,
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: const TextStyle(
+                              fontSize: 20,
+                              fontWeight: FontWeight.w600,
+                              color: AppColors.textPrimary,
+                            ),
                           ),
                         ),
-                      ),
-                      const SizedBox(width: 8),
-                      Container(
-                        width: 22,
-                        height: 22,
-                        decoration: const BoxDecoration(
-                          color: AppColors.primary,
-                          shape: BoxShape.circle,
-                        ),
-                        alignment: Alignment.center,
-                        child: const Text(
-                          '3',
-                          style: TextStyle(
-                            fontSize: 11,
-                            fontWeight: FontWeight.w800,
-                            color: AppColors.textPrimary,
+                        const SizedBox(width: 8),
+                        Container(
+                          width: 22,
+                          height: 22,
+                          decoration: const BoxDecoration(
+                            color: AppColors.primary,
+                            shape: BoxShape.circle,
+                          ),
+                          alignment: Alignment.center,
+                          child: const Text(
+                            '3',
+                            style: TextStyle(
+                              fontSize: 11,
+                              fontWeight: FontWeight.w800,
+                              color: AppColors.textPrimary,
+                            ),
                           ),
                         ),
-                      ),
-                    ],
+                      ],
+                    ),
                   ),
                 ),
               ],

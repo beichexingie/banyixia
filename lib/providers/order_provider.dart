@@ -16,8 +16,8 @@ class OrderProvider extends ChangeNotifier {
   OrderProvider({
     PaymentService? paymentService,
     SessionService? sessionService,
-  })  : _paymentService = paymentService ?? const AlipayPaymentService(),
-        _sessionService = sessionService ?? EcsSessionService();
+  }) : _paymentService = paymentService ?? const AlipayPaymentService(),
+       _sessionService = sessionService ?? EcsSessionService();
 
   List<Order> get orders => _orders;
   bool get isLoading => _isLoading;
@@ -65,7 +65,8 @@ class OrderProvider extends ChangeNotifier {
           message: '该订单已经支付成功',
         );
       }
-      final merchantOrderNo = order.merchantOrderNo ?? _buildMerchantOrderNo(order);
+      final merchantOrderNo =
+          order.merchantOrderNo ?? _buildMerchantOrderNo(order);
       debugPrint(
         'Pay order request: merchantOrderNo=$merchantOrderNo, amount=${order.amount}',
       );
@@ -93,7 +94,8 @@ class OrderProvider extends ChangeNotifier {
           outcome: PaymentOutcome.success,
           success: true,
           message: '支付成功，订单已确认',
-          transactionId: confirmed?['provider_trade_no']?.toString() ??
+          transactionId:
+              confirmed?['provider_trade_no']?.toString() ??
               result.transactionId,
           orderString: result.orderString,
         );
@@ -126,7 +128,9 @@ class OrderProvider extends ChangeNotifier {
     }
   }
 
-  Future<Map<String, dynamic>?> _waitForPaymentConfirmation(String orderId) async {
+  Future<Map<String, dynamic>?> _waitForPaymentConfirmation(
+    String orderId,
+  ) async {
     for (var attempt = 0; attempt < 6; attempt += 1) {
       try {
         final response = await _api.get(
@@ -141,7 +145,9 @@ class OrderProvider extends ChangeNotifier {
           }
         }
       } catch (error) {
-        debugPrint('Payment status check attempt ${attempt + 1} failed: $error');
+        debugPrint(
+          'Payment status check attempt ${attempt + 1} failed: $error',
+        );
       }
 
       if (attempt < 5) {
@@ -156,11 +162,22 @@ class OrderProvider extends ChangeNotifier {
     await loadOrders();
   }
 
-  Future<void> reviewOrder(String orderId, {required int rating, required String content, bool anonymous = true}) async {
+  Future<void> reviewOrder(
+    String orderId, {
+    required int rating,
+    required String content,
+    List<String> images = const [],
+    bool anonymous = true,
+  }) async {
     await _api.post(
       '/orders/$orderId/review',
       authToken: _token(),
-      body: {'rating': rating, 'content': content, 'is_anonymous': anonymous},
+      body: {
+        'rating': rating,
+        'content': content,
+        'images': images,
+        'is_anonymous': anonymous,
+      },
     );
     await loadOrders();
   }
@@ -192,7 +209,8 @@ class OrderProvider extends ChangeNotifier {
       '/orders/one-cent-test',
       authToken: _token(),
       body: {
-        if (guideId != null && guideId.trim().isNotEmpty) 'guide_id': guideId.trim(),
+        if (guideId != null && guideId.trim().isNotEmpty)
+          'guide_id': guideId.trim(),
       },
     );
     final data = response['data'];
@@ -206,7 +224,10 @@ class OrderProvider extends ChangeNotifier {
   }
 
   Future<void> acceptOrder(String orderId) async {
-    final response = await _api.post('/orders/$orderId/accept', authToken: _token());
+    final response = await _api.post(
+      '/orders/$orderId/accept',
+      authToken: _token(),
+    );
     final data = response['data'];
     if (data is Map<String, dynamic>) {
       final accepted = Order.fromJson(data);

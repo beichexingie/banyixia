@@ -1,14 +1,18 @@
 import 'dart:async';
+import 'dart:convert';
 
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
+import 'package:image_picker/image_picker.dart';
 import 'package:provider/provider.dart';
 
 import '../../config/app_theme.dart';
 import '../../models/order.dart';
+import '../../providers/user_provider.dart';
 import '../../providers/message_provider.dart';
 import '../../providers/order_provider.dart';
+import '../../services/ecs_api_client.dart';
 import '../../widgets/safety_control_panel.dart';
 
 class OrdersPage extends StatefulWidget {
@@ -129,6 +133,8 @@ class _OrdersPageState extends State<OrdersPage>
   Future<void> _reviewOrder(Order order) async {
     var rating = 5;
     final controller = TextEditingController();
+    final picker = ImagePicker();
+    final selectedImages = <XFile>[];
     final result = await showDialog<Map<String, dynamic>>(
       context: context,
       builder: (context) => StatefulBuilder(
@@ -139,24 +145,51 @@ class _OrdersPageState extends State<OrdersPage>
             children: [
               Row(
                 mainAxisAlignment: MainAxisAlignment.center,
-                children: List.generate(5, (index) => IconButton(
-                  onPressed: () => setState(() => rating = index + 1),
-                  icon: Icon(index < rating ? Icons.star : Icons.star_border),
-                  color: const Color(0xFFE28B24),
-                )),
+                children: List.generate(
+                  5,
+                  (index) => IconButton(
+                    onPressed: () => setState(() => rating = index + 1),
+                    icon: Icon(index < rating ? Icons.star : Icons.star_border),
+                    color: const Color(0xFFE28B24),
+                  ),
+                ),
               ),
               TextField(
                 controller: controller,
                 maxLines: 4,
                 decoration: const InputDecoration(hintText: '说说这次服务的感受'),
               ),
+              Align(
+                alignment: Alignment.centerLeft,
+                child: TextButton.icon(
+                  onPressed: () async {
+                    final picked = await picker.pickMultiImage();
+                    if (picked.isNotEmpty)
+                      selectedImages.addAll(picked.take(9));
+                  },
+                  icon: const Icon(Icons.photo_library_outlined),
+                  label: const Text('添加图片'),
+                ),
+              ),
               const SizedBox(height: 8),
-              const Text('默认匿名展示，地陪只能看到匿名反馈。', style: TextStyle(fontSize: 12, color: AppColors.textHint)),
+              const Text(
+                '默认匿名展示，地陪只能看到匿名反馈。',
+                style: TextStyle(fontSize: 12, color: AppColors.textHint),
+              ),
             ],
           ),
           actions: [
-            TextButton(onPressed: () => Navigator.pop(context), child: const Text('取消')),
-            FilledButton(onPressed: () => Navigator.pop(context, {'rating': rating, 'content': controller.text.trim()}), child: const Text('提交')),
+            TextButton(
+              onPressed: () => Navigator.pop(context),
+              child: const Text('取消'),
+            ),
+            FilledButton(
+              onPressed: () => Navigator.pop(context, {
+                'rating': rating,
+                'content': controller.text.trim(),
+              }),
+              child: const Text('提交'),
+            ),
           ],
         ),
       ),
@@ -166,7 +199,29 @@ class _OrdersPageState extends State<OrdersPage>
     controller.dispose();
     if (!mounted || selectedRating == null || content.isEmpty) return;
     try {
-      await context.read<OrderProvider>().reviewOrder(order.id, rating: selectedRating, content: content);
+      final imageUrls = <String>[];
+      final api = EcsApiClient();
+      final token = context.read<UserProvider>().accessToken;
+      for (final file in selectedImages) {
+        final response = await api.post(
+          '/uploads/review-image',
+          authToken: token,
+          body: {
+            'filename': file.name,
+            'bytes_base64': base64Encode(await file.readAsBytes()),
+          },
+        );
+        final data = response['data'];
+        if (data is Map<String, dynamic> && data['url'] != null) {
+          imageUrls.add(data['url'].toString());
+        }
+      }
+      await context.read<OrderProvider>().reviewOrder(
+        order.id,
+        rating: selectedRating,
+        content: content,
+        images: imageUrls,
+      );
       if (mounted) _showSimpleMessage('评价已提交');
     } catch (error) {
       if (mounted) _showSimpleMessage('评价提交失败：$error');
@@ -323,7 +378,8 @@ class _OrdersPageState extends State<OrdersPage>
             order.serviceName.contains('0.10')) ||
         (order.merchantOrderNo?.startsWith('DBG') ?? false) ||
         (order.merchantOrderNo?.startsWith('TEST001') ?? false);
-    final waitingGuideAccept = isDebugOrder &&
+    final waitingGuideAccept =
+        isDebugOrder &&
         order.status == OrderStatus.pendingPayment &&
         order.paymentStatus == 'pending';
     final isPaying = _payingOrderIds.contains(order.id);
@@ -333,202 +389,208 @@ class _OrdersPageState extends State<OrdersPage>
       onTap: () => context.push('/profile/orders/${order.id}'),
       borderRadius: BorderRadius.circular(22),
       child: Container(
-      margin: const EdgeInsets.only(bottom: 12),
-      padding: const EdgeInsets.fromLTRB(14, 12, 14, 14),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(22),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            children: [
-              CircleAvatar(
-                radius: 11,
-                backgroundImage: order.guideAvatar.isNotEmpty
-                    ? NetworkImage(order.guideAvatar)
-                    : null,
-                child: order.guideAvatar.isEmpty
-                    ? const Icon(Icons.person, size: 12)
-                    : null,
-              ),
-              const SizedBox(width: 6),
-              Expanded(
-                child: Text(
-                  order.guideName.isEmpty ? '用户10938' : order.guideName,
-                  style: const TextStyle(
-                    fontSize: 15,
+        margin: const EdgeInsets.only(bottom: 12),
+        padding: const EdgeInsets.fromLTRB(14, 12, 14, 14),
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(22),
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            GestureDetector(
+              onTap: () => context.push('/guide/${order.guideId}'),
+              child: Row(
+                children: [
+                  CircleAvatar(
+                    radius: 11,
+                    backgroundImage: order.guideAvatar.isNotEmpty
+                        ? NetworkImage(order.guideAvatar)
+                        : null,
+                    child: order.guideAvatar.isEmpty
+                        ? const Icon(Icons.person, size: 12)
+                        : null,
+                  ),
+                  const SizedBox(width: 6),
+                  Expanded(
+                    child: Text(
+                      order.guideName.isEmpty ? '用户10938' : order.guideName,
+                      style: const TextStyle(
+                        fontSize: 15,
+                        color: AppColors.textHint,
+                      ),
+                    ),
+                  ),
+                  const Icon(
+                    Icons.chevron_right,
+                    size: 18,
                     color: AppColors.textHint,
                   ),
+                ],
+              ),
+            ),
+            const SizedBox(height: 12),
+            Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                ClipRRect(
+                  borderRadius: BorderRadius.circular(14),
+                  child: order.guideAvatar.isNotEmpty
+                      ? CachedNetworkImage(
+                          imageUrl: order.guideAvatar,
+                          width: 86,
+                          height: 86,
+                          fit: BoxFit.cover,
+                          errorWidget: (context, url, error) =>
+                              _thumbFallback(),
+                        )
+                      : _thumbFallback(),
                 ),
-              ),
-              const Icon(
-                Icons.chevron_right,
-                size: 18,
-                color: AppColors.textHint,
-              ),
-            ],
-          ),
-          const SizedBox(height: 12),
-          Row(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              ClipRRect(
-                borderRadius: BorderRadius.circular(14),
-                child: order.guideAvatar.isNotEmpty
-                    ? CachedNetworkImage(
-                        imageUrl: order.guideAvatar,
-                        width: 86,
-                        height: 86,
-                        fit: BoxFit.cover,
-                        errorWidget: (context, url, error) => _thumbFallback(),
-                      )
-                    : _thumbFallback(),
-              ),
-              const SizedBox(width: 12),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Row(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Expanded(
-                          child: Text(
-                            isDebugOrder ? '支付联调测试订单' : _serviceTitle(order),
-                            maxLines: 2,
-                            overflow: TextOverflow.ellipsis,
-                            style: const TextStyle(
-                              fontSize: 16,
-                              fontWeight: FontWeight.w800,
-                              color: AppColors.textPrimary,
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Row(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Expanded(
+                            child: Text(
+                              isDebugOrder ? '支付联调测试订单' : _serviceTitle(order),
+                              maxLines: 2,
+                              overflow: TextOverflow.ellipsis,
+                              style: const TextStyle(
+                                fontSize: 16,
+                                fontWeight: FontWeight.w800,
+                                color: AppColors.textPrimary,
+                              ),
                             ),
                           ),
-                        ),
-                        const SizedBox(width: 8),
-                        Text(
-                          '¥${_formatAmount(order.amount)}',
-                          style: const TextStyle(
-                            fontSize: 17,
-                            fontWeight: FontWeight.w800,
-                            color: Color(0xFFFF5A2E),
-                          ),
-                        ),
-                      ],
-                    ),
-                    const SizedBox(height: 6),
-                    Text(
-                      order.serviceName.isEmpty
-                          ? '内容内容内容内容内容内容'
-                          : order.serviceName,
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      style: const TextStyle(
-                        fontSize: 12.5,
-                        color: AppColors.textSecondary,
-                        height: 1.4,
-                      ),
-                    ),
-                    const SizedBox(height: 10),
-                    Container(
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 10,
-                        vertical: 6,
-                      ),
-                      decoration: BoxDecoration(
-                        color: const Color(0xFFF4FBDD),
-                        borderRadius: BorderRadius.circular(10),
-                      ),
-                      child: Row(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          const Icon(
-                            Icons.access_time,
-                            size: 14,
-                            color: AppColors.textPrimary,
-                          ),
-                          const SizedBox(width: 4),
+                          const SizedBox(width: 8),
                           Text(
-                            _formatDateTime(order.serviceDate),
+                            '¥${_formatAmount(order.amount)}',
                             style: const TextStyle(
-                              fontSize: 12,
-                              color: AppColors.textPrimary,
+                              fontSize: 17,
+                              fontWeight: FontWeight.w800,
+                              color: Color(0xFFFF5A2E),
                             ),
                           ),
                         ],
                       ),
-                    ),
-                  ],
-                ),
-              ),
-            ],
-          ),
-          if (order.status == OrderStatus.inProgress) ...[
-            const SizedBox(height: 12),
-            SafetyControlPanel(orderId: order.id),
-          ],
-          const SizedBox(height: 12),
-          Row(
-            children: [
-              Text(
-                statusText,
-                style: TextStyle(
-                  fontSize: 14,
-                  color: statusColor,
-                  fontWeight: FontWeight.w700,
-                ),
-              ),
-              const Spacer(),
-              if (order.status == OrderStatus.pendingPayment) ...[
-                _outlineAction(
-                  label: '申请售后',
-                  onTap: () => _showSimpleMessage('售后入口稍后接入'),
-                ),
-                const SizedBox(width: 8),
-                _outlineAction(
-                  label: waitingGuideAccept
-                      ? '等待接单'
-                      : isPaying
-                          ? '支付中...'
-                          : (isDebugOrder ? '继续支付' : '去支付'),
-                  onTap: waitingGuideAccept || isPaying ? null : () => _payOrder(order),
-                ),
-              ] else if (order.status == OrderStatus.inProgress) ...[
-                _outlineAction(
-                  label: '联系地陪',
-                  onTap: () => _contactGuide(order),
-                ),
-                const SizedBox(width: 8),
-                _outlineAction(
-                  label: isCompleting ? '提交中...' : '确认完成',
-                  onTap: isCompleting ? null : () => _completeOrder(order),
-                ),
-              ] else if (order.status == OrderStatus.pendingReview) ...[
-                _outlineAction(
-                  label: '申请售后',
-                  onTap: () => _showSimpleMessage('售后入口稍后接入'),
-                ),
-                const SizedBox(width: 8),
-                _outlineAction(
-                  label: '待评价',
-                  onTap: () => _reviewOrder(order),
-                ),
-              ] else if (order.status == OrderStatus.completed) ...[
-                _outlineAction(
-                  label: '申请售后',
-                  onTap: () => _showSimpleMessage('售后入口稍后接入'),
-                ),
-                const SizedBox(width: 8),
-                _outlineAction(
-                  label: '已完成',
-                  onTap: () => _showSimpleMessage('订单已完成'),
+                      const SizedBox(height: 6),
+                      Text(
+                        order.serviceName.isEmpty
+                            ? '内容内容内容内容内容内容'
+                            : order.serviceName,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: const TextStyle(
+                          fontSize: 12.5,
+                          color: AppColors.textSecondary,
+                          height: 1.4,
+                        ),
+                      ),
+                      const SizedBox(height: 10),
+                      Container(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 10,
+                          vertical: 6,
+                        ),
+                        decoration: BoxDecoration(
+                          color: const Color(0xFFF4FBDD),
+                          borderRadius: BorderRadius.circular(10),
+                        ),
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            const Icon(
+                              Icons.access_time,
+                              size: 14,
+                              color: AppColors.textPrimary,
+                            ),
+                            const SizedBox(width: 4),
+                            Text(
+                              _formatDateTime(order.serviceDate),
+                              style: const TextStyle(
+                                fontSize: 12,
+                                color: AppColors.textPrimary,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ],
+                  ),
                 ),
               ],
+            ),
+            if (order.status == OrderStatus.inProgress) ...[
+              const SizedBox(height: 12),
+              SafetyControlPanel(orderId: order.id),
             ],
-          ),
-        ],
-      ),
+            const SizedBox(height: 12),
+            Row(
+              children: [
+                Text(
+                  statusText,
+                  style: TextStyle(
+                    fontSize: 14,
+                    color: statusColor,
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
+                const Spacer(),
+                if (order.status == OrderStatus.pendingPayment) ...[
+                  _outlineAction(
+                    label: '申请售后',
+                    onTap: () => _showSimpleMessage('售后入口稍后接入'),
+                  ),
+                  const SizedBox(width: 8),
+                  _outlineAction(
+                    label: waitingGuideAccept
+                        ? '等待接单'
+                        : isPaying
+                        ? '支付中...'
+                        : (isDebugOrder ? '继续支付' : '去支付'),
+                    onTap: waitingGuideAccept || isPaying
+                        ? null
+                        : () => _payOrder(order),
+                  ),
+                ] else if (order.status == OrderStatus.inProgress) ...[
+                  _outlineAction(
+                    label: '联系地陪',
+                    onTap: () => _contactGuide(order),
+                  ),
+                  const SizedBox(width: 8),
+                  _outlineAction(
+                    label: isCompleting ? '提交中...' : '确认完成',
+                    onTap: isCompleting ? null : () => _completeOrder(order),
+                  ),
+                ] else if (order.status == OrderStatus.pendingReview) ...[
+                  _outlineAction(
+                    label: '申请售后',
+                    onTap: () => _showSimpleMessage('售后入口稍后接入'),
+                  ),
+                  const SizedBox(width: 8),
+                  _outlineAction(
+                    label: '待评价',
+                    onTap: () => _reviewOrder(order),
+                  ),
+                ] else if (order.status == OrderStatus.completed) ...[
+                  _outlineAction(
+                    label: '申请售后',
+                    onTap: () => _showSimpleMessage('售后入口稍后接入'),
+                  ),
+                  const SizedBox(width: 8),
+                  _outlineAction(
+                    label: '已完成',
+                    onTap: () => _showSimpleMessage('订单已完成'),
+                  ),
+                ],
+              ],
+            ),
+          ],
+        ),
       ),
     );
   }

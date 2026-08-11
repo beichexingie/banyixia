@@ -135,6 +135,13 @@ class _MainScaffoldState extends State<MainScaffold>
                   ),
                   const SizedBox(height: 10),
                   _publishItem(
+                    icon: Icons.explore_outlined,
+                    title: '需求大厅',
+                    subtitle: '查看需求并寻找合适的地陪',
+                    route: '/demands',
+                  ),
+                  const SizedBox(height: 10),
+                  _publishItem(
                     icon: Icons.verified_user_outlined,
                     title: '申请入驻',
                     subtitle: '成为平台认证向导',

@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:go_router/go_router.dart';
 import 'package:provider/provider.dart';
 
 import '../../config/app_theme.dart';
@@ -40,7 +41,9 @@ class _DemandDetailPageState extends State<DemandDetailPage> {
   }
 
   Future<void> _selectGuide(DemandApplication application) async {
-    final amount = double.tryParse(_amountController.text.trim());
+    final amount =
+        application.quoteAmount ??
+        double.tryParse(_amountController.text.trim());
     if (amount == null || amount <= 0) {
       ScaffoldMessenger.of(
         context,
@@ -48,15 +51,17 @@ class _DemandDetailPageState extends State<DemandDetailPage> {
       return;
     }
     try {
-      final data = await context.read<DemandProvider>().selectGuideAndCreateOrder(
+      final data = await context
+          .read<DemandProvider>()
+          .selectGuideAndCreateOrder(
             demandId: widget.demandId,
             applicationId: application.id,
             amount: amount,
           );
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('已生成订单：${data['id'] ?? ''}')),
-      );
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text('已生成订单：${data['id'] ?? ''}')));
       await _refresh();
     } catch (e) {
       if (!mounted) return;
@@ -105,18 +110,52 @@ class _DemandDetailPageState extends State<DemandDetailPage> {
                       Row(
                         children: [
                           Expanded(
-                            child: Text(
-                              demand.title,
-                              style: const TextStyle(
-                                fontSize: 20,
-                                fontWeight: FontWeight.w900,
-                                color: AppColors.textPrimary,
+                            child: GestureDetector(
+                              onTap: demand.authorId.isEmpty
+                                  ? null
+                                  : () => context.push(
+                                      '/user/${demand.authorId}',
+                                    ),
+                              child: Row(
+                                children: [
+                                  CircleAvatar(
+                                    radius: 18,
+                                    backgroundImage:
+                                        demand.authorAvatar.isNotEmpty
+                                        ? NetworkImage(demand.authorAvatar)
+                                        : null,
+                                    child: demand.authorAvatar.isEmpty
+                                        ? const Icon(Icons.person_outline)
+                                        : null,
+                                  ),
+                                  const SizedBox(width: 8),
+                                  Expanded(
+                                    child: Text(
+                                      demand.authorName.isEmpty
+                                          ? '客户'
+                                          : demand.authorName,
+                                      style: const TextStyle(
+                                        fontSize: 15,
+                                        fontWeight: FontWeight.w800,
+                                      ),
+                                    ),
+                                  ),
+                                ],
                               ),
                             ),
                           ),
                           const SizedBox(width: 10),
                           _DemandStatusChip(status: demand.status),
                         ],
+                      ),
+                      const SizedBox(height: 10),
+                      Text(
+                        demand.title,
+                        style: const TextStyle(
+                          fontSize: 20,
+                          fontWeight: FontWeight.w900,
+                          color: AppColors.textPrimary,
+                        ),
                       ),
                       const SizedBox(height: 12),
                       Text(
@@ -127,6 +166,27 @@ class _DemandDetailPageState extends State<DemandDetailPage> {
                           height: 1.6,
                         ),
                       ),
+                      if (demand.images.isNotEmpty) ...[
+                        const SizedBox(height: 12),
+                        SizedBox(
+                          height: 88,
+                          child: ListView.separated(
+                            scrollDirection: Axis.horizontal,
+                            itemCount: demand.images.length,
+                            separatorBuilder: (_, _) =>
+                                const SizedBox(width: 8),
+                            itemBuilder: (context, index) => ClipRRect(
+                              borderRadius: BorderRadius.circular(12),
+                              child: Image.network(
+                                demand.images[index],
+                                width: 88,
+                                height: 88,
+                                fit: BoxFit.cover,
+                              ),
+                            ),
+                          ),
+                        ),
+                      ],
                       const SizedBox(height: 14),
                       Text('地点：${demand.city} ${demand.location}'),
                       const SizedBox(height: 8),
@@ -134,7 +194,9 @@ class _DemandDetailPageState extends State<DemandDetailPage> {
                       const SizedBox(height: 8),
                       Text('人数：${demand.peopleCount}人 · ${demand.gender}'),
                       const SizedBox(height: 8),
-                      Text('预算：${demand.budget.isEmpty ? '未填写' : demand.budget}'),
+                      Text(
+                        '预算：${demand.budget.isEmpty ? '未填写' : demand.budget}',
+                      ),
                     ],
                   ),
                 ),
@@ -203,13 +265,39 @@ class _DemandDetailPageState extends State<DemandDetailPage> {
                                   Row(
                                     children: [
                                       Expanded(
-                                        child: Text(
-                                          item.guideName.isEmpty
-                                              ? '地陪'
-                                              : item.guideName,
-                                          style: const TextStyle(
-                                            fontSize: 15,
-                                            fontWeight: FontWeight.w800,
+                                        child: GestureDetector(
+                                          onTap: () => context.push(
+                                            '/guide/${item.guideId}',
+                                          ),
+                                          child: Row(
+                                            children: [
+                                              CircleAvatar(
+                                                radius: 18,
+                                                backgroundImage:
+                                                    item.guideAvatar.isNotEmpty
+                                                    ? NetworkImage(
+                                                        item.guideAvatar,
+                                                      )
+                                                    : null,
+                                                child: item.guideAvatar.isEmpty
+                                                    ? const Icon(
+                                                        Icons.person_outline,
+                                                      )
+                                                    : null,
+                                              ),
+                                              const SizedBox(width: 8),
+                                              Expanded(
+                                                child: Text(
+                                                  item.guideName.isEmpty
+                                                      ? '地陪'
+                                                      : item.guideName,
+                                                  style: const TextStyle(
+                                                    fontSize: 15,
+                                                    fontWeight: FontWeight.w800,
+                                                  ),
+                                                ),
+                                              ),
+                                            ],
                                           ),
                                         ),
                                       ),
@@ -223,6 +311,16 @@ class _DemandDetailPageState extends State<DemandDetailPage> {
                                     ],
                                   ),
                                   const SizedBox(height: 8),
+                                  Text(
+                                    item.quoteAmount == null
+                                        ? '报价：待沟通'
+                                        : '报价：¥${item.quoteAmount!.toStringAsFixed(2)}',
+                                    style: const TextStyle(
+                                      fontSize: 14,
+                                      fontWeight: FontWeight.w800,
+                                      color: Color(0xFFFF5A2E),
+                                    ),
+                                  ),
                                   Text(
                                     item.guideCity.isEmpty
                                         ? '未填写城市'
@@ -251,7 +349,8 @@ class _DemandDetailPageState extends State<DemandDetailPage> {
                                         onPressed: () => _selectGuide(item),
                                         style: ElevatedButton.styleFrom(
                                           backgroundColor: AppColors.primary,
-                                          foregroundColor: AppColors.textPrimary,
+                                          foregroundColor:
+                                              AppColors.textPrimary,
                                           elevation: 0,
                                         ),
                                         child: const Text('选中并生成订单'),

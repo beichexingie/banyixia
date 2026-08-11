@@ -590,9 +590,47 @@ class _UserProfilePageState extends State<UserProfilePage> {
                   padding: const EdgeInsets.only(bottom: 12),
                   child: Align(
                     alignment: Alignment.centerLeft,
-                    child: Text(
-                      item['content']?.toString() ?? '',
-                      style: const TextStyle(fontSize: 14, height: 1.55),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Row(
+                          children: List.generate(
+                            (item['rating'] as num?)?.toInt() ?? 0,
+                            (_) => const Icon(
+                              Icons.star,
+                              size: 16,
+                              color: Color(0xFFE28B24),
+                            ),
+                          ),
+                        ),
+                        const SizedBox(height: 4),
+                        Text(
+                          item['content']?.toString() ?? '',
+                          style: const TextStyle(fontSize: 14, height: 1.55),
+                        ),
+                        if (item['images'] is List &&
+                            (item['images'] as List).isNotEmpty) ...[
+                          const SizedBox(height: 8),
+                          SizedBox(
+                            height: 68,
+                            child: ListView.separated(
+                              scrollDirection: Axis.horizontal,
+                              itemCount: (item['images'] as List).length,
+                              separatorBuilder: (_, _) =>
+                                  const SizedBox(width: 6),
+                              itemBuilder: (context, index) => ClipRRect(
+                                borderRadius: BorderRadius.circular(8),
+                                child: Image.network(
+                                  (item['images'] as List)[index].toString(),
+                                  width: 68,
+                                  height: 68,
+                                  fit: BoxFit.cover,
+                                ),
+                              ),
+                            ),
+                          ),
+                        ],
+                      ],
                     ),
                   ),
                 );

@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_application_1/pages/profile/user_profile_page.dart';
 import 'package:provider/provider.dart';
 
 import '../../config/app_theme.dart';
@@ -26,11 +27,54 @@ class _GuideDemandHallPageState extends State<GuideDemandHallPage> {
   }
 
   Future<void> _apply(DemandRequest demand) async {
+    final quoteController = TextEditingController();
+    final noteController = TextEditingController();
+    final result = await showDialog<Map<String, dynamic>>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('报名需求'),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            TextField(
+              controller: quoteController,
+              keyboardType: const TextInputType.numberWithOptions(
+                decimal: true,
+              ),
+              decoration: const InputDecoration(labelText: '我的报价（元）'),
+            ),
+            TextField(
+              controller: noteController,
+              maxLines: 3,
+              decoration: const InputDecoration(labelText: '报名说明（可选）'),
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('取消'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.pop(context, {
+              'quote': double.tryParse(quoteController.text.trim()),
+              'note': noteController.text.trim(),
+            }),
+            child: const Text('提交报名'),
+          ),
+        ],
+      ),
+    );
+    quoteController.dispose();
+    noteController.dispose();
+    final quote = result?['quote'] as double?;
+    if (!mounted || quote == null || quote <= 0) return;
     try {
       await context.read<DemandProvider>().applyToDemand(
-            demand.id,
-            note: '地陪端报名：可根据需求提供本地陪同服务',
-          );
+        demand.id,
+        quoteAmount: quote,
+        note: result?['note']?.toString() ?? '',
+      );
       if (!mounted) return;
       ScaffoldMessenger.of(
         context,
@@ -48,13 +92,12 @@ class _GuideDemandHallPageState extends State<GuideDemandHallPage> {
   Widget build(BuildContext context) {
     return GuideAppScaffold(
       backgroundColor: const Color(0xFFF0F1F3),
-      appBar: AppBar(
-        backgroundColor: Colors.white,
-        title: const Text('需求大厅'),
-      ),
+      appBar: AppBar(backgroundColor: Colors.white, title: const Text('需求大厅')),
       body: Consumer<DemandProvider>(
         builder: (context, provider, _) {
-          final data = _showApplied ? provider.appliedDemands : provider.demands;
+          final data = _showApplied
+              ? provider.appliedDemands
+              : provider.demands;
           return Column(
             children: [
               Padding(
@@ -92,28 +135,61 @@ class _GuideDemandHallPageState extends State<GuideDemandHallPage> {
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
-                            Row(
-                              children: [
-                                Expanded(
-                                  child: Text(
-                                    demand.title,
-                                    style: const TextStyle(
-                                      fontSize: 16,
-                                      fontWeight: FontWeight.w900,
-                                      color: AppColors.textPrimary,
+                            InkWell(
+                              onTap: demand.authorId.isEmpty
+                                  ? null
+                                  : () => Navigator.of(context).push(
+                                      MaterialPageRoute<void>(
+                                        builder: (_) => UserProfilePage(
+                                          userId: demand.authorId,
+                                        ),
+                                      ),
+                                    ),
+                              child: Row(
+                                children: [
+                                  CircleAvatar(
+                                    radius: 19,
+                                    backgroundImage:
+                                        demand.authorAvatar.isNotEmpty
+                                        ? NetworkImage(demand.authorAvatar)
+                                        : null,
+                                    child: demand.authorAvatar.isEmpty
+                                        ? const Icon(Icons.person_outline)
+                                        : null,
+                                  ),
+                                  const SizedBox(width: 8),
+                                  Expanded(
+                                    child: Text(
+                                      demand.authorName.isEmpty
+                                          ? '客户'
+                                          : demand.authorName,
+                                      style: const TextStyle(
+                                        fontSize: 16,
+                                        fontWeight: FontWeight.w900,
+                                        color: AppColors.textPrimary,
+                                      ),
                                     ),
                                   ),
-                                ),
-                                Text(
-                                  _showApplied ? demand.status : '报名中',
-                                  style: const TextStyle(
-                                    fontSize: 12,
-                                    color: AppColors.textHint,
+                                  Text(
+                                    _showApplied ? demand.status : '报名中',
+                                    style: const TextStyle(
+                                      fontSize: 12,
+                                      color: AppColors.textHint,
+                                    ),
                                   ),
-                                ),
-                              ],
+                                ],
+                              ),
                             ),
                             const SizedBox(height: 10),
+                            Text(
+                              demand.title,
+                              style: const TextStyle(
+                                fontSize: 16,
+                                fontWeight: FontWeight.w900,
+                                color: AppColors.textPrimary,
+                              ),
+                            ),
+                            const SizedBox(height: 8),
                             Text(
                               demand.content,
                               maxLines: 2,
@@ -141,6 +217,18 @@ class _GuideDemandHallPageState extends State<GuideDemandHallPage> {
                               ),
                             ),
                             const SizedBox(height: 12),
+                            if (_showApplied &&
+                                demand.myQuoteAmount != null) ...[
+                              Text(
+                                '我的报价：¥${demand.myQuoteAmount!.toStringAsFixed(2)}',
+                                style: const TextStyle(
+                                  fontSize: 13,
+                                  fontWeight: FontWeight.w800,
+                                  color: Color(0xFFFF5A2E),
+                                ),
+                              ),
+                              const SizedBox(height: 8),
+                            ],
                             Row(
                               children: [
                                 Text(

@@ -31,6 +31,7 @@ import 'pages/guide_workspace_pages.dart';
 import 'pages/guide_management_pages.dart';
 import 'providers/guide_console_provider.dart';
 import 'providers/guide_backend_provider.dart';
+import 'package:flutter_application_1/providers/guide_provider.dart';
 
 class GuideApp extends StatelessWidget {
   const GuideApp({super.key});
@@ -43,6 +44,9 @@ class GuideApp extends StatelessWidget {
       providers: [
         ChangeNotifierProvider(
           create: (_) => UserProvider(sessionService: sessionService),
+        ),
+        ChangeNotifierProvider(
+          create: (_) => GuideProvider(sessionService: sessionService),
         ),
         ChangeNotifierProvider(
           create: (_) =>
@@ -438,9 +442,9 @@ class _GuideMainShellState extends State<_GuideMainShell>
   }
 
   Future<void> _openProfileEdit() async {
-    await Navigator.of(context).push(
-      MaterialPageRoute(builder: (_) => const EditProfilePage()),
-    );
+    await Navigator.of(
+      context,
+    ).push(MaterialPageRoute(builder: (_) => const EditProfilePage()));
   }
 
   Future<void> _openRoute([GuideOrderCardData? order]) async {
@@ -489,9 +493,9 @@ class _GuideMainShellState extends State<_GuideMainShell>
   }
 
   Future<void> _openSelectServicePage() async {
-    await Navigator.of(
-      context,
-    ).push(MaterialPageRoute(builder: (_) => const GuideServiceManagementPage()));
+    await Navigator.of(context).push(
+      MaterialPageRoute(builder: (_) => const GuideServiceManagementPage()),
+    );
   }
 
   Future<void> _openDemandHall() async {
@@ -501,80 +505,59 @@ class _GuideMainShellState extends State<_GuideMainShell>
   }
 
   Future<void> _openServiceOperations() async {
-    await Navigator.of(context).push(
-      MaterialPageRoute(
-        builder: (_) => const GuideOperationPage(),
-      ),
-    );
+    await Navigator.of(
+      context,
+    ).push(MaterialPageRoute(builder: (_) => const GuideOperationPage()));
   }
 
   Future<void> _openEmergencyContacts() async {
-    await Navigator.of(context).push(
-      MaterialPageRoute(
-        builder: (_) => const GuideContactPage(
-        ),
-      ),
-    );
+    await Navigator.of(
+      context,
+    ).push(MaterialPageRoute(builder: (_) => const GuideContactPage()));
   }
 
   Future<void> _openReviewCenter() async {
-    await Navigator.of(context).push(
-      MaterialPageRoute(
-        builder: (_) => const GuideReviewCenterPage(),
-      ),
-    );
+    await Navigator.of(
+      context,
+    ).push(MaterialPageRoute(builder: (_) => const GuideReviewCenterPage()));
   }
 
   Future<void> _openScheduleCenter() async {
-    await Navigator.of(context).push(
-      MaterialPageRoute(
-        builder: (_) => const GuideSchedulePage(),
-      ),
-    );
+    await Navigator.of(
+      context,
+    ).push(MaterialPageRoute(builder: (_) => const GuideSchedulePage()));
   }
 
   Future<void> _openPromotionCenter() async {
-    await Navigator.of(context).push(
-      MaterialPageRoute(
-        builder: (_) => const GuideInvitePage(
-        ),
-      ),
-    );
+    await Navigator.of(
+      context,
+    ).push(MaterialPageRoute(builder: (_) => const GuideInvitePage()));
   }
 
   Future<void> _openTaskCenter() async {
-    await Navigator.of(context).push(
-      MaterialPageRoute(
-        builder: (_) => const GuideTaskCenterPage(),
-      ),
-    );
+    await Navigator.of(
+      context,
+    ).push(MaterialPageRoute(builder: (_) => const GuideTaskCenterPage()));
   }
 
   Future<void> _openTrainingCenter() async {
-    await Navigator.of(context).push(
-      MaterialPageRoute(
-        builder: (_) => const GuideTrainingCenterPage(),
-      ),
-    );
+    await Navigator.of(
+      context,
+    ).push(MaterialPageRoute(builder: (_) => const GuideTrainingCenterPage()));
   }
 
   Future<void> _openCertificationPage() async {
     await Navigator.of(context).push(
       MaterialPageRoute(
-        builder: (_) => GuideCertificationPage(
-          onEditProfile: _openProfileEdit,
-        ),
+        builder: (_) => GuideCertificationPage(onEditProfile: _openProfileEdit),
       ),
     );
   }
 
   Future<void> _openPlatformRulesPage() async {
-    await Navigator.of(context).push(
-      MaterialPageRoute(
-        builder: (_) => const GuideRulesPage(
-        ),
-      ),
-    );
+    await Navigator.of(
+      context,
+    ).push(MaterialPageRoute(builder: (_) => const GuideRulesPage()));
   }
 
   Future<void> _openWallet() async {
@@ -584,15 +567,21 @@ class _GuideMainShellState extends State<_GuideMainShell>
   }
 
   Future<void> _openInsurancePage() async {
-    await Navigator.of(context).push(MaterialPageRoute(builder: (_) => const GuideInsurancePage()));
+    await Navigator.of(
+      context,
+    ).push(MaterialPageRoute(builder: (_) => const GuideInsurancePage()));
   }
 
   Future<void> _openBlockedUsersPage() async {
-    await Navigator.of(context).push(MaterialPageRoute(builder: (_) => const GuideBlockedUsersPage()));
+    await Navigator.of(
+      context,
+    ).push(MaterialPageRoute(builder: (_) => const GuideBlockedUsersPage()));
   }
 
   Future<void> _openAuxiliarySettingsPage() async {
-    await Navigator.of(context).push(MaterialPageRoute(builder: (_) => const GuideAuxiliarySettingsPage()));
+    await Navigator.of(context).push(
+      MaterialPageRoute(builder: (_) => const GuideAuxiliarySettingsPage()),
+    );
   }
 }
 

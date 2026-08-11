@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_application_1/pages/order/voice_call_page.dart';
 import 'package:flutter_application_1/providers/call_provider.dart';
+import 'package:flutter_application_1/pages/profile/user_profile_page.dart';
 import 'package:provider/provider.dart';
 
 import '../../config/app_theme.dart';
@@ -33,9 +34,9 @@ class _GuideOrderCenterPageState extends State<GuideOrderCenterPage> {
   GuideOrderStage _selectedStage = GuideOrderStage.inProgress;
 
   void _showSupportNotice() {
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(content: Text('客服入口暂未接入，请先通过订单聊天联系客户')),
-    );
+    ScaffoldMessenger.of(
+      context,
+    ).showSnackBar(const SnackBar(content: Text('客服入口暂未接入，请先通过订单聊天联系客户')));
   }
 
   @override
@@ -197,15 +198,21 @@ class _GuideOrderCenterPageState extends State<GuideOrderCenterPage> {
                                           .read<OrderProvider>()
                                           .completeOrder(order.id);
                                       if (!mounted) return;
-                                      ScaffoldMessenger.of(context).showSnackBar(
+                                      ScaffoldMessenger.of(
+                                        context,
+                                      ).showSnackBar(
                                         const SnackBar(
                                           content: Text('服务已完成，等待客户评价'),
                                         ),
                                       );
                                     } catch (error) {
                                       if (!mounted) return;
-                                      ScaffoldMessenger.of(context).showSnackBar(
-                                        SnackBar(content: Text('完成服务失败：$error')),
+                                      ScaffoldMessenger.of(
+                                        context,
+                                      ).showSnackBar(
+                                        SnackBar(
+                                          content: Text('完成服务失败：$error'),
+                                        ),
                                       );
                                     }
                                     return;
@@ -337,6 +344,42 @@ class _GuideOrderCard extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
+          if (data.customerId.isNotEmpty) ...[
+            InkWell(
+              onTap: () => Navigator.of(context).push(
+                MaterialPageRoute<void>(
+                  builder: (_) => UserProfilePage(userId: data.customerId),
+                ),
+              ),
+              borderRadius: BorderRadius.circular(14),
+              child: Row(
+                children: [
+                  CircleAvatar(
+                    radius: 20,
+                    backgroundImage: data.customerAvatar.isNotEmpty
+                        ? NetworkImage(data.customerAvatar)
+                        : null,
+                    child: data.customerAvatar.isEmpty
+                        ? const Icon(Icons.person_outline)
+                        : null,
+                  ),
+                  const SizedBox(width: 10),
+                  Expanded(
+                    child: Text(
+                      data.customerName.isEmpty ? '客户' : data.customerName,
+                      style: const TextStyle(
+                        fontSize: 16,
+                        fontWeight: FontWeight.w800,
+                        color: AppColors.textPrimary,
+                      ),
+                    ),
+                  ),
+                  const Icon(Icons.chevron_right, color: AppColors.textHint),
+                ],
+              ),
+            ),
+            const SizedBox(height: 14),
+          ],
           Wrap(
             spacing: 12,
             runSpacing: 10,

@@ -489,6 +489,8 @@ alter table if exists public.demands
   add column if not exists people_count integer default 1,
   add column if not exists gender text default 'any',
   add column if not exists budget text default '',
+  add column if not exists budget_min double precision,
+  add column if not exists budget_max double precision,
   add column if not exists status text default 'open',
   add column if not exists author_id uuid references public.users(id) on delete cascade,
   add column if not exists author_name text default '',
@@ -521,6 +523,7 @@ alter table if exists public.demand_applications
   add column if not exists guide_avatar text default '',
   add column if not exists guide_city text default '',
   add column if not exists note text default '',
+  add column if not exists quote_amount double precision,
   add column if not exists status text default 'pending',
   add column if not exists created_at timestamptz default now();
 
@@ -532,6 +535,28 @@ create index if not exists idx_demand_applications_guide
 
 create index if not exists idx_demand_applications_demand
   on public.demand_applications (demand_id, created_at desc);
+
+-- Keep the test order target deterministic and repair the guide projection if
+-- the approved application existed before the runtime trigger was installed.
+insert into public.guides (id, name, avatar, gender, city, description, tags, images, verified)
+select
+  u.id,
+  coalesce(nullif(u.nickname, ''), '测试地陪'),
+  coalesce(u.avatar, ''),
+  coalesce(u.gender, ''),
+  coalesce(u.city, ''),
+  coalesce(u.guide_introduction, u.bio, ''),
+  coalesce(u.guide_tags, '{}'::text[]),
+  '{}'::text[],
+  true
+from public.users u
+where u.phone = '13900010003'
+on conflict (id) do update set verified = true;
+
+-- Hide legacy duplicate mock guides without deleting users or breaking old orders.
+update public.guides
+set verified = false
+where lower(trim(name)) = '小树';
 
 create table if not exists public.guide_applications (
   id uuid primary key default gen_random_uuid(),
@@ -664,6 +689,23 @@ where o.ctid = r.ctid
 create unique index if not exists idx_orders_merchant_order_no
   on public.orders (merchant_order_no)
   where merchant_order_no is not null;
+
+create table if not exists public.guide_reviews (
+  id uuid primary key default gen_random_uuid(),
+  order_id uuid not null unique references public.orders(id) on delete cascade,
+  guide_id uuid not null references public.users(id) on delete cascade,
+  customer_id uuid not null references public.users(id) on delete cascade,
+  rating integer not null check (rating between 1 and 5),
+  content text not null default '',
+  images text[] not null default '{}'::text[],
+  is_anonymous boolean not null default true,
+  guide_reply text,
+  replied_at timestamptz,
+  created_at timestamptz not null default now()
+);
+
+alter table if exists public.guide_reviews
+  add column if not exists images text[] default '{}'::text[];
 
 alter table if exists public.guides
   add column if not exists current_lat double precision,

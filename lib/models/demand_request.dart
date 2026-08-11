@@ -11,6 +11,8 @@ class DemandRequest {
   final int peopleCount;
   final String gender;
   final String budget;
+  final double? budgetMin;
+  final double? budgetMax;
   final String status;
   final String authorId;
   final String authorName;
@@ -20,6 +22,7 @@ class DemandRequest {
   final int applicantCount;
   final DateTime createdAt;
   final List<DemandApplication> applications;
+  final double? myQuoteAmount;
 
   const DemandRequest({
     required this.id,
@@ -34,6 +37,8 @@ class DemandRequest {
     required this.peopleCount,
     required this.gender,
     required this.budget,
+    this.budgetMin,
+    this.budgetMax,
     required this.status,
     required this.authorId,
     required this.authorName,
@@ -43,6 +48,7 @@ class DemandRequest {
     this.applicantCount = 0,
     required this.createdAt,
     this.applications = const [],
+    this.myQuoteAmount,
   });
 
   factory DemandRequest.fromJson(Map<String, dynamic> json) {
@@ -71,6 +77,8 @@ class DemandRequest {
           : int.tryParse(json['people_count']?.toString() ?? '') ?? 1,
       gender: json['gender'] ?? '不限',
       budget: json['budget'] ?? '',
+      budgetMin: _parseDouble(json['budget_min'] ?? json['budgetMin']),
+      budgetMax: _parseDouble(json['budget_max'] ?? json['budgetMax']),
       status: json['status'] ?? 'open',
       authorId: json['author_id']?.toString() ?? '',
       authorName: json['author_name'] ?? '匿名用户',
@@ -85,6 +93,7 @@ class DemandRequest {
           .whereType<Map<String, dynamic>>()
           .map(DemandApplication.fromJson)
           .toList(),
+      myQuoteAmount: _parseDouble(json['application_quote_amount']),
     );
   }
 
@@ -102,6 +111,8 @@ class DemandRequest {
       'people_count': peopleCount,
       'gender': gender,
       'budget': budget,
+      'budget_min': budgetMin,
+      'budget_max': budgetMax,
       'status': status,
       'author_id': authorId,
       'author_name': authorName,
@@ -127,6 +138,8 @@ class DemandRequest {
     int? peopleCount,
     String? gender,
     String? budget,
+    double? budgetMin,
+    double? budgetMax,
     String? status,
     String? authorId,
     String? authorName,
@@ -136,6 +149,7 @@ class DemandRequest {
     int? applicantCount,
     DateTime? createdAt,
     List<DemandApplication>? applications,
+    double? myQuoteAmount,
   }) {
     return DemandRequest(
       id: id ?? this.id,
@@ -150,6 +164,8 @@ class DemandRequest {
       peopleCount: peopleCount ?? this.peopleCount,
       gender: gender ?? this.gender,
       budget: budget ?? this.budget,
+      budgetMin: budgetMin ?? this.budgetMin,
+      budgetMax: budgetMax ?? this.budgetMax,
       status: status ?? this.status,
       authorId: authorId ?? this.authorId,
       authorName: authorName ?? this.authorName,
@@ -159,6 +175,7 @@ class DemandRequest {
       applicantCount: applicantCount ?? this.applicantCount,
       createdAt: createdAt ?? this.createdAt,
       applications: applications ?? this.applications,
+      myQuoteAmount: myQuoteAmount ?? this.myQuoteAmount,
     );
   }
 
@@ -184,6 +201,7 @@ class DemandApplication {
   final String guideAvatar;
   final String guideCity;
   final String note;
+  final double? quoteAmount;
   final String status;
   final DateTime createdAt;
 
@@ -195,6 +213,7 @@ class DemandApplication {
     required this.guideAvatar,
     required this.guideCity,
     required this.note,
+    this.quoteAmount,
     required this.status,
     required this.createdAt,
   });
@@ -208,6 +227,9 @@ class DemandApplication {
       guideAvatar: json['guide_avatar']?.toString() ?? '',
       guideCity: json['guide_city']?.toString() ?? '',
       note: json['note']?.toString() ?? '',
+      quoteAmount: _parseNullableDouble(
+        json['quote_amount'] ?? json['application_quote_amount'],
+      ),
       status: json['status']?.toString() ?? 'pending',
       createdAt:
           DateTime.tryParse(json['created_at']?.toString() ?? '') ??
@@ -224,8 +246,14 @@ class DemandApplication {
       'guide_avatar': guideAvatar,
       'guide_city': guideCity,
       'note': note,
+      'quote_amount': quoteAmount,
       'status': status,
       'created_at': createdAt.toIso8601String(),
     };
+  }
+
+  static double? _parseNullableDouble(dynamic value) {
+    if (value is num) return value.toDouble();
+    return double.tryParse(value?.toString() ?? '');
   }
 }

@@ -1,10 +1,10 @@
 /// 订单状态枚举
 enum OrderStatus {
   pendingPayment, // 待付款
-  inProgress,     // 进行中
-  pendingReview,  // 待评价
-  completed,      // 已完成
-  cancelled,      // 已取消
+  inProgress, // 进行中
+  pendingReview, // 待评价
+  completed, // 已完成
+  cancelled, // 已取消
 }
 
 /// 订单模型
@@ -14,6 +14,8 @@ class Order {
   final String guideId;
   final String guideName;
   final String guideAvatar;
+  final String customerName;
+  final String customerAvatar;
   final OrderStatus status;
   final double amount;
   final String serviceName;
@@ -39,6 +41,8 @@ class Order {
     required this.guideId,
     required this.guideName,
     this.guideAvatar = '',
+    this.customerName = '',
+    this.customerAvatar = '',
     required this.status,
     required this.amount,
     this.serviceName = '',
@@ -71,6 +75,8 @@ class Order {
       guideId: json['guide_id']?.toString() ?? '',
       guideName: json['guide_name'] ?? '',
       guideAvatar: json['guide_avatar'] ?? '',
+      customerName: json['customer_name'] ?? '',
+      customerAvatar: json['customer_avatar'] ?? '',
       status: _parseStatus(json['status']),
       amount: _parseDouble(json['amount']) ?? 0,
       serviceName: json['service_name'] ?? '',
@@ -134,6 +140,8 @@ class Order {
     String? guideId,
     String? guideName,
     String? guideAvatar,
+    String? customerName,
+    String? customerAvatar,
     OrderStatus? status,
     double? amount,
     String? serviceName,
@@ -159,6 +167,8 @@ class Order {
       guideId: guideId ?? this.guideId,
       guideName: guideName ?? this.guideName,
       guideAvatar: guideAvatar ?? this.guideAvatar,
+      customerName: customerName ?? this.customerName,
+      customerAvatar: customerAvatar ?? this.customerAvatar,
       status: status ?? this.status,
       amount: amount ?? this.amount,
       serviceName: serviceName ?? this.serviceName,

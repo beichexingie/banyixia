@@ -704,7 +704,7 @@ appRouter.get('/guides/:id', async (req, res) => {
         coalesce((
           select json_agg(review order by review.created_at desc)
           from (
-            select rating, content, guide_reply, created_at
+            select rating, content, images, guide_reply, created_at
             from public.guide_reviews
             where guide_id = g.id
             limit 10
@@ -1405,8 +1405,12 @@ appRouter.get('/demands', async (req, res) => {
   const guideLocation = viewerId ? await fetchGuideLocation(pool, viewerId) : null;
   const result = await pool.query(
     `
-      select d.*
+      select
+        d.*,
+        coalesce(nullif(u.nickname, ''), d.author_name, '') as author_name,
+        coalesce(nullif(u.avatar, ''), d.author_avatar, '') as author_avatar
       from public.demands d
+      left join public.users u on u.id = d.author_id
       where not exists (
         select 1
         from public.guide_blocked_users b
@@ -1426,10 +1430,14 @@ appRouter.get('/demands/me', async (req, res) => {
   if (!userId) return;
   const result = await pool.query(
     `
-      select *
-      from public.demands
-      where author_id = $1
-      order by created_at desc
+      select
+        d.*,
+        coalesce(nullif(u.nickname, ''), d.author_name, '') as author_name,
+        coalesce(nullif(u.avatar, ''), d.author_avatar, '') as author_avatar
+      from public.demands d
+      left join public.users u on u.id = d.author_id
+      where d.author_id = $1
+      order by d.created_at desc
     `,
     [userId],
   );
@@ -1450,12 +1458,16 @@ appRouter.get('/demands/applied', async (req, res) => {
     `
       select
         d.*,
+        coalesce(nullif(customer.nickname, ''), d.author_name, '') as author_name,
+        coalesce(nullif(customer.avatar, ''), d.author_avatar, '') as author_avatar,
         da.id as application_id,
         da.status as application_status,
         da.note as application_note,
+        da.quote_amount as application_quote_amount,
         da.created_at as application_created_at
       from public.demand_applications da
       join public.demands d on d.id = da.demand_id
+      left join public.users customer on customer.id = d.author_id
       where da.guide_id = $1
       order by da.created_at desc
     `,
@@ -1470,7 +1482,16 @@ appRouter.get('/demands/:id', async (req, res) => {
   const viewerId = getSessionUserId(req);
   const guideLocation = viewerId ? await fetchGuideLocation(pool, viewerId) : null;
   const demandResult = await pool.query(
-    `select * from public.demands where id = $1 limit 1`,
+    `
+      select
+        d.*,
+        coalesce(nullif(u.nickname, ''), d.author_name, '') as author_name,
+        coalesce(nullif(u.avatar, ''), d.author_avatar, '') as author_avatar
+      from public.demands d
+      left join public.users u on u.id = d.author_id
+      where d.id = $1
+      limit 1
+    `,
     [req.params.id],
   );
   const demand = demandResult.rows[0];
@@ -1478,10 +1499,14 @@ appRouter.get('/demands/:id', async (req, res) => {
 
   const applications = await pool.query(
     `
-      select *
-      from public.demand_applications
-      where demand_id = $1
-      order by created_at desc
+      select
+        da.*,
+        coalesce(nullif(u.nickname, ''), da.guide_name, '') as guide_name,
+        coalesce(nullif(u.avatar, ''), da.guide_avatar, '') as guide_avatar
+      from public.demand_applications da
+      left join public.users u on u.id = da.guide_id
+      where da.demand_id = $1
+      order by da.created_at desc
     `,
     [req.params.id],
   );
@@ -1508,10 +1533,10 @@ appRouter.post('/demands', async (req, res) => {
     `
       insert into public.demands (
         title, content, city, location, service_lat, service_lng, service_start_at, service_end_at,
-        people_count, gender, budget, status, author_id, author_name,
-        author_avatar, tags, review_status, reject_reason
+        people_count, gender, budget, budget_min, budget_max, status, author_id, author_name,
+        author_avatar, images, tags, review_status, reject_reason
       ) values (
-        $1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16::text[],$17,$18
+        $1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18::text[],$19::text[],$20,$21
       ) returning *
     `,
     [
@@ -1526,10 +1551,13 @@ appRouter.post('/demands', async (req, res) => {
       payload.people_count,
       payload.gender,
       payload.budget,
+      toNullableNumber(payload.budget_min ?? payload.budgetMin),
+      toNullableNumber(payload.budget_max ?? payload.budgetMax),
       payload.status ?? 'open',
       userId,
       payload.author_name ?? '我',
       payload.author_avatar ?? '',
+      payload.images ?? [],
       payload.tags ?? [],
       moderation.reviewStatus,
       moderation.reviewStatus === 'pending'
@@ -1574,18 +1602,20 @@ appRouter.post('/demands/:id/apply', async (req, res) => {
   const payload = req.body ?? {};
   await assertPayloadAllowed(payload, [
     { key: 'note', label: '报名备注' },
+    { key: 'quote_amount', label: '报名报价' },
   ]);
   const result = await pool.query(
     `
       insert into public.demand_applications (
-        demand_id, guide_id, guide_name, guide_avatar, guide_city, note, status
-      ) values ($1,$2,$3,$4,$5,$6,'pending')
+        demand_id, guide_id, guide_name, guide_avatar, guide_city, note, quote_amount, status
+      ) values ($1,$2,$3,$4,$5,$6,$7,'pending')
       on conflict (demand_id, guide_id) do update
       set
         note = excluded.note,
         guide_name = excluded.guide_name,
         guide_avatar = excluded.guide_avatar,
-        guide_city = excluded.guide_city
+        guide_city = excluded.guide_city,
+        quote_amount = excluded.quote_amount
       returning *
     `,
     [
@@ -1595,6 +1625,7 @@ appRouter.post('/demands/:id/apply', async (req, res) => {
       guide.avatar ?? '',
       guide.city ?? '',
       payload.note?.toString() ?? '',
+      toNullableNumber(payload.quote_amount ?? payload.quoteAmount),
     ],
   );
 
@@ -1690,7 +1721,8 @@ appRouter.post('/demands/:id/select-guide', async (req, res) => {
         application.guide_name ?? '',
         application.guide_avatar ?? '',
         0,
-        Number.parseFloat(payload.amount?.toString() ?? '') || 0,
+        Number.parseFloat(payload.amount?.toString() ?? '') ||
+          Number.parseFloat(application.quote_amount?.toString() ?? '') || 0,
         demand.title ?? demand.content ?? '地陪服务订单',
         demand.location ?? '',
         demand.city ?? '',
@@ -1791,18 +1823,26 @@ appRouter.get('/orders', handleRoute(async (req, res) => {
   if (!userId) return;
   const result = await pool.query(
     `
-      select *
-      from public.orders
-      where user_id = $1
+      select
+        o.*,
+        coalesce(nullif(guide_user.nickname, ''), nullif(o.guide_name, ''), '') as guide_name,
+        coalesce(nullif(guide_user.avatar, ''), nullif(o.guide_avatar, ''), '') as guide_avatar,
+        o.user_id as customer_id,
+        coalesce(nullif(customer.nickname, ''), '') as customer_name,
+        coalesce(nullif(customer.avatar, ''), '') as customer_avatar
+      from public.orders o
+      left join public.users customer on customer.id = o.user_id
+      left join public.users guide_user on guide_user.id = o.guide_id
+      where o.user_id = $1
          or (
-           guide_id = $1
+           o.guide_id = $1
            and exists (
              select 1
              from public.guides
              where id = $1
            )
          )
-      order by created_at desc
+      order by o.created_at desc
     `,
     [userId],
   );
@@ -1858,30 +1898,23 @@ appRouter.post('/orders/one-cent-test', handleRoute(async (req, res) => {
   const userId = await requireSessionUser(req, res);
   if (!userId) return;
   const payload = req.body ?? {};
-  let guideId = payload.guideId ?? payload.guide_id;
+  let guideId;
   let guide;
 
-  if (guideId?.toString().trim()) {
-    const guideResult = await pool.query(
-      `select * from public.guides where id = $1 limit 1`,
-      [guideId],
-    );
-    guide = guideResult.rows[0];
-  } else {
-    const guideResult = await pool.query(
-      `
-        select g.*
-        from public.guides g
-        join public.users u on u.id = g.id
-        where u.phone = '13900010003'
-          and g.id <> $1
-        limit 1
-      `,
-      [userId],
-    );
-    guide = guideResult.rows[0];
-    guideId = guide?.id;
-  }
+  const guideResult = await pool.query(
+    `
+      select g.*
+      from public.guides g
+      join public.users u on u.id = g.id
+      where u.phone = '13900010003'
+        and g.verified = true
+        and g.id <> $1
+      limit 1
+    `,
+    [userId],
+  );
+  guide = guideResult.rows[0];
+  guideId = guide?.id;
 
   if (!guide || !guideId) {
     return fail(res, 404, '没有可用于测试的地陪账号');
@@ -2017,11 +2050,11 @@ appRouter.post('/orders/:id/review', handleRoute(async (req, res) => {
   const moderation = await reviewText(content, { field: '客户评价' });
   if (!moderation.passed || moderation.reviewStatus === 'pending') return fail(res, 400, '评价内容需要人工审核后才能发布');
   const result = await pool.query(
-    `insert into public.guide_reviews (order_id,guide_id,customer_id,rating,content,is_anonymous)
-     values ($1,$2,$3,$4,$5,$6)
-     on conflict (order_id) do update set rating=excluded.rating,content=excluded.content,is_anonymous=excluded.is_anonymous
+    `insert into public.guide_reviews (order_id,guide_id,customer_id,rating,content,images,is_anonymous)
+     values ($1,$2,$3,$4,$5,$6::text[],$7)
+     on conflict (order_id) do update set rating=excluded.rating,content=excluded.content,images=excluded.images,is_anonymous=excluded.is_anonymous
      returning *`,
-    [order.id, order.guide_id, userId, rating, content, req.body?.is_anonymous !== false],
+    [order.id, order.guide_id, userId, rating, content, req.body?.images ?? [], req.body?.is_anonymous !== false],
   );
   await pool.query(
     `update public.guides set rating = coalesce((select round(avg(rating)::numeric, 2) from public.guide_reviews where guide_id = $1), 0) where id = $1`,
@@ -3034,6 +3067,32 @@ appRouter.post('/uploads/post-image', handleRoute(async (req, res) => {
     },
     message: moderation.reviewStatus === 'pending' ? 'pending manual review' : 'uploaded',
   });
+}));
+
+appRouter.post('/uploads/demand-image', handleRoute(async (req, res) => {
+  const userId = await requireSessionUser(req, res);
+  if (!userId) return;
+  const payload = req.body ?? {};
+  const relativeUrl = await persistBase64Upload({
+    category: 'demands',
+    filename: payload.filename ?? `demand_${userId}.jpg`,
+    mimeType: payload.mime_type ?? payload.mimeType ?? 'image/jpeg',
+    bytesBase64: payload.bytes_base64 ?? payload.bytesBase64,
+  });
+  return ok(res, { data: { url: buildPublicUrl(req, relativeUrl) } });
+}));
+
+appRouter.post('/uploads/review-image', handleRoute(async (req, res) => {
+  const userId = await requireSessionUser(req, res);
+  if (!userId) return;
+  const payload = req.body ?? {};
+  const relativeUrl = await persistBase64Upload({
+    category: 'reviews',
+    filename: payload.filename ?? `review_${userId}.jpg`,
+    mimeType: payload.mime_type ?? payload.mimeType ?? 'image/jpeg',
+    bytesBase64: payload.bytes_base64 ?? payload.bytesBase64,
+  });
+  return ok(res, { data: { url: buildPublicUrl(req, relativeUrl) } });
 }));
 
 appRouter.post('/uploads/avatar', handleRoute(async (req, res) => {

@@ -1,10 +1,6 @@
 import 'package:flutter/material.dart';
 
-enum GuideDutyMode {
-  nearby,
-  sameCity,
-  crossCity,
-}
+enum GuideDutyMode { nearby, sameCity, crossCity }
 
 extension GuideDutyModeX on GuideDutyMode {
   String get label {
@@ -266,11 +262,7 @@ extension GuideServiceTypeX on GuideServiceType {
   bool get isLocked => false;
 }
 
-enum GuideOrderStage {
-  newOrder,
-  pendingPayment,
-  inProgress,
-}
+enum GuideOrderStage { newOrder, pendingPayment, inProgress }
 
 extension GuideOrderStageX on GuideOrderStage {
   String get label {
@@ -364,12 +356,12 @@ class GuideAddress {
   String get summary => '$city$title';
 
   Map<String, String> toJson() => {
-        'city': city,
-        'title': title,
-        'detail': detail,
-        'contactName': contactName,
-        'maskedPhone': maskedPhone,
-      };
+    'city': city,
+    'title': title,
+    'detail': detail,
+    'contactName': contactName,
+    'maskedPhone': maskedPhone,
+  };
 
   factory GuideAddress.fromJson(Map<String, dynamic> json) {
     return GuideAddress(
@@ -463,6 +455,9 @@ class GuideOrderCardData {
   final List<String> imageUrls;
   final GuideOrderAction primaryAction;
   final DateTime serviceTime;
+  final String customerId;
+  final String customerName;
+  final String customerAvatar;
 
   const GuideOrderCardData({
     required this.id,
@@ -479,5 +474,8 @@ class GuideOrderCardData {
     required this.imageUrls,
     required this.primaryAction,
     required this.serviceTime,
+    this.customerId = '',
+    this.customerName = '',
+    this.customerAvatar = '',
   });
 }

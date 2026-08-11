@@ -215,7 +215,9 @@ class GuideConsoleProvider extends ChangeNotifier {
       final restored = storedAddresses
           .map((item) {
             try {
-              return GuideAddress.fromJson(jsonDecode(item) as Map<String, dynamic>);
+              return GuideAddress.fromJson(
+                jsonDecode(item) as Map<String, dynamic>,
+              );
             } catch (_) {
               return null;
             }
@@ -253,7 +255,8 @@ class GuideConsoleProvider extends ChangeNotifier {
     final city = settings['city']?.toString().trim() ?? '';
     if (city.isNotEmpty) _selectedCity = city;
     if (settings['online'] is bool) _isOnline = settings['online'] as bool;
-    if (settings['nearby_only'] is bool) _nearbyOnly = settings['nearby_only'] as bool;
+    if (settings['nearby_only'] is bool)
+      _nearbyOnly = settings['nearby_only'] as bool;
     notifyListeners();
   }
 
@@ -484,9 +487,10 @@ class GuideConsoleProvider extends ChangeNotifier {
           ? GuideOrderAction.waitingReview
           : switch (stage) {
               GuideOrderStage.newOrder => GuideOrderAction.goToService,
-              GuideOrderStage.pendingPayment => order.paymentStatus == 'accepted'
-                  ? GuideOrderAction.waitingPayment
-                  : GuideOrderAction.accept,
+              GuideOrderStage.pendingPayment =>
+                order.paymentStatus == 'accepted'
+                    ? GuideOrderAction.waitingPayment
+                    : GuideOrderAction.accept,
               GuideOrderStage.inProgress => GuideOrderAction.complete,
             };
       return GuideOrderCardData(
@@ -507,6 +511,9 @@ class GuideConsoleProvider extends ChangeNotifier {
         primaryAction: primaryAction,
         serviceTime:
             order.serviceDate ?? order.createdAt.add(const Duration(hours: 6)),
+        customerId: order.userId,
+        customerName: order.customerName,
+        customerAvatar: order.customerAvatar,
       );
     }).toList();
   }

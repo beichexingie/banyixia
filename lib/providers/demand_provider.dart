@@ -17,7 +17,7 @@ class DemandProvider extends ChangeNotifier {
   String? _selectedStatus;
 
   DemandProvider({SessionService? sessionService})
-      : _sessionService = sessionService ?? EcsSessionService();
+    : _sessionService = sessionService ?? EcsSessionService();
 
   List<DemandRequest> get demands => _demands;
   List<DemandRequest> get myDemands => _myDemands;
@@ -30,7 +30,8 @@ class DemandProvider extends ChangeNotifier {
   List<DemandRequest> get filteredDemands {
     return _demands.where((demand) {
       if (_selectedCity != '全国' &&
-          _normalizeCityName(demand.city) != _normalizeCityName(_selectedCity)) {
+          _normalizeCityName(demand.city) !=
+              _normalizeCityName(_selectedCity)) {
         return false;
       }
       if (_selectedStatus != null && demand.status != _selectedStatus) {
@@ -163,6 +164,9 @@ class DemandProvider extends ChangeNotifier {
     required int peopleCount,
     required String gender,
     required String budget,
+    double? budgetMin,
+    double? budgetMax,
+    List<String> images = const [],
     required List<String> tags,
   }) async {
     final response = await _api.post(
@@ -180,10 +184,13 @@ class DemandProvider extends ChangeNotifier {
         'people_count': peopleCount,
         'gender': gender,
         'budget': budget,
+        'budget_min': budgetMin,
+        'budget_max': budgetMax,
         'status': 'open',
         'author_id': _sessionService.currentSession?.userId,
         'author_name': '我',
         'author_avatar': '',
+        'images': images,
         'tags': tags,
       },
     );
@@ -203,11 +210,12 @@ class DemandProvider extends ChangeNotifier {
   Future<void> applyToDemand(
     String demandId, {
     String note = '',
+    required double quoteAmount,
   }) async {
     await _api.post(
       '/demands/$demandId/apply',
       authToken: _token(),
-      body: {'note': note},
+      body: {'note': note, 'quote_amount': quoteAmount},
     );
     await loadAppliedDemands();
     await loadDemands();
@@ -221,10 +229,7 @@ class DemandProvider extends ChangeNotifier {
     final response = await _api.post(
       '/demands/$demandId/select-guide',
       authToken: _token(),
-      body: {
-        'application_id': applicationId,
-        'amount': amount,
-      },
+      body: {'application_id': applicationId, 'amount': amount},
     );
     await loadMyDemands();
     await loadDemands();

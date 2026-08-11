@@ -1,9 +1,14 @@
+import 'dart:convert';
+
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
+import 'package:image_picker/image_picker.dart';
 import 'package:provider/provider.dart';
 
 import '../../config/app_theme.dart';
 import '../../providers/demand_provider.dart';
+import '../../providers/user_provider.dart';
+import '../../services/ecs_api_client.dart';
 
 class DemandCreatePage extends StatefulWidget {
   const DemandCreatePage({super.key});
@@ -17,6 +22,8 @@ class _DemandCreatePageState extends State<DemandCreatePage> {
   final TextEditingController _contentController = TextEditingController();
   final TextEditingController _budgetController = TextEditingController();
   final TextEditingController _peopleController = TextEditingController();
+  final ImagePicker _picker = ImagePicker();
+  final List<XFile> _selectedImages = [];
 
   String _city = '苏州';
   String _location = '';
@@ -27,6 +34,35 @@ class _DemandCreatePageState extends State<DemandCreatePage> {
   String _gender = '不限';
   final Set<String> _tags = {'休闲游玩'};
   bool _submitting = false;
+
+  Future<List<String>> _uploadImages() async {
+    final urls = <String>[];
+    final api = EcsApiClient();
+    final token = context.read<UserProvider>().accessToken;
+    for (final file in _selectedImages) {
+      final response = await api.post(
+        '/uploads/demand-image',
+        authToken: token,
+        body: {
+          'filename': file.name,
+          'bytes_base64': base64Encode(await file.readAsBytes()),
+        },
+      );
+      final data = response['data'];
+      if (data is Map<String, dynamic> && data['url'] != null) {
+        urls.add(data['url'].toString());
+      }
+    }
+    return urls;
+  }
+
+  Future<void> _pickImages() async {
+    final picked = await _picker.pickMultiImage();
+    if (!mounted || picked.isEmpty) return;
+    setState(
+      () => _selectedImages.addAll(picked.take(9 - _selectedImages.length)),
+    );
+  }
 
   @override
   void initState() {
@@ -575,6 +611,12 @@ class _DemandCreatePageState extends State<DemandCreatePage> {
     FocusScope.of(context).unfocus();
 
     final peopleCount = int.tryParse(_peopleController.text.trim()) ?? 0;
+    final budget = _budgetController.text.trim();
+    final budgetParts = budget
+        .split(RegExp(r'[-~至到]'))
+        .map((item) => double.tryParse(item.trim()))
+        .whereType<double>()
+        .toList();
     if (_titleController.text.trim().isEmpty ||
         _contentController.text.trim().isEmpty ||
         _location.isEmpty ||
@@ -589,6 +631,9 @@ class _DemandCreatePageState extends State<DemandCreatePage> {
 
     setState(() => _submitting = true);
     try {
+      final imageUrls = _selectedImages.isEmpty
+          ? <String>[]
+          : await _uploadImages();
       await context.read<DemandProvider>().createDemand(
         title: _titleController.text.trim(),
         content: _contentController.text.trim(),
@@ -600,7 +645,14 @@ class _DemandCreatePageState extends State<DemandCreatePage> {
         serviceEndAt: _endAt!,
         peopleCount: peopleCount,
         gender: _gender,
-        budget: _budgetController.text.trim(),
+        budget: budget,
+        budgetMin: budgetParts.isEmpty
+            ? null
+            : budgetParts.reduce((a, b) => a < b ? a : b),
+        budgetMax: budgetParts.isEmpty
+            ? null
+            : budgetParts.reduce((a, b) => a > b ? a : b),
+        images: imageUrls,
         tags: _tags.toList(),
       );
       if (!mounted) {
@@ -609,7 +661,7 @@ class _DemandCreatePageState extends State<DemandCreatePage> {
       ScaffoldMessenger.of(
         context,
       ).showSnackBar(const SnackBar(content: Text('需求已发布')));
-      context.go('/demands/me');
+      context.push('/demands/me');
     } catch (e) {
       if (!mounted) {
         return;
@@ -875,33 +927,37 @@ class _DemandCreatePageState extends State<DemandCreatePage> {
                   color: const Color(0xFFF4F5EF),
                   borderRadius: BorderRadius.circular(18),
                 ),
-                child: Column(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    Container(
-                      width: 32,
-                      height: 32,
-                      decoration: const BoxDecoration(
-                        color: AppColors.primary,
-                        shape: BoxShape.circle,
+                child: InkWell(
+                  onTap: _pickImages,
+                  borderRadius: BorderRadius.circular(18),
+                  child: Column(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      Container(
+                        width: 32,
+                        height: 32,
+                        decoration: const BoxDecoration(
+                          color: AppColors.primary,
+                          shape: BoxShape.circle,
+                        ),
+                        alignment: Alignment.center,
+                        child: const Icon(
+                          Icons.add,
+                          size: 22,
+                          color: AppColors.textPrimary,
+                        ),
                       ),
-                      alignment: Alignment.center,
-                      child: const Icon(
-                        Icons.add,
-                        size: 22,
-                        color: AppColors.textPrimary,
+                      const SizedBox(height: 18),
+                      const Text(
+                        '添加图片',
+                        style: TextStyle(
+                          fontSize: 18,
+                          fontWeight: FontWeight.w700,
+                          color: Color(0xFFD2D2D2),
+                        ),
                       ),
-                    ),
-                    const SizedBox(height: 18),
-                    const Text(
-                      '添加图片',
-                      style: TextStyle(
-                        fontSize: 18,
-                        fontWeight: FontWeight.w700,
-                        color: Color(0xFFD2D2D2),
-                      ),
-                    ),
-                  ],
+                    ],
+                  ),
                 ),
               ),
               const SizedBox(width: 14),
@@ -1025,6 +1081,46 @@ class _DemandCreatePageState extends State<DemandCreatePage> {
                 ? '请输入服务人数'
                 : '${_peopleController.text}人·$_gender',
             onTap: _pickPeopleAndGender,
+          ),
+          const Divider(height: 20, thickness: 1, color: Color(0xFFF2F2F2)),
+          _buildInfoTile(
+            icon: Icons.payments_outlined,
+            label: '预期价格范围',
+            value: _budgetController.text.isEmpty
+                ? '请填写价格范围，如 300-500'
+                : _budgetController.text,
+            onTap: () async {
+              final controller = TextEditingController(
+                text: _budgetController.text,
+              );
+              final value = await showDialog<String>(
+                context: context,
+                builder: (context) => AlertDialog(
+                  title: const Text('预期价格范围'),
+                  content: TextField(
+                    controller: controller,
+                    keyboardType: const TextInputType.numberWithOptions(
+                      decimal: true,
+                    ),
+                    decoration: const InputDecoration(hintText: '例如 300-500'),
+                  ),
+                  actions: [
+                    TextButton(
+                      onPressed: () => Navigator.pop(context),
+                      child: const Text('取消'),
+                    ),
+                    FilledButton(
+                      onPressed: () =>
+                          Navigator.pop(context, controller.text.trim()),
+                      child: const Text('确定'),
+                    ),
+                  ],
+                ),
+              );
+              controller.dispose();
+              if (value != null && mounted)
+                setState(() => _budgetController.text = value);
+            },
           ),
         ],
       ),
