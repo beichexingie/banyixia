@@ -407,6 +407,22 @@ function dateOnly(date) {
   return `${year}-${month}-${day}`;
 }
 
+function daysFromToday(date) {
+  const today = new Date();
+  const start = new Date(today.getFullYear(), today.getMonth(), today.getDate());
+  const target = new Date(date.getFullYear(), date.getMonth(), date.getDate());
+  return Math.floor((target.getTime() - start.getTime()) / 86400000);
+}
+
+function assertDateWindow(date, maxOffsetDays, errorCode) {
+  const offset = daysFromToday(date);
+  if (offset < 0 || offset > maxOffsetDays) {
+    const error = new Error(errorCode);
+    error.statusCode = 400;
+    throw error;
+  }
+}
+
 function timeOnly(date) {
   return `${String(date.getHours()).padStart(2, '0')}:${String(date.getMinutes()).padStart(2, '0')}:00`;
 }
@@ -460,6 +476,7 @@ async function calculateOrderPricing(client, { guideId, serviceItemId, serviceHo
     error.statusCode = 400;
     throw error;
   }
+  assertDateWindow(date, 6, 'service_date_must_be_within_7_days');
   const itemResult = await client.query(
     `select s.*, u.nickname as guide_nickname, u.avatar as guide_avatar, u.guide_tags, g.current_lat, g.current_lng
      from public.guide_service_items s
@@ -1981,6 +1998,17 @@ appRouter.post('/demands/:id/apply', async (req, res) => {
   if (!guide) return fail(res, 403, '当前账号还不是已入驻地陪');
 
   const payload = req.body ?? {};
+  const demandStart = parseServiceDate(payload.service_start_at);
+  const demandEnd = parseServiceDate(payload.service_end_at);
+  if (!demandStart || !demandEnd || demandEnd <= demandStart) {
+    return fail(res, 400, '需求时间不正确');
+  }
+  try {
+    assertDateWindow(demandStart, 13, 'demand_start_must_be_within_14_days');
+    assertDateWindow(demandEnd, 13, 'demand_end_must_be_within_14_days');
+  } catch (error) {
+    return fail(res, error.statusCode || 400, error.message);
+  }
   await assertPayloadAllowed(payload, [
     { key: 'note', label: '报名备注' },
     { key: 'quote_amount', label: '报名报价' },

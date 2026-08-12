@@ -607,9 +607,10 @@ class _DemandCreatePageState extends State<DemandCreatePage> {
       context,
       initialStart: _startAt,
       initialEnd: _endAt,
+      dateCount: 14,
       minHours: 3,
       title: '预约服务时间',
-      subtitle: '按住时间格拖动选择连续时段，至少 3 小时',
+      subtitle: '点击开始和结束时间选择连续时段，至少 3 小时',
     );
     if (result != null && mounted) {
       setState(() {

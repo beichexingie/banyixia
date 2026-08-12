@@ -9,6 +9,7 @@ import '../../models/guide.dart';
 import '../../models/order.dart';
 import '../../providers/order_provider.dart';
 import '../../providers/user_provider.dart';
+import '../../services/payment_service.dart';
 import '../../widgets/time_range_picker.dart';
 
 class OrderCreatePage extends StatefulWidget {
@@ -32,12 +33,22 @@ class _OrderCreatePageState extends State<OrderCreatePage> {
   DateTime _serviceDateTime = DateTime.now().add(
     const Duration(days: 1, hours: 2),
   );
-  int _peopleCount = 1;
-  String _gender = '不限';
+  bool _hasSelectedTime = false;
+  int _maleCount = 0;
+  int _femaleCount = 0;
   String _paymentMethod = 'alipay';
   bool _agreed = true;
   bool _isSubmitting = false;
-  double _serviceHours = 1;
+  double _serviceHours = 0;
+
+  int get _peopleCount => _maleCount + _femaleCount;
+
+  String get _genderSummary {
+    final parts = <String>[];
+    if (_maleCount > 0) parts.add('${_maleCount}男');
+    if (_femaleCount > 0) parts.add('${_femaleCount}女');
+    return parts.isEmpty ? '请选择人数' : parts.join('');
+  }
 
   List<_ServiceOption> get _selectedServices =>
       _serviceOptions.where((item) => item.count > 0).toList();
@@ -131,22 +142,10 @@ class _OrderCreatePageState extends State<OrderCreatePage> {
     return (earthRadius * 2 * atan2(sqrt(a), sqrt(1 - a)) * 1.15).round();
   }
 
-  String get _serviceImageUrl {
-    if (widget.guide.images.isNotEmpty) {
-      return widget.guide.images.first;
-    }
-    if (widget.guide.avatar.isNotEmpty) {
-      return widget.guide.avatar;
-    }
-    return '';
-  }
-
   @override
   void initState() {
     super.initState();
-    _selectedAddress = widget.guide.city.isNotEmpty
-        ? widget.guide.city
-        : '待选择服务地点';
+    _selectedAddress = '';
     _serviceCity = widget.guide.city;
     _serviceOptions = _buildInitialServices();
   }
@@ -174,19 +173,6 @@ class _OrderCreatePageState extends State<OrderCreatePage> {
               item.id.isNotEmpty && item.title.isNotEmpty && item.price > 0,
         )
         .toList();
-  }
-
-  String _serviceSubtitleFor(String title) {
-    if (title.contains('户外') || title.contains('运动')) {
-      return '适合徒步、骑行、轻运动体验，行程更自由。';
-    }
-    if (title.contains('公务') || title.contains('商务')) {
-      return '适合接待、会面、陪同出行，节奏更高效。';
-    }
-    if (title.contains('漫步') || title.contains('城市')) {
-      return '适合城市探索、街区闲逛、轻松打卡拍照。';
-    }
-    return '适合休闲陪玩、逛街探店、轻松游玩陪同。';
   }
 
   Future<void> _pickLocation() async {
@@ -279,16 +265,20 @@ class _OrderCreatePageState extends State<OrderCreatePage> {
     final result = await showAppTimeRangePicker(
       context,
       initialStart: _serviceDateTime,
-      initialEnd: _serviceDateTime.add(Duration(hours: _serviceHours.round())),
+      initialEnd: _serviceDateTime.add(
+        Duration(hours: _serviceHours.round().clamp(1, 24)),
+      ),
+      dateCount: 7,
       minHours: 1,
       title: '选择服务时间',
-      subtitle: '只能选择地陪已设置的接单时段，按住时间格拖动选择',
+      subtitle: '只能选择地陪已设置的接单时段，点击开始和结束时间',
       isSlotAvailable: _guideSlotAvailable,
     );
     if (result != null && mounted) {
       setState(() {
         _serviceDateTime = result.start;
         _serviceHours = result.hours.toDouble();
+        _hasSelectedTime = true;
       });
     }
   }
@@ -302,10 +292,8 @@ class _OrderCreatePageState extends State<OrderCreatePage> {
         borderRadius: BorderRadius.vertical(top: Radius.circular(26)),
       ),
       builder: (ctx) {
-        final peopleController = TextEditingController(
-          text: _peopleCount.toString(),
-        );
-        String tempGender = _gender;
+        var tempMaleCount = _maleCount;
+        var tempFemaleCount = _femaleCount;
 
         return StatefulBuilder(
           builder: (context, setModalState) {
@@ -340,7 +328,7 @@ class _OrderCreatePageState extends State<OrderCreatePage> {
                   ),
                   const SizedBox(height: 12),
                   const Text(
-                    '服务人数',
+                    '客户人数及性别',
                     style: TextStyle(
                       fontSize: 14,
                       fontWeight: FontWeight.w700,
@@ -348,59 +336,28 @@ class _OrderCreatePageState extends State<OrderCreatePage> {
                     ),
                   ),
                   const SizedBox(height: 8),
-                  TextField(
-                    controller: peopleController,
-                    keyboardType: TextInputType.number,
-                    decoration: InputDecoration(
-                      hintText: '请输入服务人数',
-                      filled: true,
-                      fillColor: const Color(0xFFF6F6F0),
-                      border: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(14),
-                        borderSide: BorderSide.none,
-                      ),
-                    ),
+                  _buildPersonCounter(
+                    label: '男性',
+                    count: tempMaleCount,
+                    onChanged: (value) => setModalState(() {
+                      tempMaleCount = value;
+                    }),
                   ),
-                  const SizedBox(height: 16),
-                  const Text(
-                    '偏好性别',
-                    style: TextStyle(
+                  const SizedBox(height: 12),
+                  _buildPersonCounter(
+                    label: '女性',
+                    count: tempFemaleCount,
+                    onChanged: (value) => setModalState(() {
+                      tempFemaleCount = value;
+                    }),
+                  ),
+                  const SizedBox(height: 12),
+                  Text(
+                    '当前：${tempMaleCount > 0 ? '${tempMaleCount}男' : ''}${tempFemaleCount > 0 ? '${tempFemaleCount}女' : ''}',
+                    style: const TextStyle(
                       fontSize: 14,
-                      fontWeight: FontWeight.w700,
-                      color: AppColors.textPrimary,
+                      color: AppColors.textSecondary,
                     ),
-                  ),
-                  const SizedBox(height: 10),
-                  Row(
-                    children: ['男', '女', '不限'].map((item) {
-                      final selected = tempGender == item;
-                      return Expanded(
-                        child: Padding(
-                          padding: const EdgeInsets.only(right: 10),
-                          child: GestureDetector(
-                            onTap: () => setModalState(() => tempGender = item),
-                            child: Container(
-                              height: 48,
-                              decoration: BoxDecoration(
-                                color: selected
-                                    ? AppColors.primary
-                                    : const Color(0xFFF6F6F0),
-                                borderRadius: BorderRadius.circular(14),
-                              ),
-                              alignment: Alignment.center,
-                              child: Text(
-                                item,
-                                style: const TextStyle(
-                                  fontSize: 16,
-                                  fontWeight: FontWeight.w800,
-                                  color: AppColors.textPrimary,
-                                ),
-                              ),
-                            ),
-                          ),
-                        ),
-                      );
-                    }).toList(),
                   ),
                   const SizedBox(height: 24),
                   SizedBox(
@@ -408,11 +365,10 @@ class _OrderCreatePageState extends State<OrderCreatePage> {
                     height: 54,
                     child: ElevatedButton(
                       onPressed: () {
-                        final parsedPeople =
-                            int.tryParse(peopleController.text.trim()) ?? 1;
+                        if (tempMaleCount + tempFemaleCount < 1) return;
                         setState(() {
-                          _peopleCount = parsedPeople < 1 ? 1 : parsedPeople;
-                          _gender = tempGender;
+                          _maleCount = tempMaleCount;
+                          _femaleCount = tempFemaleCount;
                         });
                         Navigator.pop(ctx);
                       },
@@ -439,6 +395,39 @@ class _OrderCreatePageState extends State<OrderCreatePage> {
           },
         );
       },
+    );
+  }
+
+  Widget _buildPersonCounter({
+    required String label,
+    required int count,
+    required ValueChanged<int> onChanged,
+  }) {
+    return Row(
+      children: [
+        Expanded(
+          child: Text(
+            label,
+            style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w700),
+          ),
+        ),
+        IconButton(
+          onPressed: count == 0 ? null : () => onChanged(count - 1),
+          icon: const Icon(Icons.remove_circle_outline),
+        ),
+        SizedBox(
+          width: 32,
+          child: Text(
+            '$count',
+            textAlign: TextAlign.center,
+            style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w800),
+          ),
+        ),
+        IconButton(
+          onPressed: count >= 20 ? null : () => onChanged(count + 1),
+          icon: const Icon(Icons.add_circle_outline),
+        ),
+      ],
     );
   }
 
@@ -542,6 +531,23 @@ class _OrderCreatePageState extends State<OrderCreatePage> {
     }
   }
 
+  Future<void> _showPaymentPendingDialog(String message) async {
+    await showDialog<void>(
+      context: context,
+      barrierDismissible: false,
+      builder: (dialogContext) => AlertDialog(
+        title: const Text('订单已保留'),
+        content: Text(message),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(dialogContext).pop(),
+            child: const Text('知道了'),
+          ),
+        ],
+      ),
+    );
+  }
+
   Future<void> _submitOrder() async {
     FocusScope.of(context).unfocus();
 
@@ -549,6 +555,32 @@ class _OrderCreatePageState extends State<OrderCreatePage> {
       ScaffoldMessenger.of(
         context,
       ).showSnackBar(const SnackBar(content: Text('请先选择至少一项服务')));
+      return;
+    }
+    if (_selectedAddress.trim().isEmpty ||
+        _serviceLat == null ||
+        _serviceLng == null) {
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(const SnackBar(content: Text('请先选择服务地点')));
+      return;
+    }
+    if (!_hasSelectedTime || _serviceHours <= 0) {
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(const SnackBar(content: Text('请先选择服务时间')));
+      return;
+    }
+    if (_peopleCount <= 0 || (_maleCount == 0 && _femaleCount == 0)) {
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(const SnackBar(content: Text('请先填写服务人数和性别')));
+      return;
+    }
+    if (_paymentMethod != 'alipay') {
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(const SnackBar(content: Text('微信支付暂未支持，请选择支付宝支付')));
       return;
     }
     if (!_agreed) {
@@ -594,16 +626,14 @@ class _OrderCreatePageState extends State<OrderCreatePage> {
 
     setState(() => _isSubmitting = true);
 
+    Order? createdOrder;
     try {
       final title = _selectedServices.map((item) => item.title).join('、');
       final detail = _noteController.text.trim();
       final serviceSummary = [
-        _selectedServices
-            .map((item) => '${item.title}x${item.count}')
-            .join('、'),
+        _selectedServices.map((item) => item.title).join('、'),
         _selectedAddress,
-        '${_peopleCount}人',
-        _gender,
+        _genderSummary,
       ].join(' / ');
 
       final newOrder = Order(
@@ -631,7 +661,7 @@ class _OrderCreatePageState extends State<OrderCreatePage> {
         createdAt: DateTime.now(),
       );
 
-      await context.read<OrderProvider>().createOrder(
+      createdOrder = await context.read<OrderProvider>().createOrder(
         newOrder.copyWith(
           serviceName: title.isEmpty
               ? newOrder.serviceName
@@ -642,15 +672,36 @@ class _OrderCreatePageState extends State<OrderCreatePage> {
       if (!mounted) {
         return;
       }
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(const SnackBar(content: Text('订单已提交，可前往订单页继续支付')));
+      final paymentResult = await context.read<OrderProvider>().payOrder(
+        createdOrder.id,
+      );
+      if (!mounted) return;
+
+      if (paymentResult.outcome == PaymentOutcome.success &&
+          paymentResult.success) {
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(const SnackBar(content: Text('支付成功')));
+        context.pop();
+        return;
+      }
+
+      final message = paymentResult.outcome == PaymentOutcome.cancelled
+          ? '已取消支付，订单已保留，可到订单中心继续支付。'
+          : '订单已创建，但支付未完成，可到订单中心继续支付。';
+      await _showPaymentPendingDialog(message);
+      if (!mounted) return;
       context.pop();
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('创建失败: $e'), backgroundColor: Colors.red),
-        );
+        if (createdOrder != null) {
+          await _showPaymentPendingDialog('订单已创建，但支付暂未完成。你可以到订单中心继续支付。');
+          if (mounted) context.pop();
+        } else {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text('创建失败: $e'), backgroundColor: Colors.red),
+          );
+        }
       }
     } finally {
       if (mounted) {
@@ -662,7 +713,7 @@ class _OrderCreatePageState extends State<OrderCreatePage> {
   void _updateServiceCount(int index, int delta) {
     setState(() {
       for (var i = 0; i < _serviceOptions.length; i++) {
-        _serviceOptions[i].count = i == index && delta > 0 ? 1 : 0;
+        _serviceOptions[i].count = i == index ? 1 : 0;
       }
     });
   }
@@ -776,163 +827,125 @@ class _OrderCreatePageState extends State<OrderCreatePage> {
   }
 
   Widget _buildServiceItem(_ServiceOption item, int index) {
-    return Row(
-      crossAxisAlignment: CrossAxisAlignment.center,
-      children: [
-        _buildServiceImage(),
-        const SizedBox(width: 16),
-        Expanded(
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Container(
-                padding: const EdgeInsets.symmetric(
-                  horizontal: 16,
-                  vertical: 8,
-                ),
-                decoration: BoxDecoration(
-                  gradient: const LinearGradient(
-                    colors: [Color(0xFFCFFF36), Color(0xFFF1FFC3)],
-                    begin: Alignment.centerLeft,
-                    end: Alignment.centerRight,
-                  ),
-                  borderRadius: BorderRadius.circular(999),
-                ),
-                child: Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    const Icon(
-                      Icons.spa_outlined,
-                      size: 16,
-                      color: AppColors.textPrimary,
-                    ),
-                    const SizedBox(width: 6),
-                    Text(
-                      item.title,
-                      style: const TextStyle(
-                        fontSize: 15,
-                        fontWeight: FontWeight.w900,
-                        color: AppColors.textPrimary,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-              const SizedBox(height: 14),
-              Text(
-                item.subtitle,
-                maxLines: 2,
-                overflow: TextOverflow.ellipsis,
-                style: const TextStyle(
-                  fontSize: 15,
-                  height: 1.45,
-                  color: Color(0xFF808080),
-                ),
-              ),
-            ],
+    final selected = item.count > 0;
+    final hasDuration = selected && _hasSelectedTime && _serviceHours > 0;
+    final displayedPrice = hasDuration
+        ? item.price * _serviceHours
+        : item.price;
+    final priceUnit = hasDuration
+        ? '/共${_serviceHours.toStringAsFixed(0)}小时'
+        : '/小时';
+    return GestureDetector(
+      onTap: () => _updateServiceCount(index, 1),
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 160),
+        padding: const EdgeInsets.all(12),
+        decoration: BoxDecoration(
+          color: selected ? const Color(0xFFF4F9DE) : Colors.white,
+          borderRadius: BorderRadius.circular(18),
+          border: Border.all(
+            color: selected ? AppColors.primary : const Color(0xFFEDEDED),
+            width: selected ? 1.5 : 1,
           ),
         ),
-        const SizedBox(width: 14),
-        SizedBox(
-          width: 132,
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.end,
-            children: [
-              Text.rich(
-                TextSpan(
-                  children: [
-                    TextSpan(
-                      text: '¥${item.price.toStringAsFixed(2)}',
-                      style: const TextStyle(
-                        fontSize: 24,
-                        fontWeight: FontWeight.w900,
-                        color: Color(0xFFFF5A2D),
-                      ),
-                    ),
-                    const TextSpan(
-                      text: ' /小时',
-                      style: TextStyle(
-                        fontSize: 15,
-                        fontWeight: FontWeight.w700,
-                        color: Color(0xFFFF5A2D),
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-              const SizedBox(height: 18),
-              Row(
-                mainAxisAlignment: MainAxisAlignment.end,
+        child: Row(
+          crossAxisAlignment: CrossAxisAlignment.center,
+          children: [
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  _buildCountButton(
-                    icon: Icons.remove_rounded,
-                    filled: false,
-                    onTap: item.count == 0
-                        ? null
-                        : () => _updateServiceCount(index, -1),
-                  ),
-                  const SizedBox(width: 18),
-                  Text(
-                    '${item.count}',
-                    style: const TextStyle(
-                      fontSize: 18,
-                      fontWeight: FontWeight.w800,
-                      color: AppColors.textPrimary,
+                  Container(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 16,
+                      vertical: 8,
+                    ),
+                    decoration: BoxDecoration(
+                      gradient: const LinearGradient(
+                        colors: [Color(0xFFCFFF36), Color(0xFFF1FFC3)],
+                        begin: Alignment.centerLeft,
+                        end: Alignment.centerRight,
+                      ),
+                      borderRadius: BorderRadius.circular(999),
+                    ),
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        const Icon(
+                          Icons.spa_outlined,
+                          size: 16,
+                          color: AppColors.textPrimary,
+                        ),
+                        const SizedBox(width: 6),
+                        Text(
+                          item.title,
+                          style: const TextStyle(
+                            fontSize: 15,
+                            fontWeight: FontWeight.w900,
+                            color: AppColors.textPrimary,
+                          ),
+                        ),
+                      ],
                     ),
                   ),
-                  const SizedBox(width: 18),
-                  _buildCountButton(
-                    icon: Icons.add_rounded,
-                    filled: true,
-                    onTap: () => _updateServiceCount(index, 1),
+                  const SizedBox(height: 14),
+                  Text(
+                    item.subtitle,
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
+                    style: const TextStyle(
+                      fontSize: 15,
+                      height: 1.45,
+                      color: Color(0xFF808080),
+                    ),
                   ),
                 ],
               ),
-            ],
-          ),
-        ),
-      ],
-    );
-  }
-
-  Widget _buildServiceImage() {
-    if (_serviceImageUrl.isEmpty) {
-      return Container(
-        width: 128,
-        height: 128,
-        decoration: BoxDecoration(
-          color: const Color(0xFFF3EEE3),
-          borderRadius: BorderRadius.circular(18),
-        ),
-        alignment: Alignment.center,
-        child: const Icon(
-          Icons.landscape_rounded,
-          size: 30,
-          color: AppColors.textHint,
-        ),
-      );
-    }
-
-    return ClipRRect(
-      borderRadius: BorderRadius.circular(18),
-      child: Image.network(
-        _serviceImageUrl,
-        width: 128,
-        height: 128,
-        fit: BoxFit.cover,
-        errorBuilder: (_, __, ___) {
-          return Container(
-            width: 128,
-            height: 128,
-            color: const Color(0xFFF3EEE3),
-            alignment: Alignment.center,
-            child: const Icon(
-              Icons.landscape_rounded,
-              size: 30,
-              color: AppColors.textHint,
             ),
-          );
-        },
+            const SizedBox(width: 14),
+            SizedBox(
+              width: 132,
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.end,
+                children: [
+                  Text.rich(
+                    TextSpan(
+                      children: [
+                        TextSpan(
+                          text: '¥${displayedPrice.toStringAsFixed(2)}',
+                          style: const TextStyle(
+                            fontSize: 24,
+                            fontWeight: FontWeight.w900,
+                            color: Color(0xFFFF5A2D),
+                          ),
+                        ),
+                        TextSpan(
+                          text: priceUnit,
+                          style: TextStyle(
+                            fontSize: 15,
+                            fontWeight: FontWeight.w700,
+                            color: Color(0xFFFF5A2D),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(height: 18),
+                  Text(
+                    selected ? '已选择' : '点击选择',
+                    style: TextStyle(
+                      fontSize: 13,
+                      fontWeight: FontWeight.w700,
+                      color: selected
+                          ? AppColors.primaryDark
+                          : AppColors.textHint,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }
@@ -940,8 +953,6 @@ class _OrderCreatePageState extends State<OrderCreatePage> {
   Widget _buildPricingCard() {
     final serviceFee = _serviceSubtotal;
     final travelFee = _estimatedTravelFee;
-    final hourOptions = <double>{1, 2, 3, 4, 5, 6, 8, _serviceHours}.toList()
-      ..sort();
     return Container(
       color: Colors.white,
       padding: const EdgeInsets.fromLTRB(16, 16, 16, 18),
@@ -955,20 +966,11 @@ class _OrderCreatePageState extends State<OrderCreatePage> {
                   style: TextStyle(fontWeight: FontWeight.w700),
                 ),
               ),
-              DropdownButton<double>(
-                value: _serviceHours,
-                underline: const SizedBox.shrink(),
-                items: hourOptions
-                    .map(
-                      (hour) => DropdownMenuItem(
-                        value: hour.toDouble(),
-                        child: Text('${hour.toStringAsFixed(0)} 小时'),
-                      ),
-                    )
-                    .toList(),
-                onChanged: _selectedService == null
-                    ? null
-                    : (value) => setState(() => _serviceHours = value ?? 1),
+              Text(
+                _hasSelectedTime
+                    ? '${_serviceHours.toStringAsFixed(0)} 小时'
+                    : '请选择',
+                style: const TextStyle(fontWeight: FontWeight.w800),
               ),
             ],
           ),
@@ -1049,30 +1051,6 @@ class _OrderCreatePageState extends State<OrderCreatePage> {
     );
   }
 
-  Widget _buildCountButton({
-    required IconData icon,
-    required bool filled,
-    required VoidCallback? onTap,
-  }) {
-    return GestureDetector(
-      onTap: onTap,
-      child: Container(
-        width: 40,
-        height: 40,
-        decoration: BoxDecoration(
-          color: filled ? AppColors.primary : const Color(0xFFF1F1F3),
-          borderRadius: BorderRadius.circular(12),
-        ),
-        alignment: Alignment.center,
-        child: Icon(
-          icon,
-          size: 22,
-          color: onTap == null ? AppColors.textHint : AppColors.textPrimary,
-        ),
-      ),
-    );
-  }
-
   Widget _buildOrderNoticeButton() {
     return Align(
       alignment: Alignment.centerLeft,
@@ -1130,14 +1108,18 @@ class _OrderCreatePageState extends State<OrderCreatePage> {
           const Divider(height: 1, color: Color(0xFFF0F0F0)),
           _buildInfoRow(
             title: '服务时间',
-            value: _formatDateTime(_serviceDateTime),
+            value: _hasSelectedTime
+                ? '${_formatDateTime(_serviceDateTime)} - ${_formatDateTime(_serviceDateTime.add(Duration(hours: _serviceHours.round())))}'
+                : '请选择',
             icon: Icons.schedule_outlined,
             onTap: _pickTime,
           ),
           const Divider(height: 1, color: Color(0xFFF0F0F0)),
           _buildInfoRow(
             title: '服务人数及性别',
-            value: '$_peopleCount人 / $_gender',
+            value: _peopleCount > 0
+                ? '${_genderSummary}（共$_peopleCount人）'
+                : '请选择',
             icon: Icons.people_outline_rounded,
             onTap: _pickPeopleAndGender,
           ),

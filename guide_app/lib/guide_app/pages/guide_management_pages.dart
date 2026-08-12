@@ -312,70 +312,119 @@ class _GuideServiceEditorDialogState extends State<_GuideServiceEditorDialog> {
   }
 }
 
-class GuideSchedulePage extends StatelessWidget {
+class GuideSchedulePage extends StatefulWidget {
   const GuideSchedulePage({super.key});
 
-  Future<void> _add(BuildContext context) async {
-    String rule = 'exact';
-    final choice = await showDialog<String>(
-      context: context,
-      builder: (dialogContext) => SimpleDialog(
-        title: const Text('选择排班方式'),
-        children: [
-          SimpleDialogOption(
-            onPressed: () => Navigator.pop(dialogContext, 'exact'),
-            child: const Text('指定日期'),
-          ),
-          SimpleDialogOption(
-            onPressed: () => Navigator.pop(dialogContext, 'daily'),
-            child: const Text('每天'),
-          ),
-          SimpleDialogOption(
-            onPressed: () => Navigator.pop(dialogContext, 'weekdays'),
-            child: const Text('周一至周五'),
-          ),
-          SimpleDialogOption(
-            onPressed: () => Navigator.pop(dialogContext, 'weekend'),
-            child: const Text('周末'),
-          ),
-        ],
-      ),
-    );
-    if (choice == null || !context.mounted) return;
-    rule = choice == 'weekdays' || choice == 'weekend' ? 'weekly' : choice;
+  @override
+  State<GuideSchedulePage> createState() => _GuideSchedulePageState();
+}
+
+class _GuideSchedulePageState extends State<GuideSchedulePage> {
+  static const _firstHour = 6;
+  static const _lastHour = 23;
+  static const _dayCount = 7;
+  static const _dayWidth = 96.0;
+  static const _hourHeight = 56.0;
+
+  DateTime get _today {
+    final now = DateTime.now();
+    return DateTime(now.year, now.month, now.day);
+  }
+
+  DateTime _dayAt(int index) => _today.add(Duration(days: index));
+
+  String _dateText(DateTime date) =>
+      '${date.year}-${date.month.toString().padLeft(2, '0')}-${date.day.toString().padLeft(2, '0')}';
+
+  DateTime? _parseDate(dynamic raw) {
+    final value = raw?.toString().trim() ?? '';
+    if (value.isEmpty) return null;
+    return DateTime.tryParse(value)?.toLocal();
+  }
+
+  int? _minutes(dynamic raw) {
+    final parts = raw?.toString().split(':') ?? const <String>[];
+    if (parts.length < 2) return null;
+    final hour = int.tryParse(parts[0]);
+    final minute = int.tryParse(parts[1]);
+    if (hour == null || minute == null) return null;
+    return hour * 60 + minute;
+  }
+
+  DateTime _initialTime(DateTime day, int hour) =>
+      DateTime(day.year, day.month, day.day, hour);
+
+  Future<void> _editSlot(
+    BuildContext context, {
+    DateTime? day,
+    Map<String, dynamic>? item,
+  }) async {
+    final selectedDay = day ?? _parseDate(item?['service_date']) ?? _today;
+    final startMinutes = _minutes(item?['start_time']);
+    final endMinutes = _minutes(item?['end_time']);
+    final initialStart = startMinutes == null
+        ? _initialTime(selectedDay, _firstHour)
+        : _initialTime(
+            selectedDay,
+            startMinutes ~/ 60,
+          ).add(Duration(minutes: startMinutes % 60));
+    final initialEnd = endMinutes == null
+        ? initialStart.add(const Duration(hours: 1))
+        : _initialTime(
+            selectedDay,
+            endMinutes ~/ 60,
+          ).add(Duration(minutes: endMinutes % 60));
     final range = await showAppTimeRangePicker(
       context,
+      initialStart: initialStart,
+      initialEnd: initialEnd,
+      firstDate: _today,
+      dateCount: _dayCount,
       minHours: 1,
-      title: '设置接单时间',
-      subtitle: '按住时间格拖动选择连续接单时段',
+      title: item == null ? '添加接单时段' : '修改接单时段',
+      subtitle: '选择未来 7 天内的具体日期，再点击开始和结束时间',
     );
     if (range == null || !context.mounted) return;
     final date = range.start;
     final start = TimeOfDay.fromDateTime(range.start);
     final end = TimeOfDay.fromDateTime(range.end);
     String two(int value) => value.toString().padLeft(2, '0');
-    final dateText = '${date.year}-${two(date.month)}-${two(date.day)}';
+    final dateText = _dateText(date);
     final startText = '${two(start.hour)}:${two(start.minute)}';
     final endText = '${two(end.hour)}:${two(end.minute)}';
-    var weekdays = <int>[];
-    if (choice == 'weekdays') weekdays = [1, 2, 3, 4, 5];
-    if (choice == 'weekend') weekdays = [6, 7];
+    final provider = context.read<GuideBackendProvider>();
     try {
-      await context.read<GuideBackendProvider>().addAvailability(
+      if (item != null) {
+        await provider.deleteAvailability(item['id'].toString());
+      }
+      await provider.addAvailability(
         date: dateText,
         start: startText,
         end: endText,
-        recurrenceType: rule,
-        weekdays: weekdays,
+        recurrenceType: 'exact',
         dateStart: dateText,
-        dateEnd: rule == 'exact'
-            ? dateText
-            : '${date.year + 1}-${two(date.month)}-${two(date.day)}',
+        dateEnd: dateText,
       );
     } catch (error) {
       if (context.mounted) _message(context, '保存失败：$error');
     }
   }
+
+  List<Map<String, dynamic>> _itemsForDay(
+    List<Map<String, dynamic>> items,
+    DateTime day,
+  ) {
+    return items.where((item) {
+      final itemDay = _parseDate(item['service_date'] ?? item['date_start']);
+      return itemDay != null &&
+          itemDay.year == day.year &&
+          itemDay.month == day.month &&
+          itemDay.day == day.day;
+    }).toList();
+  }
+
+  String _weekday(DateTime day) =>
+      const ['周一', '周二', '周三', '周四', '周五', '周六', '周日'][day.weekday - 1];
 
   @override
   Widget build(BuildContext context) {
@@ -384,74 +433,181 @@ class GuideSchedulePage extends StatelessWidget {
       appBar: AppBar(title: const Text('时间管理'), backgroundColor: Colors.white),
       backgroundColor: const Color(0xFFF0F1F3),
       body: ListView(
-        padding: const EdgeInsets.all(16),
+        padding: const EdgeInsets.fromLTRB(16, 16, 16, 96),
         children: [
           const GuideSectionCard(
             child: Text(
-              '设置可接单时段后，用户和平台才会把对应时间的需求推荐给你。已有订单优先于排班。',
+              '未来 7 天接单安排。点击已有彩色时段可修改，点击空白日期或底部按钮可添加。',
               style: TextStyle(height: 1.5, color: AppColors.textSecondary),
             ),
           ),
           const SizedBox(height: 12),
-          if (provider.availability.isEmpty)
-            const _EmptyCard(
-              icon: Icons.calendar_month_outlined,
-              text: '暂无可接单时段',
-            )
-          else
-            ...provider.availability.map((item) {
-              final note = item['note']?.toString() ?? '';
-              return Padding(
-                padding: const EdgeInsets.only(bottom: 10),
-                child: GuideSectionCard(
-                  child: Row(
-                    children: [
-                      const Icon(Icons.schedule, color: AppColors.primaryDark),
-                      const SizedBox(width: 12),
-                      Expanded(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text(
-                              item['service_date']?.toString() ?? '',
-                              style: const TextStyle(
-                                fontSize: 17,
-                                fontWeight: FontWeight.w900,
+          GuideSectionCard(
+            padding: const EdgeInsets.fromLTRB(12, 14, 12, 14),
+            child: SingleChildScrollView(
+              scrollDirection: Axis.horizontal,
+              child: SizedBox(
+                width: 56 + _dayCount * _dayWidth,
+                child: Column(
+                  children: [
+                    SizedBox(
+                      height: 58,
+                      child: Row(
+                        children: [
+                          const SizedBox(width: 56),
+                          ...List.generate(_dayCount, (index) {
+                            final day = _dayAt(index);
+                            return SizedBox(
+                              width: _dayWidth,
+                              child: Column(
+                                mainAxisAlignment: MainAxisAlignment.center,
+                                children: [
+                                  Text(
+                                    index == 0 ? '今天' : _weekday(day),
+                                    style: const TextStyle(
+                                      fontWeight: FontWeight.w900,
+                                    ),
+                                  ),
+                                  Text(
+                                    '${day.month}/${day.day}',
+                                    style: const TextStyle(
+                                      fontSize: 12,
+                                      color: AppColors.textHint,
+                                    ),
+                                  ),
+                                ],
                               ),
-                            ),
-                            const SizedBox(height: 4),
-                            Text(
-                              '${item['start_time'] ?? ''} - ${item['end_time'] ?? ''}${note.isEmpty ? '' : '  $note'}',
-                              style: const TextStyle(
-                                color: AppColors.textSecondary,
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                      IconButton(
-                        onPressed: () async {
-                          try {
-                            await provider.deleteAvailability(
-                              item['id'].toString(),
                             );
-                          } catch (error) {
-                            if (context.mounted)
-                              _message(context, '删除失败：$error');
-                          }
-                        },
-                        icon: const Icon(Icons.delete_outline),
+                          }),
+                        ],
                       ),
-                    ],
-                  ),
+                    ),
+                    SizedBox(
+                      height: (_lastHour - _firstHour) * _hourHeight,
+                      child: Row(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          SizedBox(
+                            width: 56,
+                            child: Column(
+                              children: List.generate(
+                                _lastHour - _firstHour,
+                                (index) => SizedBox(
+                                  height: _hourHeight,
+                                  child: Text(
+                                    '${(_firstHour + index).toString().padLeft(2, '0')}:00',
+                                    style: const TextStyle(
+                                      fontSize: 11,
+                                      color: AppColors.textHint,
+                                    ),
+                                  ),
+                                ),
+                              ),
+                            ),
+                          ),
+                          ...List.generate(_dayCount, (index) {
+                            final day = _dayAt(index);
+                            final dayItems = _itemsForDay(
+                              provider.availability,
+                              day,
+                            );
+                            return GestureDetector(
+                              onTap: dayItems.isEmpty
+                                  ? () => _editSlot(context, day: day)
+                                  : null,
+                              child: SizedBox(
+                                width: _dayWidth,
+                                height: (_lastHour - _firstHour) * _hourHeight,
+                                child: Stack(
+                                  children: [
+                                    Positioned.fill(
+                                      child: Column(
+                                        children: List.generate(
+                                          _lastHour - _firstHour,
+                                          (_) => Container(
+                                            height: _hourHeight,
+                                            decoration: const BoxDecoration(
+                                              border: Border(
+                                                top: BorderSide(
+                                                  color: Color(0xFFECECEC),
+                                                ),
+                                              ),
+                                            ),
+                                          ),
+                                        ),
+                                      ),
+                                    ),
+                                    ...dayItems.map((item) {
+                                      final start = _minutes(
+                                        item['start_time'],
+                                      );
+                                      final end = _minutes(item['end_time']);
+                                      if (start == null || end == null) {
+                                        return const SizedBox.shrink();
+                                      }
+                                      final top =
+                                          ((start - _firstHour * 60) / 60) *
+                                          _hourHeight;
+                                      final height =
+                                          ((end - start) / 60) * _hourHeight;
+                                      return Positioned(
+                                        top: top.clamp(0, double.infinity),
+                                        left: 6,
+                                        right: 6,
+                                        height: height.clamp(
+                                          28,
+                                          double.infinity,
+                                        ),
+                                        child: GestureDetector(
+                                          onTap: () =>
+                                              _editSlot(context, item: item),
+                                          child: Container(
+                                            padding: const EdgeInsets.all(6),
+                                            alignment: Alignment.topLeft,
+                                            decoration: BoxDecoration(
+                                              color: AppColors.primary,
+                                              borderRadius:
+                                                  BorderRadius.circular(10),
+                                            ),
+                                            child: Text(
+                                              '${item['start_time']} - ${item['end_time']}',
+                                              maxLines: 2,
+                                              overflow: TextOverflow.clip,
+                                              style: const TextStyle(
+                                                fontSize: 10,
+                                                fontWeight: FontWeight.w800,
+                                              ),
+                                            ),
+                                          ),
+                                        ),
+                                      );
+                                    }),
+                                  ],
+                                ),
+                              ),
+                            );
+                          }),
+                        ],
+                      ),
+                    ),
+                  ],
                 ),
-              );
-            }),
-          const SizedBox(height: 88),
+              ),
+            ),
+          ),
+          if (provider.availability.isEmpty)
+            const Padding(
+              padding: EdgeInsets.only(top: 12),
+              child: Text(
+                '还没有安排，点击任意一天即可添加。',
+                textAlign: TextAlign.center,
+                style: TextStyle(color: AppColors.textHint),
+              ),
+            ),
         ],
       ),
       floatingActionButton: FloatingActionButton.extended(
-        onPressed: () => _add(context),
+        onPressed: () => _editSlot(context),
         icon: const Icon(Icons.add),
         label: const Text('添加时段'),
       ),

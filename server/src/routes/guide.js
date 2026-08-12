@@ -62,6 +62,14 @@ function mapServiceItem(row) {
   };
 }
 
+function dateOffsetFromToday(value) {
+  const date = new Date(`${value}T00:00:00`);
+  if (Number.isNaN(date.getTime())) return null;
+  const now = new Date();
+  const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+  return Math.floor((date.getTime() - today.getTime()) / 86400000);
+}
+
 async function getGuideServiceTypes(guideId) {
   const result = await pool.query(
     `select guide_tags from public.users where id = $1 limit 1`,
@@ -233,6 +241,10 @@ guideRouter.post('/availability', route(async (req, res) => {
   const start = clean(req.body?.start_time);
   const end = clean(req.body?.end_time);
   if (!/^\d{4}-\d{2}-\d{2}$/.test(date) || !/^\d{2}:\d{2}$/.test(start) || !/^\d{2}:\d{2}$/.test(end)) return fail(res, 400, '日期和时间格式不正确');
+  const dateOffset = dateOffsetFromToday(date);
+  if (dateOffset == null || dateOffset < 0 || dateOffset > 6) return fail(res, 400, '接单时间只能设置未来7天');
+  if (dateStart !== date || dateEnd !== date) return fail(res, 400, '接单时间必须使用具体日期');
+  if (recurrenceType !== 'exact') return fail(res, 400, '接单时间必须使用具体日期');
   if (!['exact', 'daily', 'weekly'].includes(recurrenceType) || !/^\d{4}-\d{2}-\d{2}$/.test(dateStart) || !/^\d{4}-\d{2}-\d{2}$/.test(dateEnd)) return fail(res, 400, 'invalid availability rule');
   if (recurrenceType === 'weekly' && weekdays.length === 0) return fail(res, 400, 'weekdays required');
   const result = await pool.query(

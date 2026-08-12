@@ -81,6 +81,14 @@ class OrderProvider extends ChangeNotifier {
         ),
       );
 
+      if (result.outcome == PaymentOutcome.cancelled) {
+        return result;
+      }
+
+      if (result.outcome == PaymentOutcome.failed) {
+        return result;
+      }
+
       final confirmed = await _waitForPaymentConfirmation(orderId);
       await loadOrders();
 
@@ -101,15 +109,11 @@ class OrderProvider extends ChangeNotifier {
         );
       }
 
-      if (result.outcome == PaymentOutcome.cancelled) {
-        return result;
-      }
-
       if (result.outcome == PaymentOutcome.success) {
         return PaymentResult(
-          outcome: PaymentOutcome.success,
-          success: true,
-          message: '支付宝已受理，服务器正在确认支付结果，请稍后刷新订单',
+          outcome: PaymentOutcome.failed,
+          success: false,
+          message: '订单已创建，但支付结果暂未确认，可到订单中心继续支付',
           transactionId: result.transactionId,
           orderString: result.orderString,
         );
@@ -182,7 +186,7 @@ class OrderProvider extends ChangeNotifier {
     await loadOrders();
   }
 
-  Future<void> createOrder(Order order) async {
+  Future<Order> createOrder(Order order) async {
     try {
       debugPrint(
         'Create order start: userId=${order.userId}, guideId=${order.guideId}, amount=${order.amount}',
@@ -197,7 +201,9 @@ class OrderProvider extends ChangeNotifier {
         final createdOrder = Order.fromJson(data);
         _orders.insert(0, createdOrder);
         notifyListeners();
+        return createdOrder;
       }
+      throw Exception('Create order response is invalid');
     } catch (e) {
       debugPrint('Create order error: $e');
       throw Exception('Create order failed: $e');

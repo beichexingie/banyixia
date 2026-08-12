@@ -8,7 +8,7 @@ class TimeRangeSelection {
 
   const TimeRangeSelection({required this.start, required this.end});
 
-  int get hours => end.difference(start).inHours;
+  int get hours => end.difference(start).inMinutes ~/ 60;
 }
 
 Future<TimeRangeSelection?> showAppTimeRangePicker(
@@ -19,7 +19,7 @@ Future<TimeRangeSelection?> showAppTimeRangePicker(
   int dateCount = 90,
   int minHours = 1,
   String title = '选择服务时间',
-  String subtitle = '按住时间格并拖动，可连续选择开始到结束时间',
+  String subtitle = '点击开始时间，再点击结束时间',
   bool Function(DateTime slot)? isSlotAvailable,
 }) {
   final now = DateTime.now();
@@ -70,8 +70,7 @@ class _TimeRangeSheetState extends State<_TimeRangeSheet> {
   late DateTime _selectedDate;
   DateTime? _start;
   DateTime? _end;
-  int? _dragStart;
-  int? _dragEnd;
+  int? _pressedIndex;
 
   final List<int> _hours = List<int>.generate(17, (index) => index + 6);
 
@@ -105,62 +104,69 @@ class _TimeRangeSheetState extends State<_TimeRangeSheet> {
     return widget.isSlotAvailable?.call(slot) ?? true;
   }
 
-  void _selectIndex(int index) {
+  bool _rangeAvailable(DateTime start, DateTime end) {
+    if (!end.isAfter(start)) return false;
+    for (
+      var slot = start;
+      slot.isBefore(end);
+      slot = slot.add(const Duration(hours: 1))
+    ) {
+      if (!_available(slot.hour)) return false;
+    }
+    return true;
+  }
+
+  bool _sameHour(DateTime? value, int hour) {
+    return value != null &&
+        value.year == _selectedDate.year &&
+        value.month == _selectedDate.month &&
+        value.day == _selectedDate.day &&
+        value.hour == hour;
+  }
+
+  String _timeText(DateTime? value) {
+    if (value == null) return '未选择';
+    return '${value.hour.toString().padLeft(2, '0')}:00';
+  }
+
+  void _handleHourTap(int index) {
     if (index < 0 || index >= _hours.length) return;
-    final hour = _hours[index];
-    if (!_available(hour)) return;
-    final candidate = _atHour(hour);
-    setState(() {
-      _start = candidate;
-      _end = null;
-      _dragStart = index;
-      _dragEnd = index;
-    });
-  }
-
-  void _updateIndex(int index) {
-    if (_dragStart == null || index < 0 || index >= _hours.length) return;
-    final low = _dragStart! <= index ? _dragStart! : index;
-    final high = _dragStart! <= index ? index : _dragStart!;
-    if (!_hours.sublist(low, high + 1).every(_available)) return;
-    setState(() {
-      _dragEnd = index;
-      final startHour = _hours[low];
-      final endHour = _hours[high] + 1;
-      _start = _atHour(startHour);
-      _end = _atHour(endHour);
-    });
-  }
-
-  void _finishDrag() {
-    if (_dragStart == null || _dragEnd == null) return;
-    final low = _dragStart! <= _dragEnd! ? _dragStart! : _dragEnd!;
-    final high = _dragStart! <= _dragEnd! ? _dragEnd! : _dragStart!;
-    final start = _atHour(_hours[low]);
-    final end = _atHour(_hours[high] + 1);
-    if (end.difference(start).inHours < widget.minHours) {
+    final candidate = _atHour(_hours[index]);
+    if (_start == null || _end != null) {
+      if (!_available(_hours[index])) {
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(const SnackBar(content: Text('这个时间段当前不可选择')));
+        return;
+      }
       setState(() {
-        _start = start;
+        _start = candidate;
         _end = null;
       });
+      return;
     }
-    _dragStart = null;
-    _dragEnd = null;
-  }
 
-  int? _indexFromPosition(Offset position, double width) {
-    const columns = 4;
-    const gap = 10.0;
-    const cellHeight = 62.0;
-    final cellWidth = (width - gap * (columns - 1)) / columns;
-    final column = (position.dx / (cellWidth + gap)).floor();
-    final row = (position.dy / (cellHeight + gap)).floor();
-    if (column < 0 || column >= columns || row < 0) return null;
-    final localX = position.dx - column * (cellWidth + gap);
-    final localY = position.dy - row * (cellHeight + gap);
-    if (localX > cellWidth || localY > cellHeight) return null;
-    final index = row * columns + column;
-    return index < _hours.length ? index : null;
+    if (candidate.isAfter(_start!)) {
+      if (!_rangeAvailable(_start!, candidate)) {
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(const SnackBar(content: Text('所选时间段包含不可用时间，请重新选择')));
+        return;
+      }
+      setState(() => _end = candidate);
+      return;
+    }
+
+    if (_available(_hours[index])) {
+      setState(() {
+        _start = candidate;
+        _end = null;
+      });
+    } else {
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(const SnackBar(content: Text('这个时间段当前不可选择')));
+    }
   }
 
   bool _isInRange(int index) {
@@ -306,7 +312,11 @@ class _TimeRangeSheetState extends State<_TimeRangeSheet> {
                 ),
                 const SizedBox(height: 6),
                 Text(
-                  '至少选择 ${widget.minHours} 小时，灰色时间不可选择',
+                  _start == null
+                      ? '请点击开始时间，灰色时间不可选择'
+                      : _end == null
+                      ? '已选开始 ${_timeText(_start)}，请点击结束时间'
+                      : '已选 ${_timeText(_start)} - ${_timeText(_end)}，可重新点击调整',
                   style: const TextStyle(
                     fontSize: 13,
                     color: AppColors.textHint,
@@ -316,106 +326,102 @@ class _TimeRangeSheetState extends State<_TimeRangeSheet> {
                 Expanded(
                   child: LayoutBuilder(
                     builder: (context, constraints) {
-                      return GestureDetector(
-                        behavior: HitTestBehavior.opaque,
-                        onPanStart: (details) {
-                          final index = _indexFromPosition(
-                            details.localPosition,
-                            constraints.maxWidth,
-                          );
-                          if (index != null) _selectIndex(index);
-                        },
-                        onPanUpdate: (details) {
-                          final index = _indexFromPosition(
-                            details.localPosition,
-                            constraints.maxWidth,
-                          );
-                          if (index != null) _updateIndex(index);
-                        },
-                        onPanEnd: (_) => _finishDrag(),
-                        onTapUp: (details) {
-                          final index = _indexFromPosition(
-                            details.localPosition,
-                            constraints.maxWidth,
-                          );
-                          if (index == null || !_available(_hours[index]))
-                            return;
-                          setState(() {
-                            final candidate = _atHour(_hours[index]);
-                            if (_start == null || _end != null) {
-                              _start = candidate;
-                              _end = null;
-                            } else if (candidate.isAfter(_start!)) {
-                              final low = _hours.indexOf(_start!.hour);
-                              final high = index;
-                              if (low >= 0 &&
-                                  high >= low &&
-                                  _hours
-                                      .sublist(low, high + 1)
-                                      .every(_available)) {
-                                _end = _atHour(_hours[high] + 1);
-                              }
-                            } else {
-                              _start = candidate;
-                              _end = null;
-                            }
-                          });
-                        },
-                        child: GridView.builder(
-                          physics: const NeverScrollableScrollPhysics(),
-                          itemCount: _hours.length,
-                          gridDelegate:
-                              const SliverGridDelegateWithFixedCrossAxisCount(
-                                crossAxisCount: 4,
-                                mainAxisSpacing: 10,
-                                crossAxisSpacing: 10,
-                                mainAxisExtent: 62,
-                              ),
-                          itemBuilder: (_, index) {
-                            final hour = _hours[index];
-                            final available = _available(hour);
-                            final active = _isInRange(index);
-                            return Container(
-                              decoration: BoxDecoration(
-                                color: !available
-                                    ? const Color(0xFFE9E9E9)
-                                    : active
-                                    ? AppColors.primary
-                                    : const Color(0xFFF8F8F3),
-                                borderRadius: BorderRadius.circular(14),
-                              ),
-                              child: Column(
-                                mainAxisAlignment: MainAxisAlignment.center,
-                                children: [
-                                  Text(
-                                    '${hour.toString().padLeft(2, '0')}:00',
-                                    style: TextStyle(
-                                      fontSize: 18,
-                                      fontWeight: FontWeight.w800,
-                                      color: available
-                                          ? AppColors.textPrimary
-                                          : const Color(0xFFB8B8B8),
-                                    ),
-                                  ),
-                                  const SizedBox(height: 4),
-                                  Text(
-                                    !available
-                                        ? '不可用'
+                      return GridView.builder(
+                        physics: const NeverScrollableScrollPhysics(),
+                        itemCount: _hours.length,
+                        gridDelegate:
+                            const SliverGridDelegateWithFixedCrossAxisCount(
+                              crossAxisCount: 4,
+                              mainAxisSpacing: 10,
+                              crossAxisSpacing: 10,
+                              mainAxisExtent: 62,
+                            ),
+                        itemBuilder: (_, index) {
+                          final hour = _hours[index];
+                          final available = _available(hour);
+                          final active = _isInRange(index);
+                          final isStart = _sameHour(_start, hour);
+                          final isEnd = _sameHour(_end, hour);
+                          return Material(
+                            color: Colors.transparent,
+                            child: InkWell(
+                              onTapDown: (_) =>
+                                  setState(() => _pressedIndex = index),
+                              onTapCancel: () =>
+                                  setState(() => _pressedIndex = null),
+                              onTap: () {
+                                _handleHourTap(index);
+                                if (mounted) {
+                                  setState(() => _pressedIndex = null);
+                                }
+                              },
+                              borderRadius: BorderRadius.circular(14),
+                              child: AnimatedScale(
+                                scale: _pressedIndex == index ? 0.94 : 1,
+                                duration: const Duration(milliseconds: 90),
+                                child: AnimatedContainer(
+                                  duration: const Duration(milliseconds: 180),
+                                  decoration: BoxDecoration(
+                                    color: !available
+                                        ? const Color(0xFFE9E9E9)
+                                        : isStart || isEnd
+                                        ? AppColors.primaryDark
                                         : active
-                                        ? '已选'
-                                        : '可选',
-                                    style: TextStyle(
-                                      fontSize: 11,
-                                      color: available
-                                          ? AppColors.textHint
-                                          : const Color(0xFFB8B8B8),
-                                    ),
+                                        ? AppColors.primary
+                                        : const Color(0xFFF8F8F3),
+                                    borderRadius: BorderRadius.circular(14),
+                                    boxShadow: isStart || isEnd
+                                        ? const [
+                                            BoxShadow(
+                                              color: Color(0x553E5E00),
+                                              blurRadius: 8,
+                                              offset: Offset(0, 3),
+                                            ),
+                                          ]
+                                        : null,
                                   ),
-                                ],
+                                  child: Column(
+                                    mainAxisAlignment: MainAxisAlignment.center,
+                                    children: [
+                                      Text(
+                                        '${hour.toString().padLeft(2, '0')}:00',
+                                        style: TextStyle(
+                                          fontSize: 18,
+                                          fontWeight: FontWeight.w800,
+                                          color: isStart || isEnd
+                                              ? Colors.white
+                                              : available
+                                              ? AppColors.textPrimary
+                                              : const Color(0xFFB8B8B8),
+                                        ),
+                                      ),
+                                      const SizedBox(height: 4),
+                                      Text(
+                                        !available
+                                            ? '不可用'
+                                            : isStart
+                                            ? '开始'
+                                            : isEnd
+                                            ? '结束'
+                                            : active
+                                            ? '已选'
+                                            : '可选',
+                                        style: TextStyle(
+                                          fontSize: 11,
+                                          color: isStart || isEnd
+                                              ? Colors.white
+                                              : available
+                                              ? AppColors.textHint
+                                              : const Color(0xFFB8B8B8),
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                ),
                               ),
-                            );
-                          },
-                        ),
+                            ),
+                          );
+                        },
                       );
                     },
                   ),
