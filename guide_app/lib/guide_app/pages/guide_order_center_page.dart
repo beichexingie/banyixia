@@ -32,6 +32,7 @@ class GuideOrderCenterPage extends StatefulWidget {
 
 class _GuideOrderCenterPageState extends State<GuideOrderCenterPage> {
   GuideOrderStage _selectedStage = GuideOrderStage.inProgress;
+  static const bool _showRouteButton = false;
 
   void _showSupportNotice() {
     ScaffoldMessenger.of(
@@ -80,26 +81,28 @@ class _GuideOrderCenterPageState extends State<GuideOrderCenterPage> {
                           active: stage == _selectedStage,
                           onTap: () => setState(() => _selectedStage = stage),
                         ),
-                      InkWell(
-                        onTap: () => widget.onOpenRoute(
-                          filtered.isNotEmpty ? filtered.first : null,
-                        ),
-                        borderRadius: BorderRadius.circular(999),
-                        child: const Row(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            Icon(Icons.route_outlined, size: 24),
-                            SizedBox(width: 6),
-                            Text(
-                              '路线',
-                              style: TextStyle(
-                                fontSize: 16,
-                                fontWeight: FontWeight.w800,
+                      if (false) ...[
+                        InkWell(
+                          onTap: () => widget.onOpenRoute(
+                            filtered.isNotEmpty ? filtered.first : null,
+                          ),
+                          borderRadius: BorderRadius.circular(999),
+                          child: const Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Icon(Icons.route_outlined, size: 24),
+                              SizedBox(width: 6),
+                              Text(
+                                '路线',
+                                style: TextStyle(
+                                  fontSize: 16,
+                                  fontWeight: FontWeight.w800,
+                                ),
                               ),
-                            ),
-                          ],
+                            ],
+                          ),
                         ),
-                      ),
+                      ],
                       InkWell(
                         onTap: () => context.read<OrderProvider>().loadOrders(),
                         borderRadius: BorderRadius.circular(999),
@@ -222,6 +225,13 @@ class _GuideOrderCenterPageState extends State<GuideOrderCenterPage> {
                                     ScaffoldMessenger.of(context).showSnackBar(
                                       const SnackBar(
                                         content: Text('客户评价后，订单将自动完成'),
+                                      ),
+                                    );
+                                  } else if (order.primaryAction ==
+                                      GuideOrderAction.completed) {
+                                    ScaffoldMessenger.of(context).showSnackBar(
+                                      const SnackBar(
+                                        content: Text('订单已完成，客户评价已收到'),
                                       ),
                                     );
                                   } else {

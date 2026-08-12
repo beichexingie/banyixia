@@ -24,6 +24,9 @@ class Guide {
   final double weightKg;
   final String serviceDescription;
   final String extraFeeDescription;
+  final double? currentLat;
+  final double? currentLng;
+  final String currentLocationText;
 
   Guide({
     required this.id,
@@ -50,6 +53,9 @@ class Guide {
     this.weightKg = 0,
     this.serviceDescription = '',
     this.extraFeeDescription = '',
+    this.currentLat,
+    this.currentLng,
+    this.currentLocationText = '',
   });
 
   factory Guide.fromJson(Map<String, dynamic> json) {
@@ -80,6 +86,13 @@ class Guide {
       weightKg: _parseDouble(json['weight_kg'] ?? json['weightKg']) ?? 0,
       serviceDescription: _asString(json['service_description']),
       extraFeeDescription: _asString(json['extra_fee_description']),
+      currentLat: _parseDouble(
+        json['current_lat'] ?? json['guide_current_lat'],
+      ),
+      currentLng: _parseDouble(
+        json['current_lng'] ?? json['guide_current_lng'],
+      ),
+      currentLocationText: _asString(json['current_location_text']),
     );
   }
 
@@ -109,6 +122,9 @@ class Guide {
       'weight_kg': weightKg,
       'service_description': serviceDescription,
       'extra_fee_description': extraFeeDescription,
+      'current_lat': currentLat,
+      'current_lng': currentLng,
+      'current_location_text': currentLocationText,
     };
   }
 

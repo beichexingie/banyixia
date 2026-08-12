@@ -26,6 +26,9 @@ class _GuideDemandHallPageState extends State<GuideDemandHallPage> {
     });
   }
 
+  // Kept for compatibility with older hot-reload state; new taps use the
+  // lifecycle-safe dialog below.
+  // ignore: unused_element
   Future<void> _apply(DemandRequest demand) async {
     final quoteController = TextEditingController();
     final noteController = TextEditingController();
@@ -56,19 +59,54 @@ class _GuideDemandHallPageState extends State<GuideDemandHallPage> {
             child: const Text('取消'),
           ),
           FilledButton(
-            onPressed: () => Navigator.pop(context, {
-              'quote': double.tryParse(quoteController.text.trim()),
-              'note': noteController.text.trim(),
-            }),
+            onPressed: () {
+              FocusManager.instance.primaryFocus?.unfocus();
+              Navigator.pop(context, {
+                'quote': double.tryParse(quoteController.text.trim()),
+                'note': noteController.text.trim(),
+              });
+            },
             child: const Text('提交报名'),
           ),
         ],
       ),
     );
-    quoteController.dispose();
-    noteController.dispose();
+    // Let the dialog finish its route transition before disposing controllers.
+    // Disposing them immediately can trip Flutter's inherited-widget
+    // dependent assertion while the text fields are still deactivating.
+    Future<void>.delayed(const Duration(milliseconds: 400), () {
+      quoteController.dispose();
+      noteController.dispose();
+    });
     final quote = result?['quote'] as double?;
     if (!mounted || quote == null || quote <= 0) return;
+    try {
+      await context.read<DemandProvider>().applyToDemand(
+        demand.id,
+        quoteAmount: quote,
+        note: result?['note']?.toString() ?? '',
+      );
+      if (!mounted) return;
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(const SnackBar(content: Text('报名成功')));
+      setState(() => _showApplied = true);
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text('报名失败：$e')));
+    }
+  }
+
+  Future<void> _applySafely(DemandRequest demand) async {
+    final result = await showDialog<Map<String, dynamic>>(
+      context: context,
+      builder: (_) => const _GuideQuoteDialog(),
+    );
+    if (!mounted) return;
+    final quote = result?['quote'] as double?;
+    if (quote == null || quote <= 0) return;
     try {
       await context.read<DemandProvider>().applyToDemand(
         demand.id,
@@ -241,7 +279,7 @@ class _GuideDemandHallPageState extends State<GuideDemandHallPage> {
                                 const Spacer(),
                                 if (!_showApplied)
                                   ElevatedButton(
-                                    onPressed: () => _apply(demand),
+                                    onPressed: () => _applySafely(demand),
                                     style: ElevatedButton.styleFrom(
                                       backgroundColor: AppColors.primary,
                                       foregroundColor: AppColors.textPrimary,
@@ -262,6 +300,72 @@ class _GuideDemandHallPageState extends State<GuideDemandHallPage> {
           );
         },
       ),
+    );
+  }
+}
+
+class _GuideQuoteDialog extends StatefulWidget {
+  const _GuideQuoteDialog();
+
+  @override
+  State<_GuideQuoteDialog> createState() => _GuideQuoteDialogState();
+}
+
+class _GuideQuoteDialogState extends State<_GuideQuoteDialog> {
+  final _quoteController = TextEditingController();
+  final _noteController = TextEditingController();
+
+  @override
+  void dispose() {
+    _quoteController.dispose();
+    _noteController.dispose();
+    super.dispose();
+  }
+
+  void _submit() {
+    final quote = double.tryParse(_quoteController.text.trim());
+    if (quote == null || quote <= 0) {
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(const SnackBar(content: Text('请输入有效的报价金额')));
+      return;
+    }
+    FocusManager.instance.primaryFocus?.unfocus();
+    Navigator.of(
+      context,
+    ).pop({'quote': quote, 'note': _noteController.text.trim()});
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return AlertDialog(
+      title: const Text('报名需求'),
+      content: SingleChildScrollView(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            TextField(
+              controller: _quoteController,
+              keyboardType: const TextInputType.numberWithOptions(
+                decimal: true,
+              ),
+              decoration: const InputDecoration(labelText: '我的报价（元）'),
+            ),
+            TextField(
+              controller: _noteController,
+              maxLines: 3,
+              decoration: const InputDecoration(labelText: '报名说明（可选）'),
+            ),
+          ],
+        ),
+      ),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.of(context).pop(),
+          child: const Text('取消'),
+        ),
+        FilledButton(onPressed: _submit, child: const Text('提交报名')),
+      ],
     );
   }
 }

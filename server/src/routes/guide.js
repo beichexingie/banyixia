@@ -55,9 +55,21 @@ function number(value, fallback = 0) {
 function mapServiceItem(row) {
   return {
     ...row,
+    service_type: row.service_type || row.name || '',
     price_per_hour: number(row.price_per_hour),
-    price_per_day: number(row.price_per_day),
+    price_per_day: 0,
+    enabled: true,
   };
+}
+
+async function getGuideServiceTypes(guideId) {
+  const result = await pool.query(
+    `select guide_tags from public.users where id = $1 limit 1`,
+    [guideId],
+  );
+  return Array.isArray(result.rows[0]?.guide_tags)
+    ? result.rows[0].guide_tags.map((item) => item?.toString().trim()).filter(Boolean)
+    : [];
 }
 
 function mapReview(row) {
@@ -90,7 +102,7 @@ async function getTaskState(guideId) {
       select t.task_key, t.progress, t.completed_at,
         u.nickname, u.city, u.guide_introduction, u.guide_tags,
         exists(select 1 from public.guide_service_items s where s.guide_id = $1 and s.enabled = true and (s.price_per_hour > 0 or s.price_per_day > 0)) as has_service,
-        exists(select 1 from public.guide_availability a where a.guide_id = $1 and a.is_available = true and a.service_date >= current_date) as has_schedule,
+         exists(select 1 from public.guide_availability a where a.guide_id = $1 and a.is_available = true and (a.service_date >= current_date or a.date_end >= current_date or a.date_end is null)) as has_schedule,
         exists(select 1 from public.orders o where o.guide_id = $1 and o.status = 3) as has_order,
         exists(select 1 from public.guide_reviews r where r.guide_id = $1) as has_review
       from public.users u
@@ -123,10 +135,10 @@ async function getTaskState(guideId) {
 guideRouter.get('/console', route(async (req, res) => {
   const guideId = await requireGuide(req, res);
   if (!guideId) return;
-  const [settings, services, availability, reviews, courses, progress, blocked, insurance, support, tasks] = await Promise.all([
+  const [settings, services, availability, reviews, courses, progress, blocked, insurance, support, tasks, profile] = await Promise.all([
     pool.query(`select * from public.guide_settings where user_id = $1 limit 1`, [guideId]),
     pool.query(`select * from public.guide_service_items where guide_id = $1 order by updated_at desc`, [guideId]),
-    pool.query(`select * from public.guide_availability where guide_id = $1 and service_date >= current_date - 1 order by service_date, start_time`, [guideId]),
+    pool.query(`select * from public.guide_availability where guide_id = $1 and (service_date >= current_date - 1 or date_end >= current_date or date_end is null) order by coalesce(date_start, service_date), start_time`, [guideId]),
     pool.query(`select r.*, o.service_name, o.service_date from public.guide_reviews r join public.orders o on o.id = r.order_id where r.guide_id = $1 order by r.created_at desc limit 100`, [guideId]),
     pool.query(`select * from public.guide_training_courses where published = true order by sort_order, id`),
     pool.query(`select course_id, completed_at from public.guide_training_progress where guide_id = $1`, [guideId]),
@@ -134,11 +146,13 @@ guideRouter.get('/console', route(async (req, res) => {
     pool.query(`select * from public.guide_insurance_policies where guide_id = $1 limit 1`, [guideId]),
     pool.query(`select * from public.guide_support_requests where guide_id = $1 order by created_at desc limit 50`, [guideId]),
     getTaskState(guideId),
+    pool.query(`select guide_tags from public.users where id = $1 limit 1`, [guideId]),
   ]);
   const completedCourses = new Set(progress.rows.map((item) => item.course_id));
   return ok(res, {
     data: {
       settings: settings.rows[0] || null,
+      guide_tags: profile.rows[0]?.guide_tags ?? [],
       service_items: services.rows.map(mapServiceItem),
       availability: availability.rows,
       reviews: reviews.rows.map(mapReview),
@@ -169,14 +183,16 @@ guideRouter.put('/settings', route(async (req, res) => {
 guideRouter.post('/service-items', route(async (req, res) => {
   const guideId = await requireGuide(req, res);
   if (!guideId) return;
-  const name = clean(req.body?.name);
+  const name = clean(req.body?.service_type ?? req.body?.name);
   const description = clean(req.body?.description);
   const hour = number(req.body?.price_per_hour);
-  const day = number(req.body?.price_per_day);
+  const types = await getGuideServiceTypes(guideId);
+  if (!types.includes(name)) return fail(res, 400, 'service_type_must_be_selected_in_profile');
+  if (hour <= 0) return fail(res, 400, 'hourly_price_must_be_positive');
   if (!name || (hour <= 0 && day <= 0)) return fail(res, 400, '服务名称和至少一个有效价格不能为空');
   const result = await pool.query(
-    `insert into public.guide_service_items (guide_id,name,description,price_per_hour,price_per_day,enabled,updated_at) values ($1,$2,$3,$4,$5,$6,now()) returning *`,
-    [guideId, name, description, hour, day, req.body?.enabled !== false],
+    `insert into public.guide_service_items (guide_id,name,service_type,description,price_per_hour,price_per_day,enabled,updated_at) values ($1,$2,$2,$3,$4,0,true,now()) returning *`,
+    [guideId, name, description, hour],
   );
   return ok(res, { data: mapServiceItem(result.rows[0]) });
 }));
@@ -184,9 +200,14 @@ guideRouter.post('/service-items', route(async (req, res) => {
 guideRouter.put('/service-items/:id', route(async (req, res) => {
   const guideId = await requireGuide(req, res);
   if (!guideId) return;
+  const requestedName = req.body?.service_type ?? req.body?.name;
+  const types = await getGuideServiceTypes(guideId);
+  if (requestedName != null && !types.includes(clean(requestedName))) return fail(res, 400, 'service_type_must_be_selected_in_profile');
+  const requestedHour = req.body?.price_per_hour == null ? null : number(req.body.price_per_hour);
+  if (requestedHour != null && requestedHour <= 0) return fail(res, 400, 'hourly_price_must_be_positive');
   const result = await pool.query(
-    `update public.guide_service_items set name=coalesce($3,name), description=coalesce($4,description), price_per_hour=coalesce($5,price_per_hour), price_per_day=coalesce($6,price_per_day), enabled=coalesce($7,enabled), updated_at=now() where id=$1 and guide_id=$2 returning *`,
-    [req.params.id, guideId, req.body?.name == null ? null : clean(req.body.name), req.body?.description == null ? null : clean(req.body.description), req.body?.price_per_hour == null ? null : number(req.body.price_per_hour), req.body?.price_per_day == null ? null : number(req.body.price_per_day), req.body?.enabled == null ? null : Boolean(req.body.enabled)],
+    `update public.guide_service_items set name=coalesce($3,name), service_type=coalesce($3,service_type,name), description=coalesce($4,description), price_per_hour=coalesce($5,price_per_hour), price_per_day=0, enabled=true, updated_at=now() where id=$1 and guide_id=$2 returning *`,
+    [req.params.id, guideId, requestedName == null ? null : clean(requestedName), req.body?.description == null ? null : clean(req.body.description), requestedHour],
   );
   if (!result.rows[0]) return fail(res, 404, '服务项目不存在');
   return ok(res, { data: mapServiceItem(result.rows[0]) });
@@ -203,12 +224,20 @@ guideRouter.post('/availability', route(async (req, res) => {
   const guideId = await requireGuide(req, res);
   if (!guideId) return;
   const date = clean(req.body?.service_date);
+  const recurrenceType = clean(req.body?.recurrence_type, 'exact');
+  const weekdays = Array.isArray(req.body?.weekdays)
+    ? req.body.weekdays.map((item) => Number(item)).filter((item) => item >= 1 && item <= 7)
+    : [];
+  const dateStart = clean(req.body?.date_start || date);
+  const dateEnd = clean(req.body?.date_end || dateStart);
   const start = clean(req.body?.start_time);
   const end = clean(req.body?.end_time);
   if (!/^\d{4}-\d{2}-\d{2}$/.test(date) || !/^\d{2}:\d{2}$/.test(start) || !/^\d{2}:\d{2}$/.test(end)) return fail(res, 400, '日期和时间格式不正确');
+  if (!['exact', 'daily', 'weekly'].includes(recurrenceType) || !/^\d{4}-\d{2}-\d{2}$/.test(dateStart) || !/^\d{4}-\d{2}-\d{2}$/.test(dateEnd)) return fail(res, 400, 'invalid availability rule');
+  if (recurrenceType === 'weekly' && weekdays.length === 0) return fail(res, 400, 'weekdays required');
   const result = await pool.query(
-    `insert into public.guide_availability (guide_id,service_date,start_time,end_time,note,is_available,updated_at) values ($1,$2,$3,$4,$5,$6,now()) returning *`,
-    [guideId, date, start, end, clean(req.body?.note), req.body?.is_available !== false],
+    `insert into public.guide_availability (guide_id,service_date,start_time,end_time,note,is_available,recurrence_type,weekdays,date_start,date_end,updated_at) values ($1,$2,$3,$4,$5,$6,$7,$8::int[],$9,$10,now()) returning *`,
+    [guideId, dateStart, start, end, clean(req.body?.note), req.body?.is_available !== false, recurrenceType, weekdays, dateStart, dateEnd],
   );
   return ok(res, { data: result.rows[0] });
 }));

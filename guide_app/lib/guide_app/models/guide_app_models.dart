@@ -262,7 +262,7 @@ extension GuideServiceTypeX on GuideServiceType {
   bool get isLocked => false;
 }
 
-enum GuideOrderStage { newOrder, pendingPayment, inProgress }
+enum GuideOrderStage { newOrder, pendingPayment, inProgress, completed }
 
 extension GuideOrderStageX on GuideOrderStage {
   String get label {
@@ -273,6 +273,8 @@ extension GuideOrderStageX on GuideOrderStage {
         return '待付款';
       case GuideOrderStage.inProgress:
         return '进行中';
+      case GuideOrderStage.completed:
+        return '已完成';
     }
   }
 }
@@ -283,6 +285,7 @@ enum GuideOrderAction {
   waitingReview,
   goToService,
   complete,
+  completed,
   navigate,
 }
 
@@ -299,6 +302,8 @@ extension GuideOrderActionX on GuideOrderAction {
         return '前往服务地点';
       case GuideOrderAction.complete:
         return '完成服务';
+      case GuideOrderAction.completed:
+        return '已完成';
       case GuideOrderAction.navigate:
         return '查看路线';
     }
@@ -316,6 +321,8 @@ extension GuideOrderActionX on GuideOrderAction {
         return Icons.near_me_rounded;
       case GuideOrderAction.complete:
         return Icons.task_alt_rounded;
+      case GuideOrderAction.completed:
+        return Icons.check_circle_rounded;
       case GuideOrderAction.navigate:
         return Icons.alt_route_rounded;
     }

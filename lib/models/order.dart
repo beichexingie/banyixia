@@ -19,6 +19,8 @@ class Order {
   final OrderStatus status;
   final double amount;
   final String serviceName;
+  final String? serviceItemId;
+  final double? serviceHours;
   final String serviceAddress;
   final String serviceCity;
   final double? serviceLat;
@@ -46,6 +48,8 @@ class Order {
     required this.status,
     required this.amount,
     this.serviceName = '',
+    this.serviceItemId,
+    this.serviceHours,
     this.serviceAddress = '',
     this.serviceCity = '',
     this.serviceLat,
@@ -80,6 +84,8 @@ class Order {
       status: _parseStatus(json['status']),
       amount: _parseDouble(json['amount']) ?? 0,
       serviceName: json['service_name'] ?? '',
+      serviceItemId: json['service_item_id']?.toString(),
+      serviceHours: _parseDouble(json['service_hours']),
       serviceAddress: json['service_address'] ?? '',
       serviceCity: json['service_city'] ?? '',
       serviceLat: _parseDouble(json['service_lat']),
@@ -113,6 +119,8 @@ class Order {
       'status': status.index,
       'amount': amount,
       'service_name': serviceName,
+      if (serviceItemId != null) 'service_item_id': serviceItemId,
+      if (serviceHours != null) 'service_hours': serviceHours,
       'service_address': serviceAddress,
       'service_city': serviceCity,
       'service_lat': serviceLat,
@@ -145,6 +153,8 @@ class Order {
     OrderStatus? status,
     double? amount,
     String? serviceName,
+    String? serviceItemId,
+    double? serviceHours,
     String? serviceAddress,
     String? serviceCity,
     double? serviceLat,
@@ -172,6 +182,8 @@ class Order {
       status: status ?? this.status,
       amount: amount ?? this.amount,
       serviceName: serviceName ?? this.serviceName,
+      serviceItemId: serviceItemId ?? this.serviceItemId,
+      serviceHours: serviceHours ?? this.serviceHours,
       serviceAddress: serviceAddress ?? this.serviceAddress,
       serviceCity: serviceCity ?? this.serviceCity,
       serviceLat: serviceLat ?? this.serviceLat,

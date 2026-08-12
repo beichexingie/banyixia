@@ -31,7 +31,8 @@ class _GuideDetailPageState extends State<GuideDetailPage> {
     _guide = widget.guide;
     _initData();
     final id = widget.guideId ?? widget.guide?.id;
-    if (id != null && id.isNotEmpty) _fetchGuide(id, showLoading: widget.guide == null);
+    if (id != null && id.isNotEmpty)
+      _fetchGuide(id, showLoading: widget.guide == null);
   }
 
   void _initData() {
@@ -51,14 +52,18 @@ class _GuideDetailPageState extends State<GuideDetailPage> {
       _initData();
     } catch (e) {
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(e.toString())));
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text(e.toString())));
       if (showLoading) context.pop();
     }
   }
 
   Future<void> _checkFollowStatus() async {
     if (_guide == null) return;
-    final following = await context.read<UserProvider>().isFollowing(_guide!.id);
+    final following = await context.read<UserProvider>().isFollowing(
+      _guide!.id,
+    );
     if (mounted) {
       setState(() => _isFollowing = following);
     }
@@ -78,7 +83,9 @@ class _GuideDetailPageState extends State<GuideDetailPage> {
       await _checkFollowStatus();
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(e.toString())));
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text(e.toString())));
       }
     } finally {
       if (mounted) {
@@ -90,12 +97,18 @@ class _GuideDetailPageState extends State<GuideDetailPage> {
   Future<void> _contactGuide() async {
     if (_guide == null) return;
     try {
-      final roomId = await context.read<MessageProvider>().getOrCreateRoom(_guide!.id);
+      final roomId = await context.read<MessageProvider>().getOrCreateRoom(
+        _guide!.id,
+      );
       if (!mounted) return;
-      context.push('/chat/$roomId?name=${Uri.encodeComponent(_guide!.name)}&avatar=${Uri.encodeComponent(_guide!.avatar)}');
+      context.push(
+        '/chat/$roomId?name=${Uri.encodeComponent(_guide!.name)}&avatar=${Uri.encodeComponent(_guide!.avatar)}',
+      );
     } catch (e) {
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(e.toString())));
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text(e.toString())));
     }
   }
 
@@ -103,7 +116,9 @@ class _GuideDetailPageState extends State<GuideDetailPage> {
   Widget build(BuildContext context) {
     if (_isLoading || _guide == null) {
       return const Scaffold(
-        body: Center(child: CircularProgressIndicator(color: AppColors.primary)),
+        body: Center(
+          child: CircularProgressIndicator(color: AppColors.primary),
+        ),
       );
     }
 
@@ -140,7 +155,9 @@ class _GuideDetailPageState extends State<GuideDetailPage> {
                   height: 20,
                   decoration: const BoxDecoration(
                     color: AppColors.background,
-                    borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+                    borderRadius: BorderRadius.vertical(
+                      top: Radius.circular(24),
+                    ),
                   ),
                 ),
               ),
@@ -161,7 +178,8 @@ class _GuideDetailPageState extends State<GuideDetailPage> {
         CachedNetworkImage(
           imageUrl: bg,
           fit: BoxFit.cover,
-          errorWidget: (context, url, error) => Container(color: AppColors.tagBackground),
+          errorWidget: (context, url, error) =>
+              Container(color: AppColors.tagBackground),
         ),
         Container(
           decoration: BoxDecoration(
@@ -207,7 +225,10 @@ class _GuideDetailPageState extends State<GuideDetailPage> {
                             ),
                             const SizedBox(width: 8),
                             Container(
-                              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 8,
+                                vertical: 4,
+                              ),
                               decoration: BoxDecoration(
                                 color: AppColors.primary,
                                 borderRadius: BorderRadius.circular(999),
@@ -244,8 +265,13 @@ class _GuideDetailPageState extends State<GuideDetailPage> {
                         backgroundColor: AppColors.primary,
                         foregroundColor: AppColors.textPrimary,
                         elevation: 0,
-                        padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 14),
-                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(999)),
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 18,
+                          vertical: 14,
+                        ),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(999),
+                        ),
                       ),
                     ),
                 ],
@@ -294,7 +320,12 @@ class _GuideDetailPageState extends State<GuideDetailPage> {
             crossAxisSpacing: 10,
             children: [
               _InfoTile(value: '${guide.likes}', label: '获赞'),
-              _InfoTile(value: guide.rating <= 0 ? '暂无' : '${(guide.rating * 20.8).clamp(0, 100).toStringAsFixed(1)}%', label: '好评率'),
+              _InfoTile(
+                value: guide.rating <= 0
+                    ? '暂无'
+                    : '${(guide.rating * 20.8).clamp(0, 100).toStringAsFixed(1)}%',
+                label: '好评率',
+              ),
               _InfoTile(value: '${guide.fans}', label: '粉丝'),
               const _InfoTile(value: '未填写', label: '民族'),
               const _InfoTile(value: '未填写', label: '星座'),
@@ -308,8 +339,7 @@ class _GuideDetailPageState extends State<GuideDetailPage> {
         _SectionCard(
           title: '个人介绍',
           child: Text(
-            guide.description.isNotEmpty ? guide.description : '地陪暂未填写个人介绍。'
-            ,
+            guide.description.isNotEmpty ? guide.description : '地陪暂未填写个人介绍。',
             style: const TextStyle(
               fontSize: 14,
               height: 1.6,
@@ -332,20 +362,55 @@ class _GuideDetailPageState extends State<GuideDetailPage> {
         _SectionCard(
           title: '服务项目',
           child: guide.serviceItems.isEmpty
-              ? const Text('地陪暂未上架服务项目。', style: TextStyle(color: AppColors.textHint))
+              ? const Text(
+                  '地陪暂未上架服务项目。',
+                  style: TextStyle(color: AppColors.textHint),
+                )
               : Column(
                   children: guide.serviceItems.map((item) {
-                    final hour = double.tryParse(item['price_per_hour']?.toString() ?? '') ?? 0;
-                    final day = double.tryParse(item['price_per_day']?.toString() ?? '') ?? 0;
+                    final hour =
+                        double.tryParse(
+                          item['price_per_hour']?.toString() ?? '',
+                        ) ??
+                        0;
                     return Padding(
                       padding: const EdgeInsets.only(bottom: 12),
                       child: Row(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          const Icon(Icons.handshake_outlined, color: AppColors.primaryDark),
+                          const Icon(
+                            Icons.handshake_outlined,
+                            color: AppColors.primaryDark,
+                          ),
                           const SizedBox(width: 10),
-                          Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [Text(item['name']?.toString() ?? '服务项目', style: const TextStyle(fontWeight: FontWeight.w800)), const SizedBox(height: 4), Text(item['description']?.toString() ?? '', style: const TextStyle(fontSize: 13, color: AppColors.textSecondary))])),
-                          Text('¥${day > 0 ? day.toStringAsFixed(0) + '/天' : hour.toStringAsFixed(0) + '/小时'}', style: const TextStyle(fontWeight: FontWeight.w800, color: Color(0xFFFF5A3C))),
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(
+                                  item['name']?.toString() ?? '服务项目',
+                                  style: const TextStyle(
+                                    fontWeight: FontWeight.w800,
+                                  ),
+                                ),
+                                const SizedBox(height: 4),
+                                Text(
+                                  item['description']?.toString() ?? '',
+                                  style: const TextStyle(
+                                    fontSize: 13,
+                                    color: AppColors.textSecondary,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                          Text(
+                            '¥${hour.toStringAsFixed(0)}/小时',
+                            style: const TextStyle(
+                              fontWeight: FontWeight.w800,
+                              color: Color(0xFFFF5A3C),
+                            ),
+                          ),
                         ],
                       ),
                     );
@@ -357,7 +422,11 @@ class _GuideDetailPageState extends State<GuideDetailPage> {
           title: '额外费用说明',
           child: Text(
             '地陪暂未填写额外费用说明，下单前请通过订单和聊天确认费用明细。',
-            style: const TextStyle(fontSize: 14, height: 1.6, color: AppColors.textPrimary),
+            style: const TextStyle(
+              fontSize: 14,
+              height: 1.6,
+              color: AppColors.textPrimary,
+            ),
           ),
         ),
         const SizedBox(height: 14),
@@ -366,10 +435,37 @@ class _GuideDetailPageState extends State<GuideDetailPage> {
           child: guide.reviews.isEmpty
               ? const Text('暂无评价', style: TextStyle(color: AppColors.textHint))
               : Column(
-                  children: guide.reviews.map((item) => Padding(
-                    padding: const EdgeInsets.only(bottom: 10),
-                    child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [Text('匿名客户 · ${item['rating'] ?? 0} 分', style: const TextStyle(fontWeight: FontWeight.w800)), const SizedBox(height: 4), Text(item['content']?.toString() ?? ''), if ((item['guide_reply']?.toString() ?? '').isNotEmpty) Padding(padding: const EdgeInsets.only(top: 4), child: Text('地陪回复：${item['guide_reply']}', style: const TextStyle(color: AppColors.textSecondary)))]),
-                  )).toList(),
+                  children: guide.reviews
+                      .map(
+                        (item) => Padding(
+                          padding: const EdgeInsets.only(bottom: 10),
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                '匿名客户 · ${item['rating'] ?? 0} 分',
+                                style: const TextStyle(
+                                  fontWeight: FontWeight.w800,
+                                ),
+                              ),
+                              const SizedBox(height: 4),
+                              Text(item['content']?.toString() ?? ''),
+                              if ((item['guide_reply']?.toString() ?? '')
+                                  .isNotEmpty)
+                                Padding(
+                                  padding: const EdgeInsets.only(top: 4),
+                                  child: Text(
+                                    '地陪回复：${item['guide_reply']}',
+                                    style: const TextStyle(
+                                      color: AppColors.textSecondary,
+                                    ),
+                                  ),
+                                ),
+                            ],
+                          ),
+                        ),
+                      )
+                      .toList(),
                 ),
         ),
       ],
@@ -378,7 +474,12 @@ class _GuideDetailPageState extends State<GuideDetailPage> {
 
   Widget _buildBottomBar(Guide guide) {
     return Container(
-      padding: EdgeInsets.fromLTRB(20, 10, 20, MediaQuery.of(context).padding.bottom + 10),
+      padding: EdgeInsets.fromLTRB(
+        20,
+        10,
+        20,
+        MediaQuery.of(context).padding.bottom + 10,
+      ),
       decoration: const BoxDecoration(
         color: Colors.white,
         border: Border(top: BorderSide(color: Color(0xFFEDEDED))),
@@ -392,7 +493,9 @@ class _GuideDetailPageState extends State<GuideDetailPage> {
           ),
           const SizedBox(width: 20),
           _BottomAction(
-            icon: _isFollowing ? Icons.check_circle : Icons.person_add_alt_1_outlined,
+            icon: _isFollowing
+                ? Icons.check_circle
+                : Icons.person_add_alt_1_outlined,
             label: _isFollowing ? '已关注' : '关注',
             active: _isFollowing,
             onTap: _isFollowLoading ? () {} : _toggleFollow,
@@ -401,16 +504,23 @@ class _GuideDetailPageState extends State<GuideDetailPage> {
           Expanded(
             child: ElevatedButton(
               onPressed: () {
-                context.push('/order/create?guideId=${guide.id}&name=${Uri.encodeComponent(guide.name)}&avatar=${Uri.encodeComponent(guide.avatar)}');
+                context.push(
+                  '/order/create?guideId=${guide.id}&name=${Uri.encodeComponent(guide.name)}&avatar=${Uri.encodeComponent(guide.avatar)}',
+                );
               },
               style: ElevatedButton.styleFrom(
                 backgroundColor: AppColors.primary,
                 foregroundColor: AppColors.textPrimary,
                 elevation: 0,
                 padding: const EdgeInsets.symmetric(vertical: 16),
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(999)),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(999),
+                ),
               ),
-              child: const Text('找TA下单', style: TextStyle(fontSize: 16, fontWeight: FontWeight.w800)),
+              child: const Text(
+                '找TA下单',
+                style: TextStyle(fontSize: 16, fontWeight: FontWeight.w800),
+              ),
             ),
           ),
         ],
@@ -546,11 +656,7 @@ class _SectionCard extends StatelessWidget {
   final Widget child;
   final Widget? trailing;
 
-  const _SectionCard({
-    required this.title,
-    required this.child,
-    this.trailing,
-  });
+  const _SectionCard({required this.title, required this.child, this.trailing});
 
   @override
   Widget build(BuildContext context) {
@@ -567,7 +673,11 @@ class _SectionCard extends StatelessWidget {
             children: [
               Text(
                 title,
-                style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w800, color: AppColors.textPrimary),
+                style: const TextStyle(
+                  fontSize: 16,
+                  fontWeight: FontWeight.w800,
+                  color: AppColors.textPrimary,
+                ),
               ),
               const Spacer(),
               if (trailing != null) trailing!,
@@ -594,10 +704,17 @@ class _InfoTile extends StatelessWidget {
       children: [
         Text(
           value,
-          style: const TextStyle(fontSize: 22, fontWeight: FontWeight.w900, color: AppColors.textPrimary),
+          style: const TextStyle(
+            fontSize: 22,
+            fontWeight: FontWeight.w900,
+            color: AppColors.textPrimary,
+          ),
         ),
         const SizedBox(height: 4),
-        Text(label, style: const TextStyle(fontSize: 12, color: AppColors.textHint)),
+        Text(
+          label,
+          style: const TextStyle(fontSize: 12, color: AppColors.textHint),
+        ),
       ],
     );
   }
@@ -640,15 +757,26 @@ class _ReviewItem extends StatelessWidget {
       children: [
         Row(
           children: [
-            const CircleAvatar(radius: 16, backgroundColor: AppColors.tagBackground, child: Icon(Icons.person, size: 18)),
+            const CircleAvatar(
+              radius: 16,
+              backgroundColor: AppColors.tagBackground,
+              child: Icon(Icons.person, size: 18),
+            ),
             const SizedBox(width: 10),
-            const Text('用户1028er', style: TextStyle(fontSize: 14, fontWeight: FontWeight.w700)),
+            const Text(
+              '用户1028er',
+              style: TextStyle(fontSize: 14, fontWeight: FontWeight.w700),
+            ),
           ],
         ),
         const SizedBox(height: 8),
         const Text(
           '这是评论内容，这是评论内容。这里展示真实用户体验与反馈。',
-          style: TextStyle(fontSize: 14, height: 1.6, color: AppColors.textPrimary),
+          style: TextStyle(
+            fontSize: 14,
+            height: 1.6,
+            color: AppColors.textPrimary,
+          ),
         ),
         if (withImages) ...[
           const SizedBox(height: 10),
@@ -697,7 +825,11 @@ class _BottomAction extends StatelessWidget {
       child: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
-          Icon(icon, size: 26, color: active ? AppColors.primaryDark : AppColors.textHint),
+          Icon(
+            icon,
+            size: 26,
+            color: active ? AppColors.primaryDark : AppColors.textHint,
+          ),
           const SizedBox(height: 2),
           Text(
             label,

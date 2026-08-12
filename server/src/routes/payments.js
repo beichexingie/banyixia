@@ -48,18 +48,22 @@ async function settlePaidOrder(orderId, tradeNo) {
       paid_at: new Date().toISOString(),
     });
 
+    // Travel fees are paid by the customer but are not subject to the
+    // platform commission. Use the server-calculated guide income here.
+    const guideIncome = Number(latestOrder.guide_income ?? latestOrder.amount);
+
     await incrementPendingBalance(
       client,
       latestOrder.guide_id,
-      Number(latestOrder.amount),
+      guideIncome,
     );
 
     await recordWalletTransaction(client, {
       userId: latestOrder.guide_id,
       orderId: latestOrder.id,
       type: 'income_pending',
-      amount: Number(latestOrder.amount),
-      actualAmount: Number(latestOrder.amount),
+      amount: guideIncome,
+      actualAmount: guideIncome,
       description: `订单收入托管到账：${latestOrder.service_name ?? '地陪服务订单'}`,
     });
 
@@ -77,10 +81,10 @@ async function settlePaidOrder(orderId, tradeNo) {
 }
 
 paymentsRouter.post('/alipay-create-order', async (req, res) => {
-  const { order_id: orderId, merchant_order_no: merchantOrderNo, amount, subject } =
+  const { order_id: orderId, merchant_order_no: merchantOrderNo, subject } =
       req.body ?? {};
 
-  if (!orderId || !amount || !subject) {
+  if (!orderId || !subject) {
     return fail(res, 400, '缺少订单参数');
   }
 
@@ -97,10 +101,15 @@ paymentsRouter.post('/alipay-create-order', async (req, res) => {
       return fail(res, 409, '订单已支付，请刷新订单状态');
     }
 
+    const orderAmount = Number(order.amount);
+    if (!Number.isFinite(orderAmount) || orderAmount <= 0) {
+      return fail(res, 400, 'invalid order amount');
+    }
+
     const built = buildOrderString({
       orderId: String(orderId),
       merchantOrderNo: merchantOrderNo?.toString() ?? order.merchant_order_no,
-      amount: Number(amount),
+      amount: orderAmount,
       subject: String(subject),
     });
 

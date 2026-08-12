@@ -22,6 +22,9 @@ create table if not exists public.guide_service_items (
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now()
 );
+alter table if exists public.guide_service_items
+  add column if not exists service_type text;
+update public.guide_service_items set service_type = name where coalesce(service_type, '') = '';
 create index if not exists idx_guide_service_items_guide
   on public.guide_service_items (guide_id, enabled, updated_at desc);
 
@@ -37,6 +40,11 @@ create table if not exists public.guide_availability (
   updated_at timestamptz not null default now(),
   constraint guide_availability_time_check check (end_time > start_time)
 );
+alter table if exists public.guide_availability
+  add column if not exists recurrence_type text not null default 'exact',
+  add column if not exists weekdays integer[] not null default '{}'::integer[],
+  add column if not exists date_start date,
+  add column if not exists date_end date;
 create index if not exists idx_guide_availability_guide_date
   on public.guide_availability (guide_id, service_date, start_time);
 

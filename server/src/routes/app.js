@@ -394,6 +394,141 @@ function haversineDistanceMeters(lat1, lng1, lat2, lng2) {
   return Math.round(earthRadius * c);
 }
 
+function parseServiceDate(value) {
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return null;
+  return date;
+}
+
+function dateOnly(date) {
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, '0');
+  const day = String(date.getDate()).padStart(2, '0');
+  return `${year}-${month}-${day}`;
+}
+
+function timeOnly(date) {
+  return `${String(date.getHours()).padStart(2, '0')}:${String(date.getMinutes()).padStart(2, '0')}:00`;
+}
+
+function didiTravelFare(distanceMeters, serviceDate) {
+  if (distanceMeters == null || distanceMeters <= 0) return 0;
+  const date = serviceDate instanceof Date ? serviceDate : new Date(serviceDate);
+  const isRestDay = date.getDay() === 0 || date.getDay() === 6;
+  const minutes = Math.max(8, Math.round((distanceMeters / 1000 / 30) * 60));
+  const km = distanceMeters / 1000;
+  let base = isRestDay ? 9.4 : 9.4;
+  let kmRate = isRestDay ? 1.44 : 1.38;
+  let minuteRate = isRestDay ? 0.28 : 0.31;
+  const hour = date.getHours() + date.getMinutes() / 60;
+  if (isRestDay) {
+    if (hour >= 0 && hour < 6) { base = 10.2; kmRate = 2.44; minuteRate = 0.33; }
+    else if (hour >= 7 && hour < 9) { base = 9.7; kmRate = 1.49; minuteRate = 0.42; }
+    else if (hour >= 16 && hour < 19) { base = 10.2; kmRate = 1.48; minuteRate = 0.43; }
+    else if (hour >= 20 && hour < 22) { base = 9.8; kmRate = 1.44; minuteRate = 0.35; }
+    else if (hour >= 23) { base = 10.2; kmRate = 2.44; minuteRate = 0.33; }
+  } else if (hour < 5 || hour >= 23) {
+    base = 10.2; kmRate = 2.38; minuteRate = 0.35;
+  } else if (hour >= 7 && hour < 9) {
+    base = 10.3; kmRate = 1.58; minuteRate = 0.47;
+  } else if (hour >= 17 && hour < 19) {
+    base = 9.9; kmRate = 1.56; minuteRate = 0.43;
+  }
+  const includedKm = 3;
+  const includedMinutes = 8;
+  const longDistanceFee =
+    Math.max(0, Math.min(km, 24) - 12) * 0.39 +
+    Math.max(0, Math.min(km, 35) - 24) * 0.60 +
+    Math.max(0, km - 35) * 0.68;
+  const fare = base +
+    Math.max(0, km - includedKm) * kmRate +
+    Math.max(0, minutes - includedMinutes) * minuteRate +
+    longDistanceFee;
+  return Math.round(fare * 100) / 100;
+}
+
+async function calculateOrderPricing(client, { guideId, serviceItemId, serviceHours, serviceDate, serviceLat, serviceLng }) {
+  const hours = Number(serviceHours);
+  if (!Number.isFinite(hours) || hours <= 0 || hours > 24) {
+    const error = new Error('service_hours_invalid');
+    error.statusCode = 400;
+    throw error;
+  }
+  const date = parseServiceDate(serviceDate);
+  if (!date) {
+    const error = new Error('service_date_invalid');
+    error.statusCode = 400;
+    throw error;
+  }
+  const itemResult = await client.query(
+    `select s.*, u.nickname as guide_nickname, u.avatar as guide_avatar, u.guide_tags, g.current_lat, g.current_lng
+     from public.guide_service_items s
+     join public.users u on u.id = s.guide_id
+     join public.guides g on g.id = s.guide_id
+     where s.id = $1 and s.guide_id = $2 and s.enabled = true and g.verified = true
+     limit 1`,
+    [serviceItemId, guideId],
+  );
+  const item = itemResult.rows[0];
+  if (!item) {
+    const error = new Error('service_item_not_available');
+    error.statusCode = 400;
+    throw error;
+  }
+  const tags = Array.isArray(item.guide_tags) ? item.guide_tags.map((tag) => tag?.toString()) : [];
+  if (!tags.includes(item.service_type || item.name)) {
+    const error = new Error('service_item_not_in_guide_profile');
+    error.statusCode = 400;
+    throw error;
+  }
+  const endDate = new Date(date.getTime() + hours * 60 * 60 * 1000);
+  if (dateOnly(endDate) !== dateOnly(date)) {
+    const error = new Error('service_cannot_cross_midnight');
+    error.statusCode = 400;
+    throw error;
+  }
+  const availability = await client.query(
+    `select 1 from public.guide_availability
+     where guide_id = $1 and is_available = true
+       and start_time <= $3::time and end_time >= $4::time
+       and (
+         (coalesce(recurrence_type, 'exact') = 'exact' and (service_date = $2::date or date_start = $2::date))
+         or (coalesce(recurrence_type, 'exact') = 'daily' and (date_start is null or date_start <= $2::date) and (date_end is null or date_end >= $2::date))
+         or (coalesce(recurrence_type, 'exact') = 'weekly' and extract(isodow from $2::date)::int = any(weekdays) and (date_start is null or date_start <= $2::date) and (date_end is null or date_end >= $2::date))
+       ) limit 1`,
+    [guideId, dateOnly(date), timeOnly(date), timeOnly(endDate)],
+  );
+  if (!availability.rows[0]) {
+    const error = new Error('guide_not_available_at_selected_time');
+    error.statusCode = 400;
+    throw error;
+  }
+  const guideLat = toNullableNumber(item.current_lat);
+  const guideLng = toNullableNumber(item.current_lng);
+  const customerLat = toNullableNumber(serviceLat);
+  const customerLng = toNullableNumber(serviceLng);
+  const straightDistance = haversineDistanceMeters(guideLat, guideLng, customerLat, customerLng);
+  const routeDistance = straightDistance == null
+    ? null
+    : Math.round(straightDistance * config.serviceRoadDistanceMultiplier);
+  const serviceFee = Math.round(Number(item.price_per_hour) * hours * 100) / 100;
+  const travelFee = didiTravelFare(routeDistance, date);
+  const platformFee = Math.round(serviceFee * 0.4 * 100) / 100;
+  const guideIncome = Math.round((serviceFee * 0.6 + travelFee) * 100) / 100;
+  return {
+    item,
+    serviceHours: hours,
+    serviceFee,
+    travelFee,
+    platformFee,
+    guideIncome,
+    totalAmount: Math.round((serviceFee + travelFee) * 100) / 100,
+    guideServiceLat: guideLat,
+    guideServiceLng: guideLng,
+    routeDistanceMeters: routeDistance,
+  };
+}
+
 function withDistanceFields(row, guideLocation) {
   if (!row) return row;
   const serviceLat = toNullableNumber(row.service_lat);
@@ -914,9 +1049,9 @@ appRouter.get('/guides/:id', async (req, res) => {
         coalesce((
           select json_agg(item order by item.updated_at desc)
           from (
-            select id, name, description, price_per_hour, price_per_day, updated_at
+            select id, name, service_type, description, price_per_hour, price_per_day, updated_at
             from public.guide_service_items
-            where guide_id = g.id and enabled = true
+            where guide_id = g.id and enabled = true and price_per_hour > 0
           ) item
         ), '[]'::json) as service_items,
         coalesce((
@@ -970,9 +1105,9 @@ appRouter.get('/guides/:id', async (req, res) => {
         coalesce((
           select json_agg(item order by item.updated_at desc)
           from (
-            select id, name, description, price_per_hour, price_per_day, updated_at
+            select id, name, service_type, description, price_per_hour, price_per_day, updated_at
             from public.guide_service_items
-            where guide_id = u.id and enabled = true
+            where guide_id = u.id and enabled = true and price_per_hour > 0
           ) item
         ), '[]'::json) as service_items,
         coalesce((
@@ -2080,36 +2215,73 @@ appRouter.post('/orders', handleRoute(async (req, res) => {
   if (!guideId?.toString().trim()) {
     return fail(res, 400, 'missing guide_id');
   }
+  const serviceItemId = payload.serviceItemId ?? payload.service_item_id;
+  if (!serviceItemId?.toString().trim()) {
+    return fail(res, 400, 'missing service_item_id');
+  }
+  const serviceDate = payload.serviceDate ?? payload.service_date;
+  const serviceLat = payload.serviceLat ?? payload.service_lat;
+  const serviceLng = payload.serviceLng ?? payload.service_lng;
+  const pricing = await calculateOrderPricing(pool, {
+    guideId: guideId.toString().trim(),
+    serviceItemId: serviceItemId.toString().trim(),
+    serviceHours: payload.serviceHours ?? payload.service_hours,
+    serviceDate,
+    serviceLat,
+    serviceLng,
+  });
   const result = await pool.query(
     `
       insert into public.orders (
         user_id, guide_id, guide_name, guide_avatar, status, amount,
         service_name, service_address, service_city, service_lat, service_lng,
-        service_date, payment_method, payment_status, merchant_order_no, created_at
+        service_date, payment_method, payment_status, merchant_order_no,
+        service_item_id, service_hours, service_fee, travel_fee, platform_fee,
+        guide_income, guide_service_lat, guide_service_lng, route_distance_meters, created_at
       )
-      values ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14, now())
+      values ($1,$2,$3,$4,0,$5,$6,$7,$8,$9,$10,$11,$12,'pending',$13,
+              $14,$15,$16,$17,$18,$19,$20,$21,$22,now())
       returning *
     `,
     [
       userId,
       guideId,
-      payload.guideName ?? payload.guide_name ?? '',
-      payload.guideAvatar ?? payload.guide_avatar ?? '',
-      payload.status ?? 0,
-      payload.amount ?? 0,
-      payload.serviceName ?? payload.service_name ?? '',
+      pricing.item.guide_nickname ?? payload.guideName ?? payload.guide_name ?? '',
+      pricing.item.guide_avatar ?? payload.guideAvatar ?? payload.guide_avatar ?? '',
+      pricing.totalAmount,
+      pricing.item.service_type || pricing.item.name,
       payload.serviceAddress ?? payload.service_address ?? '',
       payload.serviceCity ?? payload.service_city ?? '',
-      toNullableNumber(payload.serviceLat ?? payload.service_lat),
-      toNullableNumber(payload.serviceLng ?? payload.service_lng),
-      payload.serviceDate ?? payload.service_date ?? null,
+      toNullableNumber(serviceLat),
+      toNullableNumber(serviceLng),
+      serviceDate,
       payload.paymentMethod ?? payload.payment_method ?? 'alipay',
-      payload.paymentStatus ?? payload.payment_status ?? 'pending',
       payload.merchantOrderNo ?? payload.merchant_order_no ?? null,
+      pricing.item.id,
+      pricing.serviceHours,
+      pricing.serviceFee,
+      pricing.travelFee,
+      pricing.platformFee,
+      pricing.guideIncome,
+      pricing.guideServiceLat,
+      pricing.guideServiceLng,
+      pricing.routeDistanceMeters,
     ],
   );
   const guideLocation = await fetchGuideLocation(pool, guideId);
-  return ok(res, { data: withDistanceFields(result.rows[0], guideLocation) });
+  return ok(res, {
+    data: {
+      ...withDistanceFields(result.rows[0], guideLocation),
+      pricing: {
+        service_fee: pricing.serviceFee,
+        travel_fee: pricing.travelFee,
+        platform_fee: pricing.platformFee,
+        guide_income: pricing.guideIncome,
+        total_amount: pricing.totalAmount,
+        route_distance_meters: pricing.routeDistanceMeters,
+      },
+    },
+  });
 }));
 
 appRouter.post('/orders/one-cent-test', handleRoute(async (req, res) => {
@@ -2240,13 +2412,14 @@ appRouter.post('/orders/:id/complete', handleRoute(async (req, res) => {
   await withTransaction(async (client) => {
     await client.query(`update public.orders set status = 2 where id = $1`, [req.params.id]);
     if (order.payment_status === 'paid') {
-      await releasePendingBalance(client, order.guide_id, Number(order.amount));
+      const guideIncome = Number(order.guide_income ?? order.amount);
+      await releasePendingBalance(client, order.guide_id, guideIncome);
       await recordWalletTransaction(client, {
         userId: order.guide_id,
         orderId: order.id,
         type: 'income_available',
-        amount: Number(order.amount),
-        actualAmount: Number(order.amount),
+        amount: guideIncome,
+        actualAmount: guideIncome,
         description: `订单完成，收入转为可提现：${order.service_name ?? '地陪服务订单'}`,
       });
     }

@@ -1,3 +1,5 @@
+import 'dart:math';
+
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:provider/provider.dart';
@@ -34,27 +36,98 @@ class _OrderCreatePageState extends State<OrderCreatePage> {
   String _paymentMethod = 'alipay';
   bool _agreed = true;
   bool _isSubmitting = false;
+  double _serviceHours = 1;
 
   List<_ServiceOption> get _selectedServices =>
       _serviceOptions.where((item) => item.count > 0).toList();
 
   double get _serviceSubtotal {
-    return _serviceOptions.fold<double>(
-      0,
-      (sum, item) => sum + item.price * item.count,
+    final selected = _selectedService;
+    return selected == null ? 0 : selected.price * _serviceHours;
+  }
+
+  _ServiceOption? get _selectedService =>
+      _serviceOptions.where((item) => item.count > 0).isEmpty
+      ? null
+      : _serviceOptions.where((item) => item.count > 0).first;
+
+  double get _estimatedTravelFee {
+    final distance = _guideDistanceMeters;
+    if (distance == null || distance <= 0) return 0;
+    final km = distance / 1000;
+    final time = _serviceDateTime.hour + _serviceDateTime.minute / 60;
+    var base = 9.4;
+    var rate = _isWeekend ? 1.44 : 1.38;
+    var minuteRate = _isWeekend ? 0.28 : 0.31;
+    if (_isWeekend) {
+      if ((time >= 0 && time < 6) || time >= 23) {
+        base = 10.2;
+        rate = 2.44;
+        minuteRate = 0.33;
+      } else if (time >= 7 && time < 9) {
+        base = 9.7;
+        rate = 1.49;
+        minuteRate = 0.42;
+      } else if (time >= 16 && time < 19) {
+        base = 10.2;
+        rate = 1.48;
+        minuteRate = 0.43;
+      } else if (time >= 20 && time < 22) {
+        base = 9.8;
+        rate = 1.44;
+        minuteRate = 0.35;
+      }
+    } else if (time < 5 || time >= 23) {
+      base = 10.2;
+      rate = 2.38;
+      minuteRate = 0.35;
+    } else if (time >= 7 && time < 9) {
+      base = 10.3;
+      rate = 1.58;
+      minuteRate = 0.47;
+    } else if (time >= 17 && time < 19) {
+      base = 9.9;
+      rate = 1.56;
+      minuteRate = 0.43;
+    }
+    final minutes = (distance / 1000 / 30 * 60).round().clamp(8, 999);
+    final longFee =
+        (km - 12).clamp(0, 12) * 0.39 +
+        (km - 24).clamp(0, 11) * 0.60 +
+        (km - 35).clamp(0, 999) * 0.68;
+    return double.parse(
+      (base +
+              (km - 3).clamp(0, 999) * rate +
+              (minutes - 8).clamp(0, 999) * minuteRate +
+              longFee)
+          .toStringAsFixed(2),
     );
   }
 
-  double get _displayAmount {
-    var total = _serviceSubtotal;
-    if (_peopleCount > 1) {
-      total += (_peopleCount - 1) * 80;
-    }
-    if (_serviceDateTime.weekday == DateTime.saturday ||
-        _serviceDateTime.weekday == DateTime.sunday) {
-      total += 60;
-    }
-    return total;
+  bool get _isWeekend =>
+      _serviceDateTime.weekday == DateTime.saturday ||
+      _serviceDateTime.weekday == DateTime.sunday;
+
+  int? get _guideDistanceMeters {
+    final lat1 = widget.guide.currentLat;
+    final lng1 = widget.guide.currentLng;
+    if (lat1 == null ||
+        lng1 == null ||
+        _serviceLat == null ||
+        _serviceLng == null)
+      return null;
+    const earthRadius = 6371000.0;
+    final dLat = (_serviceLat! - lat1) * 3.141592653589793 / 180;
+    final dLng = (_serviceLng! - lng1) * 3.141592653589793 / 180;
+    final a =
+        (sin(dLat / 2) * sin(dLat / 2)) +
+        cos(lat1 * 3.141592653589793 / 180) *
+            cos(_serviceLat! * 3.141592653589793 / 180) *
+            sin(dLng / 2) *
+            sin(dLng / 2);
+    // Match the server's conservative road-distance estimate used for fare
+    // calculation. The server remains authoritative when the order is saved.
+    return (earthRadius * 2 * atan2(sqrt(a), sqrt(1 - a)) * 1.15).round();
   }
 
   String get _serviceImageUrl {
@@ -84,37 +157,22 @@ class _OrderCreatePageState extends State<OrderCreatePage> {
   }
 
   List<_ServiceOption> _buildInitialServices() {
-    final titles = <String>[];
-    for (final tag in widget.guide.tags) {
-      final text = tag.trim();
-      if (text.isNotEmpty && !titles.contains(text)) {
-        titles.add(text);
-      }
-      if (titles.length == 4) {
-        break;
-      }
-    }
-
-    const fallbacks = ['休闲游玩', '户外运动', '公务随行', '城市漫步'];
-    for (final title in fallbacks) {
-      if (!titles.contains(title)) {
-        titles.add(title);
-      }
-      if (titles.length == 4) {
-        break;
-      }
-    }
-
-    const prices = [400.0, 400.0, 520.0, 360.0];
-    return List.generate(
-      titles.length,
-      (index) => _ServiceOption(
-        title: titles[index],
-        subtitle: _serviceSubtitleFor(titles[index]),
-        price: prices[index % prices.length],
-        count: index == 0 ? 1 : 0,
-      ),
-    );
+    return widget.guide.serviceItems
+        .map((item) {
+          final price = double.tryParse('${item['price_per_hour'] ?? 0}') ?? 0;
+          return _ServiceOption(
+            id: item['id']?.toString() ?? '',
+            title: (item['service_type'] ?? item['name'] ?? '').toString(),
+            subtitle: (item['description'] ?? '').toString(),
+            price: price,
+            count: 0,
+          );
+        })
+        .where(
+          (item) =>
+              item.id.isNotEmpty && item.title.isNotEmpty && item.price > 0,
+        )
+        .toList();
   }
 
   String _serviceSubtitleFor(String title) {
@@ -141,10 +199,9 @@ class _OrderCreatePageState extends State<OrderCreatePage> {
             result['summary']?.toString() ??
             result['address']?.toString() ??
             _selectedAddress;
-        _serviceCity =
-            result['city']?.toString().trim().isNotEmpty == true
-                ? result['city'].toString().trim()
-                : _serviceCity;
+        _serviceCity = result['city']?.toString().trim().isNotEmpty == true
+            ? result['city'].toString().trim()
+            : _serviceCity;
         _serviceLat = (result['latitude'] as num?)?.toDouble();
         _serviceLng = (result['longitude'] as num?)?.toDouble();
       });
@@ -472,7 +529,7 @@ class _OrderCreatePageState extends State<OrderCreatePage> {
       return;
     }
 
-    final amount = _displayAmount;
+    final amount = _serviceSubtotal + _estimatedTravelFee;
     if (amount <= 0) {
       ScaffoldMessenger.of(
         context,
@@ -509,6 +566,8 @@ class _OrderCreatePageState extends State<OrderCreatePage> {
         serviceCity: _serviceCity,
         serviceLat: _serviceLat,
         serviceLng: _serviceLng,
+        serviceItemId: _selectedService!.id,
+        serviceHours: _serviceHours,
         paymentMethod: _paymentMethod,
         paymentStatus: 'pending',
         merchantOrderNo:
@@ -547,9 +606,9 @@ class _OrderCreatePageState extends State<OrderCreatePage> {
 
   void _updateServiceCount(int index, int delta) {
     setState(() {
-      final current = _serviceOptions[index].count;
-      final next = current + delta;
-      _serviceOptions[index].count = next < 0 ? 0 : next;
+      for (var i = 0; i < _serviceOptions.length; i++) {
+        _serviceOptions[i].count = i == index && delta > 0 ? 1 : 0;
+      }
     });
   }
 
@@ -609,6 +668,11 @@ class _OrderCreatePageState extends State<OrderCreatePage> {
                   const SizedBox(height: 14),
                   Padding(
                     padding: const EdgeInsets.symmetric(horizontal: 16),
+                    child: _buildPricingCard(),
+                  ),
+                  const SizedBox(height: 14),
+                  Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 16),
                     child: _buildOrderNoticeButton(),
                   ),
                   const SizedBox(height: 16),
@@ -630,6 +694,20 @@ class _OrderCreatePageState extends State<OrderCreatePage> {
   }
 
   Widget _buildServiceCard() {
+    if (_serviceOptions.isEmpty) {
+      return Container(
+        width: double.infinity,
+        padding: const EdgeInsets.all(20),
+        decoration: BoxDecoration(
+          color: const Color(0xFFF7F7F2),
+          borderRadius: BorderRadius.circular(18),
+        ),
+        child: const Text(
+          '该用户未上架项目，请返回选择其他地陪。',
+          style: TextStyle(color: Color(0xFF777777)),
+        ),
+      );
+    }
     return Column(
       children: List.generate(_serviceOptions.length, (index) {
         return Padding(
@@ -709,7 +787,7 @@ class _OrderCreatePageState extends State<OrderCreatePage> {
                 TextSpan(
                   children: [
                     TextSpan(
-                      text: '¥${item.price.toStringAsFixed(0)}',
+                      text: '¥${item.price.toStringAsFixed(2)}',
                       style: const TextStyle(
                         fontSize: 24,
                         fontWeight: FontWeight.w900,
@@ -717,7 +795,7 @@ class _OrderCreatePageState extends State<OrderCreatePage> {
                       ),
                     ),
                     const TextSpan(
-                      text: ' /天',
+                      text: ' /小时',
                       style: TextStyle(
                         fontSize: 15,
                         fontWeight: FontWeight.w700,
@@ -800,6 +878,116 @@ class _OrderCreatePageState extends State<OrderCreatePage> {
             ),
           );
         },
+      ),
+    );
+  }
+
+  Widget _buildPricingCard() {
+    final serviceFee = _serviceSubtotal;
+    final travelFee = _estimatedTravelFee;
+    return Container(
+      color: Colors.white,
+      padding: const EdgeInsets.fromLTRB(16, 16, 16, 18),
+      child: Column(
+        children: [
+          Row(
+            children: [
+              const Expanded(
+                child: Text(
+                  '服务时长',
+                  style: TextStyle(fontWeight: FontWeight.w700),
+                ),
+              ),
+              DropdownButton<double>(
+                value: _serviceHours,
+                underline: const SizedBox.shrink(),
+                items: [1, 2, 3, 4, 5, 6, 8]
+                    .map(
+                      (hour) => DropdownMenuItem(
+                        value: hour.toDouble(),
+                        child: Text('$hour 小时'),
+                      ),
+                    )
+                    .toList(),
+                onChanged: _selectedService == null
+                    ? null
+                    : (value) => setState(() => _serviceHours = value ?? 1),
+              ),
+            ],
+          ),
+          const Divider(height: 18),
+          _buildPriceRow('服务费', serviceFee),
+          const SizedBox(height: 8),
+          Row(
+            children: [
+              const Expanded(
+                child: Text('路费', style: TextStyle(color: Color(0xFF666666))),
+              ),
+              InkWell(
+                onTap: _showTravelFeeRule,
+                borderRadius: BorderRadius.circular(20),
+                child: const Padding(
+                  padding: EdgeInsets.all(3),
+                  child: Icon(
+                    Icons.help_outline,
+                    size: 17,
+                    color: Color(0xFF9B9B9B),
+                  ),
+                ),
+              ),
+              const SizedBox(width: 6),
+              Text(
+                '¥${travelFee.toStringAsFixed(2)}',
+                style: const TextStyle(color: Color(0xFF666666)),
+              ),
+            ],
+          ),
+          const Divider(height: 24),
+          _buildPriceRow('应付总额', serviceFee + travelFee, strong: true),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildPriceRow(String label, double amount, {bool strong = false}) {
+    return Row(
+      children: [
+        Expanded(
+          child: Text(
+            label,
+            style: TextStyle(
+              fontWeight: strong ? FontWeight.w900 : FontWeight.w600,
+              fontSize: strong ? 17 : 14,
+            ),
+          ),
+        ),
+        Text(
+          '¥${amount.toStringAsFixed(2)}',
+          style: TextStyle(
+            fontWeight: FontWeight.w900,
+            fontSize: strong ? 21 : 15,
+            color: strong ? const Color(0xFFFF5A2D) : AppColors.textPrimary,
+          ),
+        ),
+      ],
+    );
+  }
+
+  void _showTravelFeeRule() {
+    showDialog<void>(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        title: const Text('路费如何计算'),
+        content: const Text(
+          '路费参考滴滴快车普通型计价规则，根据服务地点与地陪服务地点之间的路线距离、预计行驶时长、日期和时段计算。起步价包含 3 公里和 8 分钟，超出部分按分时段里程费、时长费及远途费计算。最终金额以提交订单时服务端核算结果为准。',
+          style: TextStyle(height: 1.55),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(dialogContext),
+            child: const Text('知道了'),
+          ),
+        ],
       ),
     );
   }
@@ -1182,12 +1370,14 @@ class _OrderCreatePageState extends State<OrderCreatePage> {
 
 class _ServiceOption {
   _ServiceOption({
+    required this.id,
     required this.title,
     required this.subtitle,
     required this.price,
     this.count = 0,
   });
 
+  final String id;
   final String title;
   final String subtitle;
   final double price;

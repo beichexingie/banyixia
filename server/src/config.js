@@ -131,6 +131,14 @@ export const config = {
     30,
     parseNumber(process.env.TRTC_HEARTBEAT_TIMEOUT_SECONDS, 45),
   ),
+  serviceTravelFeePerKm: Math.max(
+    0,
+    parseNumber(process.env.SERVICE_TRAVEL_FEE_PER_KM, 1),
+  ),
+  serviceRoadDistanceMultiplier: Math.max(
+    1,
+    parseNumber(process.env.SERVICE_ROAD_DISTANCE_MULTIPLIER, 1.15),
+  ),
 };
 
 export function hasAlipayConfig() {

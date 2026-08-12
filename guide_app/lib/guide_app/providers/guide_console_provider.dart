@@ -479,8 +479,8 @@ class GuideConsoleProvider extends ChangeNotifier {
       final stage = switch (order.status) {
         OrderStatus.pendingPayment => GuideOrderStage.pendingPayment,
         OrderStatus.inProgress => GuideOrderStage.inProgress,
-        OrderStatus.pendingReview ||
-        OrderStatus.completed => GuideOrderStage.inProgress,
+        OrderStatus.pendingReview => GuideOrderStage.inProgress,
+        OrderStatus.completed => GuideOrderStage.completed,
         OrderStatus.cancelled => GuideOrderStage.newOrder,
       };
       final primaryAction = order.status == OrderStatus.pendingReview
@@ -492,6 +492,7 @@ class GuideConsoleProvider extends ChangeNotifier {
                     ? GuideOrderAction.waitingPayment
                     : GuideOrderAction.accept,
               GuideOrderStage.inProgress => GuideOrderAction.complete,
+              GuideOrderStage.completed => GuideOrderAction.completed,
             };
       return GuideOrderCardData(
         id: order.id,
