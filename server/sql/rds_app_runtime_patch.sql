@@ -89,6 +89,23 @@ create unique index if not exists idx_users_phone
   on public.users (phone)
   where phone is not null and btrim(phone) <> '';
 
+create table if not exists public.auth_sms_codes (
+  id bigserial primary key,
+  phone text not null,
+  purpose text not null default 'login',
+  code_hash text not null,
+  expires_at timestamptz not null,
+  attempts integer not null default 0,
+  consumed_at timestamptz,
+  created_at timestamptz not null default now()
+);
+
+create index if not exists idx_auth_sms_codes_lookup
+  on public.auth_sms_codes (phone, purpose, created_at desc);
+
+create index if not exists idx_auth_sms_codes_cleanup
+  on public.auth_sms_codes (expires_at);
+
 create table if not exists public.guides (
   id uuid primary key default gen_random_uuid(),
   name text not null default '',

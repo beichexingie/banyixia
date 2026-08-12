@@ -50,7 +50,7 @@ class _PasswordChangePageState extends State<PasswordChangePage> {
       return;
     }
     try {
-      await userProvider.sendSmsCode(phone);
+      await userProvider.sendSmsCode(phone, purpose: 'reset_password');
       if (!mounted) return;
       setState(() => _codeSent = true);
       _snack('验证码已发送');

@@ -33,6 +33,7 @@ import {
   buildTrtcRoomId,
 } from '../services/trtc.js';
 import { bindAxbVirtualNumber } from '../services/virtual_number.js';
+import { hasSmsConfig, sendSmsCode } from '../services/sms.js';
 
 export const appRouter = express.Router();
 const __filename = fileURLToPath(import.meta.url);
@@ -114,6 +115,140 @@ function normalizePhone(phone) {
 
 function readWhitelistCode(phone) {
   return config.authWhitelist[phone] ?? '';
+}
+
+function normalizeSmsPurpose(value) {
+  const purpose = value?.toString().trim() || 'login';
+  if (!/^[a-z_]{1,32}$/.test(purpose)) {
+    const error = new Error('验证码用途无效');
+    error.statusCode = 400;
+    throw error;
+  }
+  return purpose;
+}
+
+function hashSmsCode(phone, purpose, code) {
+  return crypto
+    .createHash('sha256')
+    .update(`${phone}:${purpose}:${code}`)
+    .digest('hex');
+}
+
+function generateSmsCode() {
+  return crypto.randomInt(100000, 1000000).toString();
+}
+
+async function issueAuthCode(client, phone, purpose) {
+  if (config.aliyunSmsEnabled && !hasSmsConfig()) {
+    const error = new Error('阿里云短信环境变量未配置完整');
+    error.statusCode = 503;
+    throw error;
+  }
+  if (!config.aliyunSmsEnabled) {
+    if (config.authWhitelistEnabled) {
+      const whitelistCode = readWhitelistCode(phone);
+      if (!whitelistCode) {
+        const error = new Error('该手机号不在测试白名单中');
+        error.statusCode = 403;
+        throw error;
+      }
+      return whitelistCode;
+    }
+    const error = new Error('短信服务未开启');
+    error.statusCode = 503;
+    throw error;
+  }
+
+  const recent = await client.query(
+    `
+      select id
+      from public.auth_sms_codes
+      where phone = $1 and purpose = $2 and created_at > now() - interval '60 seconds'
+      order by created_at desc
+      limit 1
+    `,
+    [phone, purpose],
+  );
+  if (recent.rows.length > 0) {
+    const error = new Error('验证码发送过于频繁，请稍后再试');
+    error.statusCode = 429;
+    throw error;
+  }
+
+  const code = generateSmsCode();
+  await client.query(
+    `
+      insert into public.auth_sms_codes (phone, purpose, code_hash, expires_at)
+      values ($1, $2, $3, now() + interval '5 minutes')
+    `,
+    [phone, purpose, hashSmsCode(phone, purpose, code)],
+  );
+  try {
+    await sendSmsCode(phone, code);
+  } catch (error) {
+    await client.query(
+      `delete from public.auth_sms_codes where phone = $1 and purpose = $2 and consumed_at is null`,
+      [phone, purpose],
+    );
+    throw error;
+  }
+  return code;
+}
+
+async function verifyAuthCode(client, phone, purpose, code) {
+  if (config.aliyunSmsEnabled && !hasSmsConfig()) {
+    const error = new Error('阿里云短信环境变量未配置完整');
+    error.statusCode = 503;
+    throw error;
+  }
+  if (!config.aliyunSmsEnabled) {
+    if (!config.authWhitelistEnabled) {
+      const error = new Error('短信服务未开启');
+      error.statusCode = 503;
+      throw error;
+    }
+    const whitelistCode = readWhitelistCode(phone);
+    if (!whitelistCode) {
+      const error = new Error('该手机号不在测试白名单中');
+      error.statusCode = 403;
+      throw error;
+    }
+    if (code !== whitelistCode) {
+      const error = new Error('验证码错误');
+      error.statusCode = 400;
+      throw error;
+    }
+    return;
+  }
+
+  const result = await client.query(
+    `
+      select id, code_hash, expires_at, attempts
+      from public.auth_sms_codes
+      where phone = $1 and purpose = $2 and consumed_at is null
+      order by created_at desc
+      limit 1
+    `,
+    [phone, purpose],
+  );
+  const record = result.rows[0];
+  if (!record || new Date(record.expires_at).getTime() <= Date.now()) {
+    const error = new Error('验证码已过期，请重新获取');
+    error.statusCode = 400;
+    throw error;
+  }
+  if (Number(record.attempts ?? 0) >= 5) {
+    const error = new Error('验证码错误次数过多，请重新获取');
+    error.statusCode = 429;
+    throw error;
+  }
+  if (hashSmsCode(phone, purpose, code) !== record.code_hash) {
+    await client.query('update public.auth_sms_codes set attempts = attempts + 1 where id = $1', [record.id]);
+    const error = new Error('验证码错误');
+    error.statusCode = 400;
+    throw error;
+  }
+  await client.query('update public.auth_sms_codes set consumed_at = now() where id = $1', [record.id]);
 }
 
 function assertPasswordFormat(password) {
@@ -353,13 +488,9 @@ async function hydrateUser(client, userId) {
 
 appRouter.post('/auth/send-code', handleRoute(async (req, res) => {
   const phone = normalizePhone(req.body?.phone?.toString().trim() ?? '');
+  const purpose = normalizeSmsPurpose(req.body?.purpose);
   if (!phone) return fail(res, 400, '手机号不能为空');
-  if (config.authWhitelistEnabled) {
-    const whitelistCode = readWhitelistCode(phone);
-    if (!whitelistCode) {
-      return fail(res, 403, '该手机号不在测试白名单中');
-    }
-  }
+  await issueAuthCode(pool, phone, purpose);
   return ok(res, { message: '验证码已发送', data: { phone } });
 }));
 
@@ -369,15 +500,7 @@ appRouter.post('/auth/verify-code', handleRoute(async (req, res) => {
   if (!phone) return fail(res, 400, '手机号不能为空');
   if (!code) return fail(res, 400, '验证码不能为空');
 
-  if (config.authWhitelistEnabled) {
-    const whitelistCode = readWhitelistCode(phone);
-    if (!whitelistCode) {
-      return fail(res, 403, '该手机号不在测试白名单中');
-    }
-    if (code !== whitelistCode) {
-      return fail(res, 400, '验证码错误');
-    }
-  }
+  await verifyAuthCode(pool, phone, 'login', code);
 
   const existingUser = await findUserByPhone(pool, phone);
   const userId = existingUser?.id ?? crypto.randomUUID();
@@ -430,7 +553,7 @@ appRouter.post('/auth/reset-password', handleRoute(async (req, res) => {
   const newPassword = assertPasswordFormat(req.body?.new_password);
   if (!phone) return fail(res, 400, '手机号不能为空');
   if (!code) return fail(res, 400, '验证码不能为空');
-  assertAuthCode(phone, code);
+  await verifyAuthCode(pool, phone, 'reset_password', code);
 
   const user = await findUserByPhone(pool, phone);
   if (!user) return fail(res, 404, '该手机号尚未注册');

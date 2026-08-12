@@ -15,7 +15,7 @@ abstract class SessionService {
   ValueListenable<AppSession?> get sessionListenable;
   AppSession? get currentSession;
   Future<void> initialize();
-  Future<void> sendSmsCode(String phoneNumber);
+  Future<void> sendSmsCode(String phoneNumber, {String purpose = 'login'});
   Future<void> verifySmsCode(String phoneNumber, String smsCode);
   Future<void> loginWithPassword(String phoneNumber, String password);
   Future<void> resetPassword(
@@ -66,8 +66,14 @@ class EcsSessionService extends ValueNotifier<AppSession?>
   }
 
   @override
-  Future<void> sendSmsCode(String phoneNumber) async {
-    await _apiClient.post('/auth/send-code', body: {'phone': phoneNumber});
+  Future<void> sendSmsCode(
+    String phoneNumber, {
+    String purpose = 'login',
+  }) async {
+    await _apiClient.post(
+      '/auth/send-code',
+      body: {'phone': phoneNumber, 'purpose': purpose},
+    );
   }
 
   @override

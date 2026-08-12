@@ -53,6 +53,7 @@ class _LoginPageState extends State<LoginPage> {
     try {
       await context.read<UserProvider>().sendSmsCode(
         '${AuthConfig.defaultCountryCode}$_normalizedPhone',
+        purpose: _resetMode ? 'reset_password' : 'login',
       );
       if (!mounted) return;
       setState(() => _codeSent = true);

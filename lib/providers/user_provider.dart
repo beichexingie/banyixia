@@ -109,11 +109,14 @@ class UserProvider extends ChangeNotifier {
     notifyListeners();
   }
 
-  Future<void> sendSmsCode(String phoneNumber) async {
+  Future<void> sendSmsCode(
+    String phoneNumber, {
+    String purpose = 'login',
+  }) async {
     _isLoading = true;
     notifyListeners();
     try {
-      await _sessionService.sendSmsCode(phoneNumber);
+      await _sessionService.sendSmsCode(phoneNumber, purpose: purpose);
       _pendingPhoneNumber = phoneNumber;
     } catch (e) {
       debugPrint('sendSmsCode error: $e');
