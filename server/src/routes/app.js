@@ -2266,7 +2266,9 @@ appRouter.post('/orders/:id/review', handleRoute(async (req, res) => {
   if (!Number.isInteger(rating) || rating < 1 || rating > 5) return fail(res, 400, '评分必须是1到5分');
   if (!content) return fail(res, 400, '请填写评价内容');
   const moderation = await reviewText(content, { field: '客户评价' });
-  if (!moderation.passed || moderation.reviewStatus === 'pending') return fail(res, 400, '评价内容需要人工审核后才能发布');
+  if (!moderation.passed) {
+    return fail(res, 400, moderation.reason || '评价内容包含违规信息，请修改后再提交');
+  }
   const result = await pool.query(
     `insert into public.guide_reviews (order_id,guide_id,customer_id,rating,content,images,is_anonymous)
      values ($1,$2,$3,$4,$5,$6::text[],$7)

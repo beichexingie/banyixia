@@ -150,7 +150,7 @@ async function reviewTextByAliyun(text) {
   } catch (error) {
     if (config.aliyunContentSafetyFailOpen) {
       return {
-        action: 'review',
+        action: 'pass',
         source: 'aliyun_error_fail_open',
         labels: [error.message],
       };
@@ -180,7 +180,7 @@ async function reviewImageByAliyun(imageUrl) {
   } catch (error) {
     if (config.aliyunContentSafetyFailOpen) {
       return {
-        action: 'review',
+        action: 'pass',
         source: 'aliyun_error_fail_open',
         labels: [error.message],
       };
