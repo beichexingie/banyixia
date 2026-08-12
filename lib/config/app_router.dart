@@ -28,6 +28,7 @@ import '../pages/common/state_notice_page.dart';
 import '../models/guide.dart';
 import '../pages/profile/order_detail_page.dart';
 import '../pages/profile/edit_profile_page.dart';
+import '../pages/profile/order_review_page.dart';
 
 class AppRouter {
   final UserProvider userProvider;
@@ -104,6 +105,11 @@ class AppRouter {
         },
       ),
       GoRoute(
+        path: '/profile/orders/:id/review',
+        builder: (context, state) =>
+            OrderReviewPage(orderId: state.pathParameters['id']!),
+      ),
+      GoRoute(
         path: '/travel_plan/create',
         builder: (context, state) => const TravelPlanCreatePage(),
       ),
@@ -141,10 +147,7 @@ class AppRouter {
           } else if (extra is String) {
             address = extra;
           }
-          return LocationPickerPage(
-            initialAddress: address,
-            initialCity: city,
-          );
+          return LocationPickerPage(initialAddress: address, initialCity: city);
         },
       ),
       GoRoute(

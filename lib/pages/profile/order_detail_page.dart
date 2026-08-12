@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:go_router/go_router.dart';
 import 'package:provider/provider.dart';
 
 import '../../config/app_theme.dart';
@@ -65,7 +66,9 @@ class _OrderDetailPageState extends State<OrderDetailPage> {
                       children: [
                         Expanded(
                           child: Text(
-                            order.serviceName.isEmpty ? '地陪服务订单' : order.serviceName,
+                            order.serviceName.isEmpty
+                                ? '地陪服务订单'
+                                : order.serviceName,
                             style: const TextStyle(
                               fontSize: 18,
                               fontWeight: FontWeight.w900,
@@ -95,13 +98,19 @@ class _OrderDetailPageState extends State<OrderDetailPage> {
                     const SizedBox(height: 12),
                     Text('订单号：${order.id}'),
                     const SizedBox(height: 8),
-                    Text('地陪：${order.guideName.isEmpty ? '未命名地陪' : order.guideName}'),
+                    Text(
+                      '地陪：${order.guideName.isEmpty ? '未命名地陪' : order.guideName}',
+                    ),
                     const SizedBox(height: 8),
                     Text('金额：¥${order.amount.toStringAsFixed(2)}'),
                     const SizedBox(height: 8),
-                    Text('支付方式：${order.paymentMethod.isEmpty ? '未设置' : order.paymentMethod}'),
+                    Text(
+                      '支付方式：${order.paymentMethod.isEmpty ? '未设置' : order.paymentMethod}',
+                    ),
                     const SizedBox(height: 8),
-                    Text('支付状态：${order.paymentStatus.isEmpty ? 'pending' : order.paymentStatus}'),
+                    Text(
+                      '支付状态：${order.paymentStatus.isEmpty ? 'pending' : order.paymentStatus}',
+                    ),
                     const SizedBox(height: 8),
                     Text('创建时间：${_fmt(order.createdAt)}'),
                     if (order.serviceDate != null) ...[
@@ -165,9 +174,18 @@ class _OrderDetailPageState extends State<OrderDetailPage> {
                       ),
                     ),
                     const SizedBox(height: 12),
-                    _timeline('待支付', order.status.index >= OrderStatus.pendingPayment.index),
-                    _timeline('进行中', order.status.index >= OrderStatus.inProgress.index),
-                    _timeline('待评价', order.status.index >= OrderStatus.pendingReview.index),
+                    _timeline(
+                      '待支付',
+                      order.status.index >= OrderStatus.pendingPayment.index,
+                    ),
+                    _timeline(
+                      '进行中',
+                      order.status.index >= OrderStatus.inProgress.index,
+                    ),
+                    _timeline(
+                      '待评价',
+                      order.status.index >= OrderStatus.pendingReview.index,
+                    ),
                     _timeline('已完成', order.status == OrderStatus.completed),
                     _timeline('已取消', order.status == OrderStatus.cancelled),
                   ],
@@ -181,7 +199,10 @@ class _OrderDetailPageState extends State<OrderDetailPage> {
                     children: [
                       const Text(
                         '评价本次服务',
-                        style: TextStyle(fontSize: 16, fontWeight: FontWeight.w800),
+                        style: TextStyle(
+                          fontSize: 16,
+                          fontWeight: FontWeight.w800,
+                        ),
                       ),
                       const SizedBox(height: 6),
                       const Text(
@@ -217,7 +238,9 @@ class _OrderDetailPageState extends State<OrderDetailPage> {
   Future<void> _startVoiceCall(Order order) async {
     final messenger = ScaffoldMessenger.of(context);
     try {
-      final payload = await context.read<CallProvider>().createVoiceCall(order.id);
+      final payload = await context.read<CallProvider>().createVoiceCall(
+        order.id,
+      );
       if (!mounted) return;
       await Navigator.of(context).push(
         MaterialPageRoute<void>(
@@ -228,13 +251,15 @@ class _OrderDetailPageState extends State<OrderDetailPage> {
         ),
       );
     } catch (error) {
-      messenger.showSnackBar(
-        SnackBar(content: Text('发起语音通话失败：$error')),
-      );
+      messenger.showSnackBar(SnackBar(content: Text('发起语音通话失败：$error')));
     }
   }
 
   Future<void> _reviewOrder(Order order) async {
+    await context.push('/profile/orders/${order.id}/review');
+    if (mounted) context.read<OrderProvider>().loadOrders();
+    return;
+    /*
     var rating = 5;
     final content = TextEditingController();
     final result = await showDialog<Map<String, dynamic>>(
@@ -312,6 +337,7 @@ class _OrderDetailPageState extends State<OrderDetailPage> {
     } finally {
       if (mounted) setState(() => _reviewing = false);
     }
+    */
   }
 
   Widget _card({required Widget child}) {

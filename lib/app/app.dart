@@ -55,25 +55,41 @@ class BanyixiaApp extends StatelessWidget {
           create: (_) => CallProvider(sessionService: sessionService),
         ),
       ],
-      child: Builder(
-        builder: (context) {
-          final router = AppRouter(
-            context.read<UserProvider>(),
-            context.read<GuideProvider>(),
-          ).router;
+      child: const _AppRouterHost(),
+    );
+  }
+}
 
-          return MaterialApp.router(
-            title: AppConfig.appName,
-            debugShowCheckedModeBanner: false,
-            theme: AppTheme.lightTheme,
-            builder: (context, child) => MediaQuery.withClampedTextScaling(
-              maxScaleFactor: 1.15,
-              child: child ?? const SizedBox.shrink(),
-            ),
-            routerConfig: router,
-          );
-        },
+class _AppRouterHost extends StatefulWidget {
+  const _AppRouterHost();
+
+  @override
+  State<_AppRouterHost> createState() => _AppRouterHostState();
+}
+
+class _AppRouterHostState extends State<_AppRouterHost> {
+  late final AppRouter _appRouter;
+
+  @override
+  void initState() {
+    super.initState();
+    _appRouter = AppRouter(
+      context.read<UserProvider>(),
+      context.read<GuideProvider>(),
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return MaterialApp.router(
+      title: AppConfig.appName,
+      debugShowCheckedModeBanner: false,
+      theme: AppTheme.lightTheme,
+      builder: (context, child) => MediaQuery.withClampedTextScaling(
+        maxScaleFactor: 1.15,
+        child: child ?? const SizedBox.shrink(),
       ),
+      routerConfig: _appRouter.router,
     );
   }
 }

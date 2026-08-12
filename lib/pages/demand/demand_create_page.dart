@@ -67,11 +67,16 @@ class _DemandCreatePageState extends State<DemandCreatePage> {
   @override
   void initState() {
     super.initState();
-    _contentController.addListener(() => setState(() {}));
+    _contentController.addListener(_handleContentChanged);
+  }
+
+  void _handleContentChanged() {
+    if (mounted) setState(() {});
   }
 
   @override
   void dispose() {
+    _contentController.removeListener(_handleContentChanged);
     _titleController.dispose();
     _contentController.dispose();
     _budgetController.dispose();
@@ -607,6 +612,122 @@ class _DemandCreatePageState extends State<DemandCreatePage> {
     }
   }
 
+  Future<void> _pickBudgetRange() async {
+    final existing = _budgetController.text.trim().split(RegExp(r'[-~至到]'));
+    final minController = TextEditingController(
+      text: existing.isNotEmpty ? existing.first.trim() : '',
+    );
+    final maxController = TextEditingController(
+      text: existing.length > 1 ? existing.last.trim() : '',
+    );
+    final result = await showModalBottomSheet<Map<String, String>>(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.white,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(28)),
+      ),
+      builder: (sheetContext) {
+        final bottomInset = MediaQuery.viewInsetsOf(sheetContext).bottom;
+        return SafeArea(
+          top: false,
+          child: SingleChildScrollView(
+            padding: EdgeInsets.fromLTRB(20, 18, 20, 20 + bottomInset),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  children: [
+                    const Expanded(
+                      child: Text(
+                        '预期价格范围',
+                        style: TextStyle(
+                          fontSize: 22,
+                          fontWeight: FontWeight.w900,
+                        ),
+                      ),
+                    ),
+                    IconButton(
+                      onPressed: () => Navigator.of(sheetContext).pop(),
+                      icon: const Icon(Icons.close),
+                    ),
+                  ],
+                ),
+                const Text(
+                  '填写最低价和最高价，地陪报名时会提交自己的报价。',
+                  style: TextStyle(color: AppColors.textSecondary),
+                ),
+                const SizedBox(height: 18),
+                Row(
+                  children: [
+                    Expanded(child: _priceField(minController, '最低价')),
+                    const Padding(
+                      padding: EdgeInsets.symmetric(horizontal: 12),
+                      child: Text('至', style: TextStyle(fontSize: 16)),
+                    ),
+                    Expanded(child: _priceField(maxController, '最高价')),
+                  ],
+                ),
+                const SizedBox(height: 20),
+                SizedBox(
+                  width: double.infinity,
+                  height: 52,
+                  child: FilledButton(
+                    onPressed: () {
+                      final min = double.tryParse(minController.text.trim());
+                      final max = double.tryParse(maxController.text.trim());
+                      if (min == null || max == null || min < 0 || max < min) {
+                        ScaffoldMessenger.of(sheetContext).showSnackBar(
+                          const SnackBar(content: Text('请输入有效的价格范围')),
+                        );
+                        return;
+                      }
+                      Navigator.of(sheetContext).pop({
+                        'min': min.toStringAsFixed(2),
+                        'max': max.toStringAsFixed(2),
+                      });
+                    },
+                    child: const Text(
+                      '确定',
+                      style: TextStyle(
+                        fontSize: 17,
+                        fontWeight: FontWeight.w800,
+                      ),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        );
+      },
+    );
+    minController.dispose();
+    maxController.dispose();
+    if (!mounted || result == null) return;
+    setState(
+      () => _budgetController.text = '${result['min']} - ${result['max']}',
+    );
+  }
+
+  Widget _priceField(TextEditingController controller, String hint) {
+    return TextField(
+      controller: controller,
+      keyboardType: const TextInputType.numberWithOptions(decimal: true),
+      decoration: InputDecoration(
+        prefixText: '¥ ',
+        hintText: hint,
+        filled: true,
+        fillColor: const Color(0xFFF7F7F2),
+        border: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(14),
+          borderSide: BorderSide.none,
+        ),
+      ),
+    );
+  }
+
   Future<void> _submit() async {
     FocusScope.of(context).unfocus();
 
@@ -622,7 +743,8 @@ class _DemandCreatePageState extends State<DemandCreatePage> {
         _location.isEmpty ||
         _startAt == null ||
         _endAt == null ||
-        peopleCount <= 0) {
+        peopleCount <= 0 ||
+        budgetParts.length != 2) {
       ScaffoldMessenger.of(
         context,
       ).showSnackBar(const SnackBar(content: Text('请把标题、地点、时间和人数补全')));
@@ -1089,38 +1211,7 @@ class _DemandCreatePageState extends State<DemandCreatePage> {
             value: _budgetController.text.isEmpty
                 ? '请填写价格范围，如 300-500'
                 : _budgetController.text,
-            onTap: () async {
-              final controller = TextEditingController(
-                text: _budgetController.text,
-              );
-              final value = await showDialog<String>(
-                context: context,
-                builder: (context) => AlertDialog(
-                  title: const Text('预期价格范围'),
-                  content: TextField(
-                    controller: controller,
-                    keyboardType: const TextInputType.numberWithOptions(
-                      decimal: true,
-                    ),
-                    decoration: const InputDecoration(hintText: '例如 300-500'),
-                  ),
-                  actions: [
-                    TextButton(
-                      onPressed: () => Navigator.pop(context),
-                      child: const Text('取消'),
-                    ),
-                    FilledButton(
-                      onPressed: () =>
-                          Navigator.pop(context, controller.text.trim()),
-                      child: const Text('确定'),
-                    ),
-                  ],
-                ),
-              );
-              controller.dispose();
-              if (value != null && mounted)
-                setState(() => _budgetController.text = value);
-            },
+            onTap: _pickBudgetRange,
           ),
         ],
       ),

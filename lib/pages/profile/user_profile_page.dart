@@ -301,16 +301,17 @@ class _UserProfilePageState extends State<UserProfilePage> {
                                   ),
                                 ),
                                 if (user.isGuideApproved) _buildGuideBadge(),
-                                Text(
-                                  _displayRating() <= 0
-                                      ? '暂无评分'
-                                      : '${_displayRating().toStringAsFixed(1)}分',
-                                  style: const TextStyle(
-                                    fontSize: 22,
-                                    fontWeight: FontWeight.w800,
-                                    color: Color(0xFFF2A439),
+                                if (user.isGuideApproved)
+                                  Text(
+                                    _displayRating() <= 0
+                                        ? '暂无评分'
+                                        : '${_displayRating().toStringAsFixed(1)}分',
+                                    style: const TextStyle(
+                                      fontSize: 22,
+                                      fontWeight: FontWeight.w800,
+                                      color: Color(0xFFF2A439),
+                                    ),
                                   ),
-                                ),
                               ],
                             ),
                             const SizedBox(height: 10),
@@ -350,7 +351,10 @@ class _UserProfilePageState extends State<UserProfilePage> {
                       const SizedBox(width: 42),
                       _heroStat('${user.followCount}', '关注'),
                       const SizedBox(width: 42),
-                      _heroStat('${_guideProfile?.views ?? 0}', '接单'),
+                      if (user.isGuideApproved) ...[
+                        const SizedBox(width: 42),
+                        _heroStat('${_guideProfile?.totalOrders ?? 0}', '接单'),
+                      ],
                     ],
                   ),
                   const SizedBox(height: 20),
@@ -363,9 +367,7 @@ class _UserProfilePageState extends State<UserProfilePage> {
                           children: [
                             _heroChip('IP：${_displayCity(user)}'),
                             _heroChip(_ageLabel(user)),
-                            _heroCheckChip(
-                              user.isGuideApproved ? '已实名' : '已认证',
-                            ),
+                            if (user.isGuideApproved) _heroCheckChip('已实名'),
                           ],
                         ),
                       ),
@@ -640,10 +642,67 @@ class _UserProfilePageState extends State<UserProfilePage> {
   }
 
   Widget _buildServiceTab(User user, Guide guide) {
+    if (!user.isGuideApproved) {
+      return Column(
+        children: [
+          _buildInfoSection(
+            title: '个人简介',
+            child: Text(
+              user.bio.trim().isEmpty ? '暂未填写个人简介' : user.bio,
+              style: const TextStyle(fontSize: 15, height: 1.6),
+            ),
+          ),
+          const SizedBox(height: 12),
+          _buildInfoSection(
+            title: '基本资料',
+            child: Column(
+              children: [
+                _profileInfoRow('所在城市', _displayCity(user)),
+                _profileInfoRow(
+                  '性别',
+                  user.gender.isEmpty ? '暂未填写' : user.gender,
+                ),
+                _profileInfoRow(
+                  '职业',
+                  user.occupation.isEmpty ? '暂未填写' : user.occupation,
+                ),
+                _profileInfoRow(
+                  '学历',
+                  user.education.isEmpty ? '暂未填写' : user.education,
+                ),
+              ],
+            ),
+          ),
+        ],
+      );
+    }
     final intro = _guideIntroduction(user);
     final tags = guide.tags;
 
     return _buildPublicServiceContent(user, guide, intro, tags);
+  }
+
+  Widget _profileInfoRow(String label, String value) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 12),
+      child: Row(
+        children: [
+          SizedBox(
+            width: 72,
+            child: Text(
+              label,
+              style: const TextStyle(color: AppColors.textHint),
+            ),
+          ),
+          Expanded(
+            child: Text(
+              value,
+              style: const TextStyle(fontWeight: FontWeight.w700),
+            ),
+          ),
+        ],
+      ),
+    );
   }
 
   Widget _buildInfoSection({required String title, required Widget child}) {

@@ -1,18 +1,14 @@
 import 'dart:async';
-import 'dart:convert';
 
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
-import 'package:image_picker/image_picker.dart';
 import 'package:provider/provider.dart';
 
 import '../../config/app_theme.dart';
 import '../../models/order.dart';
-import '../../providers/user_provider.dart';
 import '../../providers/message_provider.dart';
 import '../../providers/order_provider.dart';
-import '../../services/ecs_api_client.dart';
 import '../../widgets/safety_control_panel.dart';
 
 class OrdersPage extends StatefulWidget {
@@ -131,6 +127,10 @@ class _OrdersPageState extends State<OrdersPage>
   }
 
   Future<void> _reviewOrder(Order order) async {
+    await context.push('/profile/orders/${order.id}/review');
+    if (mounted) context.read<OrderProvider>().loadOrders();
+    return;
+    /*
     var rating = 5;
     final controller = TextEditingController();
     final picker = ImagePicker();
@@ -226,6 +226,7 @@ class _OrdersPageState extends State<OrdersPage>
     } catch (error) {
       if (mounted) _showSimpleMessage('评价提交失败：$error');
     }
+    */
   }
 
   @override
