@@ -7,6 +7,7 @@ import 'package:flutter_application_1/providers/call_provider.dart';
 import 'package:provider/provider.dart';
 import 'package:flutter_application_1/pages/profile/wallet_page.dart';
 import 'package:flutter_application_1/pages/profile/edit_profile_page.dart';
+import 'package:flutter_application_1/pages/profile/password_change_page.dart';
 
 import '../bootstrap/app_bootstrap.dart';
 import '../config/app_theme.dart';
@@ -93,14 +94,17 @@ class _GuideAppBootstrapperState extends State<_GuideAppBootstrapper> {
     if (_prepared) return;
     _prepared = true;
     WidgetsBinding.instance.addPostFrameCallback((_) async {
+      if (!mounted) return;
       final userProvider = context.read<UserProvider>();
       final orderProvider = context.read<OrderProvider>();
-      await context.read<GuideConsoleProvider>().syncFromProviders(
+      final guideConsoleProvider = context.read<GuideConsoleProvider>();
+      final guideBackendProvider = context.read<GuideBackendProvider>();
+      await guideConsoleProvider.syncFromProviders(
         userProvider: userProvider,
         orderProvider: orderProvider,
       );
-      await context.read<GuideBackendProvider>().load();
-      context.read<GuideConsoleProvider>().applyRemoteSettings();
+      await guideBackendProvider.load();
+      guideConsoleProvider.applyRemoteSettings();
     });
   }
 
@@ -240,6 +244,7 @@ class _GuideMainShellState extends State<_GuideMainShell>
     super.initState();
     WidgetsBinding.instance.addObserver(this);
     WidgetsBinding.instance.addPostFrameCallback((_) async {
+      if (!mounted) return;
       final guideConsoleProvider = context.read<GuideConsoleProvider>();
       final userProvider = context.read<UserProvider>();
       final orderProvider = context.read<OrderProvider>();
@@ -304,6 +309,7 @@ class _GuideMainShellState extends State<_GuideMainShell>
         onOpenPlatformRules: _openPlatformRulesPage,
         onOpenWallet: _openWallet,
         onOpenProfileEdit: _openProfileEdit,
+        onOpenPasswordChange: _openPasswordChange,
       ),
     ];
 
@@ -445,6 +451,12 @@ class _GuideMainShellState extends State<_GuideMainShell>
     await Navigator.of(
       context,
     ).push(MaterialPageRoute(builder: (_) => const EditProfilePage()));
+  }
+
+  Future<void> _openPasswordChange() async {
+    await Navigator.of(
+      context,
+    ).push(MaterialPageRoute(builder: (_) => const PasswordChangePage()));
   }
 
   Future<void> _openRoute([GuideOrderCardData? order]) async {

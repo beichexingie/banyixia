@@ -164,6 +164,34 @@ class UserProvider extends ChangeNotifier {
     }
   }
 
+  Future<void> loginWithPassword(String phoneNumber, String password) async {
+    _isLoading = true;
+    notifyListeners();
+    try {
+      await _sessionService.loginWithPassword(phoneNumber, password);
+      final session = _sessionService.currentSession;
+      if (session != null) await _loadCurrentUser(session);
+    } finally {
+      _isLoading = false;
+      notifyListeners();
+    }
+  }
+
+  Future<void> resetPassword(
+    String phoneNumber,
+    String smsCode,
+    String newPassword,
+  ) async {
+    _isLoading = true;
+    notifyListeners();
+    try {
+      await _sessionService.resetPassword(phoneNumber, smsCode, newPassword);
+    } finally {
+      _isLoading = false;
+      notifyListeners();
+    }
+  }
+
   Future<void> logout() async {
     await _sessionService.logout();
     _user = User.guest();

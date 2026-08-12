@@ -19,8 +19,7 @@ export async function findUserByPhone(client, phone) {
     `
       select *
       from public.users
-      where phone = $1 or nickname = $1
-      order by case when phone = $1 then 0 else 1 end, created_at asc nulls last
+      where phone = $1
       limit 1
     `,
     [normalizedPhone],
@@ -32,6 +31,7 @@ export async function upsertUser(client, payload) {
   const fields = [
     'id',
     'phone',
+    'password_hash',
     'nickname',
     'avatar',
     'bio',
@@ -67,6 +67,7 @@ export async function upsertUser(client, payload) {
     values (${placeholders})
     on conflict (id) do update set
       phone = coalesce(excluded.phone, public.users.phone),
+      password_hash = coalesce(excluded.password_hash, public.users.password_hash),
       nickname = excluded.nickname,
       avatar = excluded.avatar,
       bio = excluded.bio,

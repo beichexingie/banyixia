@@ -11,6 +11,7 @@ create extension if not exists pgcrypto;
 create table if not exists public.users (
   id uuid primary key,
   phone text,
+  password_hash text,
   nickname text,
   avatar text,
   bio text,
@@ -41,6 +42,7 @@ create table if not exists public.users (
 
 alter table if exists public.users
   add column if not exists phone text,
+  add column if not exists password_hash text,
   add column if not exists nickname text,
   add column if not exists avatar text,
   add column if not exists bio text,

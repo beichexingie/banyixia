@@ -1,4 +1,3 @@
-import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:flutter_application_1/config/auth_config.dart';
@@ -14,115 +13,131 @@ class LoginPage extends StatefulWidget {
 }
 
 class _LoginPageState extends State<LoginPage> {
-  final TextEditingController _phoneController = TextEditingController();
-  final TextEditingController _smsController = TextEditingController();
-  bool _isCodeSent = false;
+  final _phone = TextEditingController();
+  final _code = TextEditingController();
+  final _password = TextEditingController();
+  final _confirmPassword = TextEditingController();
+  bool _codeSent = false;
   bool _agreed = true;
-
-  @override
-  void initState() {
-    super.initState();
-    if (kDebugMode) {
-      _phoneController.text = AuthConfig.testLoginPhone;
-      _smsController.text = AuthConfig.testLoginCode;
-    }
-  }
+  bool _passwordMode = false;
+  bool _resetMode = false;
 
   @override
   void dispose() {
-    _phoneController.dispose();
-    _smsController.dispose();
+    _phone.dispose();
+    _code.dispose();
+    _password.dispose();
+    _confirmPassword.dispose();
     super.dispose();
   }
 
+  String get _normalizedPhone {
+    final digits = _phone.text.replaceAll(RegExp(r'[^0-9]'), '');
+    return digits.startsWith('86') && digits.length == 13
+        ? digits.substring(2)
+        : digits;
+  }
+
+  bool _validPhone() {
+    if (_normalizedPhone.length == 11) return true;
+    _message('请输入有效的手机号', error: true);
+    return false;
+  }
+
+  bool _validPassword(String value) => RegExp(
+    r'^(?=.*[A-Za-z])(?=.*\d)[A-Za-z\d!@#\$%^&*._-]{8,64}$',
+  ).hasMatch(value);
+
   Future<void> _sendCode() async {
-    if (!_agreed) {
-      _showMessage('请先勾选协议');
-      return;
-    }
-
-    final phone = _normalizePhone(_phoneController.text);
-    if (phone.length != 11) {
-      _showMessage('请输入有效的手机号');
-      return;
-    }
-
+    if (!_agreed || !_validPhone()) return;
     try {
-      await context
-          .read<UserProvider>()
-          .sendSmsCode('${AuthConfig.defaultCountryCode}$phone');
+      await context.read<UserProvider>().sendSmsCode(
+        '${AuthConfig.defaultCountryCode}$_normalizedPhone',
+      );
       if (!mounted) return;
-      setState(() => _isCodeSent = true);
-      _showMessage('验证码已发送');
+      setState(() => _codeSent = true);
+      _message('验证码已发送');
     } catch (e) {
-      if (!mounted) return;
-      _showMessage('发送失败: $e', isError: true);
+      if (mounted) _message('发送失败: $e', error: true);
     }
   }
 
-  Future<void> _verifyAndLogin() async {
-    if (!_agreed) {
-      _showMessage('请先勾选协议');
-      return;
-    }
-
-    final phone = _normalizePhone(_phoneController.text);
-    if (phone.length != 11) {
-      _showMessage('请输入有效的手机号');
-      return;
-    }
-
-    final smsCode = _smsController.text.trim();
-    if (smsCode.length < AuthConfig.otpLength) {
-      _showMessage('请输入有效的验证码');
-      return;
-    }
-
+  Future<void> _submit() async {
+    if (!_agreed) return _message('请先勾选协议', error: true);
+    if (!_validPhone()) return;
+    final provider = context.read<UserProvider>();
     try {
-      final userProvider = context.read<UserProvider>();
-      if (_isCodeSent) {
-        await userProvider.verifySmsCode(smsCode);
+      if (_resetMode) {
+        if (_code.text.trim().length < AuthConfig.otpLength) {
+          return _message('请输入有效的验证码', error: true);
+        }
+        if (!_validPassword(_password.text)) {
+          return _message('密码需为8-64位，并同时包含字母和数字', error: true);
+        }
+        if (_password.text != _confirmPassword.text) {
+          return _message('两次输入的密码不一致', error: true);
+        }
+        await provider.resetPassword(
+          '${AuthConfig.defaultCountryCode}$_normalizedPhone',
+          _code.text.trim(),
+          _password.text,
+        );
+        if (!mounted) return;
+        setState(() {
+          _resetMode = false;
+          _passwordMode = true;
+          _password.clear();
+          _confirmPassword.clear();
+        });
+        _message('密码设置成功，请使用新密码登录');
+      } else if (_passwordMode) {
+        if (!_validPassword(_password.text)) {
+          return _message('密码需为8-64位，并同时包含字母和数字', error: true);
+        }
+        await provider.loginWithPassword(
+          '${AuthConfig.defaultCountryCode}$_normalizedPhone',
+          _password.text,
+        );
       } else {
-        await userProvider.verifySmsCodeForPhone(
-          '${AuthConfig.defaultCountryCode}$phone',
-          smsCode,
+        if (_code.text.trim().length < AuthConfig.otpLength) {
+          return _message('请输入有效的验证码', error: true);
+        }
+        await provider.verifySmsCodeForPhone(
+          '${AuthConfig.defaultCountryCode}$_normalizedPhone',
+          _code.text.trim(),
         );
       }
     } catch (e) {
-      if (!mounted) return;
-      _showMessage('登录失败: $e', isError: true);
+      if (mounted) _message('操作失败: $e', error: true);
     }
   }
 
-  void _fillTestAccount(String phone, String code) {
+  void _mode(bool password, {bool reset = false}) {
     setState(() {
-      _phoneController.text = phone;
-      _smsController.text = code;
-      _isCodeSent = false;
+      _passwordMode = password;
+      _resetMode = reset;
+      _codeSent = false;
+      _code.clear();
+      _password.clear();
+      _confirmPassword.clear();
     });
   }
 
-  void _showMessage(String message, {bool isError = false}) {
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text(message),
-        backgroundColor: isError ? Colors.red : null,
-      ),
-    );
-  }
-
-  String _normalizePhone(String raw) {
-    final digitsOnly = raw.replaceAll(RegExp(r'[^0-9]'), '');
-    if (digitsOnly.startsWith('86') && digitsOnly.length == 13) {
-      return digitsOnly.substring(2);
-    }
-    return digitsOnly;
-  }
+  void _message(String text, {bool error = false}) =>
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(text),
+          backgroundColor: error ? Colors.red : null,
+        ),
+      );
 
   @override
   Widget build(BuildContext context) {
-    final userProvider = context.watch<UserProvider>();
-
+    final provider = context.watch<UserProvider>();
+    final title = _resetMode ? '设置新密码' : (_passwordMode ? '密码登录' : '地陪端登录');
+    final subtitle = _resetMode
+        ? '验证手机号后设置新的登录密码'
+        : (_passwordMode ? '使用手机号和密码登录伴一下地陪端' : '使用手机号验证码登录伴一下地陪端');
     return Scaffold(
       backgroundColor: Colors.white,
       body: SafeArea(
@@ -131,10 +146,7 @@ class _LoginPageState extends State<LoginPage> {
             gradient: LinearGradient(
               begin: Alignment.topCenter,
               end: Alignment.bottomCenter,
-              colors: [
-                Color(0xFFF7FFD9),
-                Color(0xFFFFFFFF),
-              ],
+              colors: [Color(0xFFF7FFD9), Colors.white],
             ),
           ),
           child: Center(
@@ -149,7 +161,7 @@ class _LoginPageState extends State<LoginPage> {
                     borderRadius: BorderRadius.circular(28),
                     boxShadow: [
                       BoxShadow(
-                        color: Colors.black.withValues(alpha: 0.06),
+                        color: Colors.black.withValues(alpha: .06),
                         blurRadius: 30,
                         offset: const Offset(0, 10),
                       ),
@@ -168,71 +180,102 @@ class _LoginPageState extends State<LoginPage> {
                         child: const Icon(
                           Icons.support_agent_rounded,
                           size: 34,
-                          color: AppColors.textPrimary,
                         ),
                       ),
                       const SizedBox(height: 20),
-                      const Text(
-                        '地陪端登录',
-                        style: TextStyle(
+                      Text(
+                        title,
+                        style: const TextStyle(
                           fontSize: 30,
                           fontWeight: FontWeight.w900,
-                          color: AppColors.textPrimary,
                         ),
                       ),
                       const SizedBox(height: 10),
-                      const Text(
-                        '使用手机号验证码登录伴一下地陪端',
-                        style: TextStyle(
+                      Text(
+                        subtitle,
+                        style: const TextStyle(
                           fontSize: 15,
                           color: AppColors.textSecondary,
                         ),
                       ),
                       const SizedBox(height: 28),
-                      _FieldCard(
-                        child: TextField(
-                          controller: _phoneController,
+                      _field(
+                        TextField(
+                          controller: _phone,
                           keyboardType: TextInputType.phone,
                           decoration: const InputDecoration(
                             prefixText: '${AuthConfig.defaultCountryCode} ',
-                            prefixStyle: TextStyle(
-                              fontSize: 16,
-                              fontWeight: FontWeight.w700,
-                              color: AppColors.textPrimary,
-                            ),
-                            hintText: '请输入手机号',
                             border: InputBorder.none,
+                            hintText: '请输入手机号',
                           ),
                         ),
                       ),
                       const SizedBox(height: 14),
-                      _FieldCard(
-                        child: Row(
-                          children: [
-                            Expanded(
-                              child: TextField(
-                                controller: _smsController,
-                                keyboardType: TextInputType.number,
-                                decoration: const InputDecoration(
-                                  hintText: '请输入验证码',
-                                  border: InputBorder.none,
+                      if (!_passwordMode || _resetMode) ...[
+                        _field(
+                          Row(
+                            children: [
+                              Expanded(
+                                child: TextField(
+                                  controller: _code,
+                                  keyboardType: TextInputType.number,
+                                  decoration: const InputDecoration(
+                                    border: InputBorder.none,
+                                    hintText: '请输入验证码',
+                                  ),
                                 ),
                               ),
-                            ),
-                            TextButton(
-                              onPressed: userProvider.isLoading ? null : _sendCode,
-                              child: Text(_isCodeSent ? '重新获取' : '获取验证码'),
-                            ),
-                          ],
+                              TextButton(
+                                onPressed: provider.isLoading
+                                    ? null
+                                    : _sendCode,
+                                child: Text(_codeSent ? '重新获取' : '获取验证码'),
+                              ),
+                            ],
+                          ),
                         ),
-                      ),
-                      const SizedBox(height: 14),
+                        const SizedBox(height: 14),
+                      ],
+                      if (_passwordMode || _resetMode) ...[
+                        _field(
+                          TextField(
+                            controller: _password,
+                            obscureText: true,
+                            decoration: InputDecoration(
+                              border: InputBorder.none,
+                              hintText: _resetMode ? '新密码' : '请输入密码',
+                            ),
+                          ),
+                        ),
+                        if (_resetMode) ...[
+                          const SizedBox(height: 14),
+                          _field(
+                            TextField(
+                              controller: _confirmPassword,
+                              obscureText: true,
+                              decoration: const InputDecoration(
+                                border: InputBorder.none,
+                                hintText: '确认新密码',
+                              ),
+                            ),
+                          ),
+                        ],
+                        if (_passwordMode && !_resetMode)
+                          Align(
+                            alignment: Alignment.centerRight,
+                            child: TextButton(
+                              onPressed: () => _mode(true, reset: true),
+                              child: const Text('忘记密码？'),
+                            ),
+                          ),
+                      ],
                       Row(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
                           Checkbox(
                             value: _agreed,
-                            onChanged: (value) => setState(() => _agreed = value ?? false),
+                            onChanged: (value) =>
+                                setState(() => _agreed = value ?? false),
                             activeColor: AppColors.primaryDark,
                           ),
                           const Expanded(
@@ -254,7 +297,7 @@ class _LoginPageState extends State<LoginPage> {
                       SizedBox(
                         width: double.infinity,
                         child: ElevatedButton(
-                          onPressed: userProvider.isLoading ? null : _verifyAndLogin,
+                          onPressed: provider.isLoading ? null : _submit,
                           style: ElevatedButton.styleFrom(
                             backgroundColor: AppColors.primary,
                             foregroundColor: AppColors.textPrimary,
@@ -264,48 +307,39 @@ class _LoginPageState extends State<LoginPage> {
                             ),
                             elevation: 0,
                           ),
-                          child: userProvider.isLoading
+                          child: provider.isLoading
                               ? const SizedBox(
                                   width: 20,
                                   height: 20,
                                   child: CircularProgressIndicator(
                                     strokeWidth: 2,
-                                    color: AppColors.textPrimary,
                                   ),
                                 )
-                              : const Text(
-                                  '登录',
-                                  style: TextStyle(
+                              : Text(
+                                  _resetMode ? '确认设置' : '登录',
+                                  style: const TextStyle(
                                     fontSize: 18,
                                     fontWeight: FontWeight.w800,
                                   ),
                                 ),
                         ),
                       ),
-                      const SizedBox(height: 20),
-                      const Text(
-                        '调试快捷登录',
-                        style: TextStyle(
-                          fontSize: 13,
-                          fontWeight: FontWeight.w700,
-                          color: AppColors.textHint,
+                      const SizedBox(height: 14),
+                      Center(
+                        child: TextButton(
+                          onPressed: () => _mode(!_passwordMode),
+                          child: Text(
+                            _resetMode || _passwordMode ? '短信验证码登录' : '密码登录',
+                          ),
                         ),
                       ),
-                      const SizedBox(height: 10),
-                      Wrap(
-                        spacing: 10,
-                        runSpacing: 10,
-                        children: [
-                          OutlinedButton(
-                            onPressed: () => _fillTestAccount('13800138000', '123456'),
-                            child: const Text('13800138000 / 123456'),
+                      if (_resetMode)
+                        Center(
+                          child: TextButton(
+                            onPressed: () => _mode(true),
+                            child: const Text('返回密码登录'),
                           ),
-                          OutlinedButton(
-                            onPressed: () => _fillTestAccount('18860900310', '127244'),
-                            child: const Text('18860900310 / 127244'),
-                          ),
-                        ],
-                      ),
+                        ),
                     ],
                   ),
                 ),
@@ -316,22 +350,13 @@ class _LoginPageState extends State<LoginPage> {
       ),
     );
   }
-}
 
-class _FieldCard extends StatelessWidget {
-  final Widget child;
-
-  const _FieldCard({required this.child});
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
-      decoration: BoxDecoration(
-        color: const Color(0xFFF6F7F9),
-        borderRadius: BorderRadius.circular(18),
-      ),
-      child: child,
-    );
-  }
+  Widget _field(Widget child) => Container(
+    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
+    decoration: BoxDecoration(
+      color: const Color(0xFFF6F7F9),
+      borderRadius: BorderRadius.circular(18),
+    ),
+    child: child,
+  );
 }

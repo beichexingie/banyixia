@@ -15,6 +15,7 @@ class GuideProfilePage extends StatelessWidget {
   final VoidCallback onOpenPlatformRules;
   final VoidCallback onOpenWallet;
   final VoidCallback onOpenProfileEdit;
+  final VoidCallback onOpenPasswordChange;
 
   const GuideProfilePage({
     super.key,
@@ -25,6 +26,7 @@ class GuideProfilePage extends StatelessWidget {
     required this.onOpenPlatformRules,
     required this.onOpenWallet,
     required this.onOpenProfileEdit,
+    required this.onOpenPasswordChange,
   });
 
   @override
@@ -35,7 +37,9 @@ class GuideProfilePage extends StatelessWidget {
     final stats = console.stats;
     final positiveReviews = backend.reviews.where((item) {
       final value = item['rating'];
-      final rating = value is num ? value.toDouble() : double.tryParse(value?.toString() ?? '') ?? 0;
+      final rating = value is num
+          ? value.toDouble()
+          : double.tryParse(value?.toString() ?? '') ?? 0;
       return rating >= 4;
     }).length;
 
@@ -54,7 +58,7 @@ class GuideProfilePage extends StatelessWidget {
                   width: 72,
                   height: 72,
                   fit: BoxFit.cover,
-                  errorBuilder: (_, __, ___) => Container(
+                  errorBuilder: (context, error, stackTrace) => Container(
                     width: 72,
                     height: 72,
                     color: const Color(0xFFECEEF2),
@@ -69,12 +73,18 @@ class GuideProfilePage extends StatelessWidget {
                   children: [
                     Text(
                       user.nickname.isNotEmpty ? user.nickname : '地陪运营账号',
-                      style: const TextStyle(fontSize: 24, fontWeight: FontWeight.w900),
+                      style: const TextStyle(
+                        fontSize: 24,
+                        fontWeight: FontWeight.w900,
+                      ),
                     ),
                     const SizedBox(height: 6),
                     Text(
                       user.identityLabel,
-                      style: const TextStyle(fontSize: 15, color: AppColors.textSecondary),
+                      style: const TextStyle(
+                        fontSize: 15,
+                        color: AppColors.textSecondary,
+                      ),
                     ),
                     const SizedBox(height: 10),
                     Wrap(
@@ -123,6 +133,12 @@ class GuideProfilePage extends StatelessWidget {
                 ),
                 const Divider(height: 1),
                 _ProfileRow(
+                  icon: Icons.lock_outline,
+                  title: '修改密码',
+                  onTap: onOpenPasswordChange,
+                ),
+                const Divider(height: 1),
+                _ProfileRow(
                   icon: Icons.settings_outlined,
                   title: '接单设置',
                   onTap: onOpenDutySettings,
@@ -164,7 +180,9 @@ class GuideProfilePage extends StatelessWidget {
                 foregroundColor: const Color(0xFFE85B47),
                 elevation: 0,
                 padding: const EdgeInsets.symmetric(vertical: 18),
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(24),
+                ),
               ),
               child: const Text(
                 '退出当前账号',
@@ -182,10 +200,7 @@ class _ProfileStat extends StatelessWidget {
   final String label;
   final String value;
 
-  const _ProfileStat({
-    required this.label,
-    required this.value,
-  });
+  const _ProfileStat({required this.label, required this.value});
 
   @override
   Widget build(BuildContext context) {
@@ -229,7 +244,10 @@ class _ProfileRow extends StatelessWidget {
             Expanded(
               child: Text(
                 title,
-                style: const TextStyle(fontSize: 17, fontWeight: FontWeight.w700),
+                style: const TextStyle(
+                  fontSize: 17,
+                  fontWeight: FontWeight.w700,
+                ),
               ),
             ),
             const Icon(Icons.chevron_right_rounded),

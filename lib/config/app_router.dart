@@ -10,6 +10,7 @@ import '../pages/profile/settings_page.dart';
 import '../pages/travel_plan/travel_plan_create_page.dart';
 import '../pages/profile/notification_settings_page.dart';
 import '../pages/profile/security_settings_page.dart';
+import '../pages/profile/password_change_page.dart';
 import '../pages/profile/wallet_page.dart';
 import '../pages/profile/help_feedback_page.dart';
 import '../pages/profile/coupons_page.dart';
@@ -73,6 +74,10 @@ class AppRouter {
       GoRoute(
         path: '/settings/security',
         builder: (context, state) => const SecuritySettingsPage(),
+      ),
+      GoRoute(
+        path: '/settings/password',
+        builder: (context, state) => const PasswordChangePage(),
       ),
       GoRoute(
         path: '/settings/help',

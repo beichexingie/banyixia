@@ -116,6 +116,46 @@ function readWhitelistCode(phone) {
   return config.authWhitelist[phone] ?? '';
 }
 
+function assertPasswordFormat(password) {
+  const value = password?.toString() ?? '';
+  if (!/^(?=.*[A-Za-z])(?=.*\d)[A-Za-z\d!@#$%^&*._-]{8,64}$/.test(value)) {
+    const error = new Error('密码需为8-64位，并同时包含字母和数字');
+    error.statusCode = 400;
+    throw error;
+  }
+  return value;
+}
+
+function hashPassword(password) {
+  const salt = crypto.randomBytes(16).toString('hex');
+  const hash = crypto.scryptSync(password, salt, 64).toString('hex');
+  return `scrypt$${salt}$${hash}`;
+}
+
+function verifyPassword(password, storedHash) {
+  const [algorithm, salt, expectedHex] = (storedHash ?? '').split('$');
+  if (algorithm !== 'scrypt' || !salt || !expectedHex) return false;
+  const actual = crypto.scryptSync(password, salt, 64);
+  const expected = Buffer.from(expectedHex, 'hex');
+  return actual.length === expected.length && crypto.timingSafeEqual(actual, expected);
+}
+
+function assertAuthCode(phone, code) {
+  if (config.authWhitelistEnabled) {
+    const whitelistCode = readWhitelistCode(phone);
+    if (!whitelistCode) {
+      const error = new Error('该手机号不在测试白名单中');
+      error.statusCode = 403;
+      throw error;
+    }
+    if (code !== whitelistCode) {
+      const error = new Error('验证码错误');
+      error.statusCode = 400;
+      throw error;
+    }
+  }
+}
+
 function sanitizeFilenamePart(value, fallback = 'file') {
   const normalized = value?.toString().trim() ?? '';
   const safe = normalized.replace(/[^0-9A-Za-z._-]/g, '_');
@@ -366,6 +406,39 @@ appRouter.post('/auth/verify-code', handleRoute(async (req, res) => {
     });
   }
   return ok(res, { message: '登录成功', session });
+}));
+
+appRouter.post('/auth/login-password', handleRoute(async (req, res) => {
+  const phone = normalizePhone(req.body?.phone?.toString().trim() ?? '');
+  const password = req.body?.password?.toString() ?? '';
+  if (!phone) return fail(res, 400, '手机号不能为空');
+  if (!password) return fail(res, 400, '密码不能为空');
+
+  const user = await findUserByPhone(pool, phone);
+  if (!user?.password_hash || !verifyPassword(password, user.password_hash)) {
+    return fail(res, 401, '手机号或密码错误');
+  }
+  return ok(res, {
+    message: '登录成功',
+    session: { access_token: user.id, user_id: user.id },
+  });
+}));
+
+appRouter.post('/auth/reset-password', handleRoute(async (req, res) => {
+  const phone = normalizePhone(req.body?.phone?.toString().trim() ?? '');
+  const code = req.body?.code?.toString().trim() ?? '';
+  const newPassword = assertPasswordFormat(req.body?.new_password);
+  if (!phone) return fail(res, 400, '手机号不能为空');
+  if (!code) return fail(res, 400, '验证码不能为空');
+  assertAuthCode(phone, code);
+
+  const user = await findUserByPhone(pool, phone);
+  if (!user) return fail(res, 404, '该手机号尚未注册');
+  await pool.query(
+    'update public.users set password_hash = $1 where id = $2',
+    [hashPassword(newPassword), user.id],
+  );
+  return ok(res, { message: '密码已重置' });
 }));
 
 appRouter.post('/auth/logout', async (_req, res) => {

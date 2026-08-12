@@ -8,11 +8,7 @@ class AppSession {
   final String? phone;
   final String? accessToken;
 
-  const AppSession({
-    required this.userId,
-    this.phone,
-    this.accessToken,
-  });
+  const AppSession({required this.userId, this.phone, this.accessToken});
 }
 
 abstract class SessionService {
@@ -21,6 +17,12 @@ abstract class SessionService {
   Future<void> initialize();
   Future<void> sendSmsCode(String phoneNumber);
   Future<void> verifySmsCode(String phoneNumber, String smsCode);
+  Future<void> loginWithPassword(String phoneNumber, String password);
+  Future<void> resetPassword(
+    String phoneNumber,
+    String smsCode,
+    String newPassword,
+  );
   Future<void> logout();
 }
 
@@ -34,8 +36,8 @@ class EcsSessionService extends ValueNotifier<AppSession?>
   SharedPreferences? _prefs;
 
   EcsSessionService({EcsApiClient? apiClient})
-      : _apiClient = apiClient ?? EcsApiClient(),
-        super(null);
+    : _apiClient = apiClient ?? EcsApiClient(),
+      super(null);
 
   @override
   AppSession? get currentSession => value;
@@ -89,6 +91,51 @@ class EcsSessionService extends ValueNotifier<AppSession?>
     await prefs.setString(_sessionUserIdKey, userId);
     await prefs.setString(_sessionPhoneKey, phoneNumber);
     value = AppSession(userId: userId, phone: phoneNumber, accessToken: token);
+  }
+
+  Future<void> _saveSession(
+    Map<String, dynamic> session,
+    String phoneNumber,
+  ) async {
+    final token = session['access_token']?.toString() ?? '';
+    final userId = session['user_id']?.toString() ?? '';
+    if (token.isEmpty || userId.isEmpty) {
+      throw EcsApiException(500, '登录失败');
+    }
+    final prefs = await _getPrefs();
+    await prefs.setString(_sessionTokenKey, token);
+    await prefs.setString(_sessionUserIdKey, userId);
+    await prefs.setString(_sessionPhoneKey, phoneNumber);
+    value = AppSession(userId: userId, phone: phoneNumber, accessToken: token);
+  }
+
+  @override
+  Future<void> loginWithPassword(String phoneNumber, String password) async {
+    final result = await _apiClient.post(
+      '/auth/login-password',
+      body: {'phone': phoneNumber, 'password': password},
+    );
+    final session = result['session'];
+    if (session is! Map<String, dynamic>) {
+      throw EcsApiException(500, '登录失败');
+    }
+    await _saveSession(session, phoneNumber);
+  }
+
+  @override
+  Future<void> resetPassword(
+    String phoneNumber,
+    String smsCode,
+    String newPassword,
+  ) async {
+    await _apiClient.post(
+      '/auth/reset-password',
+      body: {
+        'phone': phoneNumber,
+        'code': smsCode,
+        'new_password': newPassword,
+      },
+    );
   }
 
   @override
