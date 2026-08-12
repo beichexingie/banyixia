@@ -280,7 +280,7 @@ class _OrderCreatePageState extends State<OrderCreatePage> {
       context,
       initialStart: _serviceDateTime,
       initialEnd: _serviceDateTime.add(Duration(hours: _serviceHours.round())),
-      minHours: _serviceHours.round(),
+      minHours: 1,
       title: '选择服务时间',
       subtitle: '只能选择地陪已设置的接单时段，按住时间格拖动选择',
       isSlotAvailable: _guideSlotAvailable,
@@ -940,6 +940,8 @@ class _OrderCreatePageState extends State<OrderCreatePage> {
   Widget _buildPricingCard() {
     final serviceFee = _serviceSubtotal;
     final travelFee = _estimatedTravelFee;
+    final hourOptions = <double>{1, 2, 3, 4, 5, 6, 8, _serviceHours}.toList()
+      ..sort();
     return Container(
       color: Colors.white,
       padding: const EdgeInsets.fromLTRB(16, 16, 16, 18),
@@ -956,11 +958,11 @@ class _OrderCreatePageState extends State<OrderCreatePage> {
               DropdownButton<double>(
                 value: _serviceHours,
                 underline: const SizedBox.shrink(),
-                items: [1, 2, 3, 4, 5, 6, 8]
+                items: hourOptions
                     .map(
                       (hour) => DropdownMenuItem(
                         value: hour.toDouble(),
-                        child: Text('$hour 小时'),
+                        child: Text('${hour.toStringAsFixed(0)} 小时'),
                       ),
                     )
                     .toList(),
