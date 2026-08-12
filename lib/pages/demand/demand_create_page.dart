@@ -9,6 +9,7 @@ import '../../config/app_theme.dart';
 import '../../providers/demand_provider.dart';
 import '../../providers/user_provider.dart';
 import '../../services/ecs_api_client.dart';
+import '../../widgets/time_range_picker.dart';
 
 class DemandCreatePage extends StatefulWidget {
   const DemandCreatePage({super.key});
@@ -273,19 +274,7 @@ class _DemandCreatePageState extends State<DemandCreatePage> {
     }
   }
 
-  Future<void> _pickTimeRange() async {
-    final now = DateTime.now();
-    final initialDate = _startAt ?? now.add(const Duration(days: 1));
-    DateTime selectedDate = DateTime(
-      initialDate.year,
-      initialDate.month,
-      initialDate.day,
-    );
-    DateTime? tempStart = _startAt;
-    DateTime? tempEnd = _endAt;
-    const minHours = 3;
-    final hours = List.generate(18, (i) => 6 + i);
-
+  /* Legacy time-range sheet replaced by the shared draggable picker.
     final result = await showModalBottomSheet<Map<String, DateTime>>(
       context: context,
       isScrollControlled: true,
@@ -608,6 +597,24 @@ class _DemandCreatePageState extends State<DemandCreatePage> {
       setState(() {
         _startAt = result['start'];
         _endAt = result['end'];
+      });
+    }
+  }
+
+    */
+  Future<void> _pickTimeRange() async {
+    final result = await showAppTimeRangePicker(
+      context,
+      initialStart: _startAt,
+      initialEnd: _endAt,
+      minHours: 3,
+      title: '预约服务时间',
+      subtitle: '按住时间格拖动选择连续时段，至少 3 小时',
+    );
+    if (result != null && mounted) {
+      setState(() {
+        _startAt = result.start;
+        _endAt = result.end;
       });
     }
   }

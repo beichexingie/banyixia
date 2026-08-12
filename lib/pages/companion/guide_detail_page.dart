@@ -504,9 +504,7 @@ class _GuideDetailPageState extends State<GuideDetailPage> {
           Expanded(
             child: ElevatedButton(
               onPressed: () {
-                context.push(
-                  '/order/create?guideId=${guide.id}&name=${Uri.encodeComponent(guide.name)}&avatar=${Uri.encodeComponent(guide.avatar)}',
-                );
+                context.push('/order/create?guideId=${guide.id}', extra: guide);
               },
               style: ElevatedButton.styleFrom(
                 backgroundColor: AppColors.primary,

@@ -964,7 +964,25 @@ appRouter.get('/guides', async (_req, res) => {
         u.service_description,
         u.extra_fee_description,
         coalesce((select count(*) from public.orders o where o.guide_id = g.id), 0)::int as total_orders,
-        coalesce((select avg(r.rating) / 5.0 * 100 from public.guide_reviews r where r.guide_id = g.id), 0)::double precision as good_rate
+        coalesce((select avg(r.rating) / 5.0 * 100 from public.guide_reviews r where r.guide_id = g.id), 0)::double precision as good_rate,
+        coalesce((
+          select json_agg(item order by item.updated_at desc)
+          from (
+            select id, name, service_type, description, price_per_hour, price_per_day, updated_at
+            from public.guide_service_items
+            where guide_id = g.id and enabled = true and price_per_hour > 0
+          ) item
+        ), '[]'::json) as service_items,
+        coalesce((
+          select json_agg(schedule order by schedule.date_start, schedule.start_time)
+          from (
+            select id, service_date, date_start, date_end, start_time, end_time,
+              recurrence_type, weekdays, is_available
+            from public.guide_availability
+            where guide_id = g.id and is_available = true
+              and (service_date >= current_date or date_end >= current_date or date_end is null)
+          ) schedule
+        ), '[]'::json) as availability
       from public.guides g
       left join public.users u on u.id = g.id
       where g.verified = true
@@ -1054,6 +1072,16 @@ appRouter.get('/guides/:id', async (req, res) => {
             where guide_id = g.id and enabled = true and price_per_hour > 0
           ) item
         ), '[]'::json) as service_items,
+        coalesce((
+          select json_agg(schedule order by schedule.date_start, schedule.start_time)
+          from (
+            select id, service_date, date_start, date_end, start_time, end_time,
+              recurrence_type, weekdays, is_available
+            from public.guide_availability
+            where guide_id = g.id and is_available = true
+              and (service_date >= current_date or date_end >= current_date or date_end is null)
+          ) schedule
+        ), '[]'::json) as availability,
         coalesce((
           select json_agg(review order by review.created_at desc)
           from (

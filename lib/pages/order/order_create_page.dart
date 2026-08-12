@@ -9,6 +9,7 @@ import '../../models/guide.dart';
 import '../../models/order.dart';
 import '../../providers/order_provider.dart';
 import '../../providers/user_provider.dart';
+import '../../widgets/time_range_picker.dart';
 
 class OrderCreatePage extends StatefulWidget {
   final Guide guide;
@@ -208,34 +209,88 @@ class _OrderCreatePageState extends State<OrderCreatePage> {
     }
   }
 
-  Future<void> _pickTime() async {
-    final pickedDate = await showDatePicker(
-      context: context,
-      initialDate: _serviceDateTime,
-      firstDate: DateTime.now(),
-      lastDate: DateTime.now().add(const Duration(days: 90)),
-    );
-    if (pickedDate == null || !mounted) {
-      return;
-    }
-
-    final pickedTime = await showTimePicker(
-      context: context,
-      initialTime: TimeOfDay.fromDateTime(_serviceDateTime),
-    );
-    if (pickedTime == null || !mounted) {
-      return;
-    }
-
-    setState(() {
-      _serviceDateTime = DateTime(
-        pickedDate.year,
-        pickedDate.month,
-        pickedDate.day,
-        pickedTime.hour,
-        pickedTime.minute,
+  bool _guideSlotAvailable(DateTime slot) {
+    final dateOnly = DateTime(slot.year, slot.month, slot.day);
+    final slotMinutes = slot.hour * 60 + slot.minute;
+    for (final rule in widget.guide.availability) {
+      if (rule['is_available'] == false) continue;
+      final startDate = DateTime.tryParse(
+        rule['date_start']?.toString() ??
+            rule['service_date']?.toString() ??
+            '',
       );
-    });
+      final endDate = DateTime.tryParse(
+        rule['date_end']?.toString() ?? rule['service_date']?.toString() ?? '',
+      );
+      final type = rule['recurrence_type']?.toString() ?? 'exact';
+      final inDateRange =
+          startDate == null ||
+          (dateOnly.isAfter(
+                DateTime(
+                  startDate.year,
+                  startDate.month,
+                  startDate.day,
+                ).subtract(const Duration(days: 1)),
+              ) &&
+              (endDate == null ||
+                  dateOnly.isBefore(
+                    DateTime(
+                      endDate.year,
+                      endDate.month,
+                      endDate.day,
+                    ).add(const Duration(days: 1)),
+                  )));
+      if (!inDateRange) continue;
+      if (type == 'weekly') {
+        final weekdays =
+            (rule['weekdays'] as List?)
+                ?.map((item) => int.tryParse(item.toString()))
+                .whereType<int>()
+                .toSet() ??
+            const <int>{};
+        if (!weekdays.contains(dateOnly.weekday)) continue;
+      } else if (type == 'exact' &&
+          startDate != null &&
+          DateTime(startDate.year, startDate.month, startDate.day) !=
+              dateOnly) {
+        continue;
+      }
+      int? parseMinutes(dynamic value) {
+        final parts = value?.toString().split(':') ?? const <String>[];
+        if (parts.length < 2) return null;
+        final hour = int.tryParse(parts[0]);
+        final minute = int.tryParse(parts[1]);
+        return hour == null || minute == null ? null : hour * 60 + minute;
+      }
+
+      final startMinutes = parseMinutes(rule['start_time']);
+      final endMinutes = parseMinutes(rule['end_time']);
+      if (startMinutes != null &&
+          endMinutes != null &&
+          slotMinutes >= startMinutes &&
+          slotMinutes < endMinutes) {
+        return true;
+      }
+    }
+    return false;
+  }
+
+  Future<void> _pickTime() async {
+    final result = await showAppTimeRangePicker(
+      context,
+      initialStart: _serviceDateTime,
+      initialEnd: _serviceDateTime.add(Duration(hours: _serviceHours.round())),
+      minHours: _serviceHours.round(),
+      title: '选择服务时间',
+      subtitle: '只能选择地陪已设置的接单时段，按住时间格拖动选择',
+      isSlotAvailable: _guideSlotAvailable,
+    );
+    if (result != null && mounted) {
+      setState(() {
+        _serviceDateTime = result.start;
+        _serviceHours = result.hours.toDouble();
+      });
+    }
   }
 
   void _pickPeopleAndGender() {

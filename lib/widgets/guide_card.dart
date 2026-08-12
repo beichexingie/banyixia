@@ -28,7 +28,13 @@ class GuideCard extends StatelessWidget {
           color: Colors.white,
           borderRadius: BorderRadius.circular(12),
           border: Border.all(color: AppColors.divider.withValues(alpha: 0.5)),
-          boxShadow: [BoxShadow(color: Colors.black.withValues(alpha: 0.02), blurRadius: 4, offset: const Offset(0, 2))],
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withValues(alpha: 0.02),
+              blurRadius: 4,
+              offset: const Offset(0, 2),
+            ),
+          ],
         ),
         child: Row(
           crossAxisAlignment: CrossAxisAlignment.start,
@@ -40,14 +46,25 @@ class GuideCard extends StatelessWidget {
                   borderRadius: BorderRadius.circular(8),
                   child: CachedNetworkImage(
                     // 默认显示相册里的第一张作为大图，如果没有则显示头像
-                    imageUrl: guide.images.isNotEmpty ? guide.images[0] : guide.avatar, 
-                    width: 100, 
-                    height: 130, 
+                    imageUrl: guide.images.isNotEmpty
+                        ? guide.images[0]
+                        : guide.avatar,
+                    width: 100,
+                    height: 130,
                     fit: BoxFit.cover,
-                    placeholder: (context, url) => Container(width: 100, height: 130, color: AppColors.tagBackground),
+                    placeholder: (context, url) => Container(
+                      width: 100,
+                      height: 130,
+                      color: AppColors.tagBackground,
+                    ),
                     errorWidget: (context, url, error) => Container(
-                      width: 100, height: 130, color: AppColors.tagBackground,
-                      child: const Icon(Icons.broken_image, color: AppColors.textHint),
+                      width: 100,
+                      height: 130,
+                      color: AppColors.tagBackground,
+                      child: const Icon(
+                        Icons.broken_image,
+                        color: AppColors.textHint,
+                      ),
                     ),
                   ),
                 ),
@@ -55,7 +72,10 @@ class GuideCard extends StatelessWidget {
                   bottom: 6,
                   left: 6,
                   child: Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 6,
+                      vertical: 2,
+                    ),
                     decoration: BoxDecoration(
                       color: const Color(0xFF4CAF50),
                       borderRadius: BorderRadius.circular(10),
@@ -63,9 +83,23 @@ class GuideCard extends StatelessWidget {
                     child: Row(
                       mainAxisSize: MainAxisSize.min,
                       children: [
-                        Container(width: 4, height: 4, decoration: const BoxDecoration(color: Colors.white, shape: BoxShape.circle)),
+                        Container(
+                          width: 4,
+                          height: 4,
+                          decoration: const BoxDecoration(
+                            color: Colors.white,
+                            shape: BoxShape.circle,
+                          ),
+                        ),
                         const SizedBox(width: 4),
-                        const Text('今天来过', style: TextStyle(color: Colors.white, fontSize: 10, fontWeight: FontWeight.bold)),
+                        const Text(
+                          '今天来过',
+                          style: TextStyle(
+                            color: Colors.white,
+                            fontSize: 10,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
                       ],
                     ),
                   ),
@@ -85,8 +119,12 @@ class GuideCard extends StatelessWidget {
                       children: [
                         ClipOval(
                           child: CachedNetworkImage(
-                            imageUrl: guide.avatar, width: 20, height: 20, fit: BoxFit.cover,
-                            errorWidget: (context, url, error) => const Icon(Icons.person, size: 20),
+                            imageUrl: guide.avatar,
+                            width: 20,
+                            height: 20,
+                            fit: BoxFit.cover,
+                            errorWidget: (context, url, error) =>
+                                const Icon(Icons.person, size: 20),
                           ),
                         ),
                         const SizedBox(width: 6),
@@ -94,17 +132,42 @@ class GuideCard extends StatelessWidget {
                           child: Text(
                             guide.name,
                             overflow: TextOverflow.ellipsis,
-                            style: const TextStyle(fontSize: 15, fontWeight: FontWeight.bold, color: AppColors.textPrimary),
+                            style: const TextStyle(
+                              fontSize: 15,
+                              fontWeight: FontWeight.bold,
+                              color: AppColors.textPrimary,
+                            ),
                           ),
                         ),
                         const SizedBox(width: 4),
                         // 树形徽章 (这里先用park代替UI中的绿色图标)
-                        const Icon(Icons.park, size: 14, color: Color(0xFF4CAF50)),
+                        const Icon(
+                          Icons.park,
+                          size: 14,
+                          color: Color(0xFF4CAF50),
+                        ),
                         const SizedBox(width: 6),
-                        const Icon(Icons.star, size: 14, color: AppColors.starColor),
-                        Text('${guide.rating}分', style: const TextStyle(fontSize: 12, color: AppColors.starColor, fontWeight: FontWeight.bold)),
+                        const Icon(
+                          Icons.star,
+                          size: 14,
+                          color: AppColors.starColor,
+                        ),
+                        Text(
+                          '${guide.rating}分',
+                          style: const TextStyle(
+                            fontSize: 12,
+                            color: AppColors.starColor,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
                         const Spacer(),
-                        const Text('查看全部> ', style: TextStyle(fontSize: 10, color: AppColors.textHint)),
+                        const Text(
+                          '查看全部> ',
+                          style: TextStyle(
+                            fontSize: 10,
+                            color: AppColors.textHint,
+                          ),
+                        ),
                       ],
                     ),
                     const SizedBox(height: 8),
@@ -113,15 +176,21 @@ class GuideCard extends StatelessWidget {
                       guide.description,
                       maxLines: 2,
                       overflow: TextOverflow.ellipsis,
-                      style: const TextStyle(fontSize: 13, color: AppColors.textSecondary, height: 1.4),
+                      style: const TextStyle(
+                        fontSize: 13,
+                        color: AppColors.textSecondary,
+                        height: 1.4,
+                      ),
                     ),
                     const Spacer(), // 占据剩余空间
                     // 底部互动数据 & 去下单
                     Consumer<GuideProvider>(
                       builder: (context, provider, child) {
                         final isLiked = provider.likedIds.contains(guide.id);
-                        final isFavorited = provider.favoriteIds.contains(guide.id);
-                        
+                        final isFavorited = provider.favoriteIds.contains(
+                          guide.id,
+                        );
+
                         return Row(
                           children: [
                             // 互动数据区域
@@ -133,35 +202,67 @@ class GuideCard extends StatelessWidget {
                                   mainAxisSize: MainAxisSize.min,
                                   children: [
                                     GestureDetector(
-                                      onTap: () => provider.toggleLike(guide.id),
+                                      onTap: () =>
+                                          provider.toggleLike(guide.id),
                                       child: Row(
                                         children: [
                                           Icon(
-                                            isLiked ? Icons.favorite : Icons.favorite_border, 
-                                            size: 14, 
-                                            color: isLiked ? Colors.red : AppColors.textHint
+                                            isLiked
+                                                ? Icons.favorite
+                                                : Icons.favorite_border,
+                                            size: 14,
+                                            color: isLiked
+                                                ? Colors.red
+                                                : AppColors.textHint,
                                           ),
                                           const SizedBox(width: 2),
-                                          Text('${guide.likes + (isLiked ? 1 : 0)}', style: const TextStyle(fontSize: 10, color: AppColors.textHint)),
+                                          Text(
+                                            '${guide.likes + (isLiked ? 1 : 0)}',
+                                            style: const TextStyle(
+                                              fontSize: 10,
+                                              color: AppColors.textHint,
+                                            ),
+                                          ),
                                         ],
                                       ),
                                     ),
                                     const SizedBox(width: 8),
-                                    const Icon(Icons.chat_bubble_outline, size: 14, color: AppColors.textHint),
+                                    const Icon(
+                                      Icons.chat_bubble_outline,
+                                      size: 14,
+                                      color: AppColors.textHint,
+                                    ),
                                     const SizedBox(width: 2),
-                                    const Text('11', style: TextStyle(fontSize: 10, color: AppColors.textHint)),
+                                    const Text(
+                                      '11',
+                                      style: TextStyle(
+                                        fontSize: 10,
+                                        color: AppColors.textHint,
+                                      ),
+                                    ),
                                     const SizedBox(width: 8),
                                     GestureDetector(
-                                      onTap: () => provider.toggleFavorite(guide.id),
+                                      onTap: () =>
+                                          provider.toggleFavorite(guide.id),
                                       child: Row(
                                         children: [
                                           Icon(
-                                            isFavorited ? Icons.star : Icons.star_border, 
-                                            size: 14, 
-                                            color: isFavorited ? Colors.amber : AppColors.textHint
+                                            isFavorited
+                                                ? Icons.star
+                                                : Icons.star_border,
+                                            size: 14,
+                                            color: isFavorited
+                                                ? Colors.amber
+                                                : AppColors.textHint,
                                           ),
                                           const SizedBox(width: 2),
-                                          Text('${guide.fans + (isFavorited ? 1 : 0)}', style: const TextStyle(fontSize: 10, color: AppColors.textHint)),
+                                          Text(
+                                            '${guide.fans + (isFavorited ? 1 : 0)}',
+                                            style: const TextStyle(
+                                              fontSize: 10,
+                                              color: AppColors.textHint,
+                                            ),
+                                          ),
                                         ],
                                       ),
                                     ),
@@ -171,14 +272,27 @@ class GuideCard extends StatelessWidget {
                             ),
                             const SizedBox(width: 8),
                             GestureDetector(
-                            onTap: () => context.push('/order/create?guideId=${guide.id}&name=${Uri.encodeComponent(guide.name)}&avatar=${Uri.encodeComponent(guide.avatar)}'),
+                              onTap: () => context.push(
+                                '/order/create?guideId=${guide.id}',
+                                extra: guide,
+                              ),
                               child: Container(
-                                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                                padding: const EdgeInsets.symmetric(
+                                  horizontal: 12,
+                                  vertical: 6,
+                                ),
                                 decoration: BoxDecoration(
                                   color: AppColors.primary,
                                   borderRadius: BorderRadius.circular(16),
                                 ),
-                                child: const Text('去下单', style: TextStyle(color: Colors.white, fontSize: 12, fontWeight: FontWeight.bold)),
+                                child: const Text(
+                                  '去下单',
+                                  style: TextStyle(
+                                    color: Colors.white,
+                                    fontSize: 12,
+                                    fontWeight: FontWeight.bold,
+                                  ),
+                                ),
                               ),
                             ),
                           ],

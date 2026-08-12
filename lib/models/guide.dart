@@ -14,6 +14,7 @@ class Guide {
   final int fans;
   final String city;
   final List<Map<String, dynamic>> serviceItems;
+  final List<Map<String, dynamic>> availability;
   final List<Map<String, dynamic>> reviews;
   final int totalOrders;
   final int completedOrders;
@@ -43,6 +44,7 @@ class Guide {
     this.fans = 0,
     this.city = '',
     this.serviceItems = const [],
+    this.availability = const [],
     this.reviews = const [],
     this.totalOrders = 0,
     this.completedOrders = 0,
@@ -74,6 +76,7 @@ class Guide {
       fans: _asInt(json['fans']),
       city: _asString(json['city']),
       serviceItems: _maps(json['service_items']),
+      availability: _maps(json['availability']),
       reviews: _maps(json['reviews']),
       totalOrders: _asInt(json['total_orders'] ?? json['totalOrders']),
       completedOrders: _asInt(
@@ -112,6 +115,7 @@ class Guide {
       'fans': fans,
       'city': city,
       'service_items': serviceItems,
+      'availability': availability,
       'reviews': reviews,
       'total_orders': totalOrders,
       'completed_orders': completedOrders,

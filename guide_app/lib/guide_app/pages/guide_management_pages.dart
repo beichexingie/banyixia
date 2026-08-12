@@ -4,6 +4,7 @@ import 'package:provider/provider.dart';
 import '../../config/app_theme.dart';
 import '../providers/guide_backend_provider.dart';
 import '../widgets/guide_app_shell.dart';
+import 'package:flutter_application_1/widgets/time_range_picker.dart';
 
 class GuideServiceManagementPage extends StatelessWidget {
   const GuideServiceManagementPage({super.key});
@@ -342,23 +343,16 @@ class GuideSchedulePage extends StatelessWidget {
     );
     if (choice == null || !context.mounted) return;
     rule = choice == 'weekdays' || choice == 'weekend' ? 'weekly' : choice;
-    final date = await showDatePicker(
-      context: context,
-      firstDate: DateTime.now(),
-      lastDate: DateTime.now().add(const Duration(days: 365)),
-      initialDate: DateTime.now(),
+    final range = await showAppTimeRangePicker(
+      context,
+      minHours: 1,
+      title: '设置接单时间',
+      subtitle: '按住时间格拖动选择连续接单时段',
     );
-    if (date == null || !context.mounted) return;
-    final start = await showTimePicker(
-      context: context,
-      initialTime: const TimeOfDay(hour: 9, minute: 0),
-    );
-    if (start == null || !context.mounted) return;
-    final end = await showTimePicker(
-      context: context,
-      initialTime: const TimeOfDay(hour: 18, minute: 0),
-    );
-    if (end == null || !context.mounted) return;
+    if (range == null || !context.mounted) return;
+    final date = range.start;
+    final start = TimeOfDay.fromDateTime(range.start);
+    final end = TimeOfDay.fromDateTime(range.end);
     String two(int value) => value.toString().padLeft(2, '0');
     final dateText = '${date.year}-${two(date.month)}-${two(date.day)}';
     final startText = '${two(start.hour)}:${two(start.minute)}';
