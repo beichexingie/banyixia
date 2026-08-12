@@ -45,6 +45,7 @@ dependencies:
   flutter_map: ^8.3.0
   latlong2: ^0.9.1
   http: ^1.2.2
+  http_parser: ^4.1.2
   alipay_payment: ^1.1.2
   tencent_rtc_sdk: ^13.4.2
   permission_handler: ^12.0.3

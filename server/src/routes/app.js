@@ -1,6 +1,7 @@
 import express from 'express';
 import crypto from 'crypto';
 import fs from 'fs/promises';
+import multer from 'multer';
 import path from 'path';
 import { fileURLToPath } from 'url';
 
@@ -39,6 +40,10 @@ export const appRouter = express.Router();
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 const uploadsDir = path.resolve(__dirname, '../../uploads');
+const reviewImageUpload = multer({
+  storage: multer.memoryStorage(),
+  limits: { fileSize: 10 * 1024 * 1024 },
+});
 
 function handleRoute(handler) {
   return async (req, res, next) => {
@@ -335,6 +340,23 @@ async function persistBase64Upload({
   const buffer = Buffer.from(bytesBase64, 'base64');
   await fs.writeFile(absolutePath, buffer);
 
+  return `/uploads/${category}/${finalName}`;
+}
+
+async function persistUploadedFile({ category, file }) {
+  if (!file?.buffer?.length) {
+    throw new Error('缺少图片文件');
+  }
+  const categoryDir = path.join(uploadsDir, category);
+  await fs.mkdir(categoryDir, { recursive: true });
+  const safeName = sanitizeFilenamePart(
+    path.basename(file.originalname ?? '', path.extname(file.originalname ?? '')),
+    category,
+  );
+  const ext = detectExtension(file.originalname, file.mimetype);
+  const finalName = `${Date.now()}_${safeName}${ext}`;
+  const absolutePath = path.join(categoryDir, finalName);
+  await fs.writeFile(absolutePath, file.buffer);
   return `/uploads/${category}/${finalName}`;
 }
 
@@ -3278,15 +3300,12 @@ appRouter.post('/uploads/demand-image', handleRoute(async (req, res) => {
   return ok(res, { data: { url: buildPublicUrl(req, relativeUrl) } });
 }));
 
-appRouter.post('/uploads/review-image', handleRoute(async (req, res) => {
+appRouter.post('/uploads/review-image', reviewImageUpload.single('file'), handleRoute(async (req, res) => {
   const userId = await requireSessionUser(req, res);
   if (!userId) return;
-  const payload = req.body ?? {};
-  const relativeUrl = await persistBase64Upload({
+  const relativeUrl = await persistUploadedFile({
     category: 'reviews',
-    filename: payload.filename ?? `review_${userId}.jpg`,
-    mimeType: payload.mime_type ?? payload.mimeType ?? 'image/jpeg',
-    bytesBase64: payload.bytes_base64 ?? payload.bytesBase64,
+    file: req.file,
   });
   return ok(res, { data: { url: buildPublicUrl(req, relativeUrl) } });
 }));

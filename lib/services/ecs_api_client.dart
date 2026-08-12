@@ -2,6 +2,7 @@ import 'dart:convert';
 
 import 'package:flutter/foundation.dart';
 import 'package:http/http.dart' as http;
+import 'package:http_parser/http_parser.dart';
 
 import '../config/app_config.dart';
 
@@ -77,6 +78,35 @@ class EcsApiClient {
       body: jsonEncode(body ?? const <String, dynamic>{}),
     );
     return _decode(response, uri);
+  }
+
+  Future<Map<String, dynamic>> uploadFile(
+    String path, {
+    required String filename,
+    required List<int> bytes,
+    String? mimeType,
+    String? authToken,
+    String fieldName = 'file',
+  }) async {
+    final uri = Uri.parse('$baseUrl$path');
+    final request = http.MultipartRequest('POST', uri)
+      ..headers.addAll(_buildHeaders(authToken: authToken, jsonBody: false))
+      ..files.add(
+        http.MultipartFile.fromBytes(
+          fieldName,
+          bytes,
+          filename: filename,
+          contentType: mimeType == null ? null : _parseMediaType(mimeType),
+        ),
+      );
+    final response = await http.Response.fromStream(await request.send());
+    return _decode(response, uri);
+  }
+
+  MediaType? _parseMediaType(String value) {
+    final parts = value.split('/');
+    if (parts.length != 2) return null;
+    return MediaType(parts[0], parts[1]);
   }
 
   Future<Map<String, dynamic>> put(

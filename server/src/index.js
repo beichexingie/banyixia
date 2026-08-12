@@ -1,5 +1,6 @@
 import cors from 'cors';
 import express from 'express';
+import multer from 'multer';
 import path from 'path';
 import { fileURLToPath } from 'url';
 
@@ -54,6 +55,16 @@ app.use('/api/guide', guideRouter);
 app.use('/api', appRouter);
 app.use('/api/payments', paymentsRouter);
 app.use('/api', paymentsRouter);
+
+app.use((error, _req, res, next) => {
+  if (error instanceof multer.MulterError && error.code === 'LIMIT_FILE_SIZE') {
+    return res.status(413).json({
+      success: false,
+      message: '图片不能超过10MB，请压缩后重试',
+    });
+  }
+  return next(error);
+});
 
 app.listen(config.port, () => {
   console.log(`yidianban server listening on port ${config.port}`);

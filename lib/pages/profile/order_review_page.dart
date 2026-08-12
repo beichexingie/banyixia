@@ -1,4 +1,3 @@
-import 'dart:convert';
 import 'dart:typed_data';
 
 import 'package:flutter/material.dart';
@@ -42,7 +41,11 @@ class _OrderReviewPageState extends State<OrderReviewPage> {
   }
 
   Future<void> _pickImages() async {
-    final picked = await _picker.pickMultiImage();
+    final picked = await _picker.pickMultiImage(
+      maxWidth: 1600,
+      maxHeight: 1600,
+      imageQuality: 82,
+    );
     if (!mounted || picked.isEmpty) return;
     setState(() => _images.addAll(picked.take(9 - _images.length)));
   }
@@ -52,13 +55,12 @@ class _OrderReviewPageState extends State<OrderReviewPage> {
     final token = context.read<UserProvider>().accessToken;
     final urls = <String>[];
     for (final file in _images) {
-      final response = await api.post(
+      final response = await api.uploadFile(
         '/uploads/review-image',
+        filename: file.name,
+        bytes: await file.readAsBytes(),
+        mimeType: file.mimeType ?? 'image/jpeg',
         authToken: token,
-        body: {
-          'filename': file.name,
-          'bytes_base64': base64Encode(await file.readAsBytes()),
-        },
       );
       final data = response['data'];
       if (data is Map<String, dynamic> && data['url'] != null) {
@@ -79,6 +81,7 @@ class _OrderReviewPageState extends State<OrderReviewPage> {
     setState(() => _submitting = true);
     try {
       final imageUrls = await _uploadImages();
+      if (!mounted) return;
       await context.read<OrderProvider>().reviewOrder(
         order.id,
         rating: _rating,
@@ -134,7 +137,7 @@ class _OrderReviewPageState extends State<OrderReviewPage> {
                   children: [
                     CircleAvatar(
                       radius: 28,
-                      backgroundImage: order!.guideAvatar.isNotEmpty
+                      backgroundImage: order.guideAvatar.isNotEmpty
                           ? NetworkImage(order.guideAvatar)
                           : null,
                       child: order.guideAvatar.isEmpty

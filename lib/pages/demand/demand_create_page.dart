@@ -613,13 +613,6 @@ class _DemandCreatePageState extends State<DemandCreatePage> {
   }
 
   Future<void> _pickBudgetRange() async {
-    final existing = _budgetController.text.trim().split(RegExp(r'[-~至到]'));
-    final minController = TextEditingController(
-      text: existing.isNotEmpty ? existing.first.trim() : '',
-    );
-    final maxController = TextEditingController(
-      text: existing.length > 1 ? existing.last.trim() : '',
-    );
     final result = await showModalBottomSheet<Map<String, String>>(
       context: context,
       isScrollControlled: true,
@@ -627,104 +620,11 @@ class _DemandCreatePageState extends State<DemandCreatePage> {
       shape: const RoundedRectangleBorder(
         borderRadius: BorderRadius.vertical(top: Radius.circular(28)),
       ),
-      builder: (sheetContext) {
-        final bottomInset = MediaQuery.viewInsetsOf(sheetContext).bottom;
-        return SafeArea(
-          top: false,
-          child: SingleChildScrollView(
-            padding: EdgeInsets.fromLTRB(20, 18, 20, 20 + bottomInset),
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Row(
-                  children: [
-                    const Expanded(
-                      child: Text(
-                        '预期价格范围',
-                        style: TextStyle(
-                          fontSize: 22,
-                          fontWeight: FontWeight.w900,
-                        ),
-                      ),
-                    ),
-                    IconButton(
-                      onPressed: () => Navigator.of(sheetContext).pop(),
-                      icon: const Icon(Icons.close),
-                    ),
-                  ],
-                ),
-                const Text(
-                  '填写最低价和最高价，地陪报名时会提交自己的报价。',
-                  style: TextStyle(color: AppColors.textSecondary),
-                ),
-                const SizedBox(height: 18),
-                Row(
-                  children: [
-                    Expanded(child: _priceField(minController, '最低价')),
-                    const Padding(
-                      padding: EdgeInsets.symmetric(horizontal: 12),
-                      child: Text('至', style: TextStyle(fontSize: 16)),
-                    ),
-                    Expanded(child: _priceField(maxController, '最高价')),
-                  ],
-                ),
-                const SizedBox(height: 20),
-                SizedBox(
-                  width: double.infinity,
-                  height: 52,
-                  child: FilledButton(
-                    onPressed: () {
-                      final min = double.tryParse(minController.text.trim());
-                      final max = double.tryParse(maxController.text.trim());
-                      if (min == null || max == null || min < 0 || max < min) {
-                        ScaffoldMessenger.of(sheetContext).showSnackBar(
-                          const SnackBar(content: Text('请输入有效的价格范围')),
-                        );
-                        return;
-                      }
-                      Navigator.of(sheetContext).pop({
-                        'min': min.toStringAsFixed(2),
-                        'max': max.toStringAsFixed(2),
-                      });
-                    },
-                    child: const Text(
-                      '确定',
-                      style: TextStyle(
-                        fontSize: 17,
-                        fontWeight: FontWeight.w800,
-                      ),
-                    ),
-                  ),
-                ),
-              ],
-            ),
-          ),
-        );
-      },
+      builder: (_) => _BudgetRangeSheet(initialValue: _budgetController.text),
     );
-    minController.dispose();
-    maxController.dispose();
     if (!mounted || result == null) return;
     setState(
       () => _budgetController.text = '${result['min']} - ${result['max']}',
-    );
-  }
-
-  Widget _priceField(TextEditingController controller, String hint) {
-    return TextField(
-      controller: controller,
-      keyboardType: const TextInputType.numberWithOptions(decimal: true),
-      decoration: InputDecoration(
-        prefixText: '¥ ',
-        hintText: hint,
-        filled: true,
-        fillColor: const Color(0xFFF7F7F2),
-        border: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(14),
-          borderSide: BorderSide.none,
-        ),
-      ),
     );
   }
 
@@ -1377,5 +1277,127 @@ class _DemandCreatePageState extends State<DemandCreatePage> {
   String _formatMoment(DateTime dateTime) {
     const weekdays = ['周一', '周二', '周三', '周四', '周五', '周六', '周日'];
     return '${dateTime.year}.${dateTime.month}.${dateTime.day} ${dateTime.hour.toString().padLeft(2, '0')}:${dateTime.minute.toString().padLeft(2, '0')} ${weekdays[dateTime.weekday - 1]}';
+  }
+}
+
+class _BudgetRangeSheet extends StatefulWidget {
+  final String initialValue;
+
+  const _BudgetRangeSheet({required this.initialValue});
+
+  @override
+  State<_BudgetRangeSheet> createState() => _BudgetRangeSheetState();
+}
+
+class _BudgetRangeSheetState extends State<_BudgetRangeSheet> {
+  late final TextEditingController _minController;
+  late final TextEditingController _maxController;
+
+  @override
+  void initState() {
+    super.initState();
+    final values = widget.initialValue.trim().split(RegExp(r'[-~至到]'));
+    _minController = TextEditingController(
+      text: values.isNotEmpty ? values.first.trim() : '',
+    );
+    _maxController = TextEditingController(
+      text: values.length > 1 ? values.last.trim() : '',
+    );
+  }
+
+  @override
+  void dispose() {
+    _minController.dispose();
+    _maxController.dispose();
+    super.dispose();
+  }
+
+  void _confirm() {
+    final min = double.tryParse(_minController.text.trim());
+    final max = double.tryParse(_maxController.text.trim());
+    if (min == null || max == null || min < 0 || max < min) {
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(const SnackBar(content: Text('请输入有效的价格范围')));
+      return;
+    }
+    Navigator.of(
+      context,
+    ).pop({'min': min.toStringAsFixed(2), 'max': max.toStringAsFixed(2)});
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final bottomInset = MediaQuery.viewInsetsOf(context).bottom;
+    return SafeArea(
+      top: false,
+      child: SingleChildScrollView(
+        padding: EdgeInsets.fromLTRB(20, 18, 20, 20 + bottomInset),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                const Expanded(
+                  child: Text(
+                    '预期价格范围',
+                    style: TextStyle(fontSize: 22, fontWeight: FontWeight.w900),
+                  ),
+                ),
+                IconButton(
+                  onPressed: () => Navigator.of(context).pop(),
+                  icon: const Icon(Icons.close),
+                ),
+              ],
+            ),
+            const Text(
+              '填写最低价和最高价，地陪报名时会提交自己的报价。',
+              style: TextStyle(color: AppColors.textSecondary),
+            ),
+            const SizedBox(height: 18),
+            Row(
+              children: [
+                Expanded(child: _priceField(_minController, '最低价')),
+                const Padding(
+                  padding: EdgeInsets.symmetric(horizontal: 12),
+                  child: Text('至', style: TextStyle(fontSize: 16)),
+                ),
+                Expanded(child: _priceField(_maxController, '最高价')),
+              ],
+            ),
+            const SizedBox(height: 20),
+            SizedBox(
+              width: double.infinity,
+              height: 52,
+              child: FilledButton(
+                onPressed: _confirm,
+                child: const Text(
+                  '确定',
+                  style: TextStyle(fontSize: 17, fontWeight: FontWeight.w800),
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _priceField(TextEditingController controller, String hint) {
+    return TextField(
+      controller: controller,
+      keyboardType: const TextInputType.numberWithOptions(decimal: true),
+      decoration: InputDecoration(
+        prefixText: '¥ ',
+        hintText: hint,
+        filled: true,
+        fillColor: const Color(0xFFF7F7F2),
+        border: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(14),
+          borderSide: BorderSide.none,
+        ),
+      ),
+    );
   }
 }
