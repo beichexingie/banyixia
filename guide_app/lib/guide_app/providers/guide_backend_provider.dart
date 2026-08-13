@@ -2,6 +2,8 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter_application_1/services/ecs_api_client.dart';
 import 'package:flutter_application_1/services/session_service.dart';
 
+import '../models/guide_app_models.dart';
+
 class GuideServiceItemData {
   final String id;
   final String name;
@@ -48,6 +50,7 @@ class GuideBackendProvider extends ChangeNotifier {
   List<Map<String, dynamic>> _training = [];
   List<Map<String, dynamic>> _blockedUsers = [];
   List<Map<String, dynamic>> _supportRequests = [];
+  List<GuideAddress> _serviceAddresses = [];
   Map<String, dynamic>? _insurance;
 
   GuideBackendProvider({
@@ -68,6 +71,14 @@ class GuideBackendProvider extends ChangeNotifier {
   List<Map<String, dynamic>> get blockedUsers => _blockedUsers;
   List<Map<String, dynamic>> get supportRequests => _supportRequests;
   Map<String, dynamic>? get insurance => _insurance;
+  List<GuideAddress> get serviceAddresses =>
+      List.unmodifiable(_serviceAddresses);
+  GuideAddress? get selectedServiceAddress {
+    for (final item in _serviceAddresses) {
+      if (item.isSelected) return item;
+    }
+    return null;
+  }
 
   String? get _token => _sessionService.currentSession?.accessToken;
 
@@ -90,6 +101,13 @@ class GuideBackendProvider extends ChangeNotifier {
       _training = _list(data['training']);
       _blockedUsers = _list(data['blocked_users']);
       _supportRequests = _list(data['support_requests']);
+      _serviceAddresses = _list(data['service_locations'])
+          .map(GuideAddress.fromJson)
+          .where(
+            (item) =>
+                item.title.trim().isNotEmpty || item.detail.trim().isNotEmpty,
+          )
+          .toList();
       _insurance = data['insurance'] is Map
           ? Map<String, dynamic>.from(data['insurance'] as Map)
           : null;
@@ -196,6 +214,109 @@ class GuideBackendProvider extends ChangeNotifier {
         'location_text': locationText,
       },
     );
+    notifyListeners();
+  }
+
+  Future<GuideAddress> createServiceAddress({
+    required String label,
+    required String city,
+    required String address,
+    required double latitude,
+    required double longitude,
+    bool select = true,
+  }) async {
+    final response = await _api.post(
+      '/guide/service-locations',
+      authToken: _token,
+      body: {
+        'label': label,
+        'city': city,
+        'address': address,
+        'latitude': latitude,
+        'longitude': longitude,
+        'select': select,
+      },
+    );
+    final item = GuideAddress.fromJson(
+      Map<String, dynamic>.from(response['data'] as Map),
+    );
+    _replaceServiceAddress(item);
+    return item;
+  }
+
+  Future<GuideAddress> updateServiceAddress({
+    required String id,
+    required String label,
+    required String city,
+    required String address,
+    required double latitude,
+    required double longitude,
+  }) async {
+    final response = await _api.put(
+      '/guide/service-locations/$id',
+      authToken: _token,
+      body: {
+        'label': label,
+        'city': city,
+        'address': address,
+        'latitude': latitude,
+        'longitude': longitude,
+      },
+    );
+    final item = GuideAddress.fromJson(
+      Map<String, dynamic>.from(response['data'] as Map),
+    );
+    _replaceServiceAddress(item);
+    return item;
+  }
+
+  Future<void> selectServiceAddress(String id) async {
+    final response = await _api.post(
+      '/guide/service-locations/$id/select',
+      authToken: _token,
+    );
+    final data = response['data'];
+    if (data is List) {
+      _serviceAddresses = data
+          .whereType<Map>()
+          .map((item) => GuideAddress.fromJson(Map<String, dynamic>.from(item)))
+          .toList();
+    } else {
+      _serviceAddresses = _serviceAddresses
+          .map((item) => item.copyWith(isSelected: item.id == id))
+          .toList();
+    }
+    notifyListeners();
+  }
+
+  Future<void> deleteServiceAddress(String id) async {
+    final response = await _api.delete(
+      '/guide/service-locations/$id',
+      authToken: _token,
+    );
+    final data = response['data'];
+    if (data is List) {
+      _serviceAddresses = data
+          .whereType<Map>()
+          .map((item) => GuideAddress.fromJson(Map<String, dynamic>.from(item)))
+          .toList();
+    } else {
+      _serviceAddresses = _serviceAddresses
+          .where((item) => item.id != id)
+          .toList();
+    }
+    notifyListeners();
+  }
+
+  void _replaceServiceAddress(GuideAddress item) {
+    _serviceAddresses = [
+      item,
+      ..._serviceAddresses
+          .where((old) => old.id != item.id)
+          .map(
+            (old) => item.isSelected ? old.copyWith(isSelected: false) : old,
+          ),
+    ];
     notifyListeners();
   }
 

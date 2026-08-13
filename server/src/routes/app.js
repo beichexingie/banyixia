@@ -478,10 +478,18 @@ async function calculateOrderPricing(client, { guideId, serviceItemId, serviceHo
   }
   assertDateWindow(date, 6, 'service_date_must_be_within_7_days');
   const itemResult = await client.query(
-    `select s.*, u.nickname as guide_nickname, u.avatar as guide_avatar, u.guide_tags, g.current_lat, g.current_lng
-     from public.guide_service_items s
-     join public.users u on u.id = s.guide_id
-     join public.guides g on g.id = s.guide_id
+     `select s.*, u.nickname as guide_nickname, u.avatar as guide_avatar, u.guide_tags,
+             coalesce(loc.latitude, g.current_lat) as current_lat,
+             coalesce(loc.longitude, g.current_lng) as current_lng
+      from public.guide_service_items s
+      join public.users u on u.id = s.guide_id
+      join public.guides g on g.id = s.guide_id
+      left join lateral (
+        select latitude, longitude
+        from public.guide_service_locations
+        where guide_id = g.id and is_selected = true
+        limit 1
+      ) loc on true
      where s.id = $1 and s.guide_id = $2 and s.enabled = true and g.verified = true
      limit 1`,
     [serviceItemId, guideId],
@@ -584,11 +592,17 @@ async function fetchGuideLocation(client, guideId) {
   const result = await client.query(
     `
       select
-        current_lat,
-        current_lng,
+        coalesce(loc.latitude, g.current_lat) as current_lat,
+        coalesce(loc.longitude, g.current_lng) as current_lng,
         current_location_text,
         location_updated_at
       from public.guides
+      left join lateral (
+        select latitude, longitude
+        from public.guide_service_locations
+        where guide_id = guides.id and is_selected = true
+        limit 1
+      ) loc on true
       where id = $1
       limit 1
     `,
@@ -962,11 +976,17 @@ appRouter.delete('/users/:id/follow', async (req, res) => {
   return ok(res, { message: '取消关注成功' });
 });
 
-appRouter.get('/guides', async (_req, res) => {
+appRouter.get('/guides', async (req, res) => {
+  const customerLat = toNullableNumber(req.query?.latitude ?? req.query?.lat);
+  const customerLng = toNullableNumber(req.query?.longitude ?? req.query?.lng);
+  const sort = req.query?.sort?.toString().trim() ?? '';
   const durableGuides = await pool.query(
     `
       select
         g.*,
+        loc.latitude as selected_service_lat,
+        loc.longitude as selected_service_lng,
+        guide_distance.distance_meters,
         u.nickname as user_nickname,
         u.avatar as user_avatar,
         u.gender as user_gender,
@@ -1002,14 +1022,37 @@ appRouter.get('/guides', async (_req, res) => {
         ), '[]'::json) as availability
       from public.guides g
       left join public.users u on u.id = g.id
+      left join lateral (
+        select latitude, longitude
+        from public.guide_service_locations
+        where guide_id = g.id and is_selected = true
+        limit 1
+      ) loc on true
+      cross join lateral (
+        select case
+          when $1::double precision is null or $2::double precision is null
+            or loc.latitude is null or loc.longitude is null then null
+          else round((6371000 * 2 * asin(sqrt(
+            power(sin(radians(loc.latitude - $1) / 2), 2) +
+            cos(radians($1)) * cos(radians(loc.latitude)) *
+            power(sin(radians(loc.longitude - $2) / 2), 2)
+          )))::numeric)::int
+        end as distance_meters
+      ) guide_distance
       where g.verified = true
-      order by g.created_at desc
+      order by case when $3 = 'distance' then guide_distance.distance_meters end asc nulls last,
+        g.created_at desc
     `,
+    [customerLat, customerLng, sort],
   );
   return ok(res, {
     data: durableGuides.rows
       .filter((row) => !isLegacyAllysaGuide(row))
-      .map(mergeGuideUserFields),
+      .map((row) => mergeGuideUserFields({
+        ...row,
+        current_lat: row.selected_service_lat ?? row.current_lat,
+        current_lng: row.selected_service_lng ?? row.current_lng,
+      })),
   });
 
   /* Legacy application-table fallback removed: guides is the single source of truth.
@@ -1066,6 +1109,8 @@ appRouter.get('/guides/:id', async (req, res) => {
     `
       select
         g.*,
+        loc.latitude as selected_service_lat,
+        loc.longitude as selected_service_lng,
         u.nickname as user_nickname,
         u.avatar as user_avatar,
         u.gender as user_gender,
@@ -1110,6 +1155,12 @@ appRouter.get('/guides/:id', async (req, res) => {
         ), '[]'::json) as reviews
       from public.guides g
       left join public.users u on u.id = g.id
+      left join lateral (
+        select latitude, longitude
+        from public.guide_service_locations
+        where guide_id = g.id and is_selected = true
+        limit 1
+      ) loc on true
       where g.id = $1 and g.verified = true
       limit 1
     `,
@@ -1118,7 +1169,12 @@ appRouter.get('/guides/:id', async (req, res) => {
   if (!durableGuide.rows[0] || isLegacyAllysaGuide(durableGuide.rows[0])) {
     return fail(res, 404, 'guide not found');
   }
-  return ok(res, { data: mergeGuideUserFields(durableGuide.rows[0]) });
+  const guide = durableGuide.rows[0];
+  return ok(res, { data: mergeGuideUserFields({
+    ...guide,
+    current_lat: guide.selected_service_lat ?? guide.current_lat,
+    current_lng: guide.selected_service_lng ?? guide.current_lng,
+  }) });
 
   /* Legacy application-table fallback removed: guides is the single source of truth.
   const result = await pool.query(
@@ -3602,8 +3658,22 @@ appRouter.put('/guides/me/location', handleRoute(async (req, res) => {
   const userId = await requireSessionUser(req, res);
   if (!userId) return;
   const payload = req.body ?? {};
-  const result = await pool.query(
-    `
+  const latitude = toNullableNumber(payload.latitude ?? payload.current_lat);
+  const longitude = toNullableNumber(payload.longitude ?? payload.current_lng);
+  const locationText = payload.location_text?.toString() ?? payload.current_location_text?.toString() ?? '';
+  if (latitude == null || longitude == null) return fail(res, 400, 'guide_location_coordinates_required');
+  const client = await pool.connect();
+  let result;
+  try {
+    await client.query('begin');
+    await client.query(`update public.guide_service_locations set is_selected=false, updated_at=now() where guide_id=$1`, [userId]);
+    await client.query(
+      `insert into public.guide_service_locations (guide_id, label, city, address, latitude, longitude, is_selected)
+       values ($1, '当前服务地址', '', $2, $3, $4, true) returning *`,
+      [userId, locationText, latitude, longitude],
+    );
+    result = await client.query(
+      `
       update public.guides
       set
         current_lat = $2,
@@ -3615,14 +3685,19 @@ appRouter.put('/guides/me/location', handleRoute(async (req, res) => {
     `,
     [
       userId,
-      toNullableNumber(payload.latitude ?? payload.current_lat),
-      toNullableNumber(payload.longitude ?? payload.current_lng),
-      payload.location_text?.toString() ??
-          payload.current_location_text?.toString() ??
-          null,
+      latitude,
+      longitude,
+      locationText || null,
     ],
-  );
-  if (!result.rows[0]) {
+      );
+    await client.query('commit');
+  } catch (error) {
+    await client.query('rollback');
+    throw error;
+  } finally {
+    client.release();
+  }
+  if (!result?.rows[0]) {
     return fail(res, 404, 'guide not found');
   }
   return ok(res, {

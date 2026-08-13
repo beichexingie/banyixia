@@ -1,5 +1,3 @@
-import 'dart:convert';
-
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
@@ -19,7 +17,6 @@ class GuideConsoleProvider extends ChangeNotifier {
   static const _nearbyOnlyKey = 'guide_console_nearby_only';
   static const _enabledTypesKey = 'guide_console_types';
   static const _onlineKey = 'guide_console_online';
-  static const _addressesKeyPrefix = 'guide_console_addresses_';
 
   GuideDutyMode _mode = GuideDutyMode.nearby;
   String _selectedCity = '苏州';
@@ -30,35 +27,13 @@ class GuideConsoleProvider extends ChangeNotifier {
   Set<GuideServiceType> _enabledTypes = {GuideServiceType.localCompanion};
   int _routeTabIndex = 0;
   GuideAddress _currentLocation = const GuideAddress(
-    city: '江苏省苏州市',
-    title: '姑苏区观前街',
-    detail: '（自动定位所在城市的具体位置）',
-    contactName: '刘小林女士',
-    maskedPhone: '159****6890',
+    city: '',
+    title: '尚未设置服务地址',
+    detail: '',
+    contactName: '',
+    maskedPhone: '',
   );
-  List<GuideAddress> _serviceAddresses = const [
-    GuideAddress(
-      city: '苏州市工业园区',
-      title: '金鸡湖大酒店',
-      detail: '金鸡湖大道 122 号',
-      contactName: '刘小林女士',
-      maskedPhone: '159****6890',
-    ),
-    GuideAddress(
-      city: '苏州市工业园区',
-      title: '金鸡湖大酒店',
-      detail: '星港街 88 号',
-      contactName: '刘小林女士',
-      maskedPhone: '159****6890',
-    ),
-    GuideAddress(
-      city: '苏州市工业园区',
-      title: '金鸡湖大酒店',
-      detail: '月光码头 B2 栋',
-      contactName: '刘小林女士',
-      maskedPhone: '159****6890',
-    ),
-  ];
+  List<GuideAddress> _serviceAddresses = const [];
 
   final List<GuideServiceOption> _serviceOptions = [
     GuideServiceOption(
@@ -183,9 +158,6 @@ class GuideConsoleProvider extends ChangeNotifier {
       _refreshLoginState(userProvider.user);
       return;
     }
-    _lastUserId = userProvider.user.id.trim().isEmpty
-        ? 'guest'
-        : userProvider.user.id.trim();
     final prefs = await SharedPreferences.getInstance();
     final modeIndex = prefs.getInt(_modeKey);
     if (modeIndex != null &&
@@ -209,24 +181,6 @@ class GuideConsoleProvider extends ChangeNotifier {
         _enabledTypes = parsed;
       }
     }
-    final addressKey = _addressesKey(_lastUserId);
-    final storedAddresses = prefs.getStringList(addressKey);
-    if (storedAddresses != null) {
-      final restored = storedAddresses
-          .map((item) {
-            try {
-              return GuideAddress.fromJson(
-                jsonDecode(item) as Map<String, dynamic>,
-              );
-            } catch (_) {
-              return null;
-            }
-          })
-          .whereType<GuideAddress>()
-          .where((item) => item.title.trim().isNotEmpty)
-          .toList();
-      _serviceAddresses = restored;
-    }
     _syncEnabledTypesFromUser(userProvider.user);
     _refreshLoginState(userProvider.user);
     _isInitialized = true;
@@ -247,16 +201,27 @@ class GuideConsoleProvider extends ChangeNotifier {
 
   void applyRemoteSettings() {
     final settings = _backend?.settings;
-    if (settings == null || settings.isEmpty) return;
-    final modeName = settings['duty_mode']?.toString() ?? '';
-    for (final item in GuideDutyMode.values) {
-      if (item.name == modeName) _mode = item;
+    if (settings != null && settings.isNotEmpty) {
+      final modeName = settings['duty_mode']?.toString() ?? '';
+      for (final item in GuideDutyMode.values) {
+        if (item.name == modeName) _mode = item;
+      }
+      final city = settings['city']?.toString().trim() ?? '';
+      if (city.isNotEmpty) _selectedCity = city;
+      if (settings['online'] is bool) _isOnline = settings['online'] as bool;
+      if (settings['nearby_only'] is bool) {
+        _nearbyOnly = settings['nearby_only'] as bool;
+      }
     }
-    final city = settings['city']?.toString().trim() ?? '';
-    if (city.isNotEmpty) _selectedCity = city;
-    if (settings['online'] is bool) _isOnline = settings['online'] as bool;
-    if (settings['nearby_only'] is bool)
-      _nearbyOnly = settings['nearby_only'] as bool;
+    final remoteAddresses =
+        _backend?.serviceAddresses ?? const <GuideAddress>[];
+    if (remoteAddresses.isNotEmpty) {
+      _serviceAddresses = remoteAddresses;
+      _currentLocation = remoteAddresses.firstWhere(
+        (item) => item.isSelected,
+        orElse: () => remoteAddresses.first,
+      );
+    }
     notifyListeners();
   }
 
@@ -432,7 +397,6 @@ class GuideConsoleProvider extends ChangeNotifier {
   void addServiceAddress(GuideAddress address) {
     _serviceAddresses = [address, ..._serviceAddresses];
     notifyListeners();
-    _persistServiceAddresses();
   }
 
   void removeServiceAddress(GuideAddress address) {
@@ -440,24 +404,18 @@ class GuideConsoleProvider extends ChangeNotifier {
         .where((item) => item != address)
         .toList(growable: false);
     notifyListeners();
-    _persistServiceAddresses();
   }
 
-  String _addressesKey(String userId) {
-    final normalized = userId.trim().isEmpty ? 'guest' : userId.trim();
-    return '$_addressesKeyPrefix$normalized';
+  void replaceServiceAddresses(List<GuideAddress> addresses) {
+    _serviceAddresses = List<GuideAddress>.of(addresses);
+    final selected = _serviceAddresses.where((item) => item.isSelected);
+    if (selected.isNotEmpty) {
+      _currentLocation = selected.first;
+    } else if (_serviceAddresses.isNotEmpty) {
+      _currentLocation = _serviceAddresses.first;
+    }
+    notifyListeners();
   }
-
-  Future<void> _persistServiceAddresses() async {
-    final prefs = await SharedPreferences.getInstance();
-    // Address settings are local UI data until a server endpoint is available.
-    await prefs.setStringList(
-      _addressesKey(_lastUserId),
-      _serviceAddresses.map((item) => jsonEncode(item.toJson())).toList(),
-    );
-  }
-
-  String _lastUserId = 'guest';
 
   List<GuideOrderCardData> buildGuideOrders(
     List<Order> orders, {
@@ -612,15 +570,6 @@ class GuideConsoleProvider extends ChangeNotifier {
         .where((item) => item.guideId == userProvider.user.id)
         .toList();
     _stats = _buildStats(guideOrders);
-    final derivedAddresses = _buildServiceAddresses(guideOrders);
-    if (derivedAddresses.isNotEmpty) {
-      final existing = <String>{};
-      _serviceAddresses = [
-        ..._serviceAddresses,
-        ...derivedAddresses,
-      ].where((item) => existing.add(item.summary)).toList(growable: false);
-      await _persistServiceAddresses();
-    }
     notifyListeners();
   }
 

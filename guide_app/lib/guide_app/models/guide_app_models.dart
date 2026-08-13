@@ -346,37 +346,79 @@ class GuideWorkbenchStats {
 }
 
 class GuideAddress {
+  final String id;
   final String city;
   final String title;
   final String detail;
   final String contactName;
   final String maskedPhone;
+  final double? latitude;
+  final double? longitude;
+  final bool isSelected;
 
   const GuideAddress({
+    this.id = '',
     required this.city,
     required this.title,
     required this.detail,
     required this.contactName,
     required this.maskedPhone,
+    this.latitude,
+    this.longitude,
+    this.isSelected = false,
   });
 
   String get summary => '$city$title';
 
-  Map<String, String> toJson() => {
+  GuideAddress copyWith({
+    String? id,
+    String? city,
+    String? title,
+    String? detail,
+    String? contactName,
+    String? maskedPhone,
+    double? latitude,
+    double? longitude,
+    bool? isSelected,
+  }) {
+    return GuideAddress(
+      id: id ?? this.id,
+      city: city ?? this.city,
+      title: title ?? this.title,
+      detail: detail ?? this.detail,
+      contactName: contactName ?? this.contactName,
+      maskedPhone: maskedPhone ?? this.maskedPhone,
+      latitude: latitude ?? this.latitude,
+      longitude: longitude ?? this.longitude,
+      isSelected: isSelected ?? this.isSelected,
+    );
+  }
+
+  Map<String, dynamic> toJson() => {
+    'id': id,
     'city': city,
     'title': title,
     'detail': detail,
     'contactName': contactName,
     'maskedPhone': maskedPhone,
+    'latitude': latitude,
+    'longitude': longitude,
+    'isSelected': isSelected,
   };
 
   factory GuideAddress.fromJson(Map<String, dynamic> json) {
+    double? number(dynamic value) =>
+        value == null ? null : double.tryParse(value.toString());
     return GuideAddress(
+      id: json['id']?.toString() ?? '',
       city: json['city']?.toString() ?? '',
-      title: json['title']?.toString() ?? '',
-      detail: json['detail']?.toString() ?? '',
+      title: json['title']?.toString() ?? json['label']?.toString() ?? '',
+      detail: json['detail']?.toString() ?? json['address']?.toString() ?? '',
       contactName: json['contactName']?.toString() ?? '',
       maskedPhone: json['maskedPhone']?.toString() ?? '',
+      latitude: number(json['latitude']),
+      longitude: number(json['longitude']),
+      isSelected: json['is_selected'] == true || json['isSelected'] == true,
     );
   }
 }

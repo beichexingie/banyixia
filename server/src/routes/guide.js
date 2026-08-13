@@ -143,7 +143,7 @@ async function getTaskState(guideId) {
 guideRouter.get('/console', route(async (req, res) => {
   const guideId = await requireGuide(req, res);
   if (!guideId) return;
-  const [settings, services, availability, reviews, courses, progress, blocked, insurance, support, tasks, profile] = await Promise.all([
+  const [settings, services, availability, reviews, courses, progress, blocked, insurance, support, tasks, profile, serviceLocations] = await Promise.all([
     pool.query(`select * from public.guide_settings where user_id = $1 limit 1`, [guideId]),
     pool.query(`select * from public.guide_service_items where guide_id = $1 order by updated_at desc`, [guideId]),
     pool.query(`select * from public.guide_availability where guide_id = $1 and (service_date >= current_date - 1 or date_end >= current_date or date_end is null) order by coalesce(date_start, service_date), start_time`, [guideId]),
@@ -155,12 +155,14 @@ guideRouter.get('/console', route(async (req, res) => {
     pool.query(`select * from public.guide_support_requests where guide_id = $1 order by created_at desc limit 50`, [guideId]),
     getTaskState(guideId),
     pool.query(`select guide_tags from public.users where id = $1 limit 1`, [guideId]),
+    pool.query(`select * from public.guide_service_locations where guide_id = $1 order by is_selected desc, updated_at desc`, [guideId]),
   ]);
   const completedCourses = new Set(progress.rows.map((item) => item.course_id));
   return ok(res, {
     data: {
       settings: settings.rows[0] || null,
       guide_tags: profile.rows[0]?.guide_tags ?? [],
+      service_locations: serviceLocations.rows,
       service_items: services.rows.map(mapServiceItem),
       availability: availability.rows,
       reviews: reviews.rows.map(mapReview),
@@ -170,6 +172,180 @@ guideRouter.get('/console', route(async (req, res) => {
       insurance: insurance.rows[0] || null,
       support_requests: support.rows,
     },
+  });
+}));
+
+function mapServiceLocation(row) {
+  return {
+    ...row,
+    latitude: number(row.latitude),
+    longitude: number(row.longitude),
+    is_selected: Boolean(row.is_selected),
+  };
+}
+
+async function syncSelectedGuideLocation(client, guideId, locationId) {
+  const selected = await client.query(
+    `select * from public.guide_service_locations where id = $1 and guide_id = $2 limit 1`,
+    [locationId, guideId],
+  );
+  if (!selected.rows[0]) return null;
+  await client.query(
+    `update public.guide_service_locations set is_selected = false, updated_at = now() where guide_id = $1`,
+    [guideId],
+  );
+  const result = await client.query(
+    `update public.guide_service_locations set is_selected = true, updated_at = now() where id = $1 and guide_id = $2 returning *`,
+    [locationId, guideId],
+  );
+  const row = result.rows[0];
+  await client.query(
+    `update public.guides
+     set current_lat = $2, current_lng = $3, current_location_text = $4, city = coalesce(nullif($5, ''), city), location_updated_at = now()
+     where id = $1`,
+    [guideId, row.latitude, row.longitude, row.address, row.city || ''],
+  );
+  return mapServiceLocation(row);
+}
+
+guideRouter.get('/service-locations', route(async (req, res) => {
+  const guideId = await requireGuide(req, res);
+  if (!guideId) return;
+  const result = await pool.query(
+    `select * from public.guide_service_locations where guide_id = $1 order by is_selected desc, updated_at desc`,
+    [guideId],
+  );
+  return ok(res, { data: result.rows.map(mapServiceLocation) });
+}));
+
+guideRouter.post('/service-locations', route(async (req, res) => {
+  const guideId = await requireGuide(req, res);
+  if (!guideId) return;
+  const label = clean(req.body?.label, '服务地址');
+  const city = clean(req.body?.city);
+  const address = clean(req.body?.address);
+  const latitude = number(req.body?.latitude, NaN);
+  const longitude = number(req.body?.longitude, NaN);
+  if (!Number.isFinite(latitude) || !Number.isFinite(longitude) || !address) {
+    return fail(res, 400, 'service_location_coordinates_required');
+  }
+  const client = await pool.connect();
+  try {
+    await client.query('begin');
+    const existing = await client.query(
+      `select id from public.guide_service_locations where guide_id = $1 limit 1`,
+      [guideId],
+    );
+    const select = req.body?.select !== false || existing.rows.length === 0;
+    if (select) {
+      await client.query(
+        `update public.guide_service_locations set is_selected = false, updated_at = now() where guide_id = $1`,
+        [guideId],
+      );
+    }
+    const result = await client.query(
+      `insert into public.guide_service_locations (guide_id, label, city, address, latitude, longitude, is_selected)
+       values ($1,$2,$3,$4,$5,$6,$7) returning *`,
+      [guideId, label, city, address, latitude, longitude, select],
+    );
+    let row = result.rows[0];
+    if (select) row = await syncSelectedGuideLocation(client, guideId, row.id);
+    await client.query('commit');
+    return ok(res, { data: mapServiceLocation(row) });
+  } catch (error) {
+    await client.query('rollback');
+    throw error;
+  } finally {
+    client.release();
+  }
+}));
+
+guideRouter.put('/service-locations/:id', route(async (req, res) => {
+  const guideId = await requireGuide(req, res);
+  if (!guideId) return;
+  const latitude = number(req.body?.latitude, NaN);
+  const longitude = number(req.body?.longitude, NaN);
+  if (!Number.isFinite(latitude) || !Number.isFinite(longitude) || !clean(req.body?.address)) {
+    return fail(res, 400, 'service_location_coordinates_required');
+  }
+  const result = await pool.query(
+    `update public.guide_service_locations
+     set label = $3, city = $4, address = $5, latitude = $6, longitude = $7, updated_at = now()
+     where id = $1 and guide_id = $2 returning *`,
+    [req.params.id, guideId, clean(req.body?.label, '服务地址'), clean(req.body?.city), clean(req.body?.address), latitude, longitude],
+  );
+  if (!result.rows[0]) return fail(res, 404, 'service_location_not_found');
+  if (result.rows[0].is_selected) {
+    await pool.query(
+      `update public.guides set current_lat=$2, current_lng=$3, current_location_text=$4, city=coalesce(nullif($5,''), city), location_updated_at=now() where id=$1`,
+      [guideId, latitude, longitude, clean(req.body?.address), clean(req.body?.city)],
+    );
+  }
+  return ok(res, { data: mapServiceLocation(result.rows[0]) });
+}));
+
+guideRouter.post('/service-locations/:id/select', route(async (req, res) => {
+  const guideId = await requireGuide(req, res);
+  if (!guideId) return;
+  const client = await pool.connect();
+  try {
+    await client.query('begin');
+    await client.query('select pg_advisory_xact_lock(hashtext($1))', [guideId]);
+    const selected = await syncSelectedGuideLocation(client, guideId, req.params.id);
+    if (!selected) {
+      await client.query('rollback');
+      return fail(res, 404, 'service_location_not_found');
+    }
+    const all = await client.query(
+      `select * from public.guide_service_locations where guide_id=$1 order by is_selected desc, updated_at desc`,
+      [guideId],
+    );
+    await client.query('commit');
+    return ok(res, { data: all.rows.map(mapServiceLocation) });
+  } catch (error) {
+    await client.query('rollback');
+    throw error;
+  } finally {
+    client.release();
+  }
+}));
+
+guideRouter.delete('/service-locations/:id', route(async (req, res) => {
+  const guideId = await requireGuide(req, res);
+  if (!guideId) return;
+  const result = await pool.query(
+    `delete from public.guide_service_locations where id=$1 and guide_id=$2 returning is_selected`,
+    [req.params.id, guideId],
+  );
+  if (!result.rows[0]) return fail(res, 404, 'service_location_not_found');
+  if (result.rows[0].is_selected) {
+    const next = await pool.query(
+      `select id from public.guide_service_locations where guide_id=$1 order by updated_at desc limit 1`,
+      [guideId],
+    );
+    if (next.rows[0]) {
+      const client = await pool.connect();
+      try {
+        await client.query('begin');
+        await syncSelectedGuideLocation(client, guideId, next.rows[0].id);
+        await client.query('commit');
+      } catch (error) {
+        await client.query('rollback');
+        throw error;
+      } finally {
+        client.release();
+      }
+    } else {
+      await pool.query(`update public.guides set current_lat=null, current_lng=null, current_location_text=null, location_updated_at=now() where id=$1`, [guideId]);
+    }
+  }
+  const remaining = await pool.query(
+    `select * from public.guide_service_locations where guide_id=$1 order by is_selected desc, updated_at desc`,
+    [guideId],
+  );
+  return ok(res, {
+    message: 'service_location_deleted',
+    data: remaining.rows.map(mapServiceLocation),
   });
 }));
 

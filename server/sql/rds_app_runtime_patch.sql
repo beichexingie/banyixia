@@ -761,6 +761,47 @@ alter table if exists public.guides
   add column if not exists current_location_text text,
   add column if not exists location_updated_at timestamptz;
 
+create table if not exists public.guide_service_locations (
+  id uuid primary key default gen_random_uuid(),
+  guide_id uuid not null references public.guides(id) on delete cascade,
+  label text not null default '服务地址',
+  city text not null default '',
+  address text not null default '',
+  latitude double precision not null,
+  longitude double precision not null,
+  is_selected boolean not null default false,
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now()
+);
+
+create index if not exists idx_guide_service_locations_guide
+  on public.guide_service_locations (guide_id, is_selected desc, updated_at desc);
+
+with ranked_selected as (
+  select id,
+    row_number() over (partition by guide_id order by updated_at desc, created_at desc, id) as row_no
+  from public.guide_service_locations
+  where is_selected = true
+)
+update public.guide_service_locations l
+set is_selected = false, updated_at = now()
+from ranked_selected r
+where l.id = r.id and r.row_no > 1;
+
+create unique index if not exists idx_guide_service_locations_one_selected
+  on public.guide_service_locations (guide_id)
+  where is_selected = true;
+
+insert into public.guide_service_locations
+  (guide_id, label, city, address, latitude, longitude, is_selected)
+select id, '当前服务地址', coalesce(city, ''), coalesce(current_location_text, ''), current_lat, current_lng, true
+from public.guides
+where current_lat is not null and current_lng is not null
+  and coalesce(current_location_text, '') <> ''
+  and not exists (
+    select 1 from public.guide_service_locations l where l.guide_id = guides.id
+  );
+
 -- ---------------------------------------------------------------------------
 -- Chat / wallet tables
 -- ---------------------------------------------------------------------------
