@@ -283,7 +283,7 @@ class _GuideMainShellState extends State<_GuideMainShell>
         onOpenSettings: _openDutySettings,
         onOpenServiceOps: _openServiceOperations,
         onOpenRoute: _openRoute,
-        onOpenChat: _openMessages,
+        onOpenChat: _openSupportChat,
       ),
       GuideWorkbenchPage(
         onOpenDutySettings: _openDutySettings,
@@ -379,6 +379,30 @@ class _GuideMainShellState extends State<_GuideMainShell>
 
   void _openMessages() {
     setState(() => _currentIndex = 3);
+  }
+
+  Future<void> _openSupportChat() async {
+    try {
+      final roomId = await context.read<MessageProvider>().openCustomerService();
+      if (!mounted) return;
+      await Navigator.of(context).push(
+        MaterialPageRoute<void>(
+          builder: (_) => ChatRoomPage(
+            roomId: roomId,
+            otherUserName: '在线客服',
+            otherUserAvatar: '',
+          ),
+        ),
+      );
+      if (mounted) {
+        await context.read<MessageProvider>().loadRooms();
+      }
+    } catch (error) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('打开客服失败：$error')),
+      );
+    }
   }
 
   Future<void> _checkIncomingCalls() async {

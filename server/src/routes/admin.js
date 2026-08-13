@@ -451,10 +451,16 @@ adminRouter.post('/review/:type/:id/reject', requirePermission('review'), handle
   return updateContentReview(req, res, 'rejected');
 }));
 
-adminRouter.get('/chat/rooms', requirePermission('chat'), handleRoute(async (_req, res) => {
+adminRouter.get('/chat/rooms', requirePermission('chat'), handleRoute(async (req, res) => {
   const result = await pool.query(`
     select
       cr.*,
+      t.title as ticket_title,
+      t.status as ticket_status,
+      t.priority as ticket_priority,
+      t.human_takeover,
+      t.auto_reply_enabled,
+      t.updated_at as ticket_updated_at,
       array(
         select jsonb_build_object(
           'id', u.id,
@@ -468,18 +474,26 @@ adminRouter.get('/chat/rooms', requirePermission('chat'), handleRoute(async (_re
       coalesce((
         select count(*)
         from public.messages m
-        where m.room_id = cr.id and m.is_read = false
+        where m.room_id = cr.id and m.is_read = false and m.sender_id <> $1
       ), 0)::int as unread_count
     from public.chat_rooms cr
+    join public.customer_service_tickets t on t.room_id = cr.id
     order by cr.last_message_time desc nulls last, cr.created_at desc
     limit 80
-  `);
+  `, [req.adminUser.id]);
   return ok(res, { data: result.rows });
 }));
 
 adminRouter.get('/chat/rooms/:id', requirePermission('chat'), handleRoute(async (req, res) => {
   const room = await pool.query(
-    `select * from public.chat_rooms where id = $1 limit 1`,
+    `
+      select cr.*, t.title as ticket_title, t.status as ticket_status,
+        t.priority as ticket_priority, t.human_takeover, t.auto_reply_enabled
+      from public.chat_rooms cr
+      join public.customer_service_tickets t on t.room_id = cr.id
+      where cr.id = $1
+      limit 1
+    `,
     [req.params.id],
   );
   if (!room.rows[0]) return fail(res, 404, '会话不存在');
@@ -503,11 +517,30 @@ adminRouter.post('/chat/rooms/:id/messages', requirePermission('chat'), handleRo
   const content = req.body?.content?.toString().trim() ?? '';
   if (!content) return fail(res, 400, '消息内容不能为空');
   await assertPayloadAllowed({ content }, [{ key: 'content', label: '客服消息' }]);
+  const ticket = await pool.query(
+    `select id from public.customer_service_tickets where room_id = $1 limit 1`,
+    [req.params.id],
+  );
+  if (!ticket.rows[0]) return fail(res, 404, '该会话不是客服工单');
   const result = await pool.query(
     `
       insert into public.messages (room_id, sender_id, content, type)
       values ($1, $2, $3, 'support')
       returning *
+    `,
+    [req.params.id, req.adminUser.id, content],
+  );
+  await pool.query(
+    `
+      update public.customer_service_tickets
+      set status = 'pending',
+          human_takeover = true,
+          auto_reply_enabled = false,
+          assigned_to = $2,
+          last_message = $3,
+          last_message_at = now(),
+          updated_at = now()
+      where room_id = $1
     `,
     [req.params.id, req.adminUser.id, content],
   );

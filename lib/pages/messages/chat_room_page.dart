@@ -157,6 +157,9 @@ class _ChatRoomPageState extends State<ChatRoomPage> {
                   itemCount: messages.length,
                   itemBuilder: (context, index) {
                     final msg = messages[index];
+                    if (msg.isSystem || msg.type == 'auto_reply') {
+                      return _buildSystemMessage(msg.content, msg.timeLabel);
+                    }
                     final isMe = msg.senderId == myId;
                     return _buildChatBubble(msg.content, isMe, msg.timeLabel);
                   },
@@ -238,6 +241,50 @@ class _ChatRoomPageState extends State<ChatRoomPage> {
           ),
           if (isMe) const SizedBox(width: 10),
           if (isMe) _buildAvatar(context.read<UserProvider>().user.avatar),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildSystemMessage(String text, String time) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 16),
+      child: Column(
+        children: [
+          Container(
+            width: double.infinity,
+            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+            decoration: BoxDecoration(
+              color: const Color(0xFFEFF6DE),
+              borderRadius: BorderRadius.circular(12),
+            ),
+            child: Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const Icon(
+                  Icons.support_agent_outlined,
+                  size: 18,
+                  color: AppColors.primaryDark,
+                ),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: Text(
+                    text,
+                    style: const TextStyle(
+                      color: AppColors.textPrimary,
+                      fontSize: 14,
+                      height: 1.45,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(height: 4),
+          Text(
+            '系统客服 · $time',
+            style: const TextStyle(fontSize: 10, color: AppColors.textHint),
+          ),
         ],
       ),
     );

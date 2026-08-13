@@ -35,9 +35,7 @@ class _GuideOrderCenterPageState extends State<GuideOrderCenterPage> {
   static const bool _showRouteButton = false;
 
   void _showSupportNotice() {
-    ScaffoldMessenger.of(
-      context,
-    ).showSnackBar(const SnackBar(content: Text('客服入口暂未接入，请先通过订单聊天联系客户')));
+    widget.onOpenChat();
   }
 
   @override

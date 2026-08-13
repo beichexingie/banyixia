@@ -6,6 +6,7 @@ import '../../config/app_theme.dart';
 import '../../models/demand_request.dart';
 import '../main_scaffold.dart';
 import '../../providers/demand_provider.dart';
+import '../../providers/message_provider.dart';
 import '../../widgets/demand_card.dart';
 
 class DemandListPage extends StatefulWidget {
@@ -17,6 +18,21 @@ class DemandListPage extends StatefulWidget {
 
 class _DemandListPageState extends State<DemandListPage> {
   int _activeChip = 0;
+
+  Future<void> _openCustomerService() async {
+    try {
+      final roomId = await context.read<MessageProvider>().openCustomerService();
+      if (!mounted) return;
+      context.push(
+        '/chat/$roomId?name=${Uri.encodeComponent('在线客服')}&avatar=',
+      );
+    } catch (error) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('打开客服失败：$error')),
+      );
+    }
+  }
 
   @override
   void initState() {
@@ -178,10 +194,7 @@ class _DemandListPageState extends State<DemandListPage> {
                             subtitle: '',
                             image: 'assets/home/feature_contact/Frame 5.png',
                             big: false,
-                            onTap: () =>
-                                ScaffoldMessenger.of(context).showSnackBar(
-                                  const SnackBar(content: Text('联系客服入口稍后接入')),
-                                ),
+                            onTap: _openCustomerService,
                           ),
                         ],
                       ),

@@ -620,6 +620,73 @@ async function requireSessionUser(req, res) {
   return userId;
 }
 
+const customerServiceAutoReplies = [
+  {
+    keywords: ['支付', '付款', '支付宝', '扣款'],
+    reply:
+      '关于支付：请先确认订单状态为“待付款”或“待支付”。如果支付宝已经扣款但订单未更新，请不要重复支付，把订单号发给人工客服处理。',
+  },
+  {
+    keywords: ['退款', '退钱', '取消订单', '取消'],
+    reply:
+      '关于退款或取消订单：请先打开对应订单详情查看当前状态。已经支付的订单请不要重复操作，人工客服会根据订单状态为您处理。',
+  },
+  {
+    keywords: ['地陪', '接单', '服务', '订单'],
+    reply:
+      '关于地陪服务：订单需要先由地陪接单，接单后用户才能付款。您可以在订单详情或订单消息中查看最新进度。',
+  },
+  {
+    keywords: ['登录', '验证码', '手机号', '账号'],
+    reply:
+      '关于登录：请确认手机号和验证码输入无误，并检查网络连接。如果仍然无法登录，请回复“转人工”，客服会继续处理。',
+  },
+];
+
+function getCustomerServiceAutoReply(content) {
+  const normalized = content.toString().trim();
+  if (!normalized) {
+    return '您好，这里是伴一下在线客服。请描述您遇到的问题，我会先为您查询常见解决方案。';
+  }
+  if (['人工', '转人工', '人工客服', '联系客服'].some((keyword) => normalized.includes(keyword))) {
+    return '已为您记录并转接人工客服，请稍候，客服会在后台回复您。';
+  }
+  const matched = customerServiceAutoReplies.find((item) =>
+    item.keywords.some((keyword) => normalized.includes(keyword)),
+  );
+  return (
+    matched?.reply ||
+    '我先为您记录这个问题。若上面的常见说明不能解决，请回复“转人工”，客服会在后台继续处理。'
+  );
+}
+
+async function createCustomerServiceReply(client, roomId, content) {
+  const reply = getCustomerServiceAutoReply(content);
+  const result = await client.query(
+    `
+      insert into public.messages (room_id, sender_id, content, type)
+      values ($1, $2, $3, 'auto_reply')
+      returning *
+    `,
+    [roomId, null, reply],
+  );
+  return result.rows[0];
+}
+
+async function findCustomerServiceTicket(client, roomId, userId = null) {
+  const result = await client.query(
+    `
+      select *
+      from public.customer_service_tickets
+      where room_id = $1
+        and ($2::uuid is null or user_id = $2)
+      limit 1
+    `,
+    [roomId, userId],
+  );
+  return result.rows[0] ?? null;
+}
+
 async function requireAdminUser(req, res) {
   const userId = await requireSessionUser(req, res);
   if (!userId) return null;
@@ -2207,10 +2274,43 @@ appRouter.get('/chat/rooms', async (req, res) => {
   if (!userId) return;
   const result = await pool.query(
     `
-      select *
-      from public.chat_rooms
-      where $1 = any(participant_ids)
-      order by last_message_time desc
+      select
+        cr.*,
+        t.title as ticket_title,
+        t.human_takeover,
+        coalesce(
+          (
+            select nullif(u.nickname, '')
+            from public.users u
+            where u.id = any(cr.participant_ids) and u.id <> $1
+            limit 1
+          ),
+          case when t.id is not null then '在线客服' else '会话' end
+        ) as other_participant_name,
+        coalesce(
+          (
+            select u.avatar
+            from public.users u
+            where u.id = any(cr.participant_ids) and u.id <> $1
+            limit 1
+          ),
+          ''
+        ) as other_participant_avatar,
+        (
+          select count(*)::int
+          from public.messages m
+          where m.room_id = cr.id
+            and m.is_read = false
+            and (m.sender_id is null or m.sender_id <> $1)
+        ) as unread_count
+      from public.chat_rooms cr
+      left join public.customer_service_tickets t on t.room_id = cr.id
+      where $1 = any(cr.participant_ids)
+         or exists (
+           select 1 from public.customer_service_tickets owned_ticket
+           where owned_ticket.room_id = cr.id and owned_ticket.user_id = $1
+         )
+      order by cr.last_message_time desc nulls last, cr.created_at desc
     `,
     [userId],
   );
@@ -2218,7 +2318,24 @@ appRouter.get('/chat/rooms', async (req, res) => {
 });
 
 appRouter.get('/chat/rooms/:id', async (req, res) => {
-  const result = await pool.query(`select * from public.chat_rooms where id = $1 limit 1`, [req.params.id]);
+  const userId = await requireSessionUser(req, res);
+  if (!userId) return;
+  const result = await pool.query(
+    `
+      select cr.*
+      from public.chat_rooms cr
+      where cr.id = $1
+        and (
+          $2 = any(cr.participant_ids)
+          or exists (
+            select 1 from public.customer_service_tickets t
+            where t.room_id = cr.id and t.user_id = $2
+          )
+        )
+      limit 1
+    `,
+    [req.params.id, userId],
+  );
   if (!result.rows[0]) return fail(res, 404, '会话不存在');
   const messages = await pool.query(
     `select * from public.messages where room_id = $1 order by created_at asc`,
@@ -2249,6 +2366,65 @@ appRouter.post('/chat/rooms', async (req, res) => {
   return ok(res, { data: created });
 });
 
+appRouter.post('/customer-service/session', handleRoute(async (req, res) => {
+  const userId = await requireSessionUser(req, res);
+  if (!userId) return;
+
+  const existing = await pool.query(
+    `
+      select
+        t.*,
+        cr.participant_ids,
+        cr.last_message,
+        cr.last_message_time,
+        cr.created_at
+      from public.customer_service_tickets t
+      join public.chat_rooms cr on cr.id = t.room_id
+      where t.user_id = $1 and t.status <> 'closed'
+      order by t.updated_at desc
+      limit 1
+    `,
+    [userId],
+  );
+
+  if (existing.rows[0]) {
+    return ok(res, {
+      data: existing.rows[0],
+      message: '已打开客服会话',
+    });
+  }
+
+  const room = await pool.query(
+    `
+      insert into public.chat_rooms (participant_ids, order_id)
+      values ($1::uuid[], null)
+      returning *
+    `,
+    [[userId]],
+  );
+  const roomRow = room.rows[0];
+  const ticket = await pool.query(
+    `
+      insert into public.customer_service_tickets
+        (user_id, room_id, title, status, priority, auto_reply_enabled, human_takeover,
+         last_message, last_message_at, updated_at)
+      values ($1, $2, '在线客服', 'open', 'normal', true, false, $3, now(), now())
+      returning *
+    `,
+    [userId, roomRow.id, '您好，这里是伴一下在线客服'],
+  );
+  await createCustomerServiceReply(pool, roomRow.id, '');
+  return ok(res, {
+    data: {
+      ...roomRow,
+      ...ticket.rows[0],
+      room_id: roomRow.id,
+      participant_ids: roomRow.participant_ids,
+    },
+    message: '客服会话已创建',
+  });
+}));
+
 appRouter.post('/chat/rooms/:id/messages', async (req, res) => {
   const userId = await requireSessionUser(req, res);
   if (!userId) return;
@@ -2258,6 +2434,23 @@ appRouter.post('/chat/rooms/:id/messages', async (req, res) => {
   if (type === 'text') {
     await assertTextAllowed(content, { field: '聊天内容' });
   }
+  const room = await pool.query(
+    `
+      select cr.id
+      from public.chat_rooms cr
+      where cr.id = $1
+        and (
+          $2 = any(cr.participant_ids)
+          or exists (
+            select 1 from public.customer_service_tickets t
+            where t.room_id = cr.id and t.user_id = $2
+          )
+        )
+      limit 1
+    `,
+    [roomId, userId],
+  );
+  if (!room.rows[0]) return fail(res, 403, '无权发送此会话消息');
   const result = await pool.query(
     `
       insert into public.messages (room_id, sender_id, content, type)
@@ -2266,12 +2459,55 @@ appRouter.post('/chat/rooms/:id/messages', async (req, res) => {
     `,
     [roomId, userId, content, type],
   );
+  const ticket = await findCustomerServiceTicket(pool, roomId, userId);
+  if (ticket) {
+    const asksForHuman = ['人工', '转人工', '人工客服', '联系客服'].some((keyword) =>
+      content.includes(keyword),
+    );
+    const shouldSendAutoReply =
+      ticket.auto_reply_enabled && !ticket.human_takeover;
+    await pool.query(
+      `
+        update public.customer_service_tickets
+        set
+          status = case when $2 then 'pending' else status end,
+          human_takeover = case when $2 then true else human_takeover end,
+          last_message = $3,
+          last_message_at = now(),
+          updated_at = now()
+        where room_id = $1
+      `,
+      [roomId, asksForHuman, content],
+    );
+    if (shouldSendAutoReply) {
+      await createCustomerServiceReply(pool, roomId, content);
+    } else if (asksForHuman && !ticket.human_takeover) {
+      await createCustomerServiceReply(pool, roomId, content);
+    }
+  }
   return ok(res, { data: result.rows[0] });
 });
 
 appRouter.post('/chat/rooms/:id/read', async (req, res) => {
   const userId = await requireSessionUser(req, res);
   if (!userId) return;
+  const room = await pool.query(
+    `
+      select cr.id
+      from public.chat_rooms cr
+      where cr.id = $1
+        and (
+          $2 = any(cr.participant_ids)
+          or exists (
+            select 1 from public.customer_service_tickets t
+            where t.room_id = cr.id and t.user_id = $2
+          )
+        )
+      limit 1
+    `,
+    [req.params.id, userId],
+  );
+  if (!room.rows[0]) return fail(res, 403, '无权操作此会话');
   await pool.query(
     `
       update public.messages

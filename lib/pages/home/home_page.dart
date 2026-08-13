@@ -7,6 +7,7 @@ import 'package:provider/provider.dart';
 import '../../config/app_theme.dart';
 import '../../models/guide.dart';
 import '../../providers/guide_provider.dart';
+import '../../providers/message_provider.dart';
 import '../main_scaffold.dart';
 import '../../widgets/service_guide_card.dart';
 
@@ -25,6 +26,21 @@ class _HomePageState extends State<HomePage>
   String _selectedCity = '苏州';
   bool _signedToday = false;
   int _currentTab = 0;
+
+  Future<void> _openCustomerService() async {
+    try {
+      final roomId = await context.read<MessageProvider>().openCustomerService();
+      if (!mounted) return;
+      context.push(
+        '/chat/$roomId?name=${Uri.encodeComponent('在线客服')}&avatar=',
+      );
+    } catch (error) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('打开客服失败：$error')),
+      );
+    }
+  }
 
   @override
   void initState() {
@@ -320,14 +336,7 @@ class _HomePageState extends State<HomePage>
                                       _featureCard(
                                         title: '联系我们',
                                         subtitle: '',
-                                        onTap: () =>
-                                            ScaffoldMessenger.of(
-                                              context,
-                                            ).showSnackBar(
-                                              const SnackBar(
-                                                content: Text('客服入口稍后接入'),
-                                              ),
-                                            ),
+                                        onTap: _openCustomerService,
                                         illustration: _buildFeatureIllustration(
                                           'assets/home/feature_contact/Frame 5.png',
                                           width: 96,

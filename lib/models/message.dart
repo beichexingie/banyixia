@@ -24,8 +24,8 @@ class Message {
     return Message(
       id: json['id'],
       roomId: json['room_id'],
-      senderId: json['sender_id'],
-      content: json['content'],
+      senderId: json['sender_id']?.toString() ?? 'system',
+      content: json['content']?.toString() ?? '',
       type: json['type'] ?? 'text',
       isRead: json['is_read'] ?? false,
       createdAt: DateTime.parse(json['created_at']),

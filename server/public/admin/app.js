@@ -420,9 +420,9 @@ async function renderChat() {
       <div class="card room-list">
         ${state.rooms.length ? state.rooms.map((room) => `
           <button class="room-item ${room.id === state.selectedRoomId ? 'active' : ''}" data-room="${room.id}">
-            <strong>${room.participants?.map((p) => p.nickname || p.phone || '用户').join(' / ') || '会话'}</strong>
+            <strong>${text(room.ticket_title, '在线客服')} · ${room.participants?.map((p) => p.nickname || p.phone || '用户').join(' / ') || '会话'}</strong>
             <p class="truncate">${text(room.last_message, '暂无消息')}</p>
-            <small>${fmtDate(room.last_message_time || room.created_at)}</small>
+            <small>${room.human_takeover ? '人工处理中' : '自动回复中'} · ${fmtDate(room.last_message_time || room.created_at)}</small>
           </button>
         `).join('') : emptyHtml('暂无客服会话')}
       </div>

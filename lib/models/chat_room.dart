@@ -38,7 +38,10 @@ class ChatRoom {
           : null,
       orderId: json['order_id'],
       createdAt: DateTime.parse(json['created_at']),
-      unreadCount: json['unread_count'] ?? 0,
+      otherParticipantName: json['other_participant_name']?.toString() ??
+          json['ticket_title']?.toString(),
+      otherParticipantAvatar: json['other_participant_avatar']?.toString(),
+      unreadCount: int.tryParse('${json['unread_count'] ?? 0}') ?? 0,
     );
   }
 

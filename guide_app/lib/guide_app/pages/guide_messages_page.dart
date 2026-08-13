@@ -18,11 +18,11 @@ class GuideMessagesPage extends StatelessWidget {
       backgroundColor: const Color(0xFFF0F1F3),
       body: Column(
         children: [
-          const Padding(
+          Padding(
             padding: EdgeInsets.fromLTRB(18, 18, 18, 12),
             child: Row(
               children: [
-                Expanded(
+                const Expanded(
                   child: Text(
                     '消息',
                     style: TextStyle(
@@ -31,7 +31,35 @@ class GuideMessagesPage extends StatelessWidget {
                     ),
                   ),
                 ),
-                Icon(Icons.notifications_none_rounded, size: 28),
+                IconButton(
+                  tooltip: '联系平台客服',
+                  icon: const Icon(Icons.support_agent_rounded, size: 28),
+                  onPressed: () async {
+                    try {
+                      final roomId = await context
+                          .read<MessageProvider>()
+                          .openCustomerService();
+                      if (!context.mounted) return;
+                      await Navigator.of(context).push(
+                        MaterialPageRoute<void>(
+                          builder: (_) => ChatRoomPage(
+                            roomId: roomId,
+                            otherUserName: '在线客服',
+                            otherUserAvatar: '',
+                          ),
+                        ),
+                      );
+                      if (context.mounted) {
+                        await context.read<MessageProvider>().loadRooms();
+                      }
+                    } catch (error) {
+                      if (!context.mounted) return;
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        SnackBar(content: Text('打开客服失败：$error')),
+                      );
+                    }
+                  },
+                ),
               ],
             ),
           ),

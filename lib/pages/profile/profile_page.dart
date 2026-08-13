@@ -7,6 +7,7 @@ import '../../models/order.dart';
 import '../../providers/guide_provider.dart';
 import '../../providers/order_provider.dart';
 import '../../providers/user_provider.dart';
+import '../../providers/message_provider.dart';
 import '../../models/user.dart' as app_model;
 import '../../widgets/service_guide_card.dart';
 
@@ -19,6 +20,19 @@ class ProfilePage extends StatefulWidget {
 
 class _ProfilePageState extends State<ProfilePage> {
   bool _isCreatingTestOrder = false;
+
+  Future<void> _openCustomerService() async {
+    try {
+      final roomId = await context.read<MessageProvider>().openCustomerService();
+      if (!mounted) return;
+      context.push(
+        '/chat/$roomId?name=${Uri.encodeComponent('在线客服')}&avatar=',
+      );
+    } catch (error) {
+      if (!mounted) return;
+      _showSnack('打开客服失败：$error');
+    }
+  }
 
   @override
   void initState() {
@@ -121,7 +135,7 @@ class _ProfilePageState extends State<ProfilePage> {
                   _headerAction(
                     icon: Icons.headset_mic_outlined,
                     label: '客服',
-                    onTap: () => _showSnack('在线客服稍后接入'),
+                    onTap: _openCustomerService,
                   ),
                   const SizedBox(width: 18),
                   _headerAction(

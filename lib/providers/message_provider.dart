@@ -109,6 +109,21 @@ class MessageProvider extends ChangeNotifier {
     throw Exception('无法创建会话');
   }
 
+  Future<String> openCustomerService() async {
+    final token = _token();
+    if (token == null || token.isEmpty) throw Exception('请先登录');
+    final response = await _api.post(
+      '/customer-service/session',
+      authToken: token,
+    );
+    final data = response['data'];
+    if (data is! Map<String, dynamic>) throw Exception('客服会话创建失败');
+    final roomId = data['room_id']?.toString() ?? data['id']?.toString() ?? '';
+    if (roomId.isEmpty) throw Exception('客服会话缺少会话编号');
+    await loadRooms();
+    return roomId;
+  }
+
   Future<void> _markRoomAsRead(String roomId) async {
     final token = _token();
     if (token == null) return;

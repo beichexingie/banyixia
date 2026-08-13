@@ -832,7 +832,7 @@ create index if not exists idx_chat_rooms_participant_ids
 create table if not exists public.messages (
   id uuid primary key default gen_random_uuid(),
   room_id uuid not null references public.chat_rooms(id) on delete cascade,
-  sender_id uuid not null references public.users(id) on delete cascade,
+  sender_id uuid references public.users(id) on delete cascade,
   content text not null,
   type text default 'text',
   is_read boolean default false,
@@ -846,6 +846,9 @@ alter table if exists public.messages
   add column if not exists type text default 'text',
   add column if not exists is_read boolean default false,
   add column if not exists created_at timestamptz default now();
+
+alter table if exists public.messages
+  alter column sender_id drop not null;
 
 alter table if exists public.messages
   alter column id set default gen_random_uuid(),
@@ -1221,6 +1224,8 @@ alter table if exists public.customer_service_tickets
   add column if not exists status text default 'open',
   add column if not exists priority text default 'normal',
   add column if not exists assigned_to uuid references public.users(id) on delete set null,
+  add column if not exists auto_reply_enabled boolean not null default true,
+  add column if not exists human_takeover boolean not null default false,
   add column if not exists last_message text,
   add column if not exists last_message_at timestamptz,
   add column if not exists created_at timestamptz default now(),

@@ -148,12 +148,25 @@ class _MessagesPageState extends State<MessagesPage> {
             child: _quickAction(
               icon: Icons.headset_mic_outlined,
               label: '在线客服',
-              onTap: () => _showMessage('在线客服稍后接入'),
+              onTap: _openCustomerService,
             ),
           ),
         ],
       ),
     );
+  }
+
+  Future<void> _openCustomerService() async {
+    try {
+      final roomId = await context.read<MessageProvider>().openCustomerService();
+      if (!mounted) return;
+      context.push(
+        '/chat/$roomId?name=${Uri.encodeComponent('在线客服')}&avatar=',
+      );
+    } catch (error) {
+      if (!mounted) return;
+      _showMessage('打开客服失败：$error');
+    }
   }
 
   Widget _quickAction({
