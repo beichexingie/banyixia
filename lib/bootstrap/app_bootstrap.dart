@@ -2,12 +2,15 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter/widgets.dart';
 
 import '../config/app_config.dart';
+import '../services/push_notification_service.dart';
 import '../services/session_service.dart';
 
 class AppBootstrap {
   const AppBootstrap._();
 
   static late final SessionService sessionService;
+  static PushNotificationService? pushNotificationService;
+  static String appVariant = 'customer';
 
   static Future<void> initialize() async {
     WidgetsFlutterBinding.ensureInitialized();
@@ -21,6 +24,11 @@ class AppBootstrap {
 
     sessionService = EcsSessionService();
     await sessionService.initialize();
+    pushNotificationService = PushNotificationService(
+      sessionService: sessionService,
+      appVariant: appVariant,
+    );
+    await pushNotificationService!.initialize();
 
     debugPrint(
       'AppBootstrap: ECS session initialized, '

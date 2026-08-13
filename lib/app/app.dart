@@ -11,7 +11,9 @@ import '../providers/guide_provider.dart';
 import '../providers/message_provider.dart';
 import '../providers/order_provider.dart';
 import '../providers/user_provider.dart';
+import '../pages/main_scaffold.dart';
 import '../services/payment_service.dart';
+import '../services/push_notification_service.dart';
 import '../bootstrap/app_bootstrap.dart';
 
 class BanyixiaApp extends StatelessWidget {
@@ -77,6 +79,22 @@ class _AppRouterHostState extends State<_AppRouterHost> {
       context.read<UserProvider>(),
       context.read<GuideProvider>(),
     );
+    AppBootstrap.pushNotificationService?.attachRouteHandler(
+      _handlePushRoute,
+    );
+  }
+
+  void _handlePushRoute(String route) {
+    final uri = Uri.tryParse(route);
+    if (uri == null) return;
+
+    if (uri.path == '/messages') {
+      MainScaffold.switchTo(3);
+      _appRouter.router.go('/');
+      return;
+    }
+
+    _appRouter.router.push(route);
   }
 
   @override

@@ -3,6 +3,7 @@ import express from 'express';
 import { pool } from '../db.js';
 import { ok, fail } from '../utils/http.js';
 import { assertPayloadAllowed } from '../services/moderation.js';
+import { notifyUser } from '../services/push_notifications.js';
 
 export const adminRouter = express.Router();
 
@@ -518,7 +519,7 @@ adminRouter.post('/chat/rooms/:id/messages', requirePermission('chat'), handleRo
   if (!content) return fail(res, 400, '消息内容不能为空');
   await assertPayloadAllowed({ content }, [{ key: 'content', label: '客服消息' }]);
   const ticket = await pool.query(
-    `select id from public.customer_service_tickets where room_id = $1 limit 1`,
+    `select id, user_id from public.customer_service_tickets where room_id = $1 limit 1`,
     [req.params.id],
   );
   if (!ticket.rows[0]) return fail(res, 404, '该会话不是客服工单');
@@ -544,6 +545,12 @@ adminRouter.post('/chat/rooms/:id/messages', requirePermission('chat'), handleRo
     `,
     [req.params.id, req.adminUser.id, content],
   );
+  await notifyUser(pool, ticket.rows[0].user_id, {
+    title: '客服已回复',
+    body: content,
+    route: `/chat/${req.params.id}`,
+    type: 'support_reply',
+  });
   await writeOperationLog(req, 'send_support_message', 'chat_room', req.params.id);
   return ok(res, { data: result.rows[0] });
 }));

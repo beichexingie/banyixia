@@ -79,6 +79,12 @@ export const config = {
     process.env.ALIPAY_TRANSFER_REPORT_INFO_CONTENT?.trim() || '地陪服务报酬',
   paymentDebugEnabled: parseBoolean(process.env.PAYMENT_DEBUG_ENABLED, false),
   corsOrigins: parseList(process.env.CORS_ORIGINS),
+  firebasePushEnabled: parseBoolean(process.env.FIREBASE_PUSH_ENABLED, false),
+  firebaseProjectId: process.env.FIREBASE_PROJECT_ID?.trim() || '',
+  firebaseServiceAccountFile:
+    process.env.FIREBASE_SERVICE_ACCOUNT_FILE?.trim() || '',
+  firebaseServiceAccountJson:
+    process.env.FIREBASE_SERVICE_ACCOUNT_JSON?.trim() || '',
   authWhitelistEnabled: parseBoolean(process.env.AUTH_WHITELIST_ENABLED, false),
   authWhitelist: parsePhoneCodeMap(process.env.AUTH_WHITELIST),
   moderationEnabled: parseBoolean(process.env.MODERATION_ENABLED, true),

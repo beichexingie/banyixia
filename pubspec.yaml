@@ -49,6 +49,9 @@ dependencies:
   alipay_payment: ^1.1.2
   tencent_rtc_sdk: ^13.4.2
   permission_handler: ^12.0.3
+  firebase_core: ^4.0.0
+  firebase_messaging: ^16.0.0
+  flutter_local_notifications: ^19.4.0
 
 dev_dependencies:
   flutter_test:

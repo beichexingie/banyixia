@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter_application_1/pages/order/voice_call_page.dart';
 import 'package:flutter_application_1/pages/order/incoming_voice_call_dialog.dart';
+import 'package:flutter_application_1/pages/messages/chat_room_page.dart';
 import 'package:flutter_application_1/providers/call_provider.dart';
 import 'package:provider/provider.dart';
 import 'package:flutter_application_1/pages/profile/wallet_page.dart';
@@ -243,6 +244,9 @@ class _GuideMainShellState extends State<_GuideMainShell>
   void initState() {
     super.initState();
     WidgetsBinding.instance.addObserver(this);
+    AppBootstrap.pushNotificationService?.attachRouteHandler(
+      _handlePushRoute,
+    );
     WidgetsBinding.instance.addPostFrameCallback((_) async {
       if (!mounted) return;
       final guideConsoleProvider = context.read<GuideConsoleProvider>();
@@ -379,6 +383,30 @@ class _GuideMainShellState extends State<_GuideMainShell>
 
   void _openMessages() {
     setState(() => _currentIndex = 3);
+  }
+
+  void _handlePushRoute(String route) {
+    final uri = Uri.tryParse(route);
+    if (uri == null || !mounted) return;
+
+    if (uri.path == '/messages') {
+      _openMessages();
+      return;
+    }
+
+    if (uri.path.startsWith('/chat/')) {
+      final roomId = uri.pathSegments.length > 1 ? uri.pathSegments[1] : '';
+      if (roomId.isEmpty) return;
+      Navigator.of(context).push(
+        MaterialPageRoute<void>(
+          builder: (_) => ChatRoomPage(
+            roomId: roomId,
+            otherUserName: uri.queryParameters['name'] ?? '客户',
+            otherUserAvatar: uri.queryParameters['avatar'] ?? '',
+          ),
+        ),
+      );
+    }
   }
 
   Future<void> _openSupportChat() async {

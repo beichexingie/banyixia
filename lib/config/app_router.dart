@@ -30,6 +30,7 @@ import '../models/guide.dart';
 import '../pages/profile/order_detail_page.dart';
 import '../pages/profile/edit_profile_page.dart';
 import '../pages/profile/order_review_page.dart';
+import '../services/push_notification_service.dart';
 
 class AppRouter {
   final UserProvider userProvider;
@@ -38,6 +39,7 @@ class AppRouter {
   AppRouter(this.userProvider, this.guideProvider);
 
   late final GoRouter router = GoRouter(
+    navigatorKey: pushNavigatorKey,
     initialLocation: '/',
     refreshListenable: userProvider,
     redirect: (context, state) {

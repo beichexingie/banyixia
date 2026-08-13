@@ -35,6 +35,7 @@ import {
 } from '../services/trtc.js';
 import { bindAxbVirtualNumber } from '../services/virtual_number.js';
 import { hasSmsConfig, sendSmsCode } from '../services/sms.js';
+import { notifyUser } from '../services/push_notifications.js';
 
 export const appRouter = express.Router();
 const __filename = fileURLToPath(import.meta.url);
@@ -822,6 +823,50 @@ appRouter.post('/auth/reset-password', handleRoute(async (req, res) => {
 appRouter.post('/auth/logout', async (_req, res) => {
   return ok(res, { message: '已退出登录' });
 });
+
+appRouter.post('/devices/push-token', handleRoute(async (req, res) => {
+  const userId = await requireSessionUser(req, res);
+  if (!userId) return;
+  const token = req.body?.token?.toString().trim() ?? '';
+  if (!token) return fail(res, 400, '推送 token 不能为空');
+  const platform = req.body?.platform?.toString().trim() || 'android';
+  const appVariant = req.body?.app_variant?.toString().trim() || 'customer';
+  const result = await pool.query(
+    `
+      insert into public.device_push_tokens
+        (user_id, token, platform, app_variant, enabled, last_seen_at, updated_at)
+      values ($1,$2,$3,$4,true,now(),now())
+      on conflict (token) do update set
+        user_id = excluded.user_id,
+        platform = excluded.platform,
+        app_variant = excluded.app_variant,
+        enabled = true,
+        last_seen_at = now(),
+        updated_at = now()
+      returning *
+    `,
+    [userId, token, platform, appVariant],
+  );
+  return ok(res, { data: result.rows[0], message: '推送设备已登记' });
+}));
+
+appRouter.delete('/devices/push-token', handleRoute(async (req, res) => {
+  const userId = await requireSessionUser(req, res);
+  if (!userId) return;
+  const token = req.body?.token?.toString().trim() ?? '';
+  if (token) {
+    await pool.query(
+      `delete from public.device_push_tokens where user_id = $1 and token = $2`,
+      [userId, token],
+    );
+  } else {
+    await pool.query(
+      `delete from public.device_push_tokens where user_id = $1`,
+      [userId],
+    );
+  }
+  return ok(res, { message: '推送设备已移除' });
+}));
 
 appRouter.post('/moderation/review', handleRoute(async (req, res) => {
   const payload = req.body ?? {};
@@ -2459,6 +2504,21 @@ appRouter.post('/chat/rooms/:id/messages', async (req, res) => {
     `,
     [roomId, userId, content, type],
   );
+  const participants = await pool.query(
+    `select participant_ids from public.chat_rooms where id = $1 limit 1`,
+    [roomId],
+  );
+  const otherUserIds = (participants.rows[0]?.participant_ids || []).filter(
+    (id) => id !== userId,
+  );
+  for (const otherUserId of otherUserIds) {
+    await notifyUser(pool, otherUserId, {
+      title: '新消息',
+      body: content,
+      route: `/chat/${roomId}`,
+      type: 'chat',
+    });
+  }
   const ticket = await findCustomerServiceTicket(pool, roomId, userId);
   if (ticket) {
     const asksForHuman = ['人工', '转人工', '人工客服', '联系客服'].some((keyword) =>
@@ -2740,6 +2800,13 @@ appRouter.post('/orders/:id/accept', handleRoute(async (req, res) => {
     `,
     [req.params.id],
   );
+  await notifyUser(pool, order.user_id, {
+    title: '地陪已接单',
+    body: `${order.service_name || '订单'}已接单，请完成付款`,
+    route: `/profile/orders/${order.id}`,
+    type: 'order_accepted',
+    orderId: order.id,
+  });
   return ok(res, { data: result.rows[0], message: '地陪已接单，等待用户付款' });
 }));
 
@@ -2772,6 +2839,23 @@ appRouter.post('/orders/:id/complete', handleRoute(async (req, res) => {
       });
     }
   });
+  if (order.user_id === userId) {
+    await notifyUser(pool, order.guide_id, {
+      title: '客户已确认服务完成',
+      body: '订单收入已转为可提现余额',
+      route: '/messages',
+      type: 'order_completed',
+      orderId: order.id,
+    });
+  } else {
+    await notifyUser(pool, order.user_id, {
+      title: '服务已完成，请评价',
+      body: '地陪已完成服务，欢迎留下评价',
+      route: `/profile/orders/${order.id}/review`,
+      type: 'order_completed',
+      orderId: order.id,
+    });
+  }
   return ok(res, { message: '服务已完成，等待客户评价' });
 }));
 
@@ -2802,6 +2886,13 @@ appRouter.post('/orders/:id/review', handleRoute(async (req, res) => {
     [order.guide_id],
   );
   await pool.query(`update public.orders set status = 3 where id = $1`, [order.id]);
+  await notifyUser(pool, order.guide_id, {
+    title: '收到新的客户评价',
+    body: '客户已提交匿名评价，点击查看详情',
+    route: '/messages',
+    type: 'review',
+    orderId: order.id,
+  });
   return ok(res, { data: result.rows[0], message: '评价已提交' });
 }));
 
@@ -2814,6 +2905,14 @@ appRouter.post('/orders/:id/cancel', handleRoute(async (req, res) => {
     return fail(res, 403, '无权限操作订单');
   }
   await pool.query(`update public.orders set status = 4 where id = $1`, [req.params.id]);
+  const otherUserId = order.user_id === userId ? order.guide_id : order.user_id;
+  await notifyUser(pool, otherUserId, {
+    title: '订单已取消',
+    body: order.service_name || '订单状态已更新',
+    route: `/profile/orders/${order.id}`,
+    type: 'order_cancelled',
+    orderId: order.id,
+  });
   return ok(res, { message: '已取消' });
 }));
 

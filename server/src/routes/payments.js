@@ -18,6 +18,7 @@ import {
   recordWalletTransaction,
 } from '../repositories/wallets.js';
 import { fail, ok } from '../utils/http.js';
+import { notifyUser } from '../services/push_notifications.js';
 
 export const paymentsRouter = express.Router();
 
@@ -30,7 +31,8 @@ function getRequestUserId(req) {
 }
 
 async function settlePaidOrder(orderId, tradeNo) {
-  return withTransaction(async (client) => {
+  let shouldNotify = false;
+  const result = await withTransaction(async (client) => {
     const latestOrder = await findOrderById(client, orderId);
     if (!latestOrder) {
       throw new Error('订单不存在');
@@ -39,6 +41,7 @@ async function settlePaidOrder(orderId, tradeNo) {
     if (latestOrder.payment_status === 'paid') {
       return latestOrder;
     }
+    shouldNotify = true;
 
     await updateOrderPayment(client, latestOrder.id, {
       payment_status: 'paid',
@@ -78,6 +81,23 @@ async function settlePaidOrder(orderId, tradeNo) {
       provider_trade_no: tradeNo,
     };
   });
+  if (shouldNotify) {
+    await notifyUser(pool, result.user_id, {
+      title: '支付成功',
+      body: `${result.service_name || '订单'}已支付成功`,
+      route: `/profile/orders/${result.id}`,
+      type: 'payment_success',
+      orderId: result.id,
+    });
+    await notifyUser(pool, result.guide_id, {
+      title: '客户已付款',
+      body: '订单已支付，可以查看服务安排',
+      route: '/messages',
+      type: 'payment_success',
+      orderId: result.id,
+    });
+  }
+  return result;
 }
 
 paymentsRouter.post('/alipay-create-order', async (req, res) => {
