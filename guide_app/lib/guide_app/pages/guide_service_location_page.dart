@@ -89,34 +89,10 @@ class _GuideServiceLocationPageState extends State<GuideServiceLocationPage> {
   }
 
   Future<String?> _askLabel(String initial) async {
-    final controller = TextEditingController(text: initial);
-    final label = await showDialog<String>(
+    return showDialog<String>(
       context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('设置地址名称'),
-        content: TextField(
-          controller: controller,
-          autofocus: true,
-          maxLength: 20,
-          decoration: const InputDecoration(hintText: '例如：金鸡湖附近、家、工作室'),
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: const Text('取消'),
-          ),
-          FilledButton(
-            onPressed: () {
-              final value = controller.text.trim();
-              Navigator.pop(context, value.isEmpty ? '服务地址' : value);
-            },
-            child: const Text('确定'),
-          ),
-        ],
-      ),
+      builder: (_) => _AddressLabelDialog(initial: initial),
     );
-    controller.dispose();
-    return label;
   }
 
   Future<void> _select(GuideAddress address) async {
@@ -271,6 +247,58 @@ class _GuideServiceLocationPageState extends State<GuideServiceLocationPage> {
           ],
         ),
       ),
+    );
+  }
+}
+
+class _AddressLabelDialog extends StatefulWidget {
+  final String initial;
+
+  const _AddressLabelDialog({required this.initial});
+
+  @override
+  State<_AddressLabelDialog> createState() => _AddressLabelDialogState();
+}
+
+class _AddressLabelDialogState extends State<_AddressLabelDialog> {
+  late final TextEditingController _controller;
+
+  @override
+  void initState() {
+    super.initState();
+    _controller = TextEditingController(text: widget.initial);
+  }
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  void _submit() {
+    final value = _controller.text.trim();
+    Navigator.of(context).pop(value.isEmpty ? '服务地址' : value);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return AlertDialog(
+      title: const Text('设置地址名称'),
+      content: TextField(
+        controller: _controller,
+        autofocus: true,
+        maxLength: 20,
+        textInputAction: TextInputAction.done,
+        onSubmitted: (_) => _submit(),
+        decoration: const InputDecoration(hintText: '例如：金鸡湖附近、家、工作室'),
+      ),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.of(context).pop(),
+          child: const Text('取消'),
+        ),
+        FilledButton(onPressed: _submit, child: const Text('确定')),
+      ],
     );
   }
 }

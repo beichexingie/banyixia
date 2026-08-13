@@ -5,7 +5,6 @@ import 'package:amap_flutter_base/amap_flutter_base.dart' as amap_base;
 import 'package:amap_flutter_map/amap_flutter_map.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/foundation.dart';
-import 'package:go_router/go_router.dart';
 import 'package:latlong2/latlong.dart';
 
 import '../../config/amap_config.dart';
@@ -794,13 +793,6 @@ class _LocationPickerPageState extends State<LocationPickerPage> {
     _notifyMapPanelChanged();
   }
 
-  void _changeMapZoom(int delta) {
-    setState(() {
-      _mapZoom = (_mapZoom + delta).clamp(3, 18).toDouble();
-    });
-    _notifyMapPanelChanged();
-  }
-
   String _buildAmapTileUrl(int x, int y, int z) {
     final subdomain = ((x + y).abs() % 4) + 1;
     return _amapTileUrl
@@ -808,25 +800,6 @@ class _LocationPickerPageState extends State<LocationPickerPage> {
         .replaceFirst('{x}', x.toString())
         .replaceFirst('{y}', y.toString())
         .replaceFirst('{z}', z.toString());
-  }
-
-  Widget _buildMapZoomButton({
-    required IconData icon,
-    required VoidCallback onTap,
-  }) {
-    return Material(
-      color: Colors.white.withValues(alpha: 0.95),
-      borderRadius: BorderRadius.circular(12),
-      child: InkWell(
-        onTap: onTap,
-        borderRadius: BorderRadius.circular(12),
-        child: SizedBox(
-          width: 36,
-          height: 36,
-          child: Icon(icon, size: 18, color: AppColors.primary),
-        ),
-      ),
-    );
   }
 
   Widget _buildAmapTileSurface() {
@@ -895,8 +868,8 @@ class _LocationPickerPageState extends State<LocationPickerPage> {
   }
 
   Future<void> _openFullscreenMap() async {
-    await Navigator.of(context).push(
-      MaterialPageRoute<void>(
+    final result = await Navigator.of(context).push<Map<String, dynamic>>(
+      MaterialPageRoute<Map<String, dynamic>>(
         builder: (context) {
           return ValueListenableBuilder<int>(
             valueListenable: _mapPanelVersion,
@@ -956,6 +929,8 @@ class _LocationPickerPageState extends State<LocationPickerPage> {
         },
       ),
     );
+    if (!mounted || result == null) return;
+    Navigator.of(context).pop(result);
   }
 
   Widget _buildStaticMapFallback() {
@@ -1016,7 +991,7 @@ class _LocationPickerPageState extends State<LocationPickerPage> {
               child: Row(
                 children: [
                   IconButton(
-                    onPressed: () => context.pop(),
+                    onPressed: () => Navigator.of(context).pop(),
                     icon: const Icon(Icons.arrow_back_ios_new, size: 18),
                   ),
                   Expanded(child: _buildSearchField()),
@@ -1115,7 +1090,8 @@ class _LocationPickerPageState extends State<LocationPickerPage> {
             width: double.infinity,
             height: 52,
             child: ElevatedButton(
-              onPressed: () => context.pop(_buildSelectionResult()),
+              onPressed: () =>
+                  Navigator.of(context).pop(_buildSelectionResult()),
               style: ElevatedButton.styleFrom(
                 backgroundColor: AppColors.primary,
                 foregroundColor: Colors.white,
@@ -1238,7 +1214,8 @@ class _LocationPickerPageState extends State<LocationPickerPage> {
             ),
             const Spacer(),
             TextButton(
-              onPressed: () => setState(() => _showAllHistory = !_showAllHistory),
+              onPressed: () =>
+                  setState(() => _showAllHistory = !_showAllHistory),
               style: TextButton.styleFrom(
                 padding: EdgeInsets.zero,
                 minimumSize: Size.zero,
@@ -1534,32 +1511,6 @@ class _LocationPickerPageState extends State<LocationPickerPage> {
     );
   }
 
-  Widget _buildMapActionColumn({required bool showFullscreenButton}) {
-    return Column(
-      mainAxisSize: MainAxisSize.min,
-      children: [
-        if (showFullscreenButton) ...[
-          _buildMapZoomButton(
-            icon: Icons.fullscreen,
-            onTap: _openFullscreenMap,
-          ),
-          const SizedBox(height: 8),
-        ],
-        _buildMapZoomButton(
-          icon: Icons.my_location_outlined,
-          onTap: _useCurrentLocation,
-        ),
-        const SizedBox(height: 8),
-        _buildMapZoomButton(icon: Icons.add, onTap: () => _changeMapZoom(1)),
-        const SizedBox(height: 8),
-        _buildMapZoomButton(
-          icon: Icons.remove,
-          onTap: () => _changeMapZoom(-1),
-        ),
-      ],
-    );
-  }
-
   Widget _buildNativeMapSurface() {
     return AMapWidget(
       privacyStatement: const amap_base.AMapPrivacyStatement(
@@ -1612,30 +1563,6 @@ class _LocationPickerPageState extends State<LocationPickerPage> {
         _notifyMapPanelChanged();
         await _handleMapMoveEnd(target);
       },
-    );
-  }
-
-  Widget _buildMapFloatingActionColumn({required bool showFullscreenButton}) {
-    return Positioned(
-      right: 14,
-      bottom: 88,
-      child: Container(
-        padding: const EdgeInsets.all(6),
-        decoration: BoxDecoration(
-          color: Colors.white.withValues(alpha: 0.96),
-          borderRadius: BorderRadius.circular(18),
-          boxShadow: [
-            BoxShadow(
-              color: Colors.black.withValues(alpha: 0.08),
-              blurRadius: 14,
-              offset: const Offset(0, 6),
-            ),
-          ],
-        ),
-        child: _buildMapActionColumn(
-          showFullscreenButton: showFullscreenButton,
-        ),
-      ),
     );
   }
 
@@ -1717,7 +1644,6 @@ class _LocationPickerPageState extends State<LocationPickerPage> {
               ],
             ),
           ),
-          _buildMapFloatingActionColumn(showFullscreenButton: !isFullscreen),
           const IgnorePointer(
             child: Center(
               child: Icon(
@@ -1751,36 +1677,61 @@ class _LocationPickerPageState extends State<LocationPickerPage> {
                         ),
                       ],
                     ),
-                    child: Row(
-                      children: [
-                        if (_locatingFromMap)
-                          const SizedBox(
-                            width: 16,
-                            height: 16,
-                            child: CircularProgressIndicator(strokeWidth: 2),
-                          )
-                        else
-                          const Icon(
-                            Icons.touch_app_outlined,
-                            size: 18,
-                            color: AppColors.primary,
-                          ),
-                        const SizedBox(width: 8),
-                        Expanded(
-                          child: Text(
-                            _locatingFromMap
-                                ? '正在识别地图中心点地址...'
-                                : '拖动地图或点击位置即可选点，支持右侧按钮缩放',
-                            style: const TextStyle(
-                              fontSize: 12,
-                              color: AppColors.textSecondary,
+                    child: isFullscreen
+                        ? SizedBox(
+                            width: double.infinity,
+                            height: 48,
+                            child: ElevatedButton.icon(
+                              onPressed: _locatingFromMap
+                                  ? null
+                                  : () => Navigator.of(
+                                      context,
+                                    ).pop(_buildSelectionResult()),
+                              icon: const Icon(Icons.check_rounded),
+                              label: Text(
+                                _locatingFromMap ? '正在识别地址...' : '确认该地址',
+                              ),
+                              style: ElevatedButton.styleFrom(
+                                backgroundColor: AppColors.primary,
+                                foregroundColor: Colors.white,
+                                disabledBackgroundColor: AppColors.primary
+                                    .withValues(alpha: 0.55),
+                                shape: RoundedRectangleBorder(
+                                  borderRadius: BorderRadius.circular(24),
+                                ),
+                              ),
                             ),
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
+                          )
+                        : Row(
+                            children: [
+                              if (_locatingFromMap)
+                                const SizedBox(
+                                  width: 16,
+                                  height: 16,
+                                  child: CircularProgressIndicator(
+                                    strokeWidth: 2,
+                                  ),
+                                )
+                              else
+                                const Icon(
+                                  Icons.touch_app_outlined,
+                                  size: 18,
+                                  color: AppColors.primary,
+                                ),
+                              const SizedBox(width: 8),
+                              const Expanded(
+                                child: Text(
+                                  '拖动地图或点击位置即可选点',
+                                  style: TextStyle(
+                                    fontSize: 12,
+                                    color: AppColors.textSecondary,
+                                  ),
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
+                                ),
+                              ),
+                            ],
                           ),
-                        ),
-                      ],
-                    ),
                   ),
                 ),
               ),
@@ -2180,7 +2131,10 @@ class _LocationPickerPageState extends State<LocationPickerPage> {
     ).showSnackBar(SnackBar(content: Text(message)));
   }
 
-  String _describeAmapError(AmapApiException error, {String fallback = '高德服务调用失败'}) {
+  String _describeAmapError(
+    AmapApiException error, {
+    String fallback = '高德服务调用失败',
+  }) {
     if (error.code == '10009') {
       return '高德 Key 与当前平台不匹配。Web 请检查 AMAP_WEB_SERVICE_KEY，Android 请检查 AMAP_ANDROID_KEY、包名和 SHA1。';
     }
