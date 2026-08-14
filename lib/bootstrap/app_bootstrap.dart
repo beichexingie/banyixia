@@ -28,7 +28,14 @@ class AppBootstrap {
       sessionService: sessionService,
       appVariant: appVariant,
     );
-    await pushNotificationService!.initialize();
+    // Push notifications are optional at startup. Never block the first
+    // Flutter frame when Firebase configuration or the Android plugin is slow.
+    await pushNotificationService!.initialize().timeout(
+      const Duration(seconds: 8),
+      onTimeout: () {
+        debugPrint('Push notification initialization timed out');
+      },
+    );
 
     debugPrint(
       'AppBootstrap: ECS session initialized, '
