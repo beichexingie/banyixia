@@ -54,7 +54,7 @@ with seed_users as (
         12
       ),
       (
-        '13900010003',
+        '18036278985',
         '测试地陪C',
         'https://picsum.photos/seed/ydb-guide-c/160/160',
         '适合商务随行、会展接待和短途城市陪同。',
@@ -195,7 +195,7 @@ with guide_seed as (
       else '上海市黄浦区'
     end as current_location_text
   from public.users u
-  where u.phone in ('13900010001', '13900010002', '13900010003')
+  where u.phone in ('13900010001', '13900010002', '18036278985')
 )
 insert into public.guides (
   id,
@@ -273,7 +273,7 @@ with guide_seed as (
       else array['https://picsum.photos/seed/ydb-guide-c-1/800/600']
     end as images
   from public.users u
-  where u.phone in ('13900010001', '13900010002', '13900010003')
+  where u.phone in ('13900010001', '13900010002', '18036278985')
 )
 insert into public.guide_applications (
   user_id,
@@ -319,7 +319,7 @@ with ids as (
     (select id from public.users where phone = '18860900310') as customer_b_id,
     (select id from public.users where phone = '13900010001') as guide_a_id,
     (select id from public.users where phone = '13900010002') as guide_b_id,
-    (select id from public.users where phone = '13900010003') as guide_c_id
+    (select id from public.users where phone = '18036278985') as guide_c_id
 ),
 order_seed as (
   select

@@ -569,7 +569,7 @@ select
   '{}'::text[],
   true
 from public.users u
-where u.phone = '13900010003'
+where u.phone = '18036278985'
 on conflict (id) do update set verified = true;
 
 -- Hide legacy duplicate mock guides without deleting users or breaking old orders.

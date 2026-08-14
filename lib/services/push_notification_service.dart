@@ -43,11 +43,6 @@ class PushNotificationService {
     if (kIsWeb || defaultTargetPlatform != TargetPlatform.android) return;
     if (_initialized) return;
     try {
-      await Firebase.initializeApp();
-      FirebaseMessaging.onBackgroundMessage(
-        firebaseMessagingBackgroundHandler,
-      );
-
       const androidSettings = AndroidInitializationSettings(
         '@mipmap/ic_launcher',
       );
@@ -66,11 +61,22 @@ class PushNotificationService {
             AndroidFlutterLocalNotificationsPlugin
           >();
       await androidPlugin?.createNotificationChannel(_channel);
-      await FirebaseMessaging.instance.requestPermission(
+      final localPermission =
+          await androidPlugin?.requestNotificationsPermission();
+      debugPrint('Local notification permission: $localPermission');
+
+      await Firebase.initializeApp();
+      FirebaseMessaging.onBackgroundMessage(
+        firebaseMessagingBackgroundHandler,
+      );
+      final permissionSettings = await FirebaseMessaging.instance.requestPermission(
         alert: true,
         badge: true,
         sound: true,
         provisional: false,
+      );
+      debugPrint(
+        'Push notification permission: ${permissionSettings.authorizationStatus}',
       );
 
       FirebaseMessaging.onMessage.listen(_handleForegroundMessage);

@@ -30,16 +30,13 @@ class AppBootstrap {
       sessionService: sessionService,
       appVariant: appVariant,
     );
-    // Push notifications are optional at startup. Start them in the
-    // background so Firebase or Android permission work never blocks the
-    // first Flutter frame.
+    // Wait until the first frame is visible before touching Firebase or
+    // Android permission APIs. Android can ignore a permission dialog request
+    // made before the Flutter Activity has finished becoming visible.
     final pushService = pushNotificationService!;
-    unawaited(
-      pushService.initialize().catchError((error, stackTrace) {
-        debugPrint('Push notification initialization failed: $error');
-        debugPrintStack(stackTrace: stackTrace);
-      }),
-    );
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      unawaited(pushService.initialize());
+    });
 
     debugPrint(
       'AppBootstrap: ECS session initialized, '

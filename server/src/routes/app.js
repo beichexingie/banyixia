@@ -2219,6 +2219,13 @@ appRouter.post('/demands/:id/apply', async (req, res) => {
     [req.params.id],
   );
 
+  await notifyUser(pool, demand.author_id, {
+    title: '有新的地陪报名',
+    body: `${guide.name || '地陪'}报名了你的需求，请打开“我的需求”查看`,
+    route: `/demand/${req.params.id}`,
+    type: 'demand_application',
+  });
+
   return ok(res, { data: result.rows[0], message: '报名成功' });
 });
 
@@ -2309,6 +2316,14 @@ appRouter.post('/demands/:id/select-guide', async (req, res) => {
       ],
     );
     return withDistanceFields(orderResult.rows[0], selectedGuideLocation);
+  });
+
+  await notifyUser(pool, application.guide_id, {
+    title: '你已被选为服务地陪',
+    body: `${demand.title || '需求'}已选定你，请在订单中心查看并接单`,
+    route: '/messages',
+    type: 'demand_selected',
+    orderId: created.id,
   });
 
   return ok(res, { data: created, message: '已选定地陪并生成订单' });
@@ -2704,7 +2719,7 @@ appRouter.post('/orders/one-cent-test', handleRoute(async (req, res) => {
       select g.*
       from public.guides g
       join public.users u on u.id = g.id
-      where u.phone = '13900010003'
+      where u.phone = '18036278985'
         and g.verified = true
         and g.id <> $1
       limit 1

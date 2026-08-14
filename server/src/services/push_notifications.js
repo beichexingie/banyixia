@@ -131,10 +131,19 @@ export async function notifyUser(
   userId,
   { title, body, route, type = 'general', orderId = '' },
 ) {
-  if (!userId || !config.firebasePushEnabled) return;
+  if (!userId) {
+    return { sent: 0, failed: 0, reason: 'missing_user' };
+  }
+  if (!config.firebasePushEnabled) {
+    console.warn(`[push] skipped user=${userId}: FIREBASE_PUSH_ENABLED is false`);
+    return { sent: 0, failed: 0, reason: 'disabled' };
+  }
   try {
     const account = await loadServiceAccount();
-    if (!account) return;
+    if (!account) {
+      console.warn(`[push] skipped user=${userId}: Firebase service account is not configured`);
+      return { sent: 0, failed: 0, reason: 'service_account_missing' };
+    }
 
     const result = await pool.query(
       `
@@ -145,7 +154,12 @@ export async function notifyUser(
       [userId],
     );
 
-    await Promise.all(
+    if (result.rows.length === 0) {
+      console.warn(`[push] skipped user=${userId}: no enabled device token`);
+      return { sent: 0, failed: 0, reason: 'device_token_missing' };
+    }
+
+    const outcomes = await Promise.all(
       result.rows.map(async (device) => {
         try {
           await sendToToken(
@@ -158,6 +172,7 @@ export async function notifyUser(
             `update public.device_push_tokens set last_seen_at = now() where id = $1`,
             [device.id],
           );
+          return true;
         } catch (error) {
           if (
             error.fcmCode === 'UNREGISTERED' ||
@@ -169,11 +184,17 @@ export async function notifyUser(
             );
           }
           console.error(`[push] user=${userId} token=${device.id}`, error);
+          return false;
         }
       }),
     );
+    const sent = outcomes.filter(Boolean).length;
+    const failed = outcomes.length - sent;
+    console.log(`[push] user=${userId} sent=${sent} failed=${failed} type=${type}`);
+    return { sent, failed, reason: failed > 0 ? 'send_failed' : 'sent' };
   } catch (error) {
     // Push is best-effort and must not fail orders, payments, or chat.
     console.error(`[push] notify user=${userId} failed`, error);
+    return { sent: 0, failed: 1, reason: 'exception' };
   }
 }
