@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/foundation.dart';
 import 'package:flutter/widgets.dart';
 
@@ -28,13 +30,15 @@ class AppBootstrap {
       sessionService: sessionService,
       appVariant: appVariant,
     );
-    // Push notifications are optional at startup. Never block the first
-    // Flutter frame when Firebase configuration or the Android plugin is slow.
-    await pushNotificationService!.initialize().timeout(
-      const Duration(seconds: 8),
-      onTimeout: () {
-        debugPrint('Push notification initialization timed out');
-      },
+    // Push notifications are optional at startup. Start them in the
+    // background so Firebase or Android permission work never blocks the
+    // first Flutter frame.
+    final pushService = pushNotificationService!;
+    unawaited(
+      pushService.initialize().catchError((error, stackTrace) {
+        debugPrint('Push notification initialization failed: $error');
+        debugPrintStack(stackTrace: stackTrace);
+      }),
     );
 
     debugPrint(
