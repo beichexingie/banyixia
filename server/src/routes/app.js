@@ -597,14 +597,14 @@ async function fetchGuideLocation(client, guideId) {
         coalesce(loc.longitude, g.current_lng) as current_lng,
         current_location_text,
         location_updated_at
-      from public.guides
+      from public.guides g
       left join lateral (
         select latitude, longitude
         from public.guide_service_locations
-        where guide_id = guides.id and is_selected = true
+        where guide_id = g.id and is_selected = true
         limit 1
       ) loc on true
-      where id = $1
+      where g.id = $1
       limit 1
     `,
     [guideId],
