@@ -3189,6 +3189,13 @@ appRouter.post('/orders/:id/calls', handleRoute(async (req, res) => {
     return findCallForUser(client, created.rows[0].id, userId);
   });
   const credential = credentialForUser(userId);
+  await notifyUser(pool, calleeUserId, {
+    title: '收到语音来电',
+    body: `${call.caller_name || '对方'}正在呼叫你`,
+    route: '/messages',
+    type: 'incoming_call',
+    orderId: order.id,
+  });
   return ok(res, {
     data: buildCallPayload(call, credential),
     message: '语音通话已创建',
