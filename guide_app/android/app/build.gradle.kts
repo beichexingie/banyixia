@@ -5,7 +5,6 @@ plugins {
     id("kotlin-android")
     // The Flutter Gradle Plugin must be applied after the Android and Kotlin Gradle plugins.
     id("dev.flutter.flutter-gradle-plugin")
-    id("com.google.gms.google-services")
 }
 
 val localProperties = Properties().apply {
@@ -18,6 +17,11 @@ val localProperties = Properties().apply {
 }
 
 val amapAndroidKey = localProperties.getProperty("amap.android.key", "")
+val aliyunPushAppKey = localProperties.getProperty("aliyun.push.app.key", "")
+val aliyunPushAppSecret = localProperties.getProperty("aliyun.push.app.secret", "")
+
+fun buildConfigString(value: String): String =
+    "\"${value.replace("\\", "\\\\").replace("\"", "\\\"")}\""
 
 android {
     namespace = "com.example.yidianban_guide_app"
@@ -41,6 +45,8 @@ android {
         versionCode = flutter.versionCode
         versionName = flutter.versionName
         manifestPlaceholders["AMAP_ANDROID_KEY"] = amapAndroidKey
+        buildConfigField("String", "ALIYUN_PUSH_APP_KEY", buildConfigString(aliyunPushAppKey))
+        buildConfigField("String", "ALIYUN_PUSH_APP_SECRET", buildConfigString(aliyunPushAppSecret))
     }
 
     buildTypes {
@@ -54,6 +60,7 @@ android {
 
 dependencies {
     coreLibraryDesugaring("com.android.tools:desugar_jdk_libs:2.1.4")
+    implementation("com.aliyun.ams:alicloud-android-push:4.0.0")
 }
 
 flutter {

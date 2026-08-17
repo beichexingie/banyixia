@@ -1,5 +1,3 @@
-import 'dart:async';
-
 import 'package:flutter/foundation.dart';
 import 'package:flutter/widgets.dart';
 
@@ -30,13 +28,6 @@ class AppBootstrap {
       sessionService: sessionService,
       appVariant: appVariant,
     );
-    // Wait until the first frame is visible before touching Firebase or
-    // Android permission APIs. Android can ignore a permission dialog request
-    // made before the Flutter Activity has finished becoming visible.
-    final pushService = pushNotificationService!;
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      unawaited(pushService.initialize());
-    });
 
     debugPrint(
       'AppBootstrap: ECS session initialized, '

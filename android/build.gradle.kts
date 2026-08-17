@@ -5,6 +5,7 @@ allprojects {
     repositories {
         google()
         mavenCentral()
+        maven(url = "https://maven.aliyun.com/repository/releases")
     }
 }
 

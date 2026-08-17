@@ -1,129 +1,68 @@
 import crypto from 'crypto';
-import fs from 'fs/promises';
 
 import { config } from '../config.js';
 
-let serviceAccountPromise;
-let accessTokenCache;
+let clientPromise;
 
-function base64Url(value) {
-  return Buffer.from(value)
-    .toString('base64')
-    .replace(/\+/g, '-')
-    .replace(/\//g, '_')
-    .replace(/=+$/g, '');
+function appKeyForVariant(appVariant) {
+  if (appVariant === 'guide') {
+    return config.aliyunMobilePushGuideAppKey;
+  }
+  return config.aliyunMobilePushCustomerAppKey;
 }
 
-async function loadServiceAccount() {
-  if (!serviceAccountPromise) {
-    serviceAccountPromise = (async () => {
-      if (config.firebaseServiceAccountFile) {
-        const content = await fs.readFile(
-          config.firebaseServiceAccountFile,
-          'utf8',
-        );
-        return JSON.parse(content);
-      }
-      if (config.firebaseServiceAccountJson) {
-        return JSON.parse(config.firebaseServiceAccountJson);
-      }
-      return null;
+function parseAppKey(value) {
+  const appKey = Number(value);
+  return Number.isSafeInteger(appKey) && appKey > 0 ? appKey : 0;
+}
+
+function hasMobilePushConfig() {
+  return Boolean(
+    config.aliyunMobilePushEnabled &&
+      config.aliyunMobilePushAccessKeyId &&
+      config.aliyunMobilePushAccessKeySecret,
+  );
+}
+
+async function getPushClient() {
+  if (!clientPromise) {
+    clientPromise = (async () => {
+      const { default: PushClient } = await import('@alicloud/push20160801');
+      return new PushClient({
+        accessKeyId: config.aliyunMobilePushAccessKeyId,
+        accessKeySecret: config.aliyunMobilePushAccessKeySecret,
+        regionId: config.aliyunMobilePushRegionId,
+      });
     })();
   }
-  return serviceAccountPromise;
+  return clientPromise;
 }
 
-async function getAccessToken(account) {
-  const now = Math.floor(Date.now() / 1000);
-  if (accessTokenCache && accessTokenCache.expiresAt > now + 60) {
-    return accessTokenCache.token;
+function chunk(items, size) {
+  const result = [];
+  for (let index = 0; index < items.length; index += size) {
+    result.push(items.slice(index, index + size));
   }
+  return result;
+}
 
-  const header = base64Url(JSON.stringify({ alg: 'RS256', typ: 'JWT' }));
-  const claim = base64Url(
-    JSON.stringify({
-      iss: account.client_email,
-      scope: 'https://www.googleapis.com/auth/firebase.messaging',
-      aud: 'https://oauth2.googleapis.com/token',
-      iat: now,
-      exp: now + 3600,
-    }),
-  );
-  const unsigned = `${header}.${claim}`;
-  const signer = crypto.createSign('RSA-SHA256');
-  signer.update(unsigned);
-  signer.end();
-  const signature = base64Url(signer.sign(account.private_key));
-  const assertion = `${unsigned}.${signature}`;
-
-  const response = await fetch('https://oauth2.googleapis.com/token', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-    body: new URLSearchParams({
-      grant_type: 'urn:ietf:params:oauth:grant-type:jwt-bearer',
-      assertion,
-    }),
+async function sendNotice(client, appKey, deviceIds, notification, data) {
+  return client.push({
+    appKey,
+    target: 'DEVICE',
+    targetValue: deviceIds.join(','),
+    deviceType: 'ANDROID',
+    pushType: 'NOTICE',
+    title: notification.title,
+    body: notification.body,
+    storeOffline: true,
+    expireTime: new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString(),
+    androidOpenType: 'APPLICATION',
+    androidNotifyType: 'BOTH',
+    androidNotificationChannel: 'yidianban_messages',
+    androidExtParameters: JSON.stringify(data),
+    idempotentToken: crypto.randomUUID(),
   });
-  const payload = await response.json();
-  if (!response.ok || !payload.access_token) {
-    throw new Error(
-      `Firebase access token failed: ${payload.error_description || payload.error || response.status}`,
-    );
-  }
-
-  accessTokenCache = {
-    token: payload.access_token,
-    expiresAt: now + Number(payload.expires_in || 3600),
-  };
-  return accessTokenCache.token;
-}
-
-async function sendToToken(account, token, notification, data) {
-  const accessToken = await getAccessToken(account);
-  const projectId = account.project_id || config.firebaseProjectId;
-  if (!projectId) throw new Error('Firebase project_id is missing');
-
-  const response = await fetch(
-    `https://fcm.googleapis.com/v1/projects/${projectId}/messages:send`,
-    {
-      method: 'POST',
-      headers: {
-        Authorization: `Bearer ${accessToken}`,
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({
-        message: {
-          token,
-          notification,
-          data: Object.fromEntries(
-            Object.entries(data || {}).map(([key, value]) => [
-              key,
-              value?.toString() ?? '',
-            ]),
-          ),
-          android: {
-            priority: 'high',
-            notification: {
-              channel_id: 'yidianban_messages',
-              sound: 'default',
-            },
-          },
-        },
-      }),
-    },
-  );
-
-  const payload = await response.json().catch(() => ({}));
-  if (!response.ok) {
-    const errorCode = payload.error?.details?.find(
-      (item) => item['@type']?.includes('FcmError'),
-    )?.errorCode;
-    const error = new Error(
-      `Firebase push failed: ${errorCode || payload.error?.message || response.status}`,
-    );
-    error.fcmCode = errorCode;
-    throw error;
-  }
 }
 
 export async function notifyUser(
@@ -134,66 +73,80 @@ export async function notifyUser(
   if (!userId) {
     return { sent: 0, failed: 0, reason: 'missing_user' };
   }
-  if (!config.firebasePushEnabled) {
-    console.warn(`[push] skipped user=${userId}: FIREBASE_PUSH_ENABLED is false`);
-    return { sent: 0, failed: 0, reason: 'disabled' };
+  if (!hasMobilePushConfig()) {
+    console.warn(
+      `[push] skipped user=${userId}: Alibaba Cloud Mobile Push is not configured`,
+    );
+    return { sent: 0, failed: 0, reason: 'not_configured' };
   }
-  try {
-    const account = await loadServiceAccount();
-    if (!account) {
-      console.warn(`[push] skipped user=${userId}: Firebase service account is not configured`);
-      return { sent: 0, failed: 0, reason: 'service_account_missing' };
-    }
 
-    const result = await pool.query(
+  try {
+    const devices = await pool.query(
       `
-        select id, token
+        select id, token, app_variant
         from public.device_push_tokens
-        where user_id = $1 and enabled = true
+        where user_id = $1
+          and enabled = true
+          and platform = 'aliyun_android'
       `,
       [userId],
     );
-
-    if (result.rows.length === 0) {
-      console.warn(`[push] skipped user=${userId}: no enabled device token`);
-      return { sent: 0, failed: 0, reason: 'device_token_missing' };
+    if (devices.rows.length === 0) {
+      console.warn(`[push] skipped user=${userId}: no Aliyun Push device`);
+      return { sent: 0, failed: 0, reason: 'device_missing' };
     }
 
-    const outcomes = await Promise.all(
-      result.rows.map(async (device) => {
+    const client = await getPushClient();
+    const variants = new Map();
+    for (const device of devices.rows) {
+      const appKey = parseAppKey(appKeyForVariant(device.app_variant));
+      if (!appKey) {
+        console.warn(
+          `[push] skipped device=${device.id}: missing AppKey for ${device.app_variant}`,
+        );
+        continue;
+      }
+      const key = `${device.app_variant}:${appKey}`;
+      const group = variants.get(key) ?? { appKey, devices: [] };
+      group.devices.push(device);
+      variants.set(key, group);
+    }
+
+    let sent = 0;
+    let failed = 0;
+    for (const { appKey, devices: variantDevices } of variants.values()) {
+      for (const deviceGroup of chunk(variantDevices, 1000)) {
         try {
-          await sendToToken(
-            account,
-            device.token,
+          await sendNotice(
+            client,
+            appKey,
+            deviceGroup.map((device) => device.token),
             { title, body },
             { route, type, order_id: orderId },
           );
           await pool.query(
-            `update public.device_push_tokens set last_seen_at = now() where id = $1`,
-            [device.id],
+            `
+              update public.device_push_tokens
+              set last_seen_at = now(), updated_at = now()
+              where id = any($1::uuid[])
+            `,
+            [deviceGroup.map((device) => device.id)],
           );
-          return true;
+          sent += deviceGroup.length;
         } catch (error) {
-          if (
-            error.fcmCode === 'UNREGISTERED' ||
-            error.fcmCode === 'INVALID_ARGUMENT'
-          ) {
-            await pool.query(
-              `update public.device_push_tokens set enabled = false where id = $1`,
-              [device.id],
-            );
-          }
-          console.error(`[push] user=${userId} token=${device.id}`, error);
-          return false;
+          failed += deviceGroup.length;
+          console.error(
+            `[push] Aliyun send failed user=${userId} appKey=${appKey}`,
+            error,
+          );
         }
-      }),
-    );
-    const sent = outcomes.filter(Boolean).length;
-    const failed = outcomes.length - sent;
+      }
+    }
+
     console.log(`[push] user=${userId} sent=${sent} failed=${failed} type=${type}`);
     return { sent, failed, reason: failed > 0 ? 'send_failed' : 'sent' };
   } catch (error) {
-    // Push is best-effort and must not fail orders, payments, or chat.
+    // Push delivery is best-effort and must never fail orders or payments.
     console.error(`[push] notify user=${userId} failed`, error);
     return { sent: 0, failed: 1, reason: 'exception' };
   }

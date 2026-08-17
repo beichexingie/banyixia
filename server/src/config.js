@@ -79,12 +79,24 @@ export const config = {
     process.env.ALIPAY_TRANSFER_REPORT_INFO_CONTENT?.trim() || '地陪服务报酬',
   paymentDebugEnabled: parseBoolean(process.env.PAYMENT_DEBUG_ENABLED, false),
   corsOrigins: parseList(process.env.CORS_ORIGINS),
-  firebasePushEnabled: parseBoolean(process.env.FIREBASE_PUSH_ENABLED, false),
-  firebaseProjectId: process.env.FIREBASE_PROJECT_ID?.trim() || '',
-  firebaseServiceAccountFile:
-    process.env.FIREBASE_SERVICE_ACCOUNT_FILE?.trim() || '',
-  firebaseServiceAccountJson:
-    process.env.FIREBASE_SERVICE_ACCOUNT_JSON?.trim() || '',
+  aliyunMobilePushEnabled: parseBoolean(
+    process.env.ALIYUN_MOBILE_PUSH_ENABLED,
+    false,
+  ),
+  aliyunMobilePushAccessKeyId:
+    process.env.ALIYUN_MOBILE_PUSH_ACCESS_KEY_ID?.trim() ||
+    process.env.ALIYUN_ACCESS_KEY_ID?.trim() ||
+    '',
+  aliyunMobilePushAccessKeySecret:
+    process.env.ALIYUN_MOBILE_PUSH_ACCESS_KEY_SECRET?.trim() ||
+    process.env.ALIYUN_ACCESS_KEY_SECRET?.trim() ||
+    '',
+  aliyunMobilePushCustomerAppKey:
+    process.env.ALIYUN_MOBILE_PUSH_CUSTOMER_APP_KEY?.trim() || '',
+  aliyunMobilePushGuideAppKey:
+    process.env.ALIYUN_MOBILE_PUSH_GUIDE_APP_KEY?.trim() || '',
+  aliyunMobilePushRegionId:
+    process.env.ALIYUN_MOBILE_PUSH_REGION_ID?.trim() || 'cn-hangzhou',
   authWhitelistEnabled: parseBoolean(process.env.AUTH_WHITELIST_ENABLED, false),
   authWhitelist: parsePhoneCodeMap(process.env.AUTH_WHITELIST),
   moderationEnabled: parseBoolean(process.env.MODERATION_ENABLED, true),

@@ -1,4 +1,4 @@
--- Device token storage for business-triggered Firebase push notifications.
+-- Alibaba Cloud Mobile Push DeviceId storage for business-triggered notices.
 
 create table if not exists public.device_push_tokens (
   id uuid primary key default gen_random_uuid(),

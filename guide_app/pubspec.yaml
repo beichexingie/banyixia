@@ -11,9 +11,6 @@ dependencies:
     sdk: flutter
   provider: ^6.1.2
   shared_preferences: ^2.3.4
-  firebase_core: ^4.0.0
-  firebase_messaging: ^16.0.0
-  flutter_local_notifications: ^19.4.0
   flutter_application_1:
     path: ..
 
