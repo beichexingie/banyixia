@@ -691,3 +691,20 @@ adminRouter.get('/logs', requirePermission('logs'), requireAdminOnly, handleRout
   `);
   return ok(res, { data: result.rows });
 }));
+
+adminRouter.get('/push/diagnostics', requirePermission('logs'), requireAdminOnly, handleRoute(async (req, res) => {
+  const limit = normalizeLimit(req.query.limit, 50, 200);
+  const result = await pool.query(
+    `
+      select
+        id, user_id, device_prefixes, app_variant, app_key,
+        notification_type, status, message_id, request_id,
+        error_code, error_message, response_json, created_at
+      from public.push_delivery_logs
+      order by created_at desc
+      limit $1
+    `,
+    [limit],
+  );
+  return ok(res, { data: result.rows });
+}));

@@ -5,6 +5,7 @@ import android.app.NotificationManager
 import android.content.Context
 import android.content.pm.PackageManager
 import android.os.Build
+import android.util.Log
 import com.alibaba.sdk.android.push.CloudPushService
 import com.alibaba.sdk.android.push.CommonCallback
 import com.alibaba.sdk.android.push.noonesdk.PushServiceFactory
@@ -56,6 +57,7 @@ class MainActivity : FlutterActivity() {
     ).setMethodCallHandler { call, result ->
       when (call.method) {
         "initialize" -> {
+          Log.i("YidianbanPush", "initialize requested")
           val appKey = BuildConfig.ALIYUN_PUSH_APP_KEY.trim()
           val appSecret = BuildConfig.ALIYUN_PUSH_APP_SECRET.trim()
           if (appKey.isEmpty() || appSecret.isEmpty()) {
@@ -101,6 +103,10 @@ class MainActivity : FlutterActivity() {
         override fun onSuccess(response: String?) {
           pushService.onAppStart()
           val deviceId = pushService.deviceId.orEmpty()
+          Log.i(
+            "YidianbanPush",
+            "registered deviceId=${deviceId.take(12)} response=${response ?: "-"}",
+          )
           runOnUiThread {
             if (deviceId.isEmpty()) {
               result.error("empty_device_id", "Aliyun Push returned no DeviceId", response)
@@ -111,6 +117,7 @@ class MainActivity : FlutterActivity() {
         }
 
         override fun onFailed(errorCode: String?, errorMessage: String?) {
+          Log.e("YidianbanPush", "registration failed: $errorCode $errorMessage")
           runOnUiThread {
             result.error(errorCode ?: "register_failed", errorMessage, null)
           }
@@ -126,10 +133,15 @@ class MainActivity : FlutterActivity() {
       val pushService: CloudPushService = PushServiceFactory.getCloudPushService()
       pushService.bindAccount(userId, object : CommonCallback {
         override fun onSuccess(response: String?) {
+          Log.i(
+            "YidianbanPush",
+            "account bound user=${userId.take(8)} response=${response ?: "-"}",
+          )
           runOnUiThread { result.success(null) }
         }
 
         override fun onFailed(errorCode: String?, errorMessage: String?) {
+          Log.e("YidianbanPush", "account bind failed: $errorCode $errorMessage")
           runOnUiThread {
             result.error(errorCode ?: "bind_failed", errorMessage, null)
           }

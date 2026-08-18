@@ -847,7 +847,30 @@ appRouter.post('/devices/push-token', handleRoute(async (req, res) => {
     `,
     [userId, token, platform, appVariant],
   );
+  console.log(
+    `[push] device registered user=${userId} appVariant=${appVariant} ` +
+      `platform=${platform} device=${token.slice(0, 12)}`,
+  );
   return ok(res, { data: result.rows[0], message: '推送设备已登记' });
+}));
+
+appRouter.get('/devices/push-diagnostics', handleRoute(async (req, res) => {
+  const userId = await requireSessionUser(req, res);
+  if (!userId) return;
+  const result = await pool.query(
+    `
+      select
+        id, device_prefixes, app_variant, app_key,
+        notification_type, status, message_id, request_id,
+        error_code, error_message, response_json, created_at
+      from public.push_delivery_logs
+      where user_id = $1
+      order by created_at desc
+      limit 50
+    `,
+    [userId],
+  );
+  return ok(res, { data: result.rows });
 }));
 
 appRouter.delete('/devices/push-token', handleRoute(async (req, res) => {

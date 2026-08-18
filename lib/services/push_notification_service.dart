@@ -70,6 +70,13 @@ class PushNotificationService {
       _initialized = true;
       _retryTimer?.cancel();
       _retryTimer = null;
+      final devicePrefix = deviceId.substring(
+        0,
+        deviceId.length < 12 ? deviceId.length : 12,
+      );
+      debugPrint(
+        'Aliyun Push initialized: appVariant=$appVariant device=$devicePrefix',
+      );
       await _registerDevice(reason: 'initialization');
     } catch (error) {
       _initialized = false;
@@ -98,6 +105,11 @@ class PushNotificationService {
       await _platform.invokeMethod<void>('bindAccount', {
         'userId': session.userId,
       });
+      final userPrefix = session.userId.substring(
+        0,
+        session.userId.length < 8 ? session.userId.length : 8,
+      );
+      debugPrint('Aliyun Push account bound: user=$userPrefix');
       await _api.post(
         '/devices/push-token',
         authToken: session.accessToken,
