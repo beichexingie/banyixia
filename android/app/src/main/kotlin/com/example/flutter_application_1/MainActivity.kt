@@ -3,8 +3,11 @@ package com.example.flutter_application_1
 import android.app.NotificationChannel
 import android.app.NotificationManager
 import android.content.Context
+import android.content.Intent
+import android.net.Uri
 import android.content.pm.PackageManager
 import android.os.Build
+import android.provider.Settings
 import android.util.Log
 import com.alibaba.sdk.android.push.CloudPushService
 import com.alibaba.sdk.android.push.CommonCallback
@@ -19,6 +22,19 @@ private const val ALIYUN_PUSH_PREFS = "aliyun_push"
 private const val PENDING_ROUTE_KEY = "pending_route"
 
 class MainActivity : FlutterActivity() {
+  private var notificationPermissionRequested = false
+
+  override fun onPostResume() {
+    super.onPostResume()
+    // Request independently from Aliyun Push initialization. Push setup may
+    // happen later (for example, after login), while Android requires a
+    // resumed Activity to show the permission dialog reliably.
+    window.decorView.postDelayed({
+      requestPushNotificationPermission()
+      logNotificationState()
+    }, 600)
+  }
+
   private fun applyAlipayEnvironment(sandbox: Boolean) {
     try {
       val envUtilsClass = Class.forName("com.alipay.sdk.app.EnvUtils")
@@ -79,6 +95,17 @@ class MainActivity : FlutterActivity() {
           val route = prefs.getString(PENDING_ROUTE_KEY, null)
           prefs.edit().remove(PENDING_ROUTE_KEY).apply()
           result.success(route)
+        }
+        "requestNotificationPermission" -> {
+          requestPushNotificationPermission()
+          result.success(notificationPermissionState())
+        }
+        "openNotificationSettings" -> {
+          openNotificationSettings()
+          result.success(null)
+        }
+        "notificationPermissionState" -> {
+          result.success(notificationPermissionState())
         }
         else -> result.notImplemented()
       }
@@ -164,6 +191,15 @@ class MainActivity : FlutterActivity() {
   }
 
   private fun logNotificationState() {
+    val state = notificationPermissionState()
+    Log.i(
+      "YidianbanPush",
+      "notification state enabled=${state["enabled"]} permission=${state["permission"]} " +
+        "channel=$ALIYUN_NOTIFICATION_CHANNEL importance=${state["channelImportance"]}",
+    )
+  }
+
+  private fun notificationPermissionState(): Map<String, Any> {
     val manager = getSystemService(NotificationManager::class.java)
     val enabled = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.N) {
       manager.areNotificationsEnabled()
@@ -175,18 +211,35 @@ class MainActivity : FlutterActivity() {
     } else {
       -1
     }
-    Log.i(
-      "YidianbanPush",
-      "notification state enabled=$enabled channel=$ALIYUN_NOTIFICATION_CHANNEL importance=$channelImportance",
+    return mapOf(
+      "enabled" to enabled,
+      "permission" to if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+        checkSelfPermission(android.Manifest.permission.POST_NOTIFICATIONS) ==
+          PackageManager.PERMISSION_GRANTED
+      } else {
+        enabled
+      },
+      "channelImportance" to channelImportance,
     )
   }
 
   private fun requestPushNotificationPermission() {
     if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU &&
+      !notificationPermissionRequested &&
       checkSelfPermission(android.Manifest.permission.POST_NOTIFICATIONS) !=
         PackageManager.PERMISSION_GRANTED
     ) {
+      notificationPermissionRequested = true
+      Log.i("YidianbanPush", "requesting POST_NOTIFICATIONS permission")
       requestPermissions(arrayOf(android.Manifest.permission.POST_NOTIFICATIONS), 1001)
     }
+  }
+
+  private fun openNotificationSettings() {
+    val intent = Intent(Settings.ACTION_APP_NOTIFICATION_SETTINGS).apply {
+      putExtra(Settings.EXTRA_APP_PACKAGE, packageName)
+      data = Uri.parse("package:$packageName")
+    }
+    startActivity(intent)
   }
 }

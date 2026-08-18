@@ -32,6 +32,29 @@ class PushNotificationService {
     sessionService.sessionListenable.addListener(_handleSessionChanged);
   }
 
+  static Future<Map<String, dynamic>> notificationPermissionState() async {
+    if (kIsWeb || defaultTargetPlatform != TargetPlatform.android) {
+      return const <String, dynamic>{'enabled': true, 'permission': true};
+    }
+    final result = await _platform.invokeMethod<dynamic>(
+      'notificationPermissionState',
+    );
+    if (result is Map) {
+      return result.map((key, value) => MapEntry(key.toString(), value));
+    }
+    return const <String, dynamic>{};
+  }
+
+  static Future<void> requestNotificationPermission() async {
+    if (kIsWeb || defaultTargetPlatform != TargetPlatform.android) return;
+    await _platform.invokeMethod<dynamic>('requestNotificationPermission');
+  }
+
+  static Future<void> openNotificationSettings() async {
+    if (kIsWeb || defaultTargetPlatform != TargetPlatform.android) return;
+    await _platform.invokeMethod<void>('openNotificationSettings');
+  }
+
   Future<void> initialize() async {
     if (kIsWeb || defaultTargetPlatform != TargetPlatform.android) return;
 
