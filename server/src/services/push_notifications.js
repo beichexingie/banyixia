@@ -148,7 +148,7 @@ async function writeDeliveryLog(pool, values) {
 export async function notifyUser(
   pool,
   userId,
-  { title, body, route, type = 'general', orderId = '' },
+  { title, body, route, type = 'general', orderId = '', devicePrefix = '' },
 ) {
   if (!userId) {
     return { sent: 0, failed: 0, reason: 'missing_user' };
@@ -168,11 +168,15 @@ export async function notifyUser(
         where user_id = $1
           and enabled = true
           and platform = 'aliyun_android'
+          and ($2 = '' or token like $2 || '%')
       `,
-      [userId],
+      [userId, devicePrefix.trim()],
     );
     if (devices.rows.length === 0) {
-      console.warn(`[push] skipped user=${userId}: no Aliyun Push device`);
+      console.warn(
+        `[push] skipped user=${userId}: no Aliyun Push device` +
+          (devicePrefix ? ` matching=${devicePrefix}` : ''),
+      );
       return { sent: 0, failed: 0, reason: 'device_missing' };
     }
 

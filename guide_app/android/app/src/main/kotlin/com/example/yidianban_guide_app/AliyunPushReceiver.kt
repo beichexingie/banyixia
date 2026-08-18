@@ -43,5 +43,8 @@ class AliyunPushReceiver : MessageReceiver() {
   override fun showNotificationNow(
     context: Context,
     extraMap: Map<String, String>,
-  ): Boolean = false
+  ): Boolean {
+    Log.i("YidianbanPush", "showing notification extras=$extraMap")
+    return true
+  }
 }

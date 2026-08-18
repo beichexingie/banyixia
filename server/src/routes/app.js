@@ -873,6 +873,20 @@ appRouter.get('/devices/push-diagnostics', handleRoute(async (req, res) => {
   return ok(res, { data: result.rows });
 }));
 
+appRouter.post('/devices/push-test', handleRoute(async (req, res) => {
+  const userId = await requireSessionUser(req, res);
+  if (!userId) return;
+  const devicePrefix = req.body?.device_prefix?.toString().trim() ?? '';
+  const result = await notifyUser(pool, userId, {
+    title: '推送诊断通知',
+    body: `推送诊断 ${new Date().toISOString()}`,
+    route: '/messages',
+    type: 'push_diagnostic',
+    devicePrefix,
+  });
+  return ok(res, { data: result, message: '已提交推送诊断任务' });
+}));
+
 appRouter.delete('/devices/push-token', handleRoute(async (req, res) => {
   const userId = await requireSessionUser(req, res);
   if (!userId) return;

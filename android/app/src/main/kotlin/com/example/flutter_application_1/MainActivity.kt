@@ -99,6 +99,7 @@ class MainActivity : FlutterActivity() {
       pushService.setNotificationSmallIcon(R.mipmap.ic_launcher)
       ensurePushNotificationChannel()
       requestPushNotificationPermission()
+      logNotificationState()
       pushService.register(applicationContext, object : CommonCallback {
         override fun onSuccess(response: String?) {
           pushService.onAppStart()
@@ -160,6 +161,24 @@ class MainActivity : FlutterActivity() {
       NotificationManager.IMPORTANCE_HIGH,
     )
     getSystemService(NotificationManager::class.java).createNotificationChannel(channel)
+  }
+
+  private fun logNotificationState() {
+    val manager = getSystemService(NotificationManager::class.java)
+    val enabled = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.N) {
+      manager.areNotificationsEnabled()
+    } else {
+      true
+    }
+    val channelImportance = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+      manager.getNotificationChannel(ALIYUN_NOTIFICATION_CHANNEL)?.importance ?: -1
+    } else {
+      -1
+    }
+    Log.i(
+      "YidianbanPush",
+      "notification state enabled=$enabled channel=$ALIYUN_NOTIFICATION_CHANNEL importance=$channelImportance",
+    )
   }
 
   private fun requestPushNotificationPermission() {
