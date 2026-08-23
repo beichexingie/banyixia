@@ -3,6 +3,7 @@ import 'package:go_router/go_router.dart';
 import 'package:provider/provider.dart';
 
 import '../../config/app_theme.dart';
+import '../../config/guide_service_catalog.dart';
 import '../../models/guide.dart';
 import '../../providers/guide_provider.dart';
 import '../../widgets/service_guide_card.dart';
@@ -21,6 +22,7 @@ class _CompanionPageState extends State<CompanionPage> {
   // Users can still choose a specific city from the picker when needed.
   String _selectedCity = '全国';
   bool _sortByTime = true;
+  String? _selectedCategory;
 
   @override
   void initState() {
@@ -87,7 +89,79 @@ class _CompanionPageState extends State<CompanionPage> {
       ),
       child: Padding(
         padding: const EdgeInsets.fromLTRB(14, 10, 14, 18),
-        child: Column(children: [_buildSearchBar()]),
+        child: Column(
+          children: [
+            _buildSearchBar(),
+            const SizedBox(height: 14),
+            _buildCategoryCards(),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildCategoryCards() {
+    const categories = [
+      ('休闲旅游', Icons.travel_explore_rounded),
+      ('户外运动', Icons.terrain_rounded),
+      ('公务随行', Icons.business_center_rounded),
+    ];
+
+    return Row(
+      children: [
+        for (var index = 0; index < categories.length; index++) ...[
+          if (index > 0) const SizedBox(width: 8),
+          Expanded(
+            child: _buildCategoryCard(
+              title: categories[index].$1,
+              icon: categories[index].$2,
+            ),
+          ),
+        ],
+      ],
+    );
+  }
+
+  Widget _buildCategoryCard({required String title, required IconData icon}) {
+    final selected = _selectedCategory == title;
+    return InkWell(
+      onTap: () => setState(() {
+        _selectedCategory = selected ? null : title;
+      }),
+      borderRadius: BorderRadius.circular(16),
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 180),
+        height: 96,
+        padding: const EdgeInsets.fromLTRB(10, 12, 8, 8),
+        decoration: BoxDecoration(
+          color: selected ? const Color(0xFFC9FF70) : const Color(0xFFEFFFCE),
+          borderRadius: BorderRadius.circular(16),
+          border: Border.all(
+            color: selected ? AppColors.primary : Colors.transparent,
+            width: 1.2,
+          ),
+        ),
+        child: Stack(
+          children: [
+            Align(
+              alignment: Alignment.topLeft,
+              child: Text(
+                title,
+                maxLines: 1,
+                overflow: TextOverflow.clip,
+                style: const TextStyle(
+                  fontSize: 15,
+                  fontWeight: FontWeight.w900,
+                  color: AppColors.textPrimary,
+                ),
+              ),
+            ),
+            Align(
+              alignment: Alignment.bottomRight,
+              child: Icon(icon, size: 38, color: const Color(0xFF202520)),
+            ),
+          ],
+        ),
       ),
     );
   }
@@ -253,6 +327,13 @@ class _CompanionPageState extends State<CompanionPage> {
           !guide.tags.contains(provider.filterTag)) {
         return false;
       }
+      final categoryTypes = _selectedCategory == null
+          ? null
+          : guideServiceCategories[_selectedCategory];
+      if (categoryTypes != null &&
+          !_guideServiceTypes(guide).any(categoryTypes.contains)) {
+        return false;
+      }
       return true;
     }).toList();
     if (baseList.isEmpty) {
@@ -286,6 +367,16 @@ class _CompanionPageState extends State<CompanionPage> {
       });
     }
     return list;
+  }
+
+  Iterable<String> _guideServiceTypes(Guide guide) sync* {
+    yield* guide.tags;
+    for (final item in guide.serviceItems) {
+      final type = item['service_type'] ?? item['serviceType'] ?? item['name'];
+      if (type != null && type.toString().trim().isNotEmpty) {
+        yield type.toString().trim();
+      }
+    }
   }
 
   Future<void> _pickCityWithLocationPicker() async {
