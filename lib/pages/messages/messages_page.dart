@@ -162,7 +162,12 @@ class _MessagesPageState extends State<MessagesPage> {
           .read<MessageProvider>()
           .openCustomerService();
       if (!mounted) return;
-      context.push('/chat/$roomId?name=${Uri.encodeComponent('在线客服')}&avatar=');
+      await context.push(
+        '/chat/$roomId?name=${Uri.encodeComponent('在线客服')}&avatar=',
+      );
+      if (mounted) {
+        await context.read<MessageProvider>().loadRooms();
+      }
     } catch (error) {
       if (!mounted) return;
       _showMessage('打开客服失败：$error');
@@ -221,10 +226,13 @@ class _MessagesPageState extends State<MessagesPage> {
         : '这里是聊天内容，这里是聊天内容';
 
     return InkWell(
-      onTap: () {
-        context.push(
+      onTap: () async {
+        await context.push(
           '/chat/${room.id}?name=${Uri.encodeComponent(displayName)}&avatar=${Uri.encodeComponent(room.otherParticipantAvatar ?? '')}',
         );
+        if (mounted) {
+          await context.read<MessageProvider>().loadRooms();
+        }
       },
       child: Padding(
         padding: const EdgeInsets.fromLTRB(16, 16, 16, 16),

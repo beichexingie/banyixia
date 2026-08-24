@@ -94,6 +94,11 @@ class MessageProvider extends ChangeNotifier {
     await enterRoom(roomId);
   }
 
+  void leaveRoom(String roomId) {
+    _pollTimer?.cancel();
+    _pollTimer = null;
+  }
+
   Future<String> getOrCreateRoom(String otherUserId) async {
     final token = _token();
     if (token == null) throw Exception('未登录');

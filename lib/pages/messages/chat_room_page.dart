@@ -24,17 +24,20 @@ class ChatRoomPage extends StatefulWidget {
 class _ChatRoomPageState extends State<ChatRoomPage> {
   final TextEditingController _messageController = TextEditingController();
   final ScrollController _scrollController = ScrollController();
+  late final MessageProvider _messageProvider;
 
   @override
   void initState() {
     super.initState();
+    _messageProvider = context.read<MessageProvider>();
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      context.read<MessageProvider>().enterRoom(widget.roomId);
+      _messageProvider.enterRoom(widget.roomId);
     });
   }
 
   @override
   void dispose() {
+    _messageProvider.leaveRoom(widget.roomId);
     _messageController.dispose();
     _scrollController.dispose();
     super.dispose();

@@ -2728,7 +2728,7 @@ appRouter.post('/chat/rooms/:id/read', async (req, res) => {
     `
       update public.messages
       set is_read = true
-      where room_id = $1 and sender_id <> $2
+      where room_id = $1 and sender_id is distinct from $2
     `,
     [req.params.id, userId],
   );
