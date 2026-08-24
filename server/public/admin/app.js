@@ -472,6 +472,11 @@ async function renderActivities() {
         <select id="activityStatus"><option value="draft">草稿</option><option value="published">发布</option><option value="offline">下线</option></select>
         <input id="activitySummary" class="wide" placeholder="活动摘要" />
         <textarea id="activityContent" rows="4" placeholder="活动内容"></textarea>
+        <label class="wide file-field">
+          <span>宣传图（建议 16:7，最大 10MB）</span>
+          <input id="activityBannerFile" type="file" accept="image/*" />
+          <small id="activityBannerStatus" class="hint">未选择图片</small>
+        </label>
       </div>
       <button id="createActivityBtn" class="primary-btn">创建活动</button>
     </div>
@@ -484,13 +489,42 @@ async function renderActivities() {
       ` : emptyHtml('暂无活动')}
     </div>
   `;
+  let bannerImage = '';
+  let bannerUploadPromise = Promise.resolve();
+  document.querySelector('#activityBannerFile').addEventListener('change', async (event) => {
+    const file = event.target.files?.[0];
+    if (!file) return;
+    const status = document.querySelector('#activityBannerStatus');
+    bannerUploadPromise = (async () => {
+      status.textContent = '正在上传...';
+      const form = new FormData();
+      form.append('file', file);
+      const response = await fetch('/api/admin/activities/banner-image', {
+        method: 'POST',
+        headers: { 'x-user-id': state.userId },
+        body: form,
+      });
+      const data = await response.json().catch(() => ({}));
+      if (!response.ok || data.success === false) {
+        status.textContent = data.message || '上传失败';
+        throw new Error(status.textContent);
+      }
+      bannerImage = data.data?.url || '';
+      status.textContent = bannerImage ? '宣传图上传成功' : '上传失败';
+      if (!bannerImage) throw new Error('宣传图上传失败');
+    })().catch((error) => {
+      toast(error.message || '宣传图上传失败');
+    });
+  });
   document.querySelector('#createActivityBtn').addEventListener('click', async () => {
+    await bannerUploadPromise;
     await api('/api/admin/activities', {
       method: 'POST',
       body: JSON.stringify({
         title: document.querySelector('#activityTitle').value,
         summary: document.querySelector('#activitySummary').value,
         content: document.querySelector('#activityContent').value,
+        banner_image: bannerImage,
         status: document.querySelector('#activityStatus').value,
       }),
     });

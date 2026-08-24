@@ -1125,6 +1125,34 @@ appRouter.delete('/users/:id/follow', async (req, res) => {
   return ok(res, { message: '取消关注成功' });
 });
 
+appRouter.get('/activities', handleRoute(async (_req, res) => {
+  const result = await pool.query(`
+    select id, title, summary, content, banner_image, status,
+      starts_at, ends_at, created_at
+    from public.admin_activities
+    where status = 'published'
+      and (starts_at is null or starts_at <= now())
+      and (ends_at is null or ends_at >= now())
+    order by created_at desc
+    limit 20
+  `);
+  return ok(res, { data: result.rows });
+}));
+
+appRouter.get('/activities/:id', handleRoute(async (req, res) => {
+  const result = await pool.query(`
+    select id, title, summary, content, banner_image, status,
+      starts_at, ends_at, created_at
+    from public.admin_activities
+    where id = $1 and status = 'published'
+      and (starts_at is null or starts_at <= now())
+      and (ends_at is null or ends_at >= now())
+    limit 1
+  `, [req.params.id]);
+  if (!result.rows[0]) return fail(res, 404, '活动不存在或已下线');
+  return ok(res, { data: result.rows[0] });
+}));
+
 appRouter.get('/guides', async (req, res) => {
   const customerLat = toNullableNumber(req.query?.latitude ?? req.query?.lat);
   const customerLng = toNullableNumber(req.query?.longitude ?? req.query?.lng);

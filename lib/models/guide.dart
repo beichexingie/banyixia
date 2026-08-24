@@ -28,6 +28,8 @@ class Guide {
   final double? currentLat;
   final double? currentLng;
   final String currentLocationText;
+  final DateTime? createdAt;
+  final int? distanceMeters;
 
   Guide({
     required this.id,
@@ -58,6 +60,8 @@ class Guide {
     this.currentLat,
     this.currentLng,
     this.currentLocationText = '',
+    this.createdAt,
+    this.distanceMeters,
   });
 
   factory Guide.fromJson(Map<String, dynamic> json) {
@@ -96,6 +100,10 @@ class Guide {
         json['current_lng'] ?? json['guide_current_lng'],
       ),
       currentLocationText: _asString(json['current_location_text']),
+      createdAt: _parseDateTime(json['created_at'] ?? json['createdAt']),
+      distanceMeters: _parseIntOrNull(
+        json['distance_meters'] ?? json['distanceMeters'],
+      ),
     );
   }
 
@@ -129,6 +137,8 @@ class Guide {
       'current_lat': currentLat,
       'current_lng': currentLng,
       'current_location_text': currentLocationText,
+      'created_at': createdAt?.toIso8601String(),
+      'distance_meters': distanceMeters,
     };
   }
 
@@ -140,6 +150,18 @@ class Guide {
   }
 
   static String _asString(dynamic value) => value?.toString() ?? '';
+
+  static DateTime? _parseDateTime(dynamic value) {
+    if (value is DateTime) return value;
+    final text = value?.toString().trim() ?? '';
+    return text.isEmpty ? null : DateTime.tryParse(text);
+  }
+
+  static int? _parseIntOrNull(dynamic value) {
+    if (value is int) return value;
+    if (value is num) return value.toInt();
+    return int.tryParse(value?.toString() ?? '');
+  }
 
   static int _asInt(dynamic value) {
     if (value is int) return value;

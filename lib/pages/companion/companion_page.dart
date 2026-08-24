@@ -3,10 +3,14 @@ import 'package:go_router/go_router.dart';
 import 'package:provider/provider.dart';
 
 import '../../config/app_theme.dart';
+import '../../config/amap_config.dart';
+import '../../config/guide_sort.dart';
 import '../../config/guide_service_catalog.dart';
 import '../../models/guide.dart';
 import '../../providers/guide_provider.dart';
 import '../../widgets/service_guide_card.dart';
+import '../../widgets/guide_sort_menu_button.dart';
+import '../../services/map_service.dart';
 
 class CompanionPage extends StatefulWidget {
   const CompanionPage({super.key});
@@ -21,8 +25,13 @@ class _CompanionPageState extends State<CompanionPage> {
   // Do not hide guides whose city has not been completed in the admin data.
   // Users can still choose a specific city from the picker when needed.
   String _selectedCity = '全国';
-  bool _sortByTime = true;
+  GuideSortMode _guideSortMode = GuideSortMode.time;
   String? _selectedCategory;
+  double? _viewerLatitude;
+  double? _viewerLongitude;
+  final MapService _mapService = const AmapMapService(
+    apiKey: AmapConfig.webServiceKey,
+  );
 
   @override
   void initState() {
@@ -61,7 +70,13 @@ class _CompanionPageState extends State<CompanionPage> {
 
             return RefreshIndicator(
               color: AppColors.primary,
-              onRefresh: () => provider.loadGuides(),
+              onRefresh: () => provider.loadGuides(
+                latitude: _viewerLatitude,
+                longitude: _viewerLongitude,
+                sort: _guideSortMode == GuideSortMode.distance
+                    ? 'distance'
+                    : null,
+              ),
               child: ListView(
                 physics: const AlwaysScrollableScrollPhysics(),
                 padding: EdgeInsets.zero,
@@ -268,35 +283,7 @@ class _CompanionPageState extends State<CompanionPage> {
           ),
         ),
         const Spacer(),
-        InkWell(
-          onTap: () => setState(() => _sortByTime = !_sortByTime),
-          borderRadius: BorderRadius.circular(16),
-          child: Container(
-            height: 42,
-            padding: const EdgeInsets.symmetric(horizontal: 14),
-            decoration: BoxDecoration(
-              color: Colors.white,
-              borderRadius: BorderRadius.circular(16),
-            ),
-            child: Row(
-              children: [
-                Text(
-                  _sortByTime ? '时间升序' : '热门排序',
-                  style: const TextStyle(
-                    fontSize: 14,
-                    color: AppColors.textPrimary,
-                  ),
-                ),
-                const SizedBox(width: 4),
-                const Icon(
-                  Icons.keyboard_arrow_down_rounded,
-                  size: 18,
-                  color: AppColors.textHint,
-                ),
-              ],
-            ),
-          ),
-        ),
+        GuideSortMenuButton(mode: _guideSortMode, onSelected: _selectGuideSort),
       ],
     );
   }
@@ -340,33 +327,42 @@ class _CompanionPageState extends State<CompanionPage> {
       return const <Guide>[];
     }
 
-    final list = baseList;
-    if (_sortByTime) {
-      list.sort((a, b) {
-        final verifiedCompare = (b.verified ? 1 : 0).compareTo(
-          a.verified ? 1 : 0,
-        );
-        if (verifiedCompare != 0) {
-          return verifiedCompare;
-        }
-        final ratingCompare = b.rating.compareTo(a.rating);
-        if (ratingCompare != 0) {
-          return ratingCompare;
-        }
-        return b.likes.compareTo(a.likes);
-      });
-    } else {
-      list.sort((a, b) {
-        final scoreA = a.likes + a.fans + a.views;
-        final scoreB = b.likes + b.fans + b.views;
-        final scoreCompare = scoreB.compareTo(scoreA);
-        if (scoreCompare != 0) {
-          return scoreCompare;
-        }
-        return b.rating.compareTo(a.rating);
-      });
-    }
+    final list = baseList..sort((a, b) => compareGuides(a, b, _guideSortMode));
     return list;
+  }
+
+  Future<void> _selectGuideSort(GuideSortMode mode) async {
+    if (mode == GuideSortMode.distance) {
+      try {
+        final position = await _mapService.currentPosition();
+        if (!mounted) return;
+        if (position?.latitude == null || position?.longitude == null) {
+          _showSortMessage('暂时无法获取当前位置，无法按距离排序');
+          return;
+        }
+        setState(() {
+          _guideSortMode = mode;
+          _viewerLatitude = position!.latitude;
+          _viewerLongitude = position.longitude;
+        });
+        await context.read<GuideProvider>().loadGuides(
+          latitude: _viewerLatitude,
+          longitude: _viewerLongitude,
+          sort: 'distance',
+        );
+        return;
+      } catch (_) {
+        if (mounted) _showSortMessage('获取当前位置失败，请检查定位权限');
+        return;
+      }
+    }
+    setState(() => _guideSortMode = mode);
+  }
+
+  void _showSortMessage(String message) {
+    ScaffoldMessenger.of(
+      context,
+    ).showSnackBar(SnackBar(content: Text(message)));
   }
 
   Iterable<String> _guideServiceTypes(Guide guide) sync* {

@@ -26,6 +26,7 @@ import '../pages/demand/demand_create_page.dart';
 import '../pages/demand/demand_detail_page.dart';
 import '../pages/demand/my_demand_list_page.dart';
 import '../pages/common/state_notice_page.dart';
+import '../pages/activity/activity_detail_page.dart';
 import '../models/guide.dart';
 import '../pages/profile/order_detail_page.dart';
 import '../pages/profile/edit_profile_page.dart';
@@ -53,6 +54,11 @@ class AppRouter {
     },
     routes: [
       GoRoute(path: '/', builder: (context, state) => const MainScaffold()),
+      GoRoute(
+        path: '/activity/:id',
+        builder: (context, state) =>
+            ActivityDetailPage(activityId: state.pathParameters['id']!),
+      ),
       GoRoute(path: '/login', builder: (context, state) => const LoginPage()),
       GoRoute(
         path: '/guide/:id',

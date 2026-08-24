@@ -1,15 +1,23 @@
 import 'dart:ui';
+import 'dart:async';
 
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:provider/provider.dart';
 
 import '../../config/app_theme.dart';
+import '../../config/amap_config.dart';
+import '../../config/guide_sort.dart';
 import '../../models/guide.dart';
+import '../../models/activity.dart';
 import '../../providers/guide_provider.dart';
 import '../../providers/message_provider.dart';
 import '../main_scaffold.dart';
 import '../../widgets/service_guide_card.dart';
+import '../../widgets/guide_sort_menu_button.dart';
+import '../../services/map_service.dart';
+import '../../services/ecs_api_client.dart';
+import '../../config/app_config.dart';
 
 class HomePage extends StatefulWidget {
   const HomePage({super.key});
@@ -22,23 +30,33 @@ class _HomePageState extends State<HomePage>
     with SingleTickerProviderStateMixin {
   late final TabController _tabController;
   late final TextEditingController _searchController;
+  late final PageController _bannerController;
+  Timer? _bannerTimer;
+  List<Activity> _activities = [];
+  int _bannerIndex = 0;
 
   String _selectedCity = '苏州';
   bool _signedToday = false;
   int _currentTab = 0;
+  GuideSortMode _guideSortMode = GuideSortMode.hot;
+  double? _viewerLatitude;
+  double? _viewerLongitude;
+  final MapService _mapService = const AmapMapService(
+    apiKey: AmapConfig.webServiceKey,
+  );
 
   Future<void> _openCustomerService() async {
     try {
-      final roomId = await context.read<MessageProvider>().openCustomerService();
+      final roomId = await context
+          .read<MessageProvider>()
+          .openCustomerService();
       if (!mounted) return;
-      context.push(
-        '/chat/$roomId?name=${Uri.encodeComponent('在线客服')}&avatar=',
-      );
+      context.push('/chat/$roomId?name=${Uri.encodeComponent('在线客服')}&avatar=');
     } catch (error) {
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('打开客服失败：$error')),
-      );
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text('打开客服失败：$error')));
     }
   }
 
@@ -49,6 +67,8 @@ class _HomePageState extends State<HomePage>
     _tabController.addListener(_handleTabChanged);
     _searchController = TextEditingController();
     _searchController.addListener(_handleSearchChanged);
+    _bannerController = PageController();
+    _loadActivities();
     WidgetsBinding.instance.addPostFrameCallback((_) {
       final provider = context.read<GuideProvider>();
       provider.setCity(_selectedCity);
@@ -62,7 +82,40 @@ class _HomePageState extends State<HomePage>
     _tabController.dispose();
     _searchController.removeListener(_handleSearchChanged);
     _searchController.dispose();
+    _bannerTimer?.cancel();
+    _bannerController.dispose();
     super.dispose();
+  }
+
+  Future<void> _loadActivities() async {
+    try {
+      final response = await EcsApiClient().get('/activities');
+      final data = response['data'];
+      if (!mounted || data is! List) return;
+      final activities = data
+          .whereType<Map>()
+          .map((item) => Activity.fromJson(Map<String, dynamic>.from(item)))
+          .where((item) => item.id.isNotEmpty && item.title.isNotEmpty)
+          .toList();
+      setState(() => _activities = activities);
+      _startBannerTimer();
+    } catch (error) {
+      debugPrint('Load activities error: $error');
+    }
+  }
+
+  void _startBannerTimer() {
+    _bannerTimer?.cancel();
+    if (_activities.length < 2) return;
+    _bannerTimer = Timer.periodic(const Duration(seconds: 4), (_) {
+      if (!mounted || !_bannerController.hasClients) return;
+      final next = (_bannerIndex + 1) % _activities.length;
+      _bannerController.animateToPage(
+        next,
+        duration: const Duration(milliseconds: 420),
+        curve: Curves.easeOut,
+      );
+    });
   }
 
   void _handleTabChanged() {
@@ -167,7 +220,7 @@ class _HomePageState extends State<HomePage>
             controller: _tabController,
             children: [
               _buildGuideList(),
-              _buildGuideList(sortByHot: false),
+              _buildGuideList(),
               _buildGuideList(showFallbackAction: true),
             ],
           ),
@@ -523,6 +576,8 @@ class _HomePageState extends State<HomePage>
   }
 
   Widget _buildBannerCard() {
+    final hasActivities = _activities.isNotEmpty;
+    final count = hasActivities ? _activities.length : 1;
     return Column(
       children: [
         ClipRRect(
@@ -530,58 +585,107 @@ class _HomePageState extends State<HomePage>
           child: SizedBox(
             width: double.infinity,
             height: 150,
-            child: Stack(
-              fit: StackFit.expand,
-              children: [
-                Image.asset(
-                  'assets/home/banner/Rectangle 8.png',
-                  fit: BoxFit.cover,
-                ),
-                Center(
-                  child: Image.asset(
-                    'assets/home/tab_mark/image 4.png',
-                    width: 226,
-                    fit: BoxFit.contain,
+            child: PageView.builder(
+              controller: _bannerController,
+              itemCount: count,
+              onPageChanged: (index) => setState(() => _bannerIndex = index),
+              itemBuilder: (context, index) {
+                if (!hasActivities) return _buildDefaultBanner();
+                final activity = _activities[index];
+                return GestureDetector(
+                  onTap: () => context.push('/activity/${activity.id}'),
+                  child: Stack(
+                    fit: StackFit.expand,
+                    children: [
+                      if (activity.bannerImage.trim().isNotEmpty)
+                        Image.network(
+                          _activityImageUrl(activity.bannerImage),
+                          fit: BoxFit.cover,
+                          errorBuilder: (_, error, stackTrace) =>
+                              _buildDefaultBanner(),
+                        )
+                      else
+                        _buildDefaultBanner(),
+                      Positioned(
+                        left: 16,
+                        right: 16,
+                        bottom: 12,
+                        child: DecoratedBox(
+                          decoration: BoxDecoration(
+                            color: Colors.black.withValues(alpha: 0.38),
+                            borderRadius: BorderRadius.circular(10),
+                          ),
+                          child: Padding(
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 12,
+                              vertical: 7,
+                            ),
+                            child: Text(
+                              activity.title,
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: const TextStyle(
+                                color: Colors.white,
+                                fontWeight: FontWeight.w800,
+                              ),
+                            ),
+                          ),
+                        ),
+                      ),
+                    ],
                   ),
-                ),
-              ],
+                );
+              },
             ),
           ),
         ),
         const SizedBox(height: 10),
         Row(
           mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Container(
-              width: 22,
-              height: 6,
-              decoration: BoxDecoration(
-                color: AppColors.textPrimary,
-                borderRadius: BorderRadius.circular(999),
+          children: List.generate(count, (index) {
+            final selected = index == _bannerIndex;
+            return Padding(
+              padding: EdgeInsets.only(right: index == count - 1 ? 0 : 8),
+              child: AnimatedContainer(
+                duration: const Duration(milliseconds: 180),
+                width: selected ? 22 : 6,
+                height: 6,
+                decoration: BoxDecoration(
+                  color: selected
+                      ? AppColors.textPrimary
+                      : AppColors.textHint.withValues(alpha: 0.38),
+                  borderRadius: BorderRadius.circular(999),
+                ),
               ),
-            ),
-            const SizedBox(width: 8),
-            Container(
-              width: 6,
-              height: 6,
-              decoration: BoxDecoration(
-                color: AppColors.textHint.withValues(alpha: 0.48),
-                shape: BoxShape.circle,
-              ),
-            ),
-            const SizedBox(width: 8),
-            Container(
-              width: 6,
-              height: 6,
-              decoration: BoxDecoration(
-                color: AppColors.textHint.withValues(alpha: 0.3),
-                shape: BoxShape.circle,
-              ),
-            ),
-          ],
+            );
+          }),
         ),
       ],
     );
+  }
+
+  Widget _buildDefaultBanner() {
+    return Stack(
+      fit: StackFit.expand,
+      children: [
+        Image.asset('assets/home/banner/Rectangle 8.png', fit: BoxFit.cover),
+        Center(
+          child: Image.asset(
+            'assets/home/tab_mark/image 4.png',
+            width: 226,
+            fit: BoxFit.contain,
+          ),
+        ),
+      ],
+    );
+  }
+
+  String _activityImageUrl(String value) {
+    if (value.startsWith('http://') || value.startsWith('https://')) {
+      return value;
+    }
+    final base = AppConfig.apiBaseUrl.replaceFirst(RegExp(r'/api/?$'), '');
+    return '$base/${value.replaceFirst(RegExp(r'^/'), '')}';
   }
 
   Widget _buildTabSelector() {
@@ -758,10 +862,7 @@ class _HomePageState extends State<HomePage>
     );
   }
 
-  Widget _buildGuideList({
-    bool sortByHot = true,
-    bool showFallbackAction = false,
-  }) {
+  Widget _buildGuideList({bool showFallbackAction = false}) {
     return Consumer<GuideProvider>(
       builder: (context, provider, _) {
         if (provider.isLoading && provider.guides.isEmpty) {
@@ -770,26 +871,8 @@ class _HomePageState extends State<HomePage>
           );
         }
 
-        final guides = List<Guide>.from(provider.filteredGuides);
-        if (sortByHot) {
-          guides.sort((a, b) {
-            final scoreA = a.likes + a.fans + a.views;
-            final scoreB = b.likes + b.fans + b.views;
-            final scoreCompare = scoreB.compareTo(scoreA);
-            if (scoreCompare != 0) return scoreCompare;
-            return b.rating.compareTo(a.rating);
-          });
-        } else {
-          guides.sort((a, b) {
-            final verifiedCompare = (b.verified ? 1 : 0).compareTo(
-              a.verified ? 1 : 0,
-            );
-            if (verifiedCompare != 0) return verifiedCompare;
-            final ratingCompare = b.rating.compareTo(a.rating);
-            if (ratingCompare != 0) return ratingCompare;
-            return b.likes.compareTo(a.likes);
-          });
-        }
+        final guides = List<Guide>.from(provider.filteredGuides)
+          ..sort((a, b) => compareGuides(a, b, _guideSortMode));
 
         if (guides.isEmpty) {
           return _emptyState(
@@ -805,23 +888,75 @@ class _HomePageState extends State<HomePage>
 
         return RefreshIndicator(
           color: AppColors.primary,
-          onRefresh: () => provider.loadGuides(),
+          onRefresh: () => provider.loadGuides(
+            latitude: _viewerLatitude,
+            longitude: _viewerLongitude,
+            sort: _guideSortMode == GuideSortMode.distance ? 'distance' : null,
+          ),
           child: ListView.separated(
             physics: const AlwaysScrollableScrollPhysics(
               parent: BouncingScrollPhysics(),
             ),
             padding: const EdgeInsets.fromLTRB(18, 8, 18, 100),
-            itemCount: guides.length,
+            itemCount: guides.length + 1,
             separatorBuilder: (_, __) => const SizedBox(height: 14),
-            itemBuilder: (context, index) => ServiceGuideCard(
-              guide: guides[index],
-              rankLabel: '${index + 1}',
-              statusLabel: '最早可约 今天 14:00',
-            ),
+            itemBuilder: (context, index) {
+              if (index == 0) return _buildGuideSortBar();
+              final guide = guides[index - 1];
+              return ServiceGuideCard(
+                guide: guide,
+                rankLabel: '$index',
+                statusLabel: '最早可约 今天 14:00',
+              );
+            },
           ),
         );
       },
     );
+  }
+
+  Widget _buildGuideSortBar() {
+    return Align(
+      alignment: Alignment.centerRight,
+      child: GuideSortMenuButton(
+        mode: _guideSortMode,
+        onSelected: _selectGuideSort,
+      ),
+    );
+  }
+
+  Future<void> _selectGuideSort(GuideSortMode mode) async {
+    if (mode == GuideSortMode.distance) {
+      try {
+        final position = await _mapService.currentPosition();
+        if (!mounted) return;
+        if (position?.latitude == null || position?.longitude == null) {
+          _showSortMessage('暂时无法获取当前位置，无法按距离排序');
+          return;
+        }
+        setState(() {
+          _guideSortMode = mode;
+          _viewerLatitude = position!.latitude;
+          _viewerLongitude = position.longitude;
+        });
+        await context.read<GuideProvider>().loadGuides(
+          latitude: _viewerLatitude,
+          longitude: _viewerLongitude,
+          sort: 'distance',
+        );
+        return;
+      } catch (_) {
+        if (mounted) _showSortMessage('获取当前位置失败，请检查定位权限');
+        return;
+      }
+    }
+    setState(() => _guideSortMode = mode);
+  }
+
+  void _showSortMessage(String message) {
+    ScaffoldMessenger.of(
+      context,
+    ).showSnackBar(SnackBar(content: Text(message)));
   }
 
   Widget _emptyState({

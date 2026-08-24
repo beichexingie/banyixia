@@ -87,11 +87,25 @@ class GuideProvider extends ChangeNotifier {
     notifyListeners();
   }
 
-  Future<void> loadGuides() async {
+  Future<void> loadGuides({
+    double? latitude,
+    double? longitude,
+    String? sort,
+  }) async {
     _isLoading = true;
     notifyListeners();
     try {
-      final response = await _api.get('/guides', authToken: _token());
+      final query = <String, dynamic>{};
+      if (latitude != null && longitude != null) {
+        query['latitude'] = latitude;
+        query['longitude'] = longitude;
+      }
+      if (sort != null && sort.isNotEmpty) query['sort'] = sort;
+      final response = await _api.get(
+        '/guides',
+        authToken: _token(),
+        query: query.isEmpty ? null : query,
+      );
       final data = response['data'];
       if (data is List) {
         final loadedGuides = <Guide>[];

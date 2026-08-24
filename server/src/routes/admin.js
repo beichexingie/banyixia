@@ -1,4 +1,8 @@
 import express from 'express';
+import fs from 'fs/promises';
+import multer from 'multer';
+import path from 'path';
+import { fileURLToPath } from 'url';
 
 import { pool } from '../db.js';
 import { ok, fail } from '../utils/http.js';
@@ -6,6 +10,18 @@ import { assertPayloadAllowed } from '../services/moderation.js';
 import { notifyUser } from '../services/push_notifications.js';
 
 export const adminRouter = express.Router();
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
+const uploadsDir = path.resolve(__dirname, '../../uploads');
+const activityImageUpload = multer({
+  storage: multer.memoryStorage(),
+  limits: { fileSize: 10 * 1024 * 1024 },
+});
+
+function activityImageUrl(req, relativePath) {
+  const protocol = req.headers['x-forwarded-proto']?.toString().trim() || req.protocol;
+  return `${protocol}://${req.headers.host}${relativePath}`;
+}
 
 const ROLE_PERMISSIONS = {
   admin: [
@@ -564,6 +580,21 @@ adminRouter.get('/activities', requirePermission('activity'), handleRoute(async 
   `);
   return ok(res, { data: result.rows });
 }));
+
+adminRouter.post(
+  '/activities/banner-image',
+  requirePermission('activity'),
+  activityImageUpload.single('file'),
+  handleRoute(async (req, res) => {
+    if (!req.file?.buffer?.length) return fail(res, 400, '请选择宣传图');
+    const directory = path.join(uploadsDir, 'activities');
+    await fs.mkdir(directory, { recursive: true });
+    const extension = path.extname(req.file.originalname || '').toLowerCase() || '.jpg';
+    const filename = `${Date.now()}_activity${extension.replace(/[^.a-z0-9]/gi, '')}`;
+    await fs.writeFile(path.join(directory, filename), req.file.buffer);
+    return ok(res, { data: { url: activityImageUrl(req, `/uploads/activities/${filename}`) } });
+  }),
+);
 
 adminRouter.post('/activities', requirePermission('activity'), handleRoute(async (req, res) => {
   const payload = req.body ?? {};
