@@ -24,7 +24,6 @@ class _EditProfilePageState extends State<EditProfilePage> {
   late final TextEditingController _cityController;
   late final TextEditingController _birthdayController;
   late final TextEditingController _occupationController;
-  late final TextEditingController _wechatController;
   late final TextEditingController _guideIntroductionController;
   late final TextEditingController _ethnicityController;
   late final TextEditingController _educationController;
@@ -47,7 +46,6 @@ class _EditProfilePageState extends State<EditProfilePage> {
     _cityController = TextEditingController(text: user.city);
     _birthdayController = TextEditingController(text: user.birthday);
     _occupationController = TextEditingController(text: user.occupation);
-    _wechatController = TextEditingController(text: user.wechat);
     _guideIntroductionController = TextEditingController(
       text: user.guideIntroduction,
     );
@@ -78,7 +76,6 @@ class _EditProfilePageState extends State<EditProfilePage> {
       _cityController,
       _birthdayController,
       _occupationController,
-      _wechatController,
       _guideIntroductionController,
       _ethnicityController,
       _educationController,
@@ -123,7 +120,6 @@ class _EditProfilePageState extends State<EditProfilePage> {
           gender: _gender,
           city: _cityController.text.trim(),
           birthday: _birthdayController.text.trim(),
-          wechat: _wechatController.text.trim(),
           occupation: _occupationController.text.trim(),
           ethnicity: _ethnicityController.text.trim(),
           education: _educationController.text.trim(),
@@ -214,7 +210,6 @@ class _EditProfilePageState extends State<EditProfilePage> {
               ],
             ),
             _field(_bioController, '个人简介', maxLines: 4, maxLength: 160),
-            _field(_wechatController, '微信号', maxLength: 40),
             if (user.isGuideApproved)
               _field(
                 _guideIntroductionController,

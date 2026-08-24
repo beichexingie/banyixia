@@ -1177,6 +1177,7 @@ appRouter.get('/guides', async (req, res) => {
         u.weight_kg,
         u.service_description,
         u.extra_fee_description,
+        coalesce((select count(*) from public.follows f where f.followed_id = g.id), 0)::int as actual_fans,
         coalesce((select count(*) from public.orders o where o.guide_id = g.id), 0)::int as total_orders,
         coalesce((select avg(r.rating) / 5.0 * 100 from public.guide_reviews r where r.guide_id = g.id), 0)::double precision as good_rate,
         coalesce((
@@ -1227,6 +1228,7 @@ appRouter.get('/guides', async (req, res) => {
       .filter((row) => !isLegacyAllysaGuide(row))
       .map((row) => mergeGuideUserFields({
         ...row,
+        fans: Number(row.actual_fans ?? row.fans ?? 0),
         current_lat: row.selected_service_lat ?? row.current_lat,
         current_lng: row.selected_service_lng ?? row.current_lng,
       })),
@@ -1301,6 +1303,7 @@ appRouter.get('/guides/:id', async (req, res) => {
         u.weight_kg,
         u.service_description,
         u.extra_fee_description,
+        coalesce((select count(*) from public.follows f where f.followed_id = g.id), 0)::int as actual_fans,
         coalesce((select count(*) from public.orders o where o.guide_id = g.id), 0)::int as total_orders,
         coalesce((select avg(r.rating) / 5.0 * 100 from public.guide_reviews r where r.guide_id = g.id), 0)::double precision as good_rate,
         coalesce((
@@ -1349,6 +1352,7 @@ appRouter.get('/guides/:id', async (req, res) => {
   const guide = durableGuide.rows[0];
   return ok(res, { data: mergeGuideUserFields({
     ...guide,
+    fans: Number(guide.actual_fans ?? guide.fans ?? 0),
     current_lat: guide.selected_service_lat ?? guide.current_lat,
     current_lng: guide.selected_service_lng ?? guide.current_lng,
   }) });

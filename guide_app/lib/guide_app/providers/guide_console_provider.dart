@@ -459,6 +459,7 @@ class GuideConsoleProvider extends ChangeNotifier {
         etaText: _etaTextForOrder(order),
         distanceText: _distanceTextForOrder(order),
         amount: order.amount,
+        expectedCommission: order.expectedGuideIncome,
         content: _contentForOrder(order),
         address: order.serviceAddress.isNotEmpty
             ? order.serviceAddress

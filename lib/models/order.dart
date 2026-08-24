@@ -18,6 +18,10 @@ class Order {
   final String customerAvatar;
   final OrderStatus status;
   final double amount;
+  final double? serviceFee;
+  final double? travelFee;
+  final double? platformFee;
+  final double? guideIncome;
   final String serviceName;
   final String? serviceItemId;
   final double? serviceHours;
@@ -47,6 +51,10 @@ class Order {
     this.customerAvatar = '',
     required this.status,
     required this.amount,
+    this.serviceFee,
+    this.travelFee,
+    this.platformFee,
+    this.guideIncome,
     this.serviceName = '',
     this.serviceItemId,
     this.serviceHours,
@@ -67,6 +75,18 @@ class Order {
     this.serviceDate,
   }) : createdAt = createdAt ?? DateTime.now();
 
+  /// The guide receives 60% of the service fee plus the full travel fee.
+  /// Older orders may not have the split fields, so they fall back to the
+  /// stored order amount instead of showing an invalid zero value.
+  double get expectedGuideIncome {
+    if (guideIncome != null) return guideIncome!;
+    if (serviceFee == null && travelFee == null) return amount;
+    final travel = travelFee ?? 0;
+    final service =
+        serviceFee ?? (amount - travel).clamp(0, double.infinity).toDouble();
+    return service * 0.6 + travel;
+  }
+
   static double _asDouble(dynamic value, {double fallback = 0}) {
     if (value is num) return value.toDouble();
     return double.tryParse(value?.toString() ?? '') ?? fallback;
@@ -83,6 +103,10 @@ class Order {
       customerAvatar: json['customer_avatar'] ?? '',
       status: _parseStatus(json['status']),
       amount: _parseDouble(json['amount']) ?? 0,
+      serviceFee: _parseDouble(json['service_fee']),
+      travelFee: _parseDouble(json['travel_fee']),
+      platformFee: _parseDouble(json['platform_fee']),
+      guideIncome: _parseDouble(json['guide_income']),
       serviceName: json['service_name'] ?? '',
       serviceItemId: json['service_item_id']?.toString(),
       serviceHours: _parseDouble(json['service_hours']),
@@ -118,6 +142,10 @@ class Order {
       'guide_avatar': guideAvatar,
       'status': status.index,
       'amount': amount,
+      if (serviceFee != null) 'service_fee': serviceFee,
+      if (travelFee != null) 'travel_fee': travelFee,
+      if (platformFee != null) 'platform_fee': platformFee,
+      if (guideIncome != null) 'guide_income': guideIncome,
       'service_name': serviceName,
       if (serviceItemId != null) 'service_item_id': serviceItemId,
       if (serviceHours != null) 'service_hours': serviceHours,
@@ -152,6 +180,10 @@ class Order {
     String? customerAvatar,
     OrderStatus? status,
     double? amount,
+    double? serviceFee,
+    double? travelFee,
+    double? platformFee,
+    double? guideIncome,
     String? serviceName,
     String? serviceItemId,
     double? serviceHours,
@@ -181,6 +213,10 @@ class Order {
       customerAvatar: customerAvatar ?? this.customerAvatar,
       status: status ?? this.status,
       amount: amount ?? this.amount,
+      serviceFee: serviceFee ?? this.serviceFee,
+      travelFee: travelFee ?? this.travelFee,
+      platformFee: platformFee ?? this.platformFee,
+      guideIncome: guideIncome ?? this.guideIncome,
       serviceName: serviceName ?? this.serviceName,
       serviceItemId: serviceItemId ?? this.serviceItemId,
       serviceHours: serviceHours ?? this.serviceHours,

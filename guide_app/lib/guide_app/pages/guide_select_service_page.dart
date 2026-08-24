@@ -22,10 +22,7 @@ class GuideSelectServicePage extends StatelessWidget {
 
     return GuideAppScaffold(
       backgroundColor: Colors.white,
-      appBar: AppBar(
-        title: const Text('选择服务'),
-        backgroundColor: Colors.white,
-      ),
+      appBar: AppBar(title: const Text('选择服务'), backgroundColor: Colors.white),
       body: Column(
         children: [
           Expanded(
@@ -67,7 +64,10 @@ class GuideSelectServicePage extends StatelessWidget {
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
                               Container(
-                                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                                padding: const EdgeInsets.symmetric(
+                                  horizontal: 12,
+                                  vertical: 6,
+                                ),
                                 decoration: BoxDecoration(
                                   color: AppColors.primary,
                                   borderRadius: BorderRadius.circular(999),
@@ -99,7 +99,7 @@ class GuideSelectServicePage extends StatelessWidget {
                           crossAxisAlignment: CrossAxisAlignment.end,
                           children: [
                             Text(
-                              '¥${service.pricePerDay.toStringAsFixed(0)}/天',
+                              '¥${service.pricePerDay.toStringAsFixed(2)}/天',
                               style: const TextStyle(
                                 fontSize: 22,
                                 fontWeight: FontWeight.w900,
@@ -119,7 +119,10 @@ class GuideSelectServicePage extends StatelessWidget {
                                 const SizedBox(width: 14),
                                 Text(
                                   '${service.count}',
-                                  style: const TextStyle(fontSize: 20, fontWeight: FontWeight.w900),
+                                  style: const TextStyle(
+                                    fontSize: 20,
+                                    fontWeight: FontWeight.w900,
+                                  ),
                                 ),
                                 const SizedBox(width: 14),
                                 _CountButton(
@@ -191,7 +194,10 @@ class GuideSelectServicePage extends StatelessWidget {
                       Container(
                         width: double.infinity,
                         margin: const EdgeInsets.fromLTRB(18, 10, 18, 18),
-                        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 14,
+                          vertical: 12,
+                        ),
                         decoration: BoxDecoration(
                           color: const Color(0xFFFFF2E5),
                           borderRadius: BorderRadius.circular(14),
@@ -228,7 +234,7 @@ class GuideSelectServicePage extends StatelessWidget {
                 Row(
                   children: [
                     Text(
-                      '合计 ¥${selectedAmount.toStringAsFixed(0)}',
+                      '合计 ¥${selectedAmount.toStringAsFixed(2)}',
                       style: const TextStyle(
                         fontSize: 20,
                         fontWeight: FontWeight.w900,
@@ -276,12 +282,17 @@ class GuideSelectServicePage extends StatelessWidget {
                       backgroundColor: AppColors.primary,
                       foregroundColor: AppColors.textPrimary,
                       padding: const EdgeInsets.symmetric(vertical: 20),
-                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(999)),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(999),
+                      ),
                       elevation: 0,
                     ),
                     child: const Text(
                       '立即付款',
-                      style: TextStyle(fontSize: 18, fontWeight: FontWeight.w900),
+                      style: TextStyle(
+                        fontSize: 18,
+                        fontWeight: FontWeight.w900,
+                      ),
                     ),
                   ),
                 ),
@@ -299,11 +310,7 @@ class _CountButton extends StatelessWidget {
   final bool active;
   final VoidCallback? onTap;
 
-  const _CountButton({
-    required this.icon,
-    required this.active,
-    this.onTap,
-  });
+  const _CountButton({required this.icon, required this.active, this.onTap});
 
   @override
   Widget build(BuildContext context) {
@@ -317,7 +324,10 @@ class _CountButton extends StatelessWidget {
           color: active ? AppColors.primary : const Color(0xFFF0F1F5),
           borderRadius: BorderRadius.circular(12),
         ),
-        child: Icon(icon, color: active ? AppColors.textPrimary : AppColors.textHint),
+        child: Icon(
+          icon,
+          color: active ? AppColors.textPrimary : AppColors.textHint,
+        ),
       ),
     );
   }
@@ -327,10 +337,7 @@ class _SelectLine extends StatelessWidget {
   final String title;
   final String value;
 
-  const _SelectLine({
-    required this.title,
-    required this.value,
-  });
+  const _SelectLine({required this.title, required this.value});
 
   @override
   Widget build(BuildContext context) {
@@ -342,7 +349,10 @@ class _SelectLine extends StatelessWidget {
             width: 118,
             child: Text(
               '$title：',
-              style: const TextStyle(fontSize: 17, color: AppColors.textSecondary),
+              style: const TextStyle(
+                fontSize: 17,
+                color: AppColors.textSecondary,
+              ),
             ),
           ),
           Expanded(
@@ -351,8 +361,12 @@ class _SelectLine extends StatelessWidget {
               textAlign: TextAlign.right,
               style: TextStyle(
                 fontSize: 17,
-                fontWeight: title == '服务人数及性别' ? FontWeight.w500 : FontWeight.w800,
-                color: title == '服务人数及性别' ? AppColors.textHint : AppColors.textPrimary,
+                fontWeight: title == '服务人数及性别'
+                    ? FontWeight.w500
+                    : FontWeight.w800,
+                color: title == '服务人数及性别'
+                    ? AppColors.textHint
+                    : AppColors.textPrimary,
               ),
             ),
           ),
@@ -390,18 +404,28 @@ class _PaymentRow extends StatelessWidget {
             Container(
               width: 54,
               height: 54,
-              decoration: BoxDecoration(color: iconColor, shape: BoxShape.circle),
+              decoration: BoxDecoration(
+                color: iconColor,
+                shape: BoxShape.circle,
+              ),
               alignment: Alignment.center,
               child: Text(
                 iconText,
-                style: const TextStyle(fontSize: 26, color: Colors.white, fontWeight: FontWeight.w900),
+                style: const TextStyle(
+                  fontSize: 26,
+                  color: Colors.white,
+                  fontWeight: FontWeight.w900,
+                ),
               ),
             ),
             const SizedBox(width: 14),
             Expanded(
               child: Text(
                 label,
-                style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w800),
+                style: const TextStyle(
+                  fontSize: 18,
+                  fontWeight: FontWeight.w800,
+                ),
               ),
             ),
             Icon(

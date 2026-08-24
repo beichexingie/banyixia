@@ -428,7 +428,7 @@ class _GuideOrderCard extends StatelessWidget {
                   ),
                   const SizedBox(width: 6),
                   Text(
-                    '¥${_formatAmount(data.amount)}',
+                    '¥${_formatAmount(data.expectedCommission ?? data.amount)}',
                     style: const TextStyle(
                       fontSize: 18,
                       fontWeight: FontWeight.w900,
@@ -486,7 +486,7 @@ class _GuideOrderCard extends StatelessWidget {
                   const SizedBox(width: 8),
                   Expanded(
                     child: Text(
-                      '已入账 ¥${_formatAmount(data.amount)}，当前为平台托管中，订单完成后可提现',
+                      '已入账 ¥${_formatAmount(data.expectedCommission ?? data.amount)}，当前为平台托管中，订单完成后可提现',
                       style: const TextStyle(
                         fontSize: 13,
                         fontWeight: FontWeight.w800,
@@ -658,10 +658,7 @@ String _formatServiceTime(DateTime serviceTime) {
 }
 
 String _formatAmount(double amount) {
-  if (amount > 0 && amount < 1) {
-    return amount.toStringAsFixed(2);
-  }
-  return amount.toStringAsFixed(0);
+  return amount.toStringAsFixed(2);
 }
 
 class _OutlineActionButton extends StatelessWidget {

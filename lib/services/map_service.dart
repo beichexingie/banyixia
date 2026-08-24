@@ -76,10 +76,7 @@ abstract class MapService {
     String? city,
   });
 
-  Future<MapPosition?> geocodeAddress({
-    required String address,
-    String? city,
-  });
+  Future<MapPosition?> geocodeAddress({required String address, String? city});
 
   Future<MapPosition?> reverseGeocode({
     required double latitude,
@@ -109,11 +106,7 @@ class AmapApiException implements Exception {
   final String info;
   final Map<String, dynamic>? raw;
 
-  const AmapApiException({
-    required this.code,
-    required this.info,
-    this.raw,
-  });
+  const AmapApiException({required this.code, required this.info, this.raw});
 
   @override
   String toString() => 'AmapApiException($code): $info';
@@ -153,22 +146,25 @@ class AmapMapService implements MapService {
     final tips = data?['tips'];
     if (tips is! List) return [];
 
-    return tips.map<MapSuggestion>((item) {
-      if (item is! Map) {
-        return const MapSuggestion(name: '', city: '');
-      }
-      final gcjLocation = _parseLocation(item['location']?.toString());
-      final location = gcjLocation == null
-          ? null
-          : _gcj02ToWgs84Exact(gcjLocation.$1!, gcjLocation.$2!);
-      return MapSuggestion(
-        name: item['name']?.toString() ?? '',
-        city: item['city']?.toString() ?? city?.trim() ?? '',
-        district: item['district']?.toString() ?? '',
-        latitude: location?.$1,
-        longitude: location?.$2,
-      );
-    }).where((item) => item.name.isNotEmpty).toList();
+    return tips
+        .map<MapSuggestion>((item) {
+          if (item is! Map) {
+            return const MapSuggestion(name: '', city: '');
+          }
+          final gcjLocation = _parseLocation(item['location']?.toString());
+          final location = gcjLocation == null
+              ? null
+              : _gcj02ToWgs84Exact(gcjLocation.$1!, gcjLocation.$2!);
+          return MapSuggestion(
+            name: item['name']?.toString() ?? '',
+            city: item['city']?.toString() ?? city?.trim() ?? '',
+            district: item['district']?.toString() ?? '',
+            latitude: location?.$1,
+            longitude: location?.$2,
+          );
+        })
+        .where((item) => item.name.isNotEmpty)
+        .toList();
   }
 
   @override
@@ -178,15 +174,12 @@ class AmapMapService implements MapService {
   }) async {
     if (!_isEnabled || address.trim().isEmpty) return null;
 
-    final uri = Uri.https(
-      'restapi.amap.com',
-      '/v3/geocode/geo',
-      <String, String>{
-        'key': apiKey.trim(),
-        'address': address.trim(),
-        if (city != null && city.trim().isNotEmpty) 'city': city.trim(),
-      },
-    );
+    final uri =
+        Uri.https('restapi.amap.com', '/v3/geocode/geo', <String, String>{
+          'key': apiKey.trim(),
+          'address': address.trim(),
+          if (city != null && city.trim().isNotEmpty) 'city': city.trim(),
+        });
 
     final data = await _getJson(uri);
     _ensureSuccess(data);
@@ -201,7 +194,8 @@ class AmapMapService implements MapService {
         : _gcj02ToWgs84Exact(gcjLocation.$1!, gcjLocation.$2!);
 
     return MapPosition(
-      formattedAddress: first['formatted_address']?.toString() ?? address.trim(),
+      formattedAddress:
+          first['formatted_address']?.toString() ?? address.trim(),
       city: first['city']?.toString() ?? city?.trim() ?? '',
       district: first['district']?.toString() ?? '',
       latitude: location?.$1,
@@ -217,16 +211,13 @@ class AmapMapService implements MapService {
     if (!_isEnabled) return null;
     final gcjLocation = _wgs84ToGcj02(latitude, longitude);
 
-    final uri = Uri.https(
-      'restapi.amap.com',
-      '/v3/geocode/regeo',
-      <String, String>{
-        'key': apiKey.trim(),
-        'location': '${gcjLocation.$2},${gcjLocation.$1}',
-        'radius': '1000',
-        'extensions': 'base',
-      },
-    );
+    final uri =
+        Uri.https('restapi.amap.com', '/v3/geocode/regeo', <String, String>{
+          'key': apiKey.trim(),
+          'location': '${gcjLocation.$2},${gcjLocation.$1}',
+          'radius': '1000',
+          'extensions': 'base',
+        });
 
     final data = await _getJson(uri);
     _ensureSuccess(data);
@@ -254,23 +245,17 @@ class AmapMapService implements MapService {
   }) {
     if (!_isEnabled) return '';
     final gcjLocation = _wgs84ToGcj02(latitude, longitude);
-    return Uri.https(
-      'restapi.amap.com',
-      '/v3/staticmap',
-      <String, String>{
-        'key': apiKey.trim(),
-        'location': '${gcjLocation.$2},${gcjLocation.$1}',
-        'zoom': zoom.toString(),
-        'size': '${width}*${height}',
-        'markers': 'mid,,A:${gcjLocation.$2},${gcjLocation.$1}',
-      },
-    ).toString();
+    return Uri.https('restapi.amap.com', '/v3/staticmap', <String, String>{
+      'key': apiKey.trim(),
+      'location': '${gcjLocation.$2},${gcjLocation.$1}',
+      'zoom': zoom.toString(),
+      'size': '${width}*${height}',
+      'markers': 'mid,,A:${gcjLocation.$2},${gcjLocation.$1}',
+    }).toString();
   }
 
   @override
   Future<MapPosition?> currentPosition() async {
-    if (!_isEnabled) return null;
-
     final serviceEnabled = await Geolocator.isLocationServiceEnabled();
     if (!serviceEnabled) {
       throw const AmapApiException(
@@ -296,15 +281,41 @@ class AmapMapService implements MapService {
       desiredAccuracy: LocationAccuracy.bestForNavigation,
     );
     final rawPoint = LatLng(position.latitude, position.longitude);
-    final normalizedPoint =
-        _shouldTreatDeviceLocationAsGcj(rawPoint)
-            ? toWgs84LatLng(rawPoint)
-            : rawPoint;
+    final normalizedPoint = _shouldTreatDeviceLocationAsGcj(rawPoint)
+        ? toWgs84LatLng(rawPoint)
+        : rawPoint;
 
-    return reverseGeocode(
-      latitude: normalizedPoint.latitude,
-      longitude: normalizedPoint.longitude,
-    );
+    // Distance sorting only needs coordinates. Reverse geocoding is optional;
+    // an invalid Web Service key must not make a valid GPS position unusable.
+    if (!_isEnabled) {
+      return MapPosition(
+        formattedAddress: '当前位置',
+        city: '',
+        latitude: normalizedPoint.latitude,
+        longitude: normalizedPoint.longitude,
+      );
+    }
+
+    try {
+      final resolved = await reverseGeocode(
+        latitude: normalizedPoint.latitude,
+        longitude: normalizedPoint.longitude,
+      );
+      return resolved ??
+          MapPosition(
+            formattedAddress: '当前位置',
+            city: '',
+            latitude: normalizedPoint.latitude,
+            longitude: normalizedPoint.longitude,
+          );
+    } on AmapApiException {
+      return MapPosition(
+        formattedAddress: '当前位置',
+        city: '',
+        latitude: normalizedPoint.latitude,
+        longitude: normalizedPoint.longitude,
+      );
+    }
   }
 
   @override
@@ -322,17 +333,14 @@ class AmapMapService implements MapService {
       destinationLongitude,
     );
 
-    final uri = Uri.https(
-      'restapi.amap.com',
-      '/v3/direction/driving',
-      <String, String>{
-        'key': apiKey.trim(),
-        'origin': '${originGcj.$2},${originGcj.$1}',
-        'destination': '${destinationGcj.$2},${destinationGcj.$1}',
-        'extensions': 'all',
-        'strategy': '0',
-      },
-    );
+    final uri =
+        Uri.https('restapi.amap.com', '/v3/direction/driving', <String, String>{
+          'key': apiKey.trim(),
+          'origin': '${originGcj.$2},${originGcj.$1}',
+          'destination': '${destinationGcj.$2},${destinationGcj.$1}',
+          'extensions': 'all',
+          'strategy': '0',
+        });
 
     final data = await _getJson(uri);
     _ensureSuccess(data);
@@ -355,8 +363,10 @@ class AmapMapService implements MapService {
           MapRouteStep(
             instruction: item['instruction']?.toString() ?? '',
             road: item['road']?.toString() ?? '',
-            distanceMeters: int.tryParse(item['distance']?.toString() ?? '') ?? 0,
-            durationSeconds: int.tryParse(item['duration']?.toString() ?? '') ?? 0,
+            distanceMeters:
+                int.tryParse(item['distance']?.toString() ?? '') ?? 0,
+            durationSeconds:
+                int.tryParse(item['duration']?.toString() ?? '') ?? 0,
             polyline: stepPoints,
           ),
         );
@@ -364,8 +374,10 @@ class AmapMapService implements MapService {
     }
 
     return MapRoute(
-      distanceMeters: int.tryParse(firstPath['distance']?.toString() ?? '') ?? 0,
-      durationSeconds: int.tryParse(firstPath['duration']?.toString() ?? '') ?? 0,
+      distanceMeters:
+          int.tryParse(firstPath['distance']?.toString() ?? '') ?? 0,
+      durationSeconds:
+          int.tryParse(firstPath['duration']?.toString() ?? '') ?? 0,
       taxiCostText: route['taxi_cost']?.toString(),
       polyline: allPoints,
       steps: steps,
@@ -427,7 +439,11 @@ class AmapMapService implements MapService {
     final info = data['info']?.toString() ?? '未知错误';
     final code = data['infocode']?.toString() ?? '';
     if (status != null && status != '1' && status != 'OK') {
-      throw AmapApiException(code: code.isEmpty ? 'UNKNOWN' : code, info: info, raw: data);
+      throw AmapApiException(
+        code: code.isEmpty ? 'UNKNOWN' : code,
+        info: info,
+        raw: data,
+      );
     }
   }
 
@@ -482,13 +498,17 @@ class AmapMapService implements MapService {
     final radLat = latitude / 180.0 * 3.1415926535897932384626;
     final magic = 1 - _eccentricity * math.sin(radLat) * math.sin(radLat);
     final sqrtMagic = math.sqrt(magic);
-    final mgLat = latitude +
+    final mgLat =
+        latitude +
         (dLat * 180.0) /
-            ((_earthRadius * (1 - _eccentricity)) / (magic * sqrtMagic) *
+            ((_earthRadius * (1 - _eccentricity)) /
+                (magic * sqrtMagic) *
                 3.1415926535897932384626);
-    final mgLng = longitude +
+    final mgLng =
+        longitude +
         (dLng * 180.0) /
-            (_earthRadius / sqrtMagic *
+            (_earthRadius /
+                sqrtMagic *
                 math.cos(radLat) *
                 3.1415926535897932384626);
     return (mgLat, mgLng);
@@ -525,7 +545,8 @@ class AmapMapService implements MapService {
   }
 
   double _transformLatitude(double longitude, double latitude) {
-    var value = -100.0 +
+    var value =
+        -100.0 +
         2.0 * longitude +
         3.0 * latitude +
         0.2 * latitude * latitude +
@@ -533,29 +554,25 @@ class AmapMapService implements MapService {
         0.2 * math.sqrt(longitude.abs());
     value +=
         (20.0 * math.sin(6.0 * longitude * 3.1415926535897932384626) +
-                20.0 * math.sin(2.0 * longitude * 3.1415926535897932384626)) *
-            2.0 /
-            3.0;
+            20.0 * math.sin(2.0 * longitude * 3.1415926535897932384626)) *
+        2.0 /
+        3.0;
     value +=
         (20.0 * math.sin(latitude * 3.1415926535897932384626) +
-                40.0 *
-                    math.sin(latitude / 3.0 * 3.1415926535897932384626)) *
-            2.0 /
-            3.0;
+            40.0 * math.sin(latitude / 3.0 * 3.1415926535897932384626)) *
+        2.0 /
+        3.0;
     value +=
-        (160.0 *
-                    math.sin(latitude / 12.0 * 3.1415926535897932384626) +
-                320 *
-                    math.sin(
-                      latitude * 3.1415926535897932384626 / 30.0,
-                    )) *
-            2.0 /
-            3.0;
+        (160.0 * math.sin(latitude / 12.0 * 3.1415926535897932384626) +
+            320 * math.sin(latitude * 3.1415926535897932384626 / 30.0)) *
+        2.0 /
+        3.0;
     return value;
   }
 
   double _transformLongitude(double longitude, double latitude) {
-    var value = 300.0 +
+    var value =
+        300.0 +
         longitude +
         2.0 * latitude +
         0.1 * longitude * longitude +
@@ -563,24 +580,19 @@ class AmapMapService implements MapService {
         0.1 * math.sqrt(longitude.abs());
     value +=
         (20.0 * math.sin(6.0 * longitude * 3.1415926535897932384626) +
-                20.0 * math.sin(2.0 * longitude * 3.1415926535897932384626)) *
-            2.0 /
-            3.0;
+            20.0 * math.sin(2.0 * longitude * 3.1415926535897932384626)) *
+        2.0 /
+        3.0;
     value +=
         (20.0 * math.sin(longitude * 3.1415926535897932384626) +
-                40.0 *
-                    math.sin(longitude / 3.0 * 3.1415926535897932384626)) *
-            2.0 /
-            3.0;
+            40.0 * math.sin(longitude / 3.0 * 3.1415926535897932384626)) *
+        2.0 /
+        3.0;
     value +=
-        (150.0 *
-                    math.sin(longitude / 12.0 * 3.1415926535897932384626) +
-                300.0 *
-                    math.sin(
-                      longitude / 30.0 * 3.1415926535897932384626,
-                    )) *
-            2.0 /
-            3.0;
+        (150.0 * math.sin(longitude / 12.0 * 3.1415926535897932384626) +
+            300.0 * math.sin(longitude / 30.0 * 3.1415926535897932384626)) *
+        2.0 /
+        3.0;
     return value;
   }
 }

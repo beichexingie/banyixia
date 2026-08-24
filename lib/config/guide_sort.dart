@@ -5,7 +5,7 @@ enum GuideSortMode { hot, time, distance }
 extension GuideSortModeLabel on GuideSortMode {
   String get label => switch (this) {
     GuideSortMode.hot => '热门排序',
-    GuideSortMode.time => '最近可约',
+    GuideSortMode.time => '时间排序',
     GuideSortMode.distance => '距离排序',
   };
 }
@@ -91,6 +91,22 @@ DateTime? nextAvailableGuideTime(
     }
   }
   return earliest;
+}
+
+String formatNextAvailableGuideTime(DateTime? value, {DateTime? now}) {
+  if (value == null) return '';
+  final current = now ?? DateTime.now();
+  final today = DateTime(current.year, current.month, current.day);
+  final date = DateTime(value.year, value.month, value.day);
+  final dayOffset = date.difference(today).inDays;
+  final time =
+      '${value.hour.toString().padLeft(2, '0')}:${value.minute.toString().padLeft(2, '0')}';
+  final dayLabel = switch (dayOffset) {
+    0 => '今天',
+    1 => '明天',
+    _ => '${value.month}月${value.day}日',
+  };
+  return '最早可约 $dayLabel $time';
 }
 
 bool _availabilityMatchesDate(Map<String, dynamic> rule, DateTime date) {

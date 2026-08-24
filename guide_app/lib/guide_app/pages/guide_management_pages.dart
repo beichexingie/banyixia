@@ -165,7 +165,7 @@ class _GuideServiceEditorDialogState extends State<_GuideServiceEditorDialog> {
     _selectedName = item?.name ?? '';
     _description = TextEditingController(text: item?.description ?? '');
     _hour = TextEditingController(
-      text: item == null ? '' : item.pricePerHour.toStringAsFixed(0),
+      text: item == null ? '' : item.pricePerHour.toStringAsFixed(2),
     );
   }
 

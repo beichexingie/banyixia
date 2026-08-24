@@ -419,7 +419,7 @@ class _WalletPageState extends State<WalletPage> {
           ),
           const SizedBox(height: 8),
           Text(
-            _walletData['balance']?.toString() ?? '0.00',
+            _formatMoney(_walletData['balance']),
             style: const TextStyle(
               color: Colors.white,
               fontSize: 32,
@@ -432,7 +432,7 @@ class _WalletPageState extends State<WalletPage> {
               Expanded(
                 child: _buildMiniStat(
                   '托管中',
-                  _walletData['pending_balance']?.toString() ?? '0.00',
+                  _formatMoney(_walletData['pending_balance']),
                 ),
               ),
               Container(width: 1, height: 24, color: Colors.white12),
@@ -441,7 +441,7 @@ class _WalletPageState extends State<WalletPage> {
                   padding: const EdgeInsets.only(left: 24),
                   child: _buildMiniStat(
                     '累计收益',
-                    _walletData['total_earned']?.toString() ?? '0.00',
+                    _formatMoney(_walletData['total_earned']),
                   ),
                 ),
               ),
@@ -575,7 +575,7 @@ class _WalletPageState extends State<WalletPage> {
                 crossAxisAlignment: CrossAxisAlignment.end,
                 children: [
                   Text(
-                    '${isIncome ? "+" : "-"}${tx['actual_amount']}',
+                    '${isIncome ? "+" : "-"}${_formatMoney(tx['actual_amount'])}',
                     style: TextStyle(
                       color: isIncome ? Colors.green : AppColors.textPrimary,
                       fontWeight: FontWeight.bold,
@@ -585,7 +585,7 @@ class _WalletPageState extends State<WalletPage> {
                   if (isIncome &&
                       (double.tryParse('${tx['platform_fee'] ?? 0}') ?? 0) > 0)
                     Text(
-                      '费: ¥${tx['platform_fee']}',
+                      '费: ¥${_formatMoney(tx['platform_fee'])}',
                       style: const TextStyle(
                         color: AppColors.textHint,
                         fontSize: 10,
@@ -606,6 +606,11 @@ class _WalletPageState extends State<WalletPage> {
     return '${date.year}-${date.month.toString().padLeft(2, '0')}-'
         '${date.day.toString().padLeft(2, '0')} '
         '${date.hour.toString().padLeft(2, '0')}:${date.minute.toString().padLeft(2, '0')}';
+  }
+
+  String _formatMoney(dynamic value) {
+    final amount = double.tryParse(value?.toString() ?? '') ?? 0;
+    return amount.toStringAsFixed(2);
   }
 }
 

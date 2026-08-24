@@ -279,9 +279,14 @@ class _GuideDetailPageState extends State<GuideDetailPage> {
               const SizedBox(height: 18),
               Row(
                 children: [
-                  _StatBox(value: '${guide.likes}', label: '粉丝'),
-                  _StatBox(value: '${guide.fans}', label: '收藏'),
-                  _StatBox(value: '${guide.views}', label: '接单'),
+                  _StatBox(value: '${guide.fans}', label: '粉丝'),
+                  _StatBox(value: '${guide.totalOrders}', label: '接单'),
+                  _StatBox(
+                    value: guide.goodRate > 0
+                        ? '${guide.goodRate.toStringAsFixed(1)}%'
+                        : '暂无',
+                    label: '好评率',
+                  ),
                 ],
               ),
               const SizedBox(height: 14),
@@ -319,14 +324,14 @@ class _GuideDetailPageState extends State<GuideDetailPage> {
             mainAxisSpacing: 10,
             crossAxisSpacing: 10,
             children: [
-              _InfoTile(value: '${guide.likes}', label: '获赞'),
+              _InfoTile(value: '${guide.fans}', label: '粉丝'),
               _InfoTile(
                 value: guide.rating <= 0
                     ? '暂无'
                     : '${(guide.rating * 20.8).clamp(0, 100).toStringAsFixed(1)}%',
                 label: '好评率',
               ),
-              _InfoTile(value: '${guide.fans}', label: '粉丝'),
+              _InfoTile(value: '${guide.totalOrders}', label: '接单'),
               const _InfoTile(value: '未填写', label: '民族'),
               const _InfoTile(value: '未填写', label: '星座'),
               const _InfoTile(value: '未填写', label: '职业'),
@@ -405,7 +410,7 @@ class _GuideDetailPageState extends State<GuideDetailPage> {
                             ),
                           ),
                           Text(
-                            '¥${hour.toStringAsFixed(0)}/小时',
+                            '¥${hour.toStringAsFixed(2)}/小时',
                             style: const TextStyle(
                               fontWeight: FontWeight.w800,
                               color: Color(0xFFFF5A3C),

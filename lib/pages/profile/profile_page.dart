@@ -23,11 +23,11 @@ class _ProfilePageState extends State<ProfilePage> {
 
   Future<void> _openCustomerService() async {
     try {
-      final roomId = await context.read<MessageProvider>().openCustomerService();
+      final roomId = await context
+          .read<MessageProvider>()
+          .openCustomerService();
       if (!mounted) return;
-      context.push(
-        '/chat/$roomId?name=${Uri.encodeComponent('在线客服')}&avatar=',
-      );
+      context.push('/chat/$roomId?name=${Uri.encodeComponent('在线客服')}&avatar=');
     } catch (error) {
       if (!mounted) return;
       _showSnack('打开客服失败：$error');
@@ -61,7 +61,9 @@ class _ProfilePageState extends State<ProfilePage> {
 
     setState(() => _isCreatingTestOrder = true);
     try {
-      final order = await context.read<OrderProvider>().createOneCentTestOrder();
+      final order = await context
+          .read<OrderProvider>()
+          .createOneCentTestOrder();
       if (!mounted) return;
       _showSnack('0.10 测试订单已创建，等待地陪接单');
       context.push('/profile/orders?tab=1', extra: order);
@@ -499,10 +501,7 @@ class _ProfilePageState extends State<ProfilePage> {
         borderRadius: BorderRadius.circular(14),
         child: Row(
           children: const [
-            Icon(
-              Icons.assignment_outlined,
-              color: AppColors.textPrimary,
-            ),
+            Icon(Icons.assignment_outlined, color: AppColors.textPrimary),
             SizedBox(width: 10),
             Expanded(
               child: Text(
@@ -514,10 +513,7 @@ class _ProfilePageState extends State<ProfilePage> {
                 ),
               ),
             ),
-            Icon(
-              Icons.chevron_right_rounded,
-              color: AppColors.textHint,
-            ),
+            Icon(Icons.chevron_right_rounded, color: AppColors.textHint),
           ],
         ),
       ),
@@ -752,11 +748,10 @@ class _ProfilePageState extends State<ProfilePage> {
                 ...List.generate(
                   guides.length > 3 ? 3 : guides.length,
                   (index) => Padding(
-                    padding: EdgeInsets.only(bottom: index == guides.length - 1 ? 0 : 12),
-                    child: ServiceGuideCard(
-                      guide: guides[index],
-                      statusLabel: '已关注，可直接下单',
+                    padding: EdgeInsets.only(
+                      bottom: index == guides.length - 1 ? 0 : 12,
                     ),
+                    child: ServiceGuideCard(guide: guides[index]),
                   ),
                 ),
             ],

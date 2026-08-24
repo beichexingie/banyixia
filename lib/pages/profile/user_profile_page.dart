@@ -348,9 +348,6 @@ class _UserProfilePageState extends State<UserProfilePage> {
                   Row(
                     children: [
                       _heroStat('${user.fansCount}', '粉丝'),
-                      const SizedBox(width: 42),
-                      _heroStat('${user.followCount}', '关注'),
-                      const SizedBox(width: 42),
                       if (user.isGuideApproved) ...[
                         const SizedBox(width: 42),
                         _heroStat('${_guideProfile?.totalOrders ?? 0}', '接单'),
@@ -569,8 +566,8 @@ class _UserProfilePageState extends State<UserProfilePage> {
           const SizedBox(width: 8),
           Text(
             day > 0
-                ? '¥${day.toStringAsFixed(0)}/天'
-                : '¥${hour.toStringAsFixed(0)}/小时',
+                ? '¥${day.toStringAsFixed(2)}/天'
+                : '¥${hour.toStringAsFixed(2)}/小时',
             style: const TextStyle(
               fontWeight: FontWeight.w800,
               color: Color(0xFFFF5A3C),

@@ -690,58 +690,70 @@ class _HomePageState extends State<HomePage>
 
   Widget _buildTabSelector() {
     const labels = ['推荐', '最新', '关注'];
-    return SingleChildScrollView(
-      scrollDirection: Axis.horizontal,
-      physics: const BouncingScrollPhysics(),
-      child: Row(
-        children: List.generate(labels.length, (index) {
-          final selected = _currentTab == index;
-          return Padding(
-            padding: EdgeInsets.only(
-              right: index == labels.length - 1 ? 0 : 24,
-            ),
-            child: GestureDetector(
-              onTap: () => _tabController.animateTo(index),
-              child: AnimatedContainer(
-                duration: const Duration(milliseconds: 180),
-                curve: Curves.easeOut,
-                height: 44,
-                padding: EdgeInsets.symmetric(horizontal: selected ? 18 : 0),
-                decoration: BoxDecoration(
-                  color: selected ? AppColors.primary : Colors.transparent,
-                  borderRadius: BorderRadius.circular(999),
-                ),
-                child: Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    if (selected && index == 0) ...[
-                      Image.asset(
-                        'assets/login/Group.png',
-                        width: 18,
-                        height: 34,
-                        fit: BoxFit.contain,
+    return Row(
+      children: [
+        Expanded(
+          child: SingleChildScrollView(
+            scrollDirection: Axis.horizontal,
+            physics: const BouncingScrollPhysics(),
+            child: Row(
+              children: List.generate(labels.length, (index) {
+                final selected = _currentTab == index;
+                return Padding(
+                  padding: EdgeInsets.only(
+                    right: index == labels.length - 1 ? 0 : 24,
+                  ),
+                  child: GestureDetector(
+                    onTap: () => _tabController.animateTo(index),
+                    child: AnimatedContainer(
+                      duration: const Duration(milliseconds: 180),
+                      curve: Curves.easeOut,
+                      height: 44,
+                      padding: EdgeInsets.symmetric(
+                        horizontal: selected ? 18 : 0,
                       ),
-                      const SizedBox(width: 8),
-                    ],
-                    Text(
-                      labels[index],
-                      style: TextStyle(
-                        fontSize: 16,
-                        fontWeight: selected
-                            ? FontWeight.w900
-                            : FontWeight.w700,
+                      decoration: BoxDecoration(
                         color: selected
-                            ? AppColors.textPrimary
-                            : AppColors.textSecondary,
+                            ? AppColors.primary
+                            : Colors.transparent,
+                        borderRadius: BorderRadius.circular(999),
+                      ),
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          if (selected && index == 0) ...[
+                            Image.asset(
+                              'assets/login/Group.png',
+                              width: 18,
+                              height: 34,
+                              fit: BoxFit.contain,
+                            ),
+                            const SizedBox(width: 8),
+                          ],
+                          Text(
+                            labels[index],
+                            style: TextStyle(
+                              fontSize: 16,
+                              fontWeight: selected
+                                  ? FontWeight.w900
+                                  : FontWeight.w700,
+                              color: selected
+                                  ? AppColors.textPrimary
+                                  : AppColors.textSecondary,
+                            ),
+                          ),
+                        ],
                       ),
                     ),
-                  ],
-                ),
-              ),
+                  ),
+                );
+              }),
             ),
-          );
-        }),
-      ),
+          ),
+        ),
+        const SizedBox(width: 8),
+        GuideSortMenuButton(mode: _guideSortMode, onSelected: _selectGuideSort),
+      ],
     );
   }
 
@@ -898,30 +910,15 @@ class _HomePageState extends State<HomePage>
               parent: BouncingScrollPhysics(),
             ),
             padding: const EdgeInsets.fromLTRB(18, 8, 18, 100),
-            itemCount: guides.length + 1,
+            itemCount: guides.length,
             separatorBuilder: (_, __) => const SizedBox(height: 14),
             itemBuilder: (context, index) {
-              if (index == 0) return _buildGuideSortBar();
-              final guide = guides[index - 1];
-              return ServiceGuideCard(
-                guide: guide,
-                rankLabel: '$index',
-                statusLabel: '最早可约 今天 14:00',
-              );
+              final guide = guides[index];
+              return ServiceGuideCard(guide: guide);
             },
           ),
         );
       },
-    );
-  }
-
-  Widget _buildGuideSortBar() {
-    return Align(
-      alignment: Alignment.centerRight,
-      child: GuideSortMenuButton(
-        mode: _guideSortMode,
-        onSelected: _selectGuideSort,
-      ),
     );
   }
 
@@ -945,8 +942,11 @@ class _HomePageState extends State<HomePage>
           sort: 'distance',
         );
         return;
-      } catch (_) {
-        if (mounted) _showSortMessage('获取当前位置失败，请检查定位权限');
+      } on AmapApiException catch (error) {
+        if (mounted) _showSortMessage('定位失败：${error.info}');
+        return;
+      } catch (error) {
+        if (mounted) _showSortMessage('获取当前位置失败：$error');
         return;
       }
     }

@@ -3,31 +3,23 @@ import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 
 import '../config/app_theme.dart';
+import '../config/guide_sort.dart';
 import '../models/guide.dart';
 
 class ServiceGuideCard extends StatelessWidget {
   final Guide guide;
-  final String statusLabel;
-  final String? rankLabel;
 
-  const ServiceGuideCard({
-    super.key,
-    required this.guide,
-    required this.statusLabel,
-    this.rankLabel,
-  });
+  const ServiceGuideCard({super.key, required this.guide});
 
   @override
   Widget build(BuildContext context) {
     final avatar = guide.avatar.isNotEmpty
         ? guide.avatar
         : (guide.images.isNotEmpty ? guide.images.first : '');
-    final likes = guide.likes;
-    final comments = guide.views;
-    final favorites = guide.fans;
     final rating = guide.rating == 0
         ? '暂无评分'
         : '${guide.rating.toStringAsFixed(1)}分';
+    final status = formatNextAvailableGuideTime(nextAvailableGuideTime(guide));
     final name = guide.name.trim().isEmpty ? '本地导游' : guide.name.trim();
     final description = guide.description.trim().isNotEmpty
         ? guide.description.trim()
@@ -76,9 +68,6 @@ class ServiceGuideCard extends StatelessWidget {
                                 color: AppColors.textPrimary,
                               ),
                             ),
-                            if ((rankLabel ?? '').isNotEmpty)
-                              _buildRankBadge(rankLabel!),
-                            _buildVerifiedBadge(),
                             Text(
                               rating,
                               style: const TextStyle(
@@ -91,13 +80,18 @@ class ServiceGuideCard extends StatelessWidget {
                         ),
                       ),
                       const SizedBox(width: 10),
-                      Text(
-                        _normalizeStatus(statusLabel),
-                        style: const TextStyle(
-                          fontSize: 12,
-                          color: Color(0xFF939393),
+                      if (status.isNotEmpty)
+                        Flexible(
+                          child: Text(
+                            status,
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: const TextStyle(
+                              fontSize: 12,
+                              color: Color(0xFF939393),
+                            ),
+                          ),
                         ),
-                      ),
                     ],
                   ),
                   const SizedBox(height: 10),
@@ -120,40 +114,33 @@ class ServiceGuideCard extends StatelessWidget {
                     ),
                   ],
                   const SizedBox(height: 14),
-                  Wrap(
-                    spacing: 18,
-                    runSpacing: 12,
-                    crossAxisAlignment: WrapCrossAlignment.center,
-                    children: [
-                      _metric(Icons.favorite_border_rounded, '$likes'),
-                      _metric(Icons.mode_comment_outlined, '$comments'),
-                      _metric(Icons.star_border_rounded, '$favorites'),
-                      SizedBox(
-                        height: 42,
-                        child: ElevatedButton(
-                          onPressed: () => context.push(
-                            '/order/create?guideId=${guide.id}',
-                            extra: guide,
+                  Align(
+                    alignment: Alignment.centerLeft,
+                    child: SizedBox(
+                      height: 42,
+                      child: ElevatedButton(
+                        onPressed: () => context.push(
+                          '/order/create?guideId=${guide.id}',
+                          extra: guide,
+                        ),
+                        style: ElevatedButton.styleFrom(
+                          elevation: 0,
+                          backgroundColor: AppColors.primary,
+                          foregroundColor: AppColors.textPrimary,
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(999),
                           ),
-                          style: ElevatedButton.styleFrom(
-                            elevation: 0,
-                            backgroundColor: AppColors.primary,
-                            foregroundColor: AppColors.textPrimary,
-                            shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(999),
-                            ),
-                            padding: const EdgeInsets.symmetric(horizontal: 18),
-                          ),
-                          child: const Text(
-                            '去下单',
-                            style: TextStyle(
-                              fontSize: 18,
-                              fontWeight: FontWeight.w800,
-                            ),
+                          padding: const EdgeInsets.symmetric(horizontal: 18),
+                        ),
+                        child: const Text(
+                          '去下单',
+                          style: TextStyle(
+                            fontSize: 18,
+                            fontWeight: FontWeight.w800,
                           ),
                         ),
                       ),
-                    ],
+                    ),
                   ),
                 ],
               ),
@@ -198,57 +185,6 @@ class ServiceGuideCard extends StatelessWidget {
     );
   }
 
-  Widget _buildRankBadge(String text) {
-    return Container(
-      width: 24,
-      height: 24,
-      decoration: BoxDecoration(
-        color: AppColors.primary,
-        borderRadius: BorderRadius.circular(9),
-      ),
-      alignment: Alignment.center,
-      child: Text(
-        text,
-        style: const TextStyle(
-          fontSize: 13,
-          fontWeight: FontWeight.w800,
-          color: AppColors.textPrimary,
-        ),
-      ),
-    );
-  }
-
-  Widget _buildVerifiedBadge() {
-    return Container(
-      width: 24,
-      height: 24,
-      decoration: const BoxDecoration(
-        color: AppColors.primary,
-        shape: BoxShape.circle,
-      ),
-      alignment: Alignment.center,
-      child: const Icon(
-        Icons.check_rounded,
-        size: 16,
-        color: AppColors.textPrimary,
-      ),
-    );
-  }
-
-  Widget _metric(IconData icon, String value) {
-    return Row(
-      mainAxisSize: MainAxisSize.min,
-      children: [
-        Icon(icon, size: 18, color: const Color(0xFFA7A7A7)),
-        const SizedBox(width: 6),
-        Text(
-          value,
-          style: const TextStyle(fontSize: 14, color: Color(0xFFA7A7A7)),
-        ),
-      ],
-    );
-  }
-
   Widget _serviceTag(String text) {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 5),
@@ -267,13 +203,5 @@ class ServiceGuideCard extends StatelessWidget {
         ),
       ),
     );
-  }
-
-  String _normalizeStatus(String raw) {
-    final text = raw.trim();
-    if (text.isEmpty) {
-      return '最早可约 今14:00';
-    }
-    return text;
   }
 }

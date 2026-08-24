@@ -659,10 +659,7 @@ class _OrdersPageState extends State<OrdersPage>
   }
 
   String _formatAmount(double amount) {
-    if (amount > 0 && amount < 1) {
-      return amount.toStringAsFixed(2);
-    }
-    return amount.toStringAsFixed(0);
+    return amount.toStringAsFixed(2);
   }
 
   void _showSimpleMessage(String text) {

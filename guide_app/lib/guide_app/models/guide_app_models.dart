@@ -496,6 +496,7 @@ class GuideOrderCardData {
   final String etaText;
   final String distanceText;
   final double amount;
+  final double? expectedCommission;
   final String content;
   final String address;
   final String serviceCity;
@@ -515,6 +516,7 @@ class GuideOrderCardData {
     required this.etaText,
     required this.distanceText,
     required this.amount,
+    this.expectedCommission,
     required this.content,
     required this.address,
     this.serviceCity = '',

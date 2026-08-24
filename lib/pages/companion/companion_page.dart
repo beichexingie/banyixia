@@ -244,11 +244,7 @@ class _CompanionPageState extends State<CompanionPage> {
                 final guide = guides[index];
                 return Padding(
                   padding: const EdgeInsets.only(bottom: 14),
-                  child: ServiceGuideCard(
-                    guide: guide,
-                    rankLabel: '${index + 1}',
-                    statusLabel: '最早可约 今14:00',
-                  ),
+                  child: ServiceGuideCard(guide: guide),
                 );
               }),
           ],
@@ -351,8 +347,11 @@ class _CompanionPageState extends State<CompanionPage> {
           sort: 'distance',
         );
         return;
-      } catch (_) {
-        if (mounted) _showSortMessage('获取当前位置失败，请检查定位权限');
+      } on AmapApiException catch (error) {
+        if (mounted) _showSortMessage('定位失败：${error.info}');
+        return;
+      } catch (error) {
+        if (mounted) _showSortMessage('获取当前位置失败：$error');
         return;
       }
     }
