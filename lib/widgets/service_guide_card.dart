@@ -84,8 +84,7 @@ class ServiceGuideCard extends StatelessWidget {
                         Flexible(
                           child: Text(
                             status,
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
+                            softWrap: true,
                             style: const TextStyle(
                               fontSize: 12,
                               color: Color(0xFF939393),

@@ -326,9 +326,9 @@ class _GuideDetailPageState extends State<GuideDetailPage> {
             children: [
               _InfoTile(value: '${guide.fans}', label: '粉丝'),
               _InfoTile(
-                value: guide.rating <= 0
+                value: guide.goodRate <= 0
                     ? '暂无'
-                    : '${(guide.rating * 20.8).clamp(0, 100).toStringAsFixed(1)}%',
+                    : '${guide.goodRate.toStringAsFixed(1)}%',
                 label: '好评率',
               ),
               _InfoTile(value: '${guide.totalOrders}', label: '接单'),

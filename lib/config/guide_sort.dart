@@ -62,7 +62,7 @@ DateTime? nextAvailableGuideTime(
       final endMinutes = _parseMinutes(rule['end_time']);
       if (startMinutes == null) continue;
       if (endMinutes == null) continue;
-      final candidate = DateTime(
+      final slotStart = DateTime(
         date.year,
         date.month,
         date.day,
@@ -76,21 +76,22 @@ DateTime? nextAvailableGuideTime(
         endMinutes ~/ 60,
         endMinutes % 60,
       );
-      final effectiveCandidate =
-          candidate.isBefore(start) &&
-              date.year == start.year &&
-              date.month == start.month &&
-              date.day == start.day &&
-              start.isBefore(end)
-          ? start
-          : candidate;
-      if (effectiveCandidate.isBefore(start)) continue;
+      final effectiveStart = slotStart.isAfter(start) ? slotStart : start;
+      final effectiveCandidate = _ceilToHour(effectiveStart);
+      if (!effectiveCandidate.isBefore(end)) continue;
       if (earliest == null || effectiveCandidate.isBefore(earliest)) {
         earliest = effectiveCandidate;
       }
     }
   }
   return earliest;
+}
+
+DateTime _ceilToHour(DateTime value) {
+  if (value.minute == 0 && value.second == 0 && value.millisecond == 0) {
+    return DateTime(value.year, value.month, value.day, value.hour);
+  }
+  return DateTime(value.year, value.month, value.day, value.hour + 1);
 }
 
 String formatNextAvailableGuideTime(DateTime? value, {DateTime? now}) {

@@ -347,7 +347,10 @@ class _UserProfilePageState extends State<UserProfilePage> {
                   const SizedBox(height: 28),
                   Row(
                     children: [
-                      _heroStat('${user.fansCount}', '粉丝'),
+                      _heroStat(
+                        '${_guideProfile?.fans ?? user.fansCount}',
+                        '粉丝',
+                      ),
                       if (user.isGuideApproved) ...[
                         const SizedBox(width: 42),
                         _heroStat('${_guideProfile?.totalOrders ?? 0}', '接单'),
@@ -1064,8 +1067,7 @@ class _UserProfilePageState extends State<UserProfilePage> {
   }
 
   double _displayRating() {
-    final rating = _guideProfile?.rating ?? 0;
-    return rating;
+    return _guideProfile?.rating ?? 0;
   }
 
   String _ageLabel(User user) {

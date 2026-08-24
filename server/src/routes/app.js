@@ -1178,8 +1178,14 @@ appRouter.get('/guides', async (req, res) => {
         u.service_description,
         u.extra_fee_description,
         coalesce((select count(*) from public.follows f where f.followed_id = g.id), 0)::int as actual_fans,
+        coalesce((select avg(r.rating) from public.guide_reviews r where r.guide_id = g.id), 0)::double precision as actual_rating,
         coalesce((select count(*) from public.orders o where o.guide_id = g.id), 0)::int as total_orders,
-        coalesce((select avg(r.rating) / 5.0 * 100 from public.guide_reviews r where r.guide_id = g.id), 0)::double precision as good_rate,
+        coalesce((
+          select 100.0 * count(*) filter (where r.rating >= 3) /
+            nullif(count(*), 0)
+          from public.guide_reviews r
+          where r.guide_id = g.id
+        ), 0)::double precision as good_rate,
         coalesce((
           select json_agg(item order by item.updated_at desc)
           from (
@@ -1229,6 +1235,7 @@ appRouter.get('/guides', async (req, res) => {
       .map((row) => mergeGuideUserFields({
         ...row,
         fans: Number(row.actual_fans ?? row.fans ?? 0),
+        rating: Number(row.actual_rating ?? row.rating ?? 0),
         current_lat: row.selected_service_lat ?? row.current_lat,
         current_lng: row.selected_service_lng ?? row.current_lng,
       })),
@@ -1304,8 +1311,14 @@ appRouter.get('/guides/:id', async (req, res) => {
         u.service_description,
         u.extra_fee_description,
         coalesce((select count(*) from public.follows f where f.followed_id = g.id), 0)::int as actual_fans,
+        coalesce((select avg(r.rating) from public.guide_reviews r where r.guide_id = g.id), 0)::double precision as actual_rating,
         coalesce((select count(*) from public.orders o where o.guide_id = g.id), 0)::int as total_orders,
-        coalesce((select avg(r.rating) / 5.0 * 100 from public.guide_reviews r where r.guide_id = g.id), 0)::double precision as good_rate,
+        coalesce((
+          select 100.0 * count(*) filter (where r.rating >= 3) /
+            nullif(count(*), 0)
+          from public.guide_reviews r
+          where r.guide_id = g.id
+        ), 0)::double precision as good_rate,
         coalesce((
           select json_agg(item order by item.updated_at desc)
           from (
@@ -1353,6 +1366,7 @@ appRouter.get('/guides/:id', async (req, res) => {
   return ok(res, { data: mergeGuideUserFields({
     ...guide,
     fans: Number(guide.actual_fans ?? guide.fans ?? 0),
+    rating: Number(guide.actual_rating ?? guide.rating ?? 0),
     current_lat: guide.selected_service_lat ?? guide.current_lat,
     current_lng: guide.selected_service_lng ?? guide.current_lng,
   }) });

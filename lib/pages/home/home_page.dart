@@ -2,6 +2,7 @@ import 'dart:ui';
 import 'dart:async';
 
 import 'package:flutter/material.dart';
+import 'package:geolocator/geolocator.dart';
 import 'package:go_router/go_router.dart';
 import 'package:provider/provider.dart';
 
@@ -943,7 +944,12 @@ class _HomePageState extends State<HomePage>
         );
         return;
       } on AmapApiException catch (error) {
-        if (mounted) _showSortMessage('定位失败：${error.info}');
+        if (!mounted) return;
+        if (error.code == 'LOCATION_SERVICE_DISABLED') {
+          await _promptToEnableLocationService();
+        } else {
+          _showSortMessage('定位失败：${error.info}');
+        }
         return;
       } catch (error) {
         if (mounted) _showSortMessage('获取当前位置失败：$error');
@@ -957,6 +963,29 @@ class _HomePageState extends State<HomePage>
     ScaffoldMessenger.of(
       context,
     ).showSnackBar(SnackBar(content: Text(message)));
+  }
+
+  Future<void> _promptToEnableLocationService() async {
+    final shouldOpen = await showDialog<bool>(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        title: const Text('系统定位未开启'),
+        content: const Text('请先打开手机系统定位服务，开启后再使用距离排序。'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(dialogContext).pop(false),
+            child: const Text('取消'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.of(dialogContext).pop(true),
+            child: const Text('去开启定位'),
+          ),
+        ],
+      ),
+    );
+    if (shouldOpen == true) {
+      await Geolocator.openLocationSettings();
+    }
   }
 
   Widget _emptyState({
