@@ -285,13 +285,13 @@ class _GuideMainShellState extends State<_GuideMainShell>
     final pages = [
       GuideOrderCenterPage(
         onOpenSettings: _openDutySettings,
-        onOpenServiceOps: _openServiceOperations,
+        onOpenServiceOps: _openSupportChat,
         onOpenRoute: _openRoute,
         onOpenChat: _openSupportChat,
       ),
       GuideWorkbenchPage(
         onOpenDutySettings: _openDutySettings,
-        onOpenServiceOps: _openServiceOperations,
+        onOpenServiceOps: _openSupportChat,
         onOpenPublish: _openPublish,
         onOpenDemandHall: _openDemandHall,
         onOpenEmergencyContacts: _openEmergencyContacts,
@@ -566,12 +566,6 @@ class _GuideMainShellState extends State<_GuideMainShell>
     await Navigator.of(
       context,
     ).push(MaterialPageRoute(builder: (_) => const GuideDemandHallPage()));
-  }
-
-  Future<void> _openServiceOperations() async {
-    await Navigator.of(
-      context,
-    ).push(MaterialPageRoute(builder: (_) => const GuideOperationPage()));
   }
 
   Future<void> _openEmergencyContacts() async {
