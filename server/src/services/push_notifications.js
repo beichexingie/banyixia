@@ -3,6 +3,69 @@ import crypto from 'crypto';
 import { config } from '../config.js';
 
 let clientPromise;
+let notificationInboxPromise;
+
+export async function ensureNotificationInbox(pool) {
+  if (!notificationInboxPromise) {
+    notificationInboxPromise = pool.query(`
+      create extension if not exists pgcrypto;
+
+      create table if not exists public.app_notifications (
+        id uuid primary key default gen_random_uuid(),
+        user_id uuid not null references public.users(id) on delete cascade,
+        title text not null,
+        body text not null default '',
+        route text not null default '',
+        notification_type text not null default 'general',
+        order_id uuid references public.orders(id) on delete set null,
+        is_read boolean not null default false,
+        created_at timestamptz not null default now()
+      );
+
+      create index if not exists idx_app_notifications_user_created
+        on public.app_notifications (user_id, created_at desc);
+    `).catch((error) => {
+      notificationInboxPromise = null;
+      throw error;
+    });
+  }
+  await notificationInboxPromise;
+}
+
+function validUuid(value) {
+  const text = value?.toString().trim() ?? '';
+  return /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(text)
+    ? text
+    : null;
+}
+
+async function writeInboxNotification(
+  pool,
+  userId,
+  { title, body, route, type, orderId },
+) {
+  try {
+    await ensureNotificationInbox(pool);
+    await pool.query(
+      `
+        insert into public.app_notifications
+          (user_id, title, body, route, notification_type, order_id)
+        values ($1,$2,$3,$4,$5,$6)
+      `,
+      [
+        userId,
+        title?.toString().trim() || '系统通知',
+        body?.toString().trim() || '',
+        route?.toString().trim() || '/messages',
+        type?.toString().trim() || 'general',
+        validUuid(orderId),
+      ],
+    );
+  } catch (error) {
+    // An inbox failure must not block the business action or phone push.
+    console.error(`[push] inbox insert failed user=${userId}`, error);
+  }
+}
 
 function appKeyForVariant(appVariant) {
   if (appVariant === 'guide') {
@@ -153,6 +216,13 @@ export async function notifyUser(
   if (!userId) {
     return { sent: 0, failed: 0, reason: 'missing_user' };
   }
+  await writeInboxNotification(pool, userId, {
+    title,
+    body,
+    route,
+    type,
+    orderId,
+  });
   if (!hasMobilePushConfig()) {
     console.warn(
       `[push] skipped user=${userId}: Alibaba Cloud Mobile Push is not configured`,

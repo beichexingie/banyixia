@@ -134,14 +134,14 @@ class _MessagesPageState extends State<MessagesPage> {
             child: _quickAction(
               icon: Icons.campaign_outlined,
               label: '活动通知',
-              onTap: () => _showMessage('活动通知稍后接入'),
+              onTap: () => context.push('/messages/activities'),
             ),
           ),
           Expanded(
             child: _quickAction(
               icon: Icons.notifications_none,
               label: '系统通知',
-              onTap: () => _showMessage('系统通知稍后接入'),
+              onTap: () => context.push('/messages/system'),
             ),
           ),
           Expanded(
@@ -158,11 +158,11 @@ class _MessagesPageState extends State<MessagesPage> {
 
   Future<void> _openCustomerService() async {
     try {
-      final roomId = await context.read<MessageProvider>().openCustomerService();
+      final roomId = await context
+          .read<MessageProvider>()
+          .openCustomerService();
       if (!mounted) return;
-      context.push(
-        '/chat/$roomId?name=${Uri.encodeComponent('在线客服')}&avatar=',
-      );
+      context.push('/chat/$roomId?name=${Uri.encodeComponent('在线客服')}&avatar=');
     } catch (error) {
       if (!mounted) return;
       _showMessage('打开客服失败：$error');

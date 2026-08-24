@@ -35,7 +35,10 @@ import {
 } from '../services/trtc.js';
 import { bindAxbVirtualNumber } from '../services/virtual_number.js';
 import { hasSmsConfig, sendSmsCode } from '../services/sms.js';
-import { notifyUser } from '../services/push_notifications.js';
+import {
+  ensureNotificationInbox,
+  notifyUser,
+} from '../services/push_notifications.js';
 
 export const appRouter = express.Router();
 const __filename = fileURLToPath(import.meta.url);
@@ -867,6 +870,61 @@ appRouter.get('/devices/push-diagnostics', handleRoute(async (req, res) => {
       where user_id = $1
       order by created_at desc
       limit 50
+    `,
+    [userId],
+  );
+  return ok(res, { data: result.rows });
+}));
+
+appRouter.get('/notifications/orders', handleRoute(async (req, res) => {
+  const userId = await requireSessionUser(req, res);
+  if (!userId) return;
+  await ensureNotificationInbox(pool);
+  const result = await pool.query(
+    `
+      select
+        n.id,
+        n.title,
+        n.body,
+        n.route,
+        n.notification_type,
+        n.order_id,
+        n.is_read,
+        n.created_at,
+        o.service_name,
+        o.amount,
+        o.status as order_status,
+        o.payment_status
+      from public.app_notifications n
+      left join public.orders o on o.id = n.order_id
+      where n.user_id = $1
+        and n.order_id is not null
+        and n.notification_type in (
+          'order_accepted',
+          'payment_success',
+          'order_completed',
+          'order_cancelled',
+          'review'
+        )
+      order by n.created_at desc
+      limit 100
+    `,
+    [userId],
+  );
+  await pool.query(
+    `
+      update public.app_notifications
+      set is_read = true
+      where user_id = $1
+        and order_id is not null
+        and is_read = false
+        and notification_type in (
+          'order_accepted',
+          'payment_success',
+          'order_completed',
+          'order_cancelled',
+          'review'
+        )
     `,
     [userId],
   );

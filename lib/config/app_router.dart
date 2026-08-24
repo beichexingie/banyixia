@@ -6,6 +6,8 @@ import '../pages/main_scaffold.dart';
 import '../pages/auth/login_page.dart';
 import '../pages/apply/apply_guide_page.dart';
 import '../pages/messages/chat_room_page.dart';
+import '../pages/messages/activity_notifications_page.dart';
+import '../pages/messages/system_notifications_page.dart';
 import '../pages/profile/settings_page.dart';
 import '../pages/travel_plan/travel_plan_create_page.dart';
 import '../pages/profile/notification_settings_page.dart';
@@ -58,6 +60,14 @@ class AppRouter {
         path: '/activity/:id',
         builder: (context, state) =>
             ActivityDetailPage(activityId: state.pathParameters['id']!),
+      ),
+      GoRoute(
+        path: '/messages/activities',
+        builder: (context, state) => const ActivityNotificationsPage(),
+      ),
+      GoRoute(
+        path: '/messages/system',
+        builder: (context, state) => const SystemNotificationsPage(),
       ),
       GoRoute(path: '/login', builder: (context, state) => const LoginPage()),
       GoRoute(
