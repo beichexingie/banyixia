@@ -155,7 +155,6 @@ function emptyHtml(message = '暂无数据') {
   return `
     <div class="empty">
       <strong>${message}</strong>
-      <span>这里展示真实数据库记录，不再使用静态占位数据。</span>
     </div>
   `;
 }
