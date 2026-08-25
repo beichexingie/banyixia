@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:convert';
 import 'dart:math' as math;
 
@@ -256,14 +257,6 @@ class AmapMapService implements MapService {
 
   @override
   Future<MapPosition?> currentPosition() async {
-    final serviceEnabled = await Geolocator.isLocationServiceEnabled();
-    if (!serviceEnabled) {
-      throw const AmapApiException(
-        code: 'LOCATION_SERVICE_DISABLED',
-        info: '定位服务未开启',
-      );
-    }
-
     final permission = await Geolocator.checkPermission();
     var resolvedPermission = permission;
     if (resolvedPermission == LocationPermission.denied) {
@@ -277,9 +270,33 @@ class AmapMapService implements MapService {
       );
     }
 
-    final position = await Geolocator.getCurrentPosition(
-      desiredAccuracy: LocationAccuracy.bestForNavigation,
-    );
+    Position? position;
+    try {
+      // Do not gate this call with isLocationServiceEnabled(). On some
+      // Android vendors that status can briefly report false even while the
+      // system location switch is on. The actual location request is the
+      // reliable source of truth here.
+      position = await Geolocator.getCurrentPosition(
+        locationSettings: const LocationSettings(
+          accuracy: LocationAccuracy.high,
+          timeLimit: Duration(seconds: 15),
+        ),
+      );
+    } on LocationServiceDisabledException {
+      throw const AmapApiException(
+        code: 'LOCATION_SERVICE_DISABLED',
+        info: '定位服务未开启',
+      );
+    } on TimeoutException {
+      position = await Geolocator.getLastKnownPosition();
+      if (position == null) {
+        throw const AmapApiException(
+          code: 'LOCATION_TIMEOUT',
+          info: '定位超时，请稍后重试',
+        );
+      }
+    }
+
     final rawPoint = LatLng(position.latitude, position.longitude);
     final normalizedPoint = _shouldTreatDeviceLocationAsGcj(rawPoint)
         ? toWgs84LatLng(rawPoint)

@@ -26,6 +26,9 @@ class _CompanionPageState extends State<CompanionPage> {
   // Do not hide guides whose city has not been completed in the admin data.
   // Users can still choose a specific city from the picker when needed.
   String _selectedCity = '全国';
+  String? _selectedPlaceAddress;
+  double? _selectedPlaceLatitude;
+  double? _selectedPlaceLongitude;
   GuideSortMode _guideSortMode = GuideSortMode.time;
   String? _selectedCategory;
   double? _viewerLatitude;
@@ -331,16 +334,22 @@ class _CompanionPageState extends State<CompanionPage> {
   Future<void> _selectGuideSort(GuideSortMode mode) async {
     if (mode == GuideSortMode.distance) {
       try {
-        final position = await _mapService.currentPosition();
-        if (!mounted) return;
-        if (position?.latitude == null || position?.longitude == null) {
-          _showSortMessage('暂时无法获取当前位置，无法按距离排序');
-          return;
+        var latitude = _selectedPlaceLatitude;
+        var longitude = _selectedPlaceLongitude;
+        if (latitude == null || longitude == null) {
+          final position = await _mapService.currentPosition();
+          if (!mounted) return;
+          latitude = position?.latitude;
+          longitude = position?.longitude;
+          if (latitude == null || longitude == null) {
+            _showSortMessage('暂时无法获取当前位置，无法按距离排序');
+            return;
+          }
         }
         setState(() {
           _guideSortMode = mode;
-          _viewerLatitude = position!.latitude;
-          _viewerLongitude = position.longitude;
+          _viewerLatitude = latitude;
+          _viewerLongitude = longitude;
         });
         await context.read<GuideProvider>().loadGuides(
           latitude: _viewerLatitude,
@@ -406,7 +415,10 @@ class _CompanionPageState extends State<CompanionPage> {
   Future<void> _pickCityWithLocationPicker() async {
     final result = await context.push<Map<String, dynamic>>(
       '/demand/location',
-      extra: {'city': _selectedCity, 'address': _selectedCity},
+      extra: {
+        'city': _selectedCity,
+        'address': _selectedPlaceAddress ?? _selectedCity,
+      },
     );
     if (result == null || !mounted) {
       return;
@@ -417,10 +429,28 @@ class _CompanionPageState extends State<CompanionPage> {
       return;
     }
 
+    final isSpecificPlace = result['isSpecificPlace'] == true;
+    final latitude = _toDouble(result['latitude']);
+    final longitude = _toDouble(result['longitude']);
+    final summary = (result['summary'] ?? result['address'] ?? '')
+        .toString()
+        .trim();
+
     setState(() {
       _selectedCity = city;
+      _selectedPlaceAddress = isSpecificPlace ? summary : null;
+      _selectedPlaceLatitude = isSpecificPlace ? latitude : null;
+      _selectedPlaceLongitude = isSpecificPlace ? longitude : null;
     });
-    context.read<GuideProvider>().setCity(city);
+    final provider = context.read<GuideProvider>();
+    provider.setCity(city);
+    if (_guideSortMode == GuideSortMode.distance) {
+      await provider.loadGuides(
+        latitude: _selectedPlaceLatitude,
+        longitude: _selectedPlaceLongitude,
+        sort: 'distance',
+      );
+    }
   }
 
   String _normalizeCityName(String? raw) {
@@ -435,6 +465,11 @@ class _CompanionPageState extends State<CompanionPage> {
       }
     }
     return city;
+  }
+
+  double? _toDouble(dynamic value) {
+    if (value is num) return value.toDouble();
+    return double.tryParse(value?.toString() ?? '');
   }
 
   Widget _buildEmptyState() {

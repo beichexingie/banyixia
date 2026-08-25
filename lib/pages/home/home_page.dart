@@ -37,6 +37,9 @@ class _HomePageState extends State<HomePage>
   int _bannerIndex = 0;
 
   String _selectedCity = '苏州';
+  String? _selectedPlaceAddress;
+  double? _selectedPlaceLatitude;
+  double? _selectedPlaceLongitude;
   bool _signedToday = false;
   int _currentTab = 0;
   GuideSortMode _guideSortMode = GuideSortMode.hot;
@@ -136,7 +139,10 @@ class _HomePageState extends State<HomePage>
   Future<void> _pickCityWithLocationPicker() async {
     final result = await context.push<Map<String, dynamic>>(
       '/demand/location',
-      extra: {'city': _selectedCity, 'address': _selectedCity},
+      extra: {
+        'city': _selectedCity,
+        'address': _selectedPlaceAddress ?? _selectedCity,
+      },
     );
     if (result == null || !mounted) {
       return;
@@ -147,10 +153,28 @@ class _HomePageState extends State<HomePage>
       return;
     }
 
+    final isSpecificPlace = result['isSpecificPlace'] == true;
+    final latitude = _toDouble(result['latitude']);
+    final longitude = _toDouble(result['longitude']);
+    final summary = (result['summary'] ?? result['address'] ?? '')
+        .toString()
+        .trim();
+
     setState(() {
       _selectedCity = city;
+      _selectedPlaceAddress = isSpecificPlace ? summary : null;
+      _selectedPlaceLatitude = isSpecificPlace ? latitude : null;
+      _selectedPlaceLongitude = isSpecificPlace ? longitude : null;
     });
-    context.read<GuideProvider>().setCity(city);
+    final provider = context.read<GuideProvider>();
+    provider.setCity(city);
+    if (_guideSortMode == GuideSortMode.distance) {
+      await provider.loadGuides(
+        latitude: _selectedPlaceLatitude,
+        longitude: _selectedPlaceLongitude,
+        sort: 'distance',
+      );
+    }
   }
 
   String _normalizeCityName(String? raw) {
@@ -166,6 +190,11 @@ class _HomePageState extends State<HomePage>
       }
     }
     return city;
+  }
+
+  double? _toDouble(dynamic value) {
+    if (value is num) return value.toDouble();
+    return double.tryParse(value?.toString() ?? '');
   }
 
   void _searchGuides() {
@@ -785,79 +814,139 @@ class _HomePageState extends State<HomePage>
           color: const Color(0xFFF0F0EB),
           borderRadius: BorderRadius.circular(20),
         ),
-        child: Row(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                mainAxisAlignment: large
-                    ? MainAxisAlignment.spaceBetween
-                    : MainAxisAlignment.center,
+        child: large
+            ? Stack(
+                clipBehavior: Clip.none,
                 children: [
-                  Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      Text(
-                        title,
-                        maxLines: 1,
-                        overflow: TextOverflow.fade,
-                        style: TextStyle(
-                          fontSize: titleSize,
-                          fontWeight: FontWeight.w900,
-                          color: AppColors.textPrimary,
-                          height: 1.05,
-                        ),
-                      ),
-                      if (subtitle.isNotEmpty) ...[
-                        const SizedBox(height: 8),
+                  Positioned(
+                    left: 0,
+                    top: 0,
+                    right: 0,
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
                         Text(
-                          subtitle,
+                          title,
+                          maxLines: 1,
+                          style: TextStyle(
+                            fontSize: titleSize,
+                            fontWeight: FontWeight.w900,
+                            color: AppColors.textPrimary,
+                            height: 1.05,
+                          ),
+                        ),
+                        if (subtitle.isNotEmpty) ...[
+                          const SizedBox(height: 8),
+                          Text(
+                            subtitle,
+                            maxLines: 1,
+                            softWrap: false,
+                            style: TextStyle(
+                              fontSize: subtitleSize,
+                              fontWeight: FontWeight.w500,
+                              color: const Color(0xFFAFAFA7),
+                              height: 1.2,
+                            ),
+                          ),
+                        ],
+                      ],
+                    ),
+                  ),
+                  Positioned(
+                    left: 0,
+                    bottom: 0,
+                    child: Container(
+                      width: 46,
+                      height: arrowHeight,
+                      decoration: BoxDecoration(
+                        color: AppColors.textPrimary,
+                        borderRadius: BorderRadius.circular(999),
+                      ),
+                      alignment: Alignment.center,
+                      child: const Icon(
+                        Icons.arrow_forward_rounded,
+                        size: 16,
+                        color: AppColors.primary,
+                      ),
+                    ),
+                  ),
+                  Positioned(
+                    right: 0,
+                    bottom: -2,
+                    child: SizedBox(
+                      width: 52,
+                      height: 52,
+                      child: FittedBox(
+                        fit: BoxFit.contain,
+                        child: illustration,
+                      ),
+                    ),
+                  ),
+                ],
+              )
+            : Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        Text(
+                          title,
                           maxLines: 1,
                           overflow: TextOverflow.fade,
                           style: TextStyle(
-                            fontSize: subtitleSize,
-                            fontWeight: FontWeight.w500,
-                            color: const Color(0xFFAFAFA7),
-                            height: 1.2,
+                            fontSize: titleSize,
+                            fontWeight: FontWeight.w900,
+                            color: AppColors.textPrimary,
+                            height: 1.05,
+                          ),
+                        ),
+                        if (subtitle.isNotEmpty) ...[
+                          const SizedBox(height: 8),
+                          Text(
+                            subtitle,
+                            maxLines: 1,
+                            overflow: TextOverflow.fade,
+                            style: TextStyle(
+                              fontSize: subtitleSize,
+                              fontWeight: FontWeight.w500,
+                              color: const Color(0xFFAFAFA7),
+                              height: 1.2,
+                            ),
+                          ),
+                        ],
+                        Container(
+                          width: 50,
+                          height: arrowHeight,
+                          decoration: BoxDecoration(
+                            color: AppColors.textPrimary,
+                            borderRadius: BorderRadius.circular(999),
+                          ),
+                          alignment: Alignment.center,
+                          child: const Icon(
+                            Icons.arrow_forward_rounded,
+                            size: 16,
+                            color: AppColors.primary,
                           ),
                         ),
                       ],
-                    ],
-                  ),
-                  Container(
-                    width: 50,
-                    height: arrowHeight,
-                    decoration: BoxDecoration(
-                      color: AppColors.textPrimary,
-                      borderRadius: BorderRadius.circular(999),
                     ),
-                    alignment: Alignment.center,
-                    child: const Icon(
-                      Icons.arrow_forward_rounded,
-                      size: 16,
-                      color: AppColors.primary,
+                  ),
+                  const SizedBox(width: 4),
+                  Flexible(
+                    child: Align(
+                      alignment: Alignment.centerRight,
+                      child: FittedBox(
+                        fit: BoxFit.scaleDown,
+                        alignment: Alignment.centerRight,
+                        child: illustration,
+                      ),
                     ),
                   ),
                 ],
               ),
-            ),
-            const SizedBox(width: 4),
-            Flexible(
-              child: Align(
-                alignment: large
-                    ? Alignment.bottomRight
-                    : Alignment.centerRight,
-                child: FittedBox(
-                  fit: BoxFit.scaleDown,
-                  alignment: Alignment.centerRight,
-                  child: illustration,
-                ),
-              ),
-            ),
-          ],
-        ),
       ),
     );
   }
@@ -926,16 +1015,22 @@ class _HomePageState extends State<HomePage>
   Future<void> _selectGuideSort(GuideSortMode mode) async {
     if (mode == GuideSortMode.distance) {
       try {
-        final position = await _mapService.currentPosition();
-        if (!mounted) return;
-        if (position?.latitude == null || position?.longitude == null) {
-          _showSortMessage('暂时无法获取当前位置，无法按距离排序');
-          return;
+        var latitude = _selectedPlaceLatitude;
+        var longitude = _selectedPlaceLongitude;
+        if (latitude == null || longitude == null) {
+          final position = await _mapService.currentPosition();
+          if (!mounted) return;
+          latitude = position?.latitude;
+          longitude = position?.longitude;
+          if (latitude == null || longitude == null) {
+            _showSortMessage('暂时无法获取当前位置，无法按距离排序');
+            return;
+          }
         }
         setState(() {
           _guideSortMode = mode;
-          _viewerLatitude = position!.latitude;
-          _viewerLongitude = position.longitude;
+          _viewerLatitude = latitude;
+          _viewerLongitude = longitude;
         });
         await context.read<GuideProvider>().loadGuides(
           latitude: _viewerLatitude,

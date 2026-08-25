@@ -42,11 +42,11 @@ class _LocationPickerPageState extends State<LocationPickerPage> {
   final ValueNotifier<int> _mapPanelVersion = ValueNotifier<int>(0);
   AMapController? _nativeMapController;
   bool _nativeMapReady = false;
-  bool _movingNativeCamera = false;
 
   late String _selectedAddress;
   late String _selectedCity;
   MapPosition? _selectedPosition;
+  bool _isSpecificPlaceSelection = false;
   List<MapSuggestion> _apiSuggestions = const [];
   String? _locationSummary;
   bool _searching = false;
@@ -419,6 +419,7 @@ class _LocationPickerPageState extends State<LocationPickerPage> {
       'summary': _locationSummary ?? _selectedAddress,
       'latitude': _selectedPosition?.latitude,
       'longitude': _selectedPosition?.longitude,
+      'isSpecificPlace': _isSpecificPlaceSelection,
     };
   }
 
@@ -434,6 +435,10 @@ class _LocationPickerPageState extends State<LocationPickerPage> {
         ? widget.initialAddress!.trim()
         : widget.initialCity?.trim();
     if (seed == null || seed.isEmpty) return;
+    _isSpecificPlaceSelection =
+        widget.initialCity?.trim().isNotEmpty == true &&
+        _normalizeCityName(seed) !=
+            _normalizeCityName(widget.initialCity!.trim());
     await _selectPlace(
       address: seed,
       city: widget.initialCity?.trim().isNotEmpty == true
@@ -462,6 +467,7 @@ class _LocationPickerPageState extends State<LocationPickerPage> {
             _selectedCity = first.city;
           }
           if (first.latitude != null && first.longitude != null) {
+            _isSpecificPlaceSelection = true;
             _selectedPosition = MapPosition(
               formattedAddress: [
                 first.city,
@@ -499,6 +505,7 @@ class _LocationPickerPageState extends State<LocationPickerPage> {
         return;
       }
       _applyResolvedPosition(result);
+      _isSpecificPlaceSelection = true;
       await _moveMapToResolvedPosition(result);
     } on AmapApiException catch (e) {
       if (!mounted) return;
@@ -517,6 +524,9 @@ class _LocationPickerPageState extends State<LocationPickerPage> {
 
   Future<void> _selectCity(_CityEntry city) async {
     await _selectPlace(address: city.name, city: city.name);
+    if (mounted) {
+      setState(() => _isSpecificPlaceSelection = false);
+    }
   }
 
   Future<void> _selectPlace({
@@ -630,7 +640,6 @@ class _LocationPickerPageState extends State<LocationPickerPage> {
     final controller = _nativeMapController;
     if (controller == null) return;
 
-    _movingNativeCamera = true;
     try {
       await controller.moveCamera(
         CameraUpdate.newCameraPosition(
@@ -642,15 +651,10 @@ class _LocationPickerPageState extends State<LocationPickerPage> {
       );
     } catch (_) {
       // Ignore native camera errors and keep the current fallback state.
-    } finally {
-      Future<void>.delayed(const Duration(milliseconds: 220), () {
-        _movingNativeCamera = false;
-      });
     }
   }
 
   void _scheduleReverseGeocode(LatLng target) {
-    if (!_hasWebServiceKey) return;
     _reverseGeocodeDebounce?.cancel();
     _reverseGeocodeToken++;
     _reverseGeocodeDebounce = Timer(
@@ -662,9 +666,11 @@ class _LocationPickerPageState extends State<LocationPickerPage> {
   Future<void> _handleMapMoveEnd(LatLng target) async {
     _reverseGeocodeDebounce?.cancel();
     _mapTarget = target;
+    _isSpecificPlaceSelection = true;
+    final wgsTarget = _requestTargetFromDisplay(target);
+    _applyMapCoordinateFallback(wgsTarget);
     _notifyMapPanelChanged();
     if (!_hasWebServiceKey) return;
-    final wgsTarget = _requestTargetFromDisplay(target);
     if (_lastResolvedTarget != null &&
         _isSamePoint(_lastResolvedTarget!, wgsTarget)) {
       return;
@@ -695,9 +701,11 @@ class _LocationPickerPageState extends State<LocationPickerPage> {
     } on AmapApiException catch (e) {
       if (!mounted || token != _reverseGeocodeToken) return;
       _showMessage(_describeAmapError(e, fallback: '逆地理编码失败'));
+      _applyMapCoordinateFallback(wgsTarget);
     } catch (e) {
       if (!mounted || token != _reverseGeocodeToken) return;
       _showMessage('逆地理编码失败：$e');
+      _applyMapCoordinateFallback(wgsTarget);
     } finally {
       if (mounted && token == _reverseGeocodeToken) {
         setState(() => _locatingFromMap = false);
@@ -709,6 +717,18 @@ class _LocationPickerPageState extends State<LocationPickerPage> {
   bool _isSamePoint(LatLng a, LatLng b) {
     return (a.latitude - b.latitude).abs() < 0.00001 &&
         (a.longitude - b.longitude).abs() < 0.00001;
+  }
+
+  void _applyMapCoordinateFallback(LatLng point) {
+    if (!mounted) return;
+    setState(() {
+      _selectedPosition = MapPosition(
+        formattedAddress: _locationSummary ?? _selectedAddress,
+        city: _selectedCity,
+        latitude: point.latitude,
+        longitude: point.longitude,
+      );
+    });
   }
 
   double _worldSize(double zoom) {
@@ -1538,6 +1558,10 @@ class _LocationPickerPageState extends State<LocationPickerPage> {
       onMapCreated: (controller) {
         _nativeMapController = controller;
         _nativeMapReady = true;
+        // The location button can be pressed before the native map finishes
+        // creating its platform view. Apply the latest target once it is
+        // ready instead of losing that request.
+        _moveNativeCamera(_mapTarget, zoom: _mapZoom);
       },
       onCameraMove: (position) {
         if (!_nativeMapReady) return;
@@ -1552,9 +1576,17 @@ class _LocationPickerPageState extends State<LocationPickerPage> {
         });
         _notifyMapPanelChanged();
       },
-      onCameraMoveEnd: (_) {
-        if (_movingNativeCamera) return;
-        _scheduleReverseGeocode(_mapTarget);
+      onCameraMoveEnd: (position) {
+        final target = LatLng(
+          position.target.latitude,
+          position.target.longitude,
+        );
+        if (!mounted) return;
+        setState(() {
+          _mapTarget = target;
+          _mapZoom = position.zoom;
+        });
+        _scheduleReverseGeocode(target);
       },
       onTap: (point) async {
         final target = LatLng(point.latitude, point.longitude);
