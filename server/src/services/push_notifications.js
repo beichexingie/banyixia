@@ -134,6 +134,7 @@ function pushExpireTime() {
 }
 
 async function sendNotice(push, appKey, deviceIds, notification, data) {
+  const isOrderPending = data.type === 'order_pending_guide';
   return push.client.push(new push.PushRequest({
     appKey,
     target: 'DEVICE',
@@ -146,7 +147,10 @@ async function sendNotice(push, appKey, deviceIds, notification, data) {
     expireTime: pushExpireTime(),
     androidOpenType: 'APPLICATION',
     androidNotifyType: 'BOTH',
-    androidNotificationChannel: 'yidianban_messages',
+    androidNotificationChannel: isOrderPending
+      ? 'yidianban_orders'
+      : 'yidianban_messages',
+    ...(isOrderPending ? { androidMusic: 'order_new' } : {}),
     androidExtParameters: JSON.stringify(data),
     idempotentToken: crypto.randomUUID(),
   }));

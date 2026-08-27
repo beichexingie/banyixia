@@ -18,6 +18,7 @@ import io.flutter.plugin.common.MethodChannel
 
 private const val ALIYUN_PUSH_CHANNEL = "yidianban/aliyun_push"
 private const val ALIYUN_NOTIFICATION_CHANNEL = "yidianban_messages"
+private const val ALIYUN_ORDER_NOTIFICATION_CHANNEL = "yidianban_orders"
 private const val ALIYUN_PUSH_PREFS = "aliyun_push"
 private const val PENDING_ROUTE_KEY = "pending_route"
 
@@ -182,12 +183,30 @@ class MainActivity : FlutterActivity() {
 
   private fun ensurePushNotificationChannel() {
     if (Build.VERSION.SDK_INT < Build.VERSION_CODES.O) return
-    val channel = NotificationChannel(
+    val messagesChannel = NotificationChannel(
       ALIYUN_NOTIFICATION_CHANNEL,
       "Yidianban messages",
       NotificationManager.IMPORTANCE_HIGH,
     )
-    getSystemService(NotificationManager::class.java).createNotificationChannel(channel)
+    val orderChannel = NotificationChannel(
+      ALIYUN_ORDER_NOTIFICATION_CHANNEL,
+      "Yidianban orders",
+      NotificationManager.IMPORTANCE_HIGH,
+    )
+    val soundId = resources.getIdentifier("order_new", "raw", packageName)
+    if (soundId != 0) {
+      val soundUri = Uri.parse("android.resource://$packageName/$soundId")
+      val attributes = android.media.AudioAttributes.Builder()
+        .setUsage(android.media.AudioAttributes.USAGE_NOTIFICATION)
+        .setContentType(android.media.AudioAttributes.CONTENT_TYPE_SONIFICATION)
+        .build()
+      orderChannel.setSound(soundUri, attributes)
+    } else {
+      Log.w("YidianbanPush", "order_new sound resource missing; order notifications use system sound")
+    }
+    getSystemService(NotificationManager::class.java).createNotificationChannels(
+      listOf(messagesChannel, orderChannel),
+    )
   }
 
   private fun logNotificationState() {
@@ -197,6 +216,13 @@ class MainActivity : FlutterActivity() {
       "notification state enabled=${state["enabled"]} permission=${state["permission"]} " +
         "channel=$ALIYUN_NOTIFICATION_CHANNEL importance=${state["channelImportance"]}",
     )
+    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+      Log.i(
+        "YidianbanPush",
+        "order notification channel importance=${state["orderChannelImportance"]} " +
+          "sound=${state["orderChannelSound"]}",
+      )
+    }
   }
 
   private fun notificationPermissionState(): Map<String, Any> {
@@ -220,6 +246,16 @@ class MainActivity : FlutterActivity() {
         enabled
       },
       "channelImportance" to channelImportance,
+      "orderChannelImportance" to if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+        manager.getNotificationChannel(ALIYUN_ORDER_NOTIFICATION_CHANNEL)?.importance ?: -1
+      } else {
+        -1
+      },
+      "orderChannelSound" to if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+        manager.getNotificationChannel(ALIYUN_ORDER_NOTIFICATION_CHANNEL)?.sound?.toString() ?: "default"
+      } else {
+        "default"
+      },
     )
   }
 

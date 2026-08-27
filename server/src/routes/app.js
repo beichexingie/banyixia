@@ -39,6 +39,12 @@ import {
   ensureNotificationInbox,
   notifyUser,
 } from '../services/push_notifications.js';
+import {
+  bankPaymentCapabilities,
+  createBankCardPaymentOrder,
+  ensureBankPayoutSchema,
+  submitWechatBankTransfer,
+} from '../services/bank_card.js';
 
 export const appRouter = express.Router();
 const __filename = fileURLToPath(import.meta.url);
@@ -901,6 +907,7 @@ appRouter.get('/notifications/orders', handleRoute(async (req, res) => {
         and n.order_id is not null
         and n.notification_type in (
           'order_accepted',
+          'order_pending_guide',
           'payment_success',
           'order_completed',
           'order_cancelled',
@@ -920,6 +927,7 @@ appRouter.get('/notifications/orders', handleRoute(async (req, res) => {
         and is_read = false
         and notification_type in (
           'order_accepted',
+          'order_pending_guide',
           'payment_success',
           'order_completed',
           'order_cancelled',
@@ -2833,6 +2841,13 @@ appRouter.post('/orders', handleRoute(async (req, res) => {
     ],
   );
   const guideLocation = await fetchGuideLocation(pool, guideId);
+  await notifyUser(pool, guideId, {
+    title: '新订单待确认',
+    body: '您有一条新的订单，请及时处理',
+    route: '/messages',
+    type: 'order_pending_guide',
+    orderId: result.rows[0].id,
+  });
   return ok(res, {
     data: {
       ...withDistanceFields(result.rows[0], guideLocation),
@@ -2903,6 +2918,13 @@ appRouter.post('/orders/one-cent-test', handleRoute(async (req, res) => {
     ],
   );
   const guideLocation = await fetchGuideLocation(pool, guideId);
+  await notifyUser(pool, guideId, {
+    title: '新订单待确认',
+    body: '您有一条新的订单，请及时处理',
+    route: '/messages',
+    type: 'order_pending_guide',
+    orderId: result.rows[0].id,
+  });
   return ok(res, {
     data: withDistanceFields(result.rows[0], guideLocation),
     message: '0.10测试订单已创建，等待地陪接单后付款',
@@ -3483,9 +3505,28 @@ appRouter.post('/calls/:id/heartbeat', handleRoute(async (req, res) => {
   return ok(res, { data: result.rows[0], message: '通话心跳已更新' });
 }));
 
+appRouter.get('/payment-methods', handleRoute(async (_req, res) => {
+  return ok(res, { data: bankPaymentCapabilities() });
+}));
+
+// Direct bank-card collection is provider-specific. Keep this endpoint in the
+// same contract as Alipay/WeChat, but never pretend a payment was created
+// before a qualified acquirer adapter is configured.
+appRouter.post('/bank-card-create-order', handleRoute(async (req, res) => {
+  const userId = await requireSessionUser(req, res);
+  if (!userId) return;
+  const orderId = req.body?.order_id?.toString().trim() ?? '';
+  if (!orderId) return fail(res, 400, '缺少订单号');
+  const order = await findOrderById(pool, orderId);
+  if (!order) return fail(res, 404, '订单不存在');
+  if (order.user_id !== userId) return fail(res, 403, '无权支付该订单');
+  createBankCardPaymentOrder();
+}));
+
 appRouter.get('/wallet', async (req, res) => {
   const userId = await requireSessionUser(req, res);
   if (!userId) return;
+  await ensureBankPayoutSchema(pool);
   const wallet = await pool.query(`select * from public.wallets where user_id = $1 limit 1`, [userId]);
   const tx = await pool.query(`select * from public.transactions where user_id = $1 order by created_at desc`, [userId]);
   const payoutAccount = await pool.query(
@@ -3496,10 +3537,21 @@ appRouter.get('/wallet', async (req, res) => {
     `select * from public.withdrawal_requests where user_id = $1 order by created_at desc limit 50`,
     [userId],
   );
+  const bankPayoutAccount = await pool.query(
+    `
+      select user_id, provider, bank_name, account_last4, real_name,
+        status, reject_reason, verified_at, created_at, updated_at
+      from public.guide_bank_payout_accounts
+      where user_id = $1
+      limit 1
+    `,
+    [userId],
+  );
   return ok(res, {
     data: {
       wallet: wallet.rows[0] ?? null,
       payout_account: payoutAccount.rows[0] ?? null,
+      bank_payout_account: bankPayoutAccount.rows[0] ?? null,
       withdrawals: withdrawals.rows,
       transactions: tx.rows,
     },
@@ -3545,11 +3597,104 @@ appRouter.put('/wallet/payout-account', handleRoute(async (req, res) => {
   return ok(res, { data: result.rows[0], message: '收款账号已提交，等待平台审核' });
 }));
 
+appRouter.put('/wallet/bank-payout-account', handleRoute(async (req, res) => {
+  const userId = await requireGuideUser(req, res);
+  if (!userId) return;
+  await ensureBankPayoutSchema(pool);
+  const payload = req.body ?? {};
+  const token = payload.provider_account_token?.toString().trim() ?? '';
+  const bankName = payload.bank_name?.toString().trim() ?? '';
+  const last4 = payload.account_last4?.toString().trim() ?? '';
+  const realName = payload.real_name?.toString().trim() ?? '';
+  if (!token) return fail(res, 400, '缺少支付机构银行卡账户 token');
+  if (token.length < 8 || token.length > 512) {
+    return fail(res, 400, '银行卡账户 token 格式无效');
+  }
+  if (!/^\d{4}$/.test(last4)) return fail(res, 400, '银行卡后四位格式无效');
+  if (realName.length < 2 || realName.length > 40) {
+    return fail(res, 400, '请填写有效的银行卡实名');
+  }
+  const result = await pool.query(
+    `
+      insert into public.guide_bank_payout_accounts (
+        user_id, provider, provider_account_token, bank_name,
+        account_last4, real_name, status, reject_reason, updated_at
+      ) values ($1,'wechat_bank_card',$2,$3,$4,$5,'pending',null,now())
+      on conflict (user_id) do update set
+        provider_account_token = excluded.provider_account_token,
+        bank_name = excluded.bank_name,
+        account_last4 = excluded.account_last4,
+        real_name = excluded.real_name,
+        status = 'pending',
+        reject_reason = null,
+        updated_at = now()
+      returning user_id, provider, bank_name, account_last4, real_name,
+        status, reject_reason, verified_at, created_at, updated_at
+    `,
+    [userId, token, bankName, last4, realName],
+  );
+  return ok(res, {
+    data: result.rows[0],
+    message: '银行卡收款账户已提交，等待平台审核',
+  });
+}));
+
 appRouter.post('/wallet/withdraw', handleRoute(async (req, res) => {
   const userId = await requireGuideUser(req, res);
   if (!userId) return;
+  await ensureBankPayoutSchema(pool);
   const amount = Number(req.body?.amount ?? 0);
+  const provider = req.body?.provider?.toString().trim() || 'alipay';
   if (!(amount > 0)) return fail(res, 400, '提现金额必须大于0');
+
+  if (provider === 'wechat_bank_card') {
+    if (!config.wechatBankTransferEnabled) {
+      return fail(res, 501, '微信商家转账到银行卡尚未开通');
+    }
+    const accountResult = await pool.query(
+      `select * from public.guide_bank_payout_accounts where user_id = $1 limit 1`,
+      [userId],
+    );
+    const account = accountResult.rows[0];
+    if (!account || account.status !== 'approved') {
+      return fail(res, 400, '请先绑定并通过审核银行卡收款账户');
+    }
+    const created = await withTransaction(async (client) => {
+      const wallet = await freezeWithdrawBalance(client, userId, amount);
+      if (!wallet) {
+        const error = new Error('可提现余额不足');
+        error.statusCode = 400;
+        throw error;
+      }
+      const result = await client.query(
+        `
+          insert into public.withdrawal_requests (
+            user_id, amount, status, payout_account_snapshot, provider, updated_at
+          ) values ($1,$2,'pending',$3::jsonb,'wechat_bank_card',now())
+          returning *
+        `,
+        [userId, amount, JSON.stringify({
+          provider: account.provider,
+          bank_name: account.bank_name,
+          account_last4: account.account_last4,
+          real_name: account.real_name,
+          provider_account_token: account.provider_account_token,
+        })],
+      );
+      await recordWalletTransaction(client, {
+        userId,
+        orderId: null,
+        type: 'withdraw_freeze',
+        amount: -amount,
+        actualAmount: -amount,
+        description: '申请银行卡提现，冻结可提现余额',
+      });
+      return result.rows[0];
+    });
+    return ok(res, { data: created, message: '银行卡提现申请已提交' });
+  }
+
+  if (provider !== 'alipay') return fail(res, 400, '不支持的提现方式');
   if (
     config.alipayTransferMinAmount > 0 &&
     amount < config.alipayTransferMinAmount
@@ -3636,6 +3781,62 @@ appRouter.get('/admin/payout-accounts', handleRoute(async (req, res) => {
     [status || null],
   );
   return ok(res, { data: result.rows });
+}));
+
+appRouter.get('/admin/bank-payout-accounts', handleRoute(async (req, res) => {
+  const adminId = await requireAdminUser(req, res);
+  if (!adminId) return;
+  await ensureBankPayoutSchema(pool);
+  const status = req.query.status?.toString().trim();
+  const result = await pool.query(
+    `
+      select gpa.user_id, gpa.provider, gpa.bank_name, gpa.account_last4,
+        gpa.real_name, gpa.status, gpa.reject_reason, gpa.verified_at,
+        gpa.created_at, gpa.updated_at, u.phone, u.nickname
+      from public.guide_bank_payout_accounts gpa
+      join public.users u on u.id = gpa.user_id
+      where ($1::text is null or gpa.status = $1)
+      order by gpa.updated_at desc
+      limit 200
+    `,
+    [status || null],
+  );
+  return ok(res, { data: result.rows });
+}));
+
+appRouter.post('/admin/bank-payout-accounts/:userId/approve', handleRoute(async (req, res) => {
+  const adminId = await requireAdminUser(req, res);
+  if (!adminId) return;
+  await ensureBankPayoutSchema(pool);
+  const result = await pool.query(
+    `
+      update public.guide_bank_payout_accounts
+      set status = 'approved', reject_reason = null, verified_at = now(), updated_at = now()
+      where user_id = $1 and status = 'pending'
+      returning user_id, provider, bank_name, account_last4, real_name, status, verified_at
+    `,
+    [req.params.userId],
+  );
+  if (!result.rows[0]) return fail(res, 404, '银行卡收款账户不存在或当前状态不能审核');
+  return ok(res, { data: result.rows[0], message: '银行卡收款账户已审核通过' });
+}));
+
+appRouter.post('/admin/bank-payout-accounts/:userId/reject', handleRoute(async (req, res) => {
+  const adminId = await requireAdminUser(req, res);
+  if (!adminId) return;
+  await ensureBankPayoutSchema(pool);
+  const reason = req.body?.reason?.toString().trim() || '银行卡收款账户审核未通过';
+  const result = await pool.query(
+    `
+      update public.guide_bank_payout_accounts
+      set status = 'rejected', reject_reason = $2, verified_at = null, updated_at = now()
+      where user_id = $1 and status = 'pending'
+      returning user_id, provider, bank_name, account_last4, real_name, status, reject_reason
+    `,
+    [req.params.userId, reason],
+  );
+  if (!result.rows[0]) return fail(res, 404, '银行卡收款账户不存在或当前状态不能驳回');
+  return ok(res, { data: result.rows[0], message: '银行卡收款账户已驳回' });
 }));
 
 appRouter.post('/admin/payout-accounts/:userId/approve', handleRoute(async (req, res) => {
@@ -3904,6 +4105,22 @@ appRouter.post('/admin/withdrawals/:id/transfer', handleRoute(async (req, res) =
         : `支付宝自动打款失败：${reason}`,
     );
   }
+}));
+
+appRouter.post('/admin/withdrawals/:id/transfer-bank', handleRoute(async (req, res) => {
+  const adminId = await requireAdminUser(req, res);
+  if (!adminId) return;
+  await ensureBankPayoutSchema(pool);
+  const result = await pool.query(
+    `select * from public.withdrawal_requests where id = $1 limit 1`,
+    [req.params.id],
+  );
+  const withdrawal = result.rows[0];
+  if (!withdrawal) return fail(res, 404, '提现申请不存在');
+  if (withdrawal.provider !== 'wechat_bank_card') {
+    return fail(res, 400, '该提现申请不是银行卡提现');
+  }
+  submitWechatBankTransfer();
 }));
 
 appRouter.post('/admin/withdrawals/:id/query-transfer', handleRoute(async (req, res) => {

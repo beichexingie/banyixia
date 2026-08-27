@@ -9,6 +9,7 @@ export async function findOrderById(client, orderId) {
         amount,
         status,
         payment_status,
+        payment_method,
         payment_request_id,
         merchant_order_no,
         provider_trade_no
@@ -33,6 +34,7 @@ export async function findOrderByMerchantOrderNo(client, merchantOrderNo) {
         amount,
         status,
         payment_status,
+        payment_method,
         payment_request_id,
         merchant_order_no,
         provider_trade_no

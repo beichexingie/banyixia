@@ -8,6 +8,9 @@
 - 健康检查接口
 - 支付宝 App 支付下单接口
 - 支付宝异步通知接口
+- 微信支付 APP 下单接口
+- 微信支付回调验签、AES-GCM 解密和订单状态查询接口
+- 银行卡支付与银行卡提现接口契约（未配置收单/代付机构时安全返回未开通）
 - 支付成功后：
   - 更新 `orders.payment_status`
   - 写入 `provider_trade_no`
@@ -23,6 +26,10 @@
 - `src/routes/health.js`：健康检查
 - `src/routes/payments.js`：支付相关路由
 - `src/services/alipay.js`：支付宝签名与验签
+- `src/services/wechat.js`：微信支付 V3 签名、下单、回调解密与查询
+
+订单创建和 `0.10` 测试订单创建后，会向目标地陪发送 `order_pending_guide` 通知：
+“您有一条新的订单，请及时处理”。
 
 ## 本地启动
 
@@ -46,6 +53,14 @@ cp .env.example .env
 - `ALIPAY_TRANSFER_REPORT_INFO_CONTENT`（本次转账的报备信息内容）
 - `ALIPAY_TRANSFER_MIN_AMOUNT`（默认 `0.10` 元）
 - `ALIPAY_NOTIFY_URL`
+- `WECHAT_PAY_ENABLED`
+- `WECHAT_APP_ID`、`WECHAT_MCH_ID`、`WECHAT_API_V3_KEY`
+- `WECHAT_CERT_SERIAL_NO`
+- `WECHAT_PLATFORM_CERT_SERIAL_NO`
+- `WECHAT_PRIVATE_KEY_PATH`、`WECHAT_PLATFORM_CERT_PATH`
+- `WECHAT_NOTIFY_URL`
+- `BANK_CARD_PAYMENT_ENABLED`、`BANK_CARD_PAYMENT_PROVIDER`
+- `WECHAT_BANK_TRANSFER_ENABLED`
 - `CORS_ORIGINS`
 
 3. 安装依赖：

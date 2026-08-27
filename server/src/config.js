@@ -65,6 +65,29 @@ export const config = {
   alipayApiBaseUrl:
     process.env.ALIPAY_API_BASE_URL?.trim() ||
     'https://openapi.alipay.com',
+  wechatPayEnabled: parseBoolean(process.env.WECHAT_PAY_ENABLED, false),
+  wechatAppId: process.env.WECHAT_APP_ID?.trim() || '',
+  wechatMchId: process.env.WECHAT_MCH_ID?.trim() || '',
+  wechatApiV3Key: process.env.WECHAT_API_V3_KEY?.trim() || '',
+  wechatCertSerialNo: process.env.WECHAT_CERT_SERIAL_NO?.trim() || '',
+  wechatPlatformCertSerialNo:
+    process.env.WECHAT_PLATFORM_CERT_SERIAL_NO?.trim() || '',
+  wechatPrivateKeyPath: process.env.WECHAT_PRIVATE_KEY_PATH?.trim() || '',
+  wechatPlatformCertPath: process.env.WECHAT_PLATFORM_CERT_PATH?.trim() || '',
+  wechatNotifyUrl: process.env.WECHAT_NOTIFY_URL?.trim() || '',
+  wechatApiBaseUrl:
+    process.env.WECHAT_API_BASE_URL?.trim() ||
+    'https://api.mch.weixin.qq.com',
+  bankCardPaymentEnabled: parseBoolean(
+    process.env.BANK_CARD_PAYMENT_ENABLED,
+    false,
+  ),
+  bankCardPaymentProvider:
+    process.env.BANK_CARD_PAYMENT_PROVIDER?.trim() || '',
+  wechatBankTransferEnabled: parseBoolean(
+    process.env.WECHAT_BANK_TRANSFER_ENABLED,
+    false,
+  ),
   alipayTransferEnabled: parseBoolean(process.env.ALIPAY_TRANSFER_ENABLED, false),
   alipayTransferMinAmount: parseNumber(
     process.env.ALIPAY_TRANSFER_MIN_AMOUNT,
@@ -174,6 +197,20 @@ export function hasAlipayTransferConfig() {
       hasAlipayConfig() &&
       config.alipayAppCertSn &&
       config.alipayRootCertSn,
+  );
+}
+
+export function hasWechatConfig() {
+  return Boolean(
+    config.wechatPayEnabled &&
+      config.wechatAppId &&
+      config.wechatMchId &&
+      config.wechatApiV3Key.length === 32 &&
+      config.wechatCertSerialNo &&
+      config.wechatPlatformCertSerialNo &&
+      config.wechatPrivateKeyPath &&
+      config.wechatPlatformCertPath &&
+      config.wechatNotifyUrl,
   );
 }
 

@@ -23,7 +23,16 @@ app.use(
     credentials: true,
   }),
 );
-app.use(express.json({ limit: '12mb' }));
+app.use(
+  express.json({
+    limit: '12mb',
+    verify: (req, _res, buffer) => {
+      if (req.originalUrl.includes('/wechat/notify')) {
+        req.rawBody = Buffer.from(buffer);
+      }
+    },
+  }),
+);
 app.use('/uploads', express.static(uploadsDir));
 app.use('/admin', express.static(adminDir));
 app.get('/admin', (_req, res) => {
