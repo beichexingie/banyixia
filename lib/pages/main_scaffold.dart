@@ -14,6 +14,7 @@ import 'messages/messages_page.dart';
 import 'order/incoming_voice_call_dialog.dart';
 import 'order/voice_call_page.dart';
 import 'profile/profile_page.dart';
+import '../widgets/design_icon.dart';
 
 final ValueNotifier<int> appTabNotifier = ValueNotifier<int>(0);
 
@@ -292,37 +293,28 @@ class _MainScaffoldState extends State<MainScaffold>
         ),
         padding: EdgeInsets.only(bottom: MediaQuery.paddingOf(context).bottom),
         child: SizedBox(
-          height: 74,
+          height: 54,
           child: Row(
-            mainAxisAlignment: MainAxisAlignment.spaceAround,
             children: [
-              _navItem(
-                index: 0,
-                label: '广场',
-                icon: Icons.explore_outlined,
-                activeIcon: Icons.explore,
+              Expanded(
+                child: _navItem(index: 0, label: '广场', designIcon: '广场'),
               ),
-              _navItem(
-                index: 1,
-                label: '服务',
-                icon: Icons.favorite_border,
-                activeIcon: Icons.favorite,
+              Expanded(
+                child: _navItem(index: 1, label: '服务', designIcon: '服务'),
               ),
-              _centerButton(),
-              Consumer<MessageProvider>(
-                builder: (context, provider, _) => _navItem(
-                  index: 3,
-                  label: '消息',
-                  icon: Icons.chat_bubble_outline,
-                  activeIcon: Icons.chat_bubble,
-                  badge: provider.totalUnread,
+              SizedBox(width: 64, child: Center(child: _centerButton())),
+              Expanded(
+                child: Consumer<MessageProvider>(
+                  builder: (context, provider, _) => _navItem(
+                    index: 3,
+                    label: '消息',
+                    designIcon: '消息',
+                    badge: provider.totalUnread,
+                  ),
                 ),
               ),
-              _navItem(
-                index: 4,
-                label: '我的',
-                icon: Icons.person_outline,
-                activeIcon: Icons.person,
+              Expanded(
+                child: _navItem(index: 4, label: '我的', designIcon: '我的'),
               ),
             ],
           ),
@@ -334,8 +326,9 @@ class _MainScaffoldState extends State<MainScaffold>
   Widget _navItem({
     required int index,
     required String label,
-    required IconData icon,
-    required IconData activeIcon,
+    String? designIcon,
+    IconData? icon,
+    IconData? activeIcon,
     int badge = 0,
   }) {
     final active = _currentIndex == index;
@@ -344,20 +337,23 @@ class _MainScaffoldState extends State<MainScaffold>
       onTap: () => _onTap(index),
       borderRadius: BorderRadius.circular(18),
       child: SizedBox(
-        width: 62,
+        width: double.infinity,
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
             Stack(
               clipBehavior: Clip.none,
               children: [
-                Icon(
-                  active ? activeIcon : icon,
-                  size: 24,
-                  color: active
-                      ? AppColors.textPrimary
-                      : const Color(0xFFD0D5E2),
-                ),
+                if (designIcon != null)
+                  _buildNavDesignIcon(designIcon!, active)
+                else
+                  Icon(
+                    active ? activeIcon : icon,
+                    size: 24,
+                    color: active
+                        ? AppColors.textPrimary
+                        : const Color(0xFFD0D5E2),
+                  ),
                 if (badge > 0)
                   Positioned(
                     top: -6,
@@ -385,11 +381,11 @@ class _MainScaffoldState extends State<MainScaffold>
                   ),
               ],
             ),
-            const SizedBox(height: 6),
+            const SizedBox(height: 3),
             Text(
               label,
               style: TextStyle(
-                fontSize: 10.5,
+                fontSize: 10,
                 fontWeight: active ? FontWeight.w700 : FontWeight.w500,
                 color: active ? AppColors.textPrimary : const Color(0xFFD0D5E2),
               ),
@@ -400,12 +396,51 @@ class _MainScaffoldState extends State<MainScaffold>
     );
   }
 
+  Widget _buildNavDesignIcon(String asset, bool active) {
+    final icon = DesignIcon(asset, size: 22);
+    if (!active) {
+      return ColorFiltered(
+        colorFilter: const ColorFilter.mode(Color(0xFFD0D5E2), BlendMode.srcIn),
+        child: icon,
+      );
+    }
+
+    // Keep the supplied artwork as the foreground and use a small offset
+    // silhouette for the active green edge. Painting the full icon in green
+    // makes the plaza artwork look like a solid green blob.
+    final edgeOpacity = asset == '广场' ? 0.08 : 0.18;
+    return SizedBox(
+      width: 22,
+      height: 22,
+      child: Stack(
+        clipBehavior: Clip.none,
+        children: [
+          Positioned(
+            left: 0.8,
+            top: 0.9,
+            child: Opacity(
+              opacity: edgeOpacity,
+              child: ColorFiltered(
+                colorFilter: const ColorFilter.mode(
+                  AppColors.primary,
+                  BlendMode.srcIn,
+                ),
+                child: icon,
+              ),
+            ),
+          ),
+          icon,
+        ],
+      ),
+    );
+  }
+
   Widget _centerButton() {
     return GestureDetector(
       onTap: () => _onTap(2),
       child: Container(
-        width: 56,
-        height: 56,
+        width: 52,
+        height: 52,
         decoration: BoxDecoration(
           color: AppColors.primary,
           shape: BoxShape.circle,
@@ -418,7 +453,7 @@ class _MainScaffoldState extends State<MainScaffold>
           ],
         ),
         alignment: Alignment.center,
-        child: const Icon(Icons.add, size: 30, color: AppColors.textPrimary),
+        child: const DesignIcon('加号', size: 52),
       ),
     );
   }

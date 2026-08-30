@@ -11,6 +11,7 @@ import '../../models/guide.dart';
 import '../../providers/guide_provider.dart';
 import '../../widgets/service_guide_card.dart';
 import '../../widgets/guide_sort_menu_button.dart';
+import '../../widgets/design_icon.dart';
 import '../../services/map_service.dart';
 
 class CompanionPage extends StatefulWidget {
@@ -107,11 +108,11 @@ class _CompanionPageState extends State<CompanionPage> {
         ),
       ),
       child: Padding(
-        padding: const EdgeInsets.fromLTRB(14, 10, 14, 18),
+        padding: const EdgeInsets.fromLTRB(14, 8, 14, 12),
         child: Column(
           children: [
             _buildSearchBar(),
-            const SizedBox(height: 14),
+            const SizedBox(height: 10),
             _buildCategoryCards(),
           ],
         ),
@@ -120,11 +121,7 @@ class _CompanionPageState extends State<CompanionPage> {
   }
 
   Widget _buildCategoryCards() {
-    const categories = [
-      ('休闲旅游', Icons.travel_explore_rounded),
-      ('户外运动', Icons.terrain_rounded),
-      ('公务随行', Icons.business_center_rounded),
-    ];
+    const categories = [('休闲游玩', '休闲游玩'), ('户外运动', '户外运动'), ('公务随行', '公务随行')];
 
     return Row(
       children: [
@@ -133,7 +130,7 @@ class _CompanionPageState extends State<CompanionPage> {
           Expanded(
             child: _buildCategoryCard(
               title: categories[index].$1,
-              icon: categories[index].$2,
+              iconAsset: categories[index].$2,
             ),
           ),
         ],
@@ -141,7 +138,10 @@ class _CompanionPageState extends State<CompanionPage> {
     );
   }
 
-  Widget _buildCategoryCard({required String title, required IconData icon}) {
+  Widget _buildCategoryCard({
+    required String title,
+    required String iconAsset,
+  }) {
     final selected = _selectedCategory == title;
     return InkWell(
       onTap: () => setState(() {
@@ -150,11 +150,11 @@ class _CompanionPageState extends State<CompanionPage> {
       borderRadius: BorderRadius.circular(16),
       child: AnimatedContainer(
         duration: const Duration(milliseconds: 180),
-        height: 96,
-        padding: const EdgeInsets.fromLTRB(10, 12, 8, 8),
+        height: 74,
+        padding: const EdgeInsets.fromLTRB(9, 9, 7, 7),
         decoration: BoxDecoration(
           color: selected ? const Color(0xFFC9FF70) : const Color(0xFFEFFFCE),
-          borderRadius: BorderRadius.circular(16),
+          borderRadius: BorderRadius.circular(10),
           border: Border.all(
             color: selected ? AppColors.primary : Colors.transparent,
             width: 1.2,
@@ -169,7 +169,7 @@ class _CompanionPageState extends State<CompanionPage> {
                 maxLines: 1,
                 overflow: TextOverflow.clip,
                 style: const TextStyle(
-                  fontSize: 15,
+                  fontSize: 13,
                   fontWeight: FontWeight.w900,
                   color: AppColors.textPrimary,
                 ),
@@ -177,7 +177,7 @@ class _CompanionPageState extends State<CompanionPage> {
             ),
             Align(
               alignment: Alignment.bottomRight,
-              child: Icon(icon, size: 38, color: const Color(0xFF202520)),
+              child: DesignIcon(iconAsset, size: 34),
             ),
           ],
         ),
@@ -187,11 +187,11 @@ class _CompanionPageState extends State<CompanionPage> {
 
   Widget _buildSearchBar() {
     return Container(
-      height: 52,
-      padding: const EdgeInsets.symmetric(horizontal: 18),
+      height: 42,
+      padding: const EdgeInsets.symmetric(horizontal: 14),
       decoration: BoxDecoration(
         color: Colors.white,
-        borderRadius: BorderRadius.circular(28),
+        borderRadius: BorderRadius.circular(21),
         boxShadow: [
           BoxShadow(
             color: Colors.black.withValues(alpha: 0.028),
@@ -202,20 +202,20 @@ class _CompanionPageState extends State<CompanionPage> {
       ),
       child: Row(
         children: [
-          const Icon(Icons.search_rounded, size: 26, color: Color(0xFFD0D0D0)),
-          const SizedBox(width: 10),
+          const Icon(Icons.search_rounded, size: 21, color: Color(0xFFD0D0D0)),
+          const SizedBox(width: 8),
           Expanded(
             child: TextField(
               controller: _searchController,
               textInputAction: TextInputAction.search,
               decoration: const InputDecoration(
                 hintText: '搜索内容',
-                hintStyle: TextStyle(fontSize: 15, color: Color(0xFFD0D0D0)),
+                hintStyle: TextStyle(fontSize: 13, color: Color(0xFFD0D0D0)),
                 border: InputBorder.none,
                 isDense: true,
               ),
               style: const TextStyle(
-                fontSize: 15,
+                fontSize: 13,
                 color: AppColors.textPrimary,
               ),
             ),
@@ -229,11 +229,11 @@ class _CompanionPageState extends State<CompanionPage> {
     return Container(
       decoration: const BoxDecoration(color: Color(0xFFF4F4F2)),
       child: Padding(
-        padding: const EdgeInsets.fromLTRB(14, 14, 14, 96),
+        padding: const EdgeInsets.fromLTRB(14, 10, 14, 96),
         child: Column(
           children: [
             _buildListHeader(),
-            const SizedBox(height: 14),
+            const SizedBox(height: 10),
             if (provider.isLoading && guides.isEmpty)
               const Padding(
                 padding: EdgeInsets.only(top: 56),
@@ -245,10 +245,12 @@ class _CompanionPageState extends State<CompanionPage> {
               _buildEmptyState()
             else
               ...List.generate(guides.length, (index) {
-                final guide = guides[index];
                 return Padding(
-                  padding: const EdgeInsets.only(bottom: 14),
-                  child: ServiceGuideCard(guide: guide),
+                  padding: const EdgeInsets.only(bottom: 7),
+                  child: ServiceGuideCard(
+                    guide: guides[index],
+                    listCompact: true,
+                  ),
                 );
               }),
           ],

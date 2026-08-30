@@ -10,6 +10,7 @@ import '../../providers/user_provider.dart';
 import '../../providers/message_provider.dart';
 import '../../models/user.dart' as app_model;
 import '../../widgets/service_guide_card.dart';
+import '../../widgets/design_icon.dart';
 
 class ProfilePage extends StatefulWidget {
   const ProfilePage({super.key});
@@ -128,90 +129,87 @@ class _ProfilePageState extends State<ProfilePage> {
       child: SafeArea(
         bottom: false,
         child: Padding(
-          padding: const EdgeInsets.fromLTRB(18, 10, 18, 26),
-          child: Column(
-            children: [
-              Row(
-                mainAxisAlignment: MainAxisAlignment.end,
-                children: [
-                  _headerAction(
-                    icon: Icons.headset_mic_outlined,
-                    label: '客服',
-                    onTap: _openCustomerService,
-                  ),
-                  const SizedBox(width: 18),
-                  _headerAction(
-                    icon: Icons.settings_outlined,
-                    label: '设置',
-                    onTap: () => context.push('/settings'),
-                  ),
-                ],
-              ),
-              const SizedBox(height: 6),
-              GestureDetector(
-                onTap: () => context.push('/settings/profile'),
-                child: Row(
-                  children: [
-                    CircleAvatar(
-                      radius: 30,
-                      backgroundColor: Colors.white,
-                      backgroundImage: user.avatar.isNotEmpty
-                          ? NetworkImage(user.avatar)
-                          : null,
-                      child: user.avatar.isEmpty
-                          ? const Icon(
-                              Icons.person,
-                              size: 28,
-                              color: AppColors.textHint,
-                            )
-                          : null,
-                    ),
-                    const SizedBox(width: 12),
-                    Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
+          padding: const EdgeInsets.fromLTRB(16, 12, 16, 18),
+          child: GestureDetector(
+            onTap: () => context.push('/settings/profile'),
+            child: Row(
+              children: [
+                CircleAvatar(
+                  radius: 30,
+                  backgroundColor: Colors.white,
+                  backgroundImage: user.avatar.isNotEmpty
+                      ? NetworkImage(user.avatar)
+                      : null,
+                  child: user.avatar.isEmpty
+                      ? const Icon(
+                          Icons.person,
+                          size: 28,
+                          color: AppColors.textHint,
+                        )
+                      : null,
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Row(
                         children: [
-                          Row(
-                            children: [
-                              Flexible(
-                                child: Text(
-                                  user.nickname.isEmpty
-                                      ? '未登录用户'
-                                      : user.nickname,
-                                  maxLines: 1,
-                                  overflow: TextOverflow.ellipsis,
-                                  style: const TextStyle(
-                                    fontSize: 28,
-                                    fontWeight: FontWeight.w900,
-                                    color: AppColors.textPrimary,
-                                  ),
-                                ),
+                          Flexible(
+                            child: Text(
+                              user.nickname.isEmpty ? '未登录用户' : user.nickname,
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: const TextStyle(
+                                fontSize: 18,
+                                height: 1.1,
+                                fontWeight: FontWeight.w900,
+                                color: AppColors.textPrimary,
                               ),
-                              const SizedBox(width: 6),
-                              if (user.isGuideApproved)
-                                const Icon(
-                                  Icons.verified,
-                                  size: 18,
-                                  color: AppColors.textPrimary,
-                                ),
-                            ],
-                          ),
-                          const SizedBox(height: 4),
-                          Text(
-                            'IP：$cityLabel',
-                            style: const TextStyle(
-                              fontSize: 14,
-                              fontWeight: FontWeight.w600,
-                              color: AppColors.textPrimary,
                             ),
                           ),
+                          const SizedBox(width: 6),
+                          if (user.isGuideApproved)
+                            const Icon(
+                              Icons.verified,
+                              size: 15,
+                              color: AppColors.textPrimary,
+                            ),
                         ],
                       ),
+                      const SizedBox(height: 4),
+                      Text(
+                        'IP：$cityLabel',
+                        style: const TextStyle(
+                          fontSize: 13,
+                          height: 1.15,
+                          fontWeight: FontWeight.w600,
+                          color: AppColors.textPrimary,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                const SizedBox(width: 10),
+                Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    _headerAction(
+                      icon: Icons.headset_mic_outlined,
+                      label: '客服',
+                      onTap: _openCustomerService,
+                    ),
+                    const SizedBox(width: 11),
+                    _headerAction(
+                      icon: Icons.settings_outlined,
+                      label: '设置',
+                      onTap: () => context.push('/settings'),
                     ),
                   ],
                 ),
-              ),
-            ],
+              ],
+            ),
           ),
         ),
       ),
@@ -227,11 +225,11 @@ class _ProfilePageState extends State<ProfilePage> {
       onTap: onTap,
       child: Column(
         children: [
-          Icon(icon, color: AppColors.textPrimary, size: 22),
+          Icon(icon, color: AppColors.textPrimary, size: 20),
           const SizedBox(height: 2),
           Text(
             label,
-            style: const TextStyle(fontSize: 12, color: AppColors.textPrimary),
+            style: const TextStyle(fontSize: 10, color: AppColors.textPrimary),
           ),
         ],
       ),
@@ -240,8 +238,8 @@ class _ProfilePageState extends State<ProfilePage> {
 
   Widget _buildVipCard(app_model.User user) {
     return Container(
-      margin: const EdgeInsets.fromLTRB(16, 0, 16, 12),
-      constraints: const BoxConstraints(minHeight: 86),
+      margin: const EdgeInsets.fromLTRB(12, 0, 12, 10),
+      constraints: const BoxConstraints(minHeight: 64),
       decoration: BoxDecoration(
         gradient: const LinearGradient(
           colors: [Color(0xFFFFE6A1), Color(0xFFFFF1C9)],
@@ -253,11 +251,11 @@ class _ProfilePageState extends State<ProfilePage> {
       child: Stack(
         children: [
           Positioned(
-            left: 92,
-            top: -8,
+            left: 76,
+            top: -10,
             child: Container(
-              width: 92,
-              height: 92,
+              width: 72,
+              height: 72,
               decoration: BoxDecoration(
                 color: Colors.white.withValues(alpha: 0.14),
                 shape: BoxShape.circle,
@@ -265,23 +263,26 @@ class _ProfilePageState extends State<ProfilePage> {
             ),
           ),
           Padding(
-            padding: const EdgeInsets.fromLTRB(16, 11, 16, 11),
+            padding: const EdgeInsets.fromLTRB(14, 8, 10, 8),
             child: Row(
               children: [
                 Expanded(
                   child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
                     mainAxisAlignment: MainAxisAlignment.center,
+                    crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       const Text(
                         'VIP会员',
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
                         style: TextStyle(
-                          fontSize: 17,
+                          fontSize: 16,
+                          height: 1.05,
                           fontWeight: FontWeight.w900,
                           color: Color(0xFF6B4A00),
                         ),
                       ),
-                      const SizedBox(height: 4),
+                      const SizedBox(height: 3),
                       Text(
                         user.vipLabel.isNotEmpty
                             ? '当前等级 ${user.vipLabel}，享受更多专属权益'
@@ -289,37 +290,44 @@ class _ProfilePageState extends State<ProfilePage> {
                         maxLines: 2,
                         overflow: TextOverflow.ellipsis,
                         style: const TextStyle(
-                          fontSize: 11.5,
+                          fontSize: 10.5,
+                          height: 1.15,
                           color: Color(0xFF8E6A18),
                         ),
                       ),
                     ],
                   ),
                 ),
-                ElevatedButton(
-                  onPressed: () => _showSnack('会员入口稍后接入'),
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: const Color(0xFFFFF4CD),
-                    foregroundColor: const Color(0xFF8B6100),
-                    elevation: 0,
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(999),
+                const SizedBox(width: 6),
+                SizedBox(
+                  width: 72,
+                  height: 32,
+                  child: ElevatedButton(
+                    onPressed: () => _showSnack('会员入口稍后接入'),
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: const Color(0xFFFFF4CD),
+                      foregroundColor: const Color(0xFF8B6100),
+                      elevation: 0,
+                      padding: EdgeInsets.zero,
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(999),
+                      ),
                     ),
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 16,
-                      vertical: 9,
+                    child: const Text(
+                      '开通会员',
+                      style: TextStyle(
+                        fontWeight: FontWeight.w800,
+                        fontSize: 12,
+                      ),
                     ),
-                  ),
-                  child: const Text(
-                    '开通会员',
-                    style: TextStyle(fontWeight: FontWeight.w800, fontSize: 13),
                   ),
                 ),
-                const SizedBox(width: 12),
-                const Icon(
-                  Icons.workspace_premium,
-                  size: 46,
-                  color: Color(0xFFFFA91A),
+                const SizedBox(width: 3),
+                Image.asset(
+                  'assets/design/image 41.png',
+                  width: 48,
+                  height: 42,
+                  fit: BoxFit.contain,
                 ),
               ],
             ),
@@ -331,8 +339,8 @@ class _ProfilePageState extends State<ProfilePage> {
 
   Widget _buildOrdersPanel(OrderProvider orderProvider) {
     return Container(
-      margin: const EdgeInsets.fromLTRB(16, 0, 16, 12),
-      padding: const EdgeInsets.fromLTRB(14, 12, 14, 12),
+      margin: const EdgeInsets.fromLTRB(12, 0, 12, 8),
+      padding: const EdgeInsets.fromLTRB(12, 9, 12, 9),
       decoration: BoxDecoration(
         color: Colors.white,
         borderRadius: BorderRadius.circular(18),
@@ -370,41 +378,9 @@ class _ProfilePageState extends State<ProfilePage> {
               ),
             ],
           ),
-          const SizedBox(height: 14),
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceAround,
-            children: [
-              _orderShortcut(
-                icon: Icons.account_balance_wallet_outlined,
-                label: '待付款',
-                count: orderProvider.getCountByStatus(
-                  OrderStatus.pendingPayment,
-                ),
-                tabIndex: 1,
-              ),
-              _orderShortcut(
-                icon: Icons.hourglass_top_outlined,
-                label: '进行中',
-                count: orderProvider.getCountByStatus(OrderStatus.inProgress),
-                tabIndex: 3,
-              ),
-              _orderShortcut(
-                icon: Icons.edit_note_outlined,
-                label: '待评价',
-                count: orderProvider.getCountByStatus(
-                  OrderStatus.pendingReview,
-                ),
-                tabIndex: 4,
-              ),
-              _orderShortcut(
-                icon: Icons.inventory_2_outlined,
-                label: '已取消',
-                count: orderProvider.getCountByStatus(OrderStatus.cancelled),
-                tabIndex: 0,
-              ),
-            ],
-          ),
-          const SizedBox(height: 14),
+          const SizedBox(height: 10),
+          _buildOrderStatusRow(orderProvider),
+          const SizedBox(height: 10),
           InkWell(
             onTap: _isCreatingTestOrder ? null : _createOneCentTestOrder,
             borderRadius: BorderRadius.circular(16),
@@ -490,7 +466,7 @@ class _ProfilePageState extends State<ProfilePage> {
 
   Widget _buildMyDemandEntry() {
     return Container(
-      margin: const EdgeInsets.fromLTRB(16, 0, 16, 12),
+      margin: const EdgeInsets.fromLTRB(12, 0, 12, 10),
       padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 14),
       decoration: BoxDecoration(
         color: Colors.white,
@@ -520,59 +496,94 @@ class _ProfilePageState extends State<ProfilePage> {
     );
   }
 
-  Widget _orderShortcut({
-    required IconData icon,
-    required String label,
-    required int count,
-    required int tabIndex,
-  }) {
-    return GestureDetector(
-      onTap: () => context.push('/profile/orders?tab=$tabIndex'),
-      child: SizedBox(
-        width: 68,
-        child: Column(
-          children: [
-            Stack(
-              clipBehavior: Clip.none,
-              children: [
-                Icon(icon, size: 25, color: AppColors.textPrimary),
-                if (count > 0)
-                  Positioned(
-                    top: -6,
-                    right: -10,
-                    child: Container(
-                      constraints: const BoxConstraints(
-                        minWidth: 16,
-                        minHeight: 16,
+  Widget _buildOrderStatusRow(OrderProvider orderProvider) {
+    final counts = [
+      orderProvider.getCountByStatus(OrderStatus.pendingPayment),
+      orderProvider.getCountByStatus(OrderStatus.inProgress),
+      orderProvider.getCountByStatus(OrderStatus.pendingReview),
+      orderProvider.getCountByStatus(OrderStatus.cancelled),
+    ];
+    const tabIndexes = [1, 3, 4, 0];
+
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final imageWidth = constraints.maxWidth;
+        final imageHeight = imageWidth * 68 / 350;
+        const iconRightCoordinates = [52.0, 141.0, 230.0, 319.0];
+        return SizedBox(
+          height: imageHeight,
+          child: Stack(
+            children: [
+              Positioned(
+                left: 0,
+                top: 0,
+                width: imageWidth,
+                height: imageHeight,
+                child: DesignIcon(
+                  '我的订单-订单状态',
+                  width: imageWidth,
+                  height: imageHeight,
+                ),
+              ),
+              Positioned(
+                left: imageWidth * 52 / 350 - imageHeight * 5 / 68,
+                top: imageHeight * 12 / 68 - imageHeight * 5 / 68,
+                width: imageHeight * 10 / 68,
+                height: imageHeight * 10 / 68,
+                child: const DecoratedBox(
+                  decoration: BoxDecoration(
+                    color: Colors.white,
+                    shape: BoxShape.circle,
+                  ),
+                ),
+              ),
+              Row(
+                children: List.generate(
+                  4,
+                  (index) => Expanded(
+                    child: InkWell(
+                      onTap: () => context.push(
+                        '/profile/orders?tab=${tabIndexes[index]}',
                       ),
-                      padding: const EdgeInsets.symmetric(horizontal: 4),
-                      decoration: const BoxDecoration(
-                        color: Color(0xFFFF6C6B),
-                        shape: BoxShape.circle,
-                      ),
-                      alignment: Alignment.center,
-                      child: Text(
-                        count > 9 ? '9+' : '$count',
-                        style: const TextStyle(
-                          fontSize: 9,
-                          color: Colors.white,
-                          fontWeight: FontWeight.w700,
-                        ),
-                      ),
+                      borderRadius: BorderRadius.circular(12),
+                      child: const SizedBox.expand(),
                     ),
                   ),
-              ],
-            ),
-            const SizedBox(height: 8),
-            Text(
-              label,
-              style: const TextStyle(
-                fontSize: 12,
-                fontWeight: FontWeight.w500,
-                color: AppColors.textPrimary,
+                ),
               ),
-            ),
-          ],
+              for (var index = 0; index < counts.length; index++)
+                if (counts[index] > 0)
+                  Positioned(
+                    left:
+                        imageWidth * iconRightCoordinates[index] / 350 -
+                        imageHeight * 9 / 68,
+                    top: imageHeight * 12 / 68 - imageHeight * 9 / 68,
+                    width: imageHeight * 18 / 68,
+                    height: imageHeight * 18 / 68,
+                    child: _orderCountBadge(counts[index]),
+                  ),
+            ],
+          ),
+        );
+      },
+    );
+  }
+
+  Widget _orderCountBadge(int count) {
+    return Container(
+      constraints: const BoxConstraints(minWidth: 16, minHeight: 16),
+      padding: const EdgeInsets.symmetric(horizontal: 4),
+      decoration: const BoxDecoration(
+        color: Color(0xFFFF6C6B),
+        shape: BoxShape.circle,
+      ),
+      alignment: Alignment.center,
+      child: Text(
+        count > 9 ? '9+' : '$count',
+        style: const TextStyle(
+          fontSize: 9,
+          color: Colors.white,
+          fontWeight: FontWeight.w700,
         ),
       ),
     );
@@ -582,8 +593,8 @@ class _ProfilePageState extends State<ProfilePage> {
     return GestureDetector(
       onTap: () => context.push('/profile/coupons'),
       child: Container(
-        margin: const EdgeInsets.fromLTRB(16, 0, 16, 12),
-        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+        margin: const EdgeInsets.fromLTRB(12, 0, 12, 8),
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 9),
         decoration: BoxDecoration(
           gradient: const LinearGradient(
             colors: [Color(0xFFFFF7F2), Color(0xFFFFFBF8)],
@@ -597,12 +608,12 @@ class _ProfilePageState extends State<ProfilePage> {
             const Text(
               '优惠券',
               style: TextStyle(
-                fontSize: 18,
+                fontSize: 16,
                 fontWeight: FontWeight.w800,
                 color: AppColors.textPrimary,
               ),
             ),
-            const SizedBox(width: 10),
+            const SizedBox(width: 8),
             Text(
               user.couponCount > 0 ? '${user.couponCount} 张可用优惠券' : '30元无门槛优惠券',
               style: const TextStyle(
@@ -621,7 +632,7 @@ class _ProfilePageState extends State<ProfilePage> {
 
   Widget _buildMenuPanel(app_model.User user) {
     return Container(
-      margin: const EdgeInsets.fromLTRB(16, 0, 16, 12),
+      margin: const EdgeInsets.fromLTRB(12, 0, 12, 10),
       decoration: BoxDecoration(
         color: Colors.white,
         borderRadius: BorderRadius.circular(18),
@@ -661,21 +672,25 @@ class _ProfilePageState extends State<ProfilePage> {
       onTap: onTap,
       borderRadius: BorderRadius.circular(18),
       child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 16),
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
         child: Row(
           children: [
-            Icon(icon, color: AppColors.textPrimary),
-            const SizedBox(width: 10),
+            Icon(icon, color: AppColors.textPrimary, size: 20),
+            const SizedBox(width: 8),
             Expanded(
               child: Text(
                 title,
                 style: const TextStyle(
-                  fontSize: 16,
+                  fontSize: 14,
                   color: AppColors.textPrimary,
                 ),
               ),
             ),
-            const Icon(Icons.chevron_right, color: AppColors.textHint),
+            const Icon(
+              Icons.chevron_right,
+              size: 20,
+              color: AppColors.textHint,
+            ),
           ],
         ),
       ),
@@ -687,7 +702,7 @@ class _ProfilePageState extends State<ProfilePage> {
       builder: (context, provider, _) {
         final guides = provider.followingGuides;
         return Container(
-          margin: const EdgeInsets.fromLTRB(16, 2, 16, 0),
+          margin: const EdgeInsets.fromLTRB(12, 2, 12, 0),
           padding: const EdgeInsets.fromLTRB(14, 14, 14, 14),
           decoration: BoxDecoration(
             color: Colors.white,
@@ -734,7 +749,7 @@ class _ProfilePageState extends State<ProfilePage> {
                   ),
                 ],
               ),
-              const SizedBox(height: 14),
+              const SizedBox(height: 10),
               if (provider.isLoading && guides.isEmpty)
                 const Padding(
                   padding: EdgeInsets.symmetric(vertical: 28),
@@ -745,14 +760,19 @@ class _ProfilePageState extends State<ProfilePage> {
               else if (guides.isEmpty)
                 _emptyFollowingGuides()
               else
-                ...List.generate(
-                  guides.length > 3 ? 3 : guides.length,
-                  (index) => Padding(
-                    padding: EdgeInsets.only(
-                      bottom: index == guides.length - 1 ? 0 : 12,
-                    ),
-                    child: ServiceGuideCard(guide: guides[index]),
-                  ),
+                Column(
+                  children: guides
+                      .take(3)
+                      .map(
+                        (guide) => Padding(
+                          padding: const EdgeInsets.only(bottom: 7),
+                          child: ServiceGuideCard(
+                            guide: guide,
+                            listCompact: true,
+                          ),
+                        ),
+                      )
+                      .toList(),
                 ),
             ],
           ),

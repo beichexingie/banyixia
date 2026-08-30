@@ -232,8 +232,8 @@ class _HomePageState extends State<HomePage>
             SliverPersistentHeader(
               pinned: true,
               delegate: _HomeHeaderDelegate(
-                minExtentHeight: topInset + 84,
-                maxExtentHeight: topInset + 608,
+                minExtentHeight: topInset + 64,
+                maxExtentHeight: topInset + 478,
                 builder: (context, progress) {
                   return _buildHeroSection(
                     collapseProgress: progress,
@@ -264,7 +264,7 @@ class _HomePageState extends State<HomePage>
     required double topInset,
   }) {
     final eased = Curves.easeOutCubic.transform(collapseProgress);
-    final searchTop = lerpDouble(topInset + 124, topInset + 10, eased)!;
+    final searchTop = lerpDouble(topInset + 95, topInset + 8, eased)!;
     final brandOpacity = (1 - eased * 1.2).clamp(0.0, 1.0);
     final bannerOpacity = (1 - eased * 1.5).clamp(0.0, 1.0);
     final featureOpacity = (1 - eased * 1.8).clamp(0.0, 1.0);
@@ -301,12 +301,12 @@ class _HomePageState extends State<HomePage>
           children: [
             Positioned.fill(
               child: Padding(
-                padding: EdgeInsets.fromLTRB(18, topInset + 10, 18, 10),
+                padding: EdgeInsets.fromLTRB(14, topInset + 8, 14, 8),
                 child: Transform.translate(
                   offset: Offset(0, -contentOffset),
                   child: Stack(
                     fit: StackFit.expand,
-                    clipBehavior: Clip.none,
+                    clipBehavior: Clip.hardEdge,
                     children: [
                       Positioned(
                         top: -4,
@@ -316,7 +316,7 @@ class _HomePageState extends State<HomePage>
                             opacity: brandOpacity,
                             child: Image.asset(
                               'assets/home/top_sketch/插画 2.png',
-                              width: 232,
+                              width: 203,
                               fit: BoxFit.contain,
                             ),
                           ),
@@ -362,7 +362,7 @@ class _HomePageState extends State<HomePage>
                         ),
                       ),
                       Positioned(
-                        top: 190,
+                        top: 132,
                         left: 0,
                         right: 0,
                         child: IgnorePointer(
@@ -374,7 +374,7 @@ class _HomePageState extends State<HomePage>
                         ),
                       ),
                       Positioned(
-                        top: 370,
+                        top: 270,
                         left: 0,
                         right: 0,
                         child: IgnorePointer(
@@ -385,7 +385,6 @@ class _HomePageState extends State<HomePage>
                               crossAxisAlignment: CrossAxisAlignment.start,
                               children: [
                                 Expanded(
-                                  flex: 49,
                                   child: _featureCard(
                                     title: '需求定制',
                                     subtitle: '根据你的需求定制～',
@@ -393,14 +392,13 @@ class _HomePageState extends State<HomePage>
                                     large: true,
                                     illustration: _buildFeatureIllustration(
                                       'assets/home/feature_settle/Frame 5.png',
-                                      width: 71,
-                                      height: 71,
+                                      width: 58,
+                                      height: 58,
                                     ),
                                   ),
                                 ),
-                                const SizedBox(width: 10),
+                                const SizedBox(width: 8),
                                 Expanded(
-                                  flex: 51,
                                   child: Column(
                                     mainAxisSize: MainAxisSize.min,
                                     children: [
@@ -411,19 +409,19 @@ class _HomePageState extends State<HomePage>
                                             context.push('/apply/guide'),
                                         illustration: _buildFeatureIllustration(
                                           'assets/home/feature_map/Frame 6.png',
-                                          width: 96,
-                                          height: 78,
+                                          width: 44,
+                                          height: 44,
                                         ),
                                       ),
-                                      const SizedBox(height: 10),
+                                      const SizedBox(height: 8),
                                       _featureCard(
                                         title: '联系我们',
                                         subtitle: '',
                                         onTap: _openCustomerService,
                                         illustration: _buildFeatureIllustration(
                                           'assets/home/feature_contact/Frame 5.png',
-                                          width: 96,
-                                          height: 78,
+                                          width: 44,
+                                          height: 44,
                                         ),
                                       ),
                                     ],
@@ -435,7 +433,7 @@ class _HomePageState extends State<HomePage>
                         ),
                       ),
                       Positioned(
-                        top: 538,
+                        top: 414,
                         left: 0,
                         right: 0,
                         child: IgnorePointer(
@@ -452,8 +450,8 @@ class _HomePageState extends State<HomePage>
               ),
             ),
             Positioned(
-              left: 18,
-              right: 18,
+              left: 14,
+              right: 14,
               top: searchTop,
               child: _buildSearchRow(),
             ),
@@ -465,44 +463,16 @@ class _HomePageState extends State<HomePage>
 
   Widget _buildBrandBlock() {
     return SizedBox(
-      width: 190,
-      height: 96,
-      child: Stack(
-        clipBehavior: Clip.none,
-        children: [
-          Positioned(
-            left: 0,
-            bottom: 0,
-            child: Image.asset(
-              'assets/home/logo 1.png',
-              width: 142,
-              fit: BoxFit.contain,
-            ),
-          ),
-          const Positioned(
-            left: 46,
-            top: 18,
-            child: Text(
-              '一点就陪伴',
-              style: TextStyle(
-                fontFamily: 'Wawati TC',
-                fontFamilyFallback: [
-                  'DFWaWaTC-W5',
-                  '华文彩云',
-                  '华文楷体',
-                  'STKaiti',
-                  'KaiTi',
-                  '楷体',
-                ],
-                fontSize: 15,
-                fontWeight: FontWeight.w600,
-                color: Color.fromRGBO(139, 196, 41, 1),
-                height: 1,
-                letterSpacing: 0.4,
-              ),
-            ),
-          ),
-        ],
+      width: 150,
+      height: 70,
+      child: Align(
+        alignment: Alignment.bottomLeft,
+        child: Image.asset(
+          'assets/home/logo 1.png',
+          width: 77,
+          height: 46,
+          fit: BoxFit.contain,
+        ),
       ),
     );
   }
@@ -512,8 +482,8 @@ class _HomePageState extends State<HomePage>
       children: [
         Expanded(
           child: Container(
-            height: 58,
-            padding: const EdgeInsets.symmetric(horizontal: 18),
+            height: 38,
+            padding: const EdgeInsets.symmetric(horizontal: 14),
             decoration: BoxDecoration(
               color: Colors.white,
               borderRadius: BorderRadius.circular(999),
@@ -529,27 +499,30 @@ class _HomePageState extends State<HomePage>
               children: [
                 const Icon(
                   Icons.search_rounded,
-                  size: 27,
+                  size: 20,
                   color: Color(0xFFD5D5D5),
                 ),
-                const SizedBox(width: 10),
+                const SizedBox(width: 8),
                 Expanded(
                   child: TextField(
                     controller: _searchController,
                     onSubmitted: (_) => _searchGuides(),
+                    textAlignVertical: TextAlignVertical.center,
                     style: const TextStyle(
-                      fontSize: 15,
+                      fontSize: 14,
                       fontWeight: FontWeight.w500,
                       color: AppColors.textPrimary,
                     ),
                     decoration: const InputDecoration(
                       hintText: '搜索内容',
                       hintStyle: TextStyle(
-                        fontSize: 15,
+                        fontSize: 14,
                         fontWeight: FontWeight.w500,
                         color: Color(0xFFD2D2D2),
                       ),
                       border: InputBorder.none,
+                      isDense: true,
+                      contentPadding: EdgeInsets.zero,
                     ),
                   ),
                 ),
@@ -557,13 +530,13 @@ class _HomePageState extends State<HomePage>
             ),
           ),
         ),
-        const SizedBox(width: 10),
+        const SizedBox(width: 8),
         InkWell(
           onTap: _pickCityWithLocationPicker,
           borderRadius: BorderRadius.circular(999),
           child: Container(
-            height: 58,
-            padding: const EdgeInsets.symmetric(horizontal: 16),
+            height: 38,
+            padding: const EdgeInsets.symmetric(horizontal: 13),
             decoration: BoxDecoration(
               color: Colors.white,
               borderRadius: BorderRadius.circular(999),
@@ -585,7 +558,7 @@ class _HomePageState extends State<HomePage>
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
                     style: const TextStyle(
-                      fontSize: 16,
+                      fontSize: 14,
                       fontWeight: FontWeight.w900,
                       color: AppColors.textPrimary,
                     ),
@@ -594,7 +567,7 @@ class _HomePageState extends State<HomePage>
                 const SizedBox(width: 7),
                 const Icon(
                   Icons.keyboard_arrow_down_rounded,
-                  size: 20,
+                  size: 18,
                   color: AppColors.textPrimary,
                 ),
               ],
@@ -611,10 +584,10 @@ class _HomePageState extends State<HomePage>
     return Column(
       children: [
         ClipRRect(
-          borderRadius: BorderRadius.circular(20),
+          borderRadius: BorderRadius.circular(12),
           child: SizedBox(
             width: double.infinity,
-            height: 150,
+            height: 104,
             child: PageView.builder(
               controller: _bannerController,
               itemCount: count,
@@ -669,7 +642,7 @@ class _HomePageState extends State<HomePage>
             ),
           ),
         ),
-        const SizedBox(height: 10),
+        const SizedBox(height: 8),
         Row(
           mainAxisAlignment: MainAxisAlignment.center,
           children: List.generate(count, (index) {
@@ -738,9 +711,9 @@ class _HomePageState extends State<HomePage>
                     child: AnimatedContainer(
                       duration: const Duration(milliseconds: 180),
                       curve: Curves.easeOut,
-                      height: 44,
+                      height: 28,
                       padding: EdgeInsets.symmetric(
-                        horizontal: selected ? 18 : 0,
+                        horizontal: selected ? 12 : 0,
                       ),
                       decoration: BoxDecoration(
                         color: selected
@@ -754,16 +727,16 @@ class _HomePageState extends State<HomePage>
                           if (selected && index == 0) ...[
                             Image.asset(
                               'assets/login/Group.png',
-                              width: 18,
-                              height: 34,
+                              width: 14,
+                              height: 22,
                               fit: BoxFit.contain,
                             ),
-                            const SizedBox(width: 8),
+                            const SizedBox(width: 5),
                           ],
                           Text(
                             labels[index],
                             style: TextStyle(
-                              fontSize: 16,
+                              fontSize: 14,
                               fontWeight: selected
                                   ? FontWeight.w900
                                   : FontWeight.w700,
@@ -794,16 +767,16 @@ class _HomePageState extends State<HomePage>
     required Widget illustration,
     bool large = false,
   }) {
-    final cardHeight = large ? 150.0 : 72.0;
-    final cardHorizontalPadding = large ? 18.0 : 14.0;
-    final cardVerticalPadding = large ? 18.0 : 12.0;
-    final titleSize = large ? 18.0 : 17.0;
-    final subtitleSize = large ? 11.0 : 12.0;
-    final arrowHeight = large ? 28.0 : 25.0;
+    final cardHeight = large ? 126.0 : 60.0;
+    final cardHorizontalPadding = large ? 11.0 : 9.0;
+    final cardVerticalPadding = large ? 9.0 : 7.0;
+    final titleSize = large ? 15.0 : 13.0;
+    final subtitleSize = large ? 9.0 : 10.0;
+    const arrowHeight = 17.0;
 
     return InkWell(
       onTap: onTap,
-      borderRadius: BorderRadius.circular(20),
+      borderRadius: BorderRadius.circular(10),
       child: Container(
         height: cardHeight,
         padding: EdgeInsets.symmetric(
@@ -812,7 +785,7 @@ class _HomePageState extends State<HomePage>
         ),
         decoration: BoxDecoration(
           color: const Color(0xFFF0F0EB),
-          borderRadius: BorderRadius.circular(20),
+          borderRadius: BorderRadius.circular(10),
         ),
         child: large
             ? Stack(
@@ -836,7 +809,7 @@ class _HomePageState extends State<HomePage>
                           ),
                         ),
                         if (subtitle.isNotEmpty) ...[
-                          const SizedBox(height: 8),
+                          const SizedBox(height: 4),
                           Text(
                             subtitle,
                             maxLines: 1,
@@ -856,7 +829,7 @@ class _HomePageState extends State<HomePage>
                     left: 0,
                     bottom: 0,
                     child: Container(
-                      width: 46,
+                      width: 30,
                       height: arrowHeight,
                       decoration: BoxDecoration(
                         color: AppColors.textPrimary,
@@ -865,7 +838,7 @@ class _HomePageState extends State<HomePage>
                       alignment: Alignment.center,
                       child: const Icon(
                         Icons.arrow_forward_rounded,
-                        size: 16,
+                        size: 12,
                         color: AppColors.primary,
                       ),
                     ),
@@ -874,8 +847,8 @@ class _HomePageState extends State<HomePage>
                     right: 0,
                     bottom: -2,
                     child: SizedBox(
-                      width: 52,
-                      height: 52,
+                      width: large ? 58 : 44,
+                      height: large ? 58 : 44,
                       child: FittedBox(
                         fit: BoxFit.contain,
                         child: illustration,
@@ -884,18 +857,19 @@ class _HomePageState extends State<HomePage>
                   ),
                 ],
               )
-            : Row(
-                crossAxisAlignment: CrossAxisAlignment.start,
+            : Stack(
+                clipBehavior: Clip.none,
                 children: [
-                  Expanded(
+                  Positioned(
+                    left: 0,
+                    top: 0,
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
-                      mainAxisAlignment: MainAxisAlignment.center,
                       children: [
                         Text(
                           title,
                           maxLines: 1,
-                          overflow: TextOverflow.fade,
+                          overflow: TextOverflow.ellipsis,
                           style: TextStyle(
                             fontSize: titleSize,
                             fontWeight: FontWeight.w900,
@@ -904,11 +878,11 @@ class _HomePageState extends State<HomePage>
                           ),
                         ),
                         if (subtitle.isNotEmpty) ...[
-                          const SizedBox(height: 8),
+                          const SizedBox(height: 4),
                           Text(
                             subtitle,
                             maxLines: 1,
-                            overflow: TextOverflow.fade,
+                            overflow: TextOverflow.ellipsis,
                             style: TextStyle(
                               fontSize: subtitleSize,
                               fontWeight: FontWeight.w500,
@@ -917,30 +891,35 @@ class _HomePageState extends State<HomePage>
                             ),
                           ),
                         ],
-                        Container(
-                          width: 50,
-                          height: arrowHeight,
-                          decoration: BoxDecoration(
-                            color: AppColors.textPrimary,
-                            borderRadius: BorderRadius.circular(999),
-                          ),
-                          alignment: Alignment.center,
-                          child: const Icon(
-                            Icons.arrow_forward_rounded,
-                            size: 16,
-                            color: AppColors.primary,
-                          ),
-                        ),
                       ],
                     ),
                   ),
-                  const SizedBox(width: 4),
-                  Flexible(
-                    child: Align(
-                      alignment: Alignment.centerRight,
+                  Positioned(
+                    left: 0,
+                    bottom: 0,
+                    child: Container(
+                      width: 30,
+                      height: arrowHeight,
+                      decoration: BoxDecoration(
+                        color: AppColors.textPrimary,
+                        borderRadius: BorderRadius.circular(999),
+                      ),
+                      alignment: Alignment.center,
+                      child: const Icon(
+                        Icons.arrow_forward_rounded,
+                        size: 12,
+                        color: AppColors.primary,
+                      ),
+                    ),
+                  ),
+                  Positioned(
+                    right: 0,
+                    bottom: 0,
+                    child: SizedBox(
+                      width: 44,
+                      height: 44,
                       child: FittedBox(
-                        fit: BoxFit.scaleDown,
-                        alignment: Alignment.centerRight,
+                        fit: BoxFit.contain,
                         child: illustration,
                       ),
                     ),
@@ -995,16 +974,21 @@ class _HomePageState extends State<HomePage>
             longitude: _viewerLongitude,
             sort: _guideSortMode == GuideSortMode.distance ? 'distance' : null,
           ),
-          child: ListView.separated(
+          child: GridView.builder(
             physics: const AlwaysScrollableScrollPhysics(
               parent: BouncingScrollPhysics(),
             ),
-            padding: const EdgeInsets.fromLTRB(18, 8, 18, 100),
+            padding: const EdgeInsets.fromLTRB(14, 5, 14, 100),
+            gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+              crossAxisCount: 2,
+              crossAxisSpacing: 10,
+              mainAxisSpacing: 10,
+              childAspectRatio: 0.88,
+            ),
             itemCount: guides.length,
-            separatorBuilder: (_, __) => const SizedBox(height: 14),
             itemBuilder: (context, index) {
               final guide = guides[index];
-              return ServiceGuideCard(guide: guide);
+              return ServiceGuideCard(guide: guide, compact: true);
             },
           ),
         );

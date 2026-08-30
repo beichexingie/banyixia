@@ -187,8 +187,8 @@ class _MessagesPageState extends State<MessagesPage> {
         child: Column(
           children: [
             Container(
-              width: 72,
-              height: 72,
+              width: 60,
+              height: 60,
               decoration: const BoxDecoration(
                 color: Color(0xFFEAF9B8),
                 shape: BoxShape.circle,
@@ -196,11 +196,11 @@ class _MessagesPageState extends State<MessagesPage> {
               alignment: Alignment.center,
               child: Icon(icon, color: AppColors.textPrimary, size: 32),
             ),
-            const SizedBox(height: 12),
+            const SizedBox(height: 8),
             Text(
               label,
               style: const TextStyle(
-                fontSize: 15,
+                fontSize: 13,
                 color: AppColors.textPrimary,
                 fontWeight: FontWeight.w600,
               ),
@@ -235,21 +235,21 @@ class _MessagesPageState extends State<MessagesPage> {
         }
       },
       child: Padding(
-        padding: const EdgeInsets.fromLTRB(16, 16, 16, 16),
+        padding: const EdgeInsets.fromLTRB(14, 12, 14, 12),
         child: Row(
           children: [
             ClipOval(
               child: (room.otherParticipantAvatar?.isNotEmpty ?? false)
                   ? CachedNetworkImage(
                       imageUrl: room.otherParticipantAvatar!,
-                      width: 56,
-                      height: 56,
+                      width: 48,
+                      height: 48,
                       fit: BoxFit.cover,
                       errorWidget: (context, url, error) => _avatarFallback(),
                     )
                   : _avatarFallback(),
             ),
-            const SizedBox(width: 12),
+            const SizedBox(width: 10),
             Expanded(
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
@@ -262,7 +262,7 @@ class _MessagesPageState extends State<MessagesPage> {
                           maxLines: 1,
                           overflow: TextOverflow.ellipsis,
                           style: const TextStyle(
-                            fontSize: 18,
+                            fontSize: 16,
                             fontWeight: FontWeight.w700,
                             color: Color(0xFF2B3B5B),
                           ),
@@ -277,7 +277,7 @@ class _MessagesPageState extends State<MessagesPage> {
                       ),
                     ],
                   ),
-                  const SizedBox(height: 8),
+                  const SizedBox(height: 5),
                   Row(
                     children: [
                       Expanded(
@@ -294,8 +294,8 @@ class _MessagesPageState extends State<MessagesPage> {
                       if (room.unreadCount > 0) ...[
                         const SizedBox(width: 8),
                         Container(
-                          width: 28,
-                          height: 28,
+                          width: 22,
+                          height: 22,
                           decoration: const BoxDecoration(
                             color: Color(0xFFFF6D6B),
                             shape: BoxShape.circle,
@@ -304,7 +304,7 @@ class _MessagesPageState extends State<MessagesPage> {
                           child: Text(
                             room.unreadCount > 9 ? '9+' : '${room.unreadCount}',
                             style: const TextStyle(
-                              fontSize: 11,
+                              fontSize: 10,
                               color: Colors.white,
                               fontWeight: FontWeight.w700,
                             ),
@@ -324,8 +324,8 @@ class _MessagesPageState extends State<MessagesPage> {
 
   Widget _avatarFallback() {
     return Container(
-      width: 56,
-      height: 56,
+      width: 48,
+      height: 48,
       color: AppColors.surfaceMuted,
       alignment: Alignment.center,
       child: const Icon(Icons.person, color: AppColors.textHint),
