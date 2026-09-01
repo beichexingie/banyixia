@@ -1,0 +1,26 @@
+<svg viewBox="0 0 46 46" xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" width="46.000000" height="46.000000" fill="none" clip-path="url(#clipPath_7)" customFrame="url(#clipPath_7)">
+	<defs>
+		<clipPath id="clipPath_7">
+			<rect width="46.000000" height="46.000000" x="0.000000" y="0.000000" rx="12.000000" fill="rgb(255,255,255)" />
+		</clipPath>
+		<clipPath id="clipPath_8">
+			<rect width="30.000000" height="30.000000" x="8.000000" y="8.000000" fill="rgb(255,255,255)" />
+		</clipPath>
+		<linearGradient id="paint_linear_6" x1="22" x2="22" y1="20" y2="35" gradientUnits="userSpaceOnUse">
+			<stop stop-color="rgb(255,255,255)" offset="0" stop-opacity="1" />
+			<stop stop-color="rgb(188,254,42)" offset="1" stop-opacity="1" />
+		</linearGradient>
+	</defs>
+	<rect id="Frame 1739336886" width="46.000000" height="46.000000" x="0.000000" y="0.000000" rx="12.000000" fill="rgb(255,255,255)" />
+	<g id="Frame" clip-path="url(#clipPath_8)" customFrame="url(#clipPath_8)">
+		<rect id="Frame" width="30.000000" height="30.000000" x="8.000000" y="8.000000" fill="rgb(255,255,255)" fill-opacity="0" />
+		<rect id="Rectangle 4015" width="18.000000" height="15.000000" x="13.000000" y="20.000000" fill="url(#paint_linear_6)" />
+		<g id="Group 1312315303">
+			<path id="Vector" d="M25.925 11L14.175 11C13.5261 11 13 11.5261 13 12.175L13 33.325C13 33.974 13.5261 34.5 14.175 34.5L30.625 34.5C31.274 34.5 31.8 33.974 31.8 33.325L31.8 20.4027" stroke="rgb(51,51,51)" stroke-linecap="round" stroke-linejoin="round" stroke-width="1.600000" />
+			<path id="Vector" d="M16.5249 19.2251L21.2249 19.2251" stroke="rgb(51,51,51)" stroke-linecap="round" stroke-width="1.600000" />
+			<path id="Vector" d="M16.5249 25.1001L23.5749 25.1001" stroke="rgb(51,51,51)" stroke-linecap="round" stroke-width="1.600000" />
+			<path id="Vector" d="M32.9746 12.1755L25.9277 19.2225" stroke="rgb(51,51,51)" stroke-linecap="round" stroke-linejoin="round" stroke-width="1.600000" />
+		</g>
+	</g>
+	<rect id="Frame 1739336886" width="45.000000" height="45.000000" x="0.500000" y="0.500000" rx="11.500000" stroke="rgb(238,238,238)" stroke-width="1.000000" />
+</svg>

@@ -4,6 +4,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter_application_1/pages/order/voice_call_page.dart';
 import 'package:flutter_application_1/pages/order/incoming_voice_call_dialog.dart';
 import 'package:flutter_application_1/pages/messages/chat_room_page.dart';
+import 'package:flutter_application_1/pages/messages/activity_notifications_page.dart';
+import 'package:flutter_application_1/pages/messages/system_notifications_page.dart';
 import 'package:flutter_application_1/providers/call_provider.dart';
 import 'package:provider/provider.dart';
 import 'package:flutter_application_1/pages/profile/wallet_page.dart';
@@ -34,6 +36,7 @@ import 'pages/guide_management_pages.dart';
 import 'providers/guide_console_provider.dart';
 import 'providers/guide_backend_provider.dart';
 import 'package:flutter_application_1/providers/guide_provider.dart';
+import 'widgets/guide_design_icon.dart';
 
 class GuideApp extends StatelessWidget {
   const GuideApp({super.key});
@@ -244,9 +247,7 @@ class _GuideMainShellState extends State<_GuideMainShell>
   void initState() {
     super.initState();
     WidgetsBinding.instance.addObserver(this);
-    AppBootstrap.pushNotificationService?.attachRouteHandler(
-      _handlePushRoute,
-    );
+    AppBootstrap.pushNotificationService?.attachRouteHandler(_handlePushRoute);
     WidgetsBinding.instance.addPostFrameCallback((_) async {
       if (!mounted) return;
       final guideConsoleProvider = context.read<GuideConsoleProvider>();
@@ -282,94 +283,52 @@ class _GuideMainShellState extends State<_GuideMainShell>
 
   @override
   Widget build(BuildContext context) {
-    final pages = [
-      GuideOrderCenterPage(
-        onOpenSettings: _openDutySettings,
-        onOpenServiceOps: _openSupportChat,
-        onOpenRoute: _openRoute,
-        onOpenChat: _openSupportChat,
-      ),
-      GuideWorkbenchPage(
-        onOpenDutySettings: _openDutySettings,
-        onOpenServiceOps: _openSupportChat,
-        onOpenPublish: _openPublish,
-        onOpenDemandHall: _openDemandHall,
-        onOpenEmergencyContacts: _openEmergencyContacts,
-        onOpenServiceItems: _openSelectServicePage,
-        onOpenAddressManager: _openServiceLocationPage,
-        onOpenReviewCenter: _openReviewCenter,
-        onOpenScheduleCenter: _openScheduleCenter,
-        onOpenPromotionCenter: _openPromotionCenter,
-        onOpenTaskCenter: _openTaskCenter,
-        onOpenTrainingCenter: _openTrainingCenter,
-      ),
-      const SizedBox.shrink(),
-      const GuideMessagesPage(),
-      GuideProfilePage(
-        onOpenDutySettings: _openDutySettings,
-        onOpenAddressManager: _openServiceLocationPage,
-        onOpenCityPicker: _openCityPage,
-        onOpenCertification: _openCertificationPage,
-        onOpenPlatformRules: _openPlatformRulesPage,
-        onOpenWallet: _openWallet,
-        onOpenProfileEdit: _openProfileEdit,
-        onOpenPasswordChange: _openPasswordChange,
-      ),
-    ];
-
     return Scaffold(
       backgroundColor: const Color(0xFFF0F1F3),
-      body: IndexedStack(index: _currentIndex, children: pages),
+      body: _buildCurrentPage(),
       floatingActionButtonLocation: FloatingActionButtonLocation.centerDocked,
       floatingActionButton: InkWell(
         onTap: _openPublish,
-        borderRadius: BorderRadius.circular(24),
+        borderRadius: BorderRadius.circular(17),
         child: Container(
-          width: 84,
-          height: 62,
+          width: 58,
+          height: 50,
           decoration: BoxDecoration(
             color: AppColors.primary,
-            borderRadius: BorderRadius.circular(24),
+            borderRadius: BorderRadius.circular(17),
           ),
-          child: const Icon(
-            Icons.add_rounded,
-            size: 40,
-            color: AppColors.textPrimary,
-          ),
+          alignment: Alignment.center,
+          child: const GuideDesignIcon('加号', size: 42),
         ),
       ),
       bottomNavigationBar: Container(
         decoration: const BoxDecoration(color: Colors.white),
-        padding: const EdgeInsets.fromLTRB(8, 8, 8, 8),
+        padding: const EdgeInsets.fromLTRB(4, 3, 4, 3),
         child: SafeArea(
           top: false,
           child: Row(
             children: [
               _NavItem(
-                icon: Icons.bolt_outlined,
-                activeIcon: Icons.bolt_rounded,
+                icon: Icons.assignment_outlined,
                 label: '订单中心',
                 active: _currentIndex == 0,
                 onTap: () => setState(() => _currentIndex = 0),
               ),
               _NavItem(
                 icon: Icons.grid_view_outlined,
-                activeIcon: Icons.grid_view_rounded,
                 label: '工作台',
                 active: _currentIndex == 1,
                 onTap: () => setState(() => _currentIndex = 1),
               ),
-              const SizedBox(width: 86),
+              const SizedBox(width: 62),
               _NavItem(
-                icon: Icons.forum_outlined,
-                activeIcon: Icons.forum_rounded,
+                icon: Icons.chat_bubble_outline_rounded,
                 label: '消息',
                 active: _currentIndex == 3,
                 onTap: () => setState(() => _currentIndex = 3),
               ),
               _NavItem(
                 icon: Icons.person_outline_rounded,
-                activeIcon: Icons.person_rounded,
                 label: '我的',
                 active: _currentIndex == 4,
                 onTap: () => setState(() => _currentIndex = 4),
@@ -379,6 +338,58 @@ class _GuideMainShellState extends State<_GuideMainShell>
         ),
       ),
     );
+  }
+
+  Widget _buildCurrentPage() {
+    switch (_currentIndex) {
+      case 0:
+        return GuideOrderCenterPage(
+          key: const ValueKey('guide-order-center'),
+          onOpenSettings: _openDutySettings,
+          onOpenServiceOps: _openSupportChat,
+          onOpenEmergencyContacts: _openEmergencyContacts,
+          onOpenRoute: _openRoute,
+          onOpenChat: _openSupportChat,
+        );
+      case 1:
+        return GuideWorkbenchPage(
+          key: const ValueKey('guide-workbench'),
+          onOpenDutySettings: _openDutySettings,
+          onOpenServiceOps: _openSupportChat,
+          onOpenPublish: _openPublish,
+          onOpenDemandHall: _openDemandHall,
+          onOpenEmergencyContacts: _openEmergencyContacts,
+          onOpenServiceItems: _openSelectServicePage,
+          onOpenAddressManager: _openServiceLocationPage,
+          onOpenReviewCenter: _openReviewCenter,
+          onOpenScheduleCenter: _openScheduleCenter,
+          onOpenPromotionCenter: _openPromotionCenter,
+          onOpenTaskCenter: _openTaskCenter,
+          onOpenTrainingCenter: _openTrainingCenter,
+        );
+      case 3:
+        return GuideMessagesPage(
+          key: const ValueKey('guide-messages'),
+          onOpenOrders: () => setState(() => _currentIndex = 0),
+          onOpenActivities: _openActivityNotifications,
+          onOpenSystemNotifications: _openSystemNotifications,
+          onOpenOperations: _openSupportChat,
+        );
+      case 4:
+        return GuideProfilePage(
+          key: const ValueKey('guide-profile'),
+          onOpenDutySettings: _openDutySettings,
+          onOpenAddressManager: _openServiceLocationPage,
+          onOpenCityPicker: _openCityPage,
+          onOpenCertification: _openCertificationPage,
+          onOpenPlatformRules: _openPlatformRulesPage,
+          onOpenWallet: _openWallet,
+          onOpenProfileEdit: _openProfileEdit,
+          onOpenPasswordChange: _openPasswordChange,
+        );
+      default:
+        return const SizedBox.shrink();
+    }
   }
 
   void _openMessages() {
@@ -411,7 +422,9 @@ class _GuideMainShellState extends State<_GuideMainShell>
 
   Future<void> _openSupportChat() async {
     try {
-      final roomId = await context.read<MessageProvider>().openCustomerService();
+      final roomId = await context
+          .read<MessageProvider>()
+          .openCustomerService();
       if (!mounted) return;
       await Navigator.of(context).push(
         MaterialPageRoute<void>(
@@ -427,9 +440,9 @@ class _GuideMainShellState extends State<_GuideMainShell>
       }
     } catch (error) {
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('打开客服失败：$error')),
-      );
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text('打开客服失败：$error')));
     }
   }
 
@@ -518,16 +531,17 @@ class _GuideMainShellState extends State<_GuideMainShell>
   }
 
   Future<void> _openDutySettings() async {
-    await Navigator.of(context).push(
-      MaterialPageRoute(
-        builder: (_) => GuideDutySettingsPage(
-          onOpenMode: _openModePage,
-          onOpenCity: _openCityPage,
-          onOpenServiceTypes: _openServiceTypePage,
-          onOpenInsurance: _openInsurancePage,
-          onOpenBlockedUsers: _openBlockedUsersPage,
-          onOpenAuxiliary: _openAuxiliarySettingsPage,
-        ),
+    await showModalBottomSheet<void>(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (_) => GuideDutySettingsSheet(
+        onOpenMode: _openModePage,
+        onOpenCity: _openCityPage,
+        onOpenServiceTypes: _openServiceTypePage,
+        onOpenInsurance: _openInsurancePage,
+        onOpenBlockedUsers: _openBlockedUsersPage,
+        onOpenAuxiliary: _openAuxiliarySettingsPage,
       ),
     );
   }
@@ -536,6 +550,18 @@ class _GuideMainShellState extends State<_GuideMainShell>
     await Navigator.of(
       context,
     ).push(MaterialPageRoute(builder: (_) => const GuideDutyModePage()));
+  }
+
+  Future<void> _openActivityNotifications() async {
+    await Navigator.of(context).push(
+      MaterialPageRoute(builder: (_) => const ActivityNotificationsPage()),
+    );
+  }
+
+  Future<void> _openSystemNotifications() async {
+    await Navigator.of(
+      context,
+    ).push(MaterialPageRoute(builder: (_) => const SystemNotificationsPage()));
   }
 
   Future<void> _openCityPage() async {
@@ -645,14 +671,12 @@ class _GuideMainShellState extends State<_GuideMainShell>
 
 class _NavItem extends StatelessWidget {
   final IconData icon;
-  final IconData activeIcon;
   final String label;
   final bool active;
   final VoidCallback onTap;
 
   const _NavItem({
     required this.icon,
-    required this.activeIcon,
     required this.label,
     required this.active,
     required this.onTap,
@@ -668,20 +692,14 @@ class _NavItem extends StatelessWidget {
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
-              Icon(
-                active ? activeIcon : icon,
-                size: 28,
-                color: active ? AppColors.textPrimary : const Color(0xFFC8CBD3),
-              ),
-              const SizedBox(height: 6),
+              Icon(icon, size: 24, color: AppColors.textPrimary),
+              const SizedBox(height: 2),
               Text(
                 label,
                 style: TextStyle(
-                  fontSize: 12,
+                  fontSize: 10,
                   fontWeight: active ? FontWeight.w900 : FontWeight.w600,
-                  color: active
-                      ? AppColors.textPrimary
-                      : const Color(0xFFC8CBD3),
+                  color: AppColors.textPrimary,
                 ),
               ),
             ],

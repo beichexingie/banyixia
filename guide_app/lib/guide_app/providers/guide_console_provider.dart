@@ -26,6 +26,7 @@ class GuideConsoleProvider extends ChangeNotifier {
   List<String> _historyCities = const ['苏州', '北京', '上海', '深圳', '杭州'];
   Set<GuideServiceType> _enabledTypes = {GuideServiceType.localCompanion};
   int _routeTabIndex = 0;
+  bool _onlineChangedLocally = false;
   GuideAddress _currentLocation = const GuideAddress(
     city: '',
     title: '尚未设置服务地址',
@@ -170,6 +171,9 @@ class GuideConsoleProvider extends ChangeNotifier {
       _selectedCity = savedCity.trim();
     }
     _nearbyOnly = prefs.getBool(_nearbyOnlyKey) ?? true;
+    // Persisted state is only a first-paint fallback. It is not a pending
+    // change, so a successful console sync may replace it with server state.
+    _onlineChangedLocally = false;
     _isOnline = prefs.getBool(_onlineKey) ?? userProvider.isGuide;
     final storedTypes = prefs.getStringList(_enabledTypesKey);
     if (storedTypes != null && storedTypes.isNotEmpty) {
@@ -188,7 +192,9 @@ class GuideConsoleProvider extends ChangeNotifier {
   }
 
   void _refreshLoginState(User user) {
-    if (!user.isGuideApproved) {
+    final hasKnownUser =
+        user.id.isNotEmpty && user.id != '0' && !user.id.startsWith('guest');
+    if (hasKnownUser && !user.isGuideApproved) {
       _isOnline = false;
     }
   }
@@ -208,7 +214,11 @@ class GuideConsoleProvider extends ChangeNotifier {
       }
       final city = settings['city']?.toString().trim() ?? '';
       if (city.isNotEmpty) _selectedCity = city;
-      if (settings['online'] is bool) _isOnline = settings['online'] as bool;
+      final remoteOnline = _readBool(settings['online']);
+      if (!_onlineChangedLocally && remoteOnline != null) {
+        // A local switch is newer than a possibly stale server response.
+        _isOnline = remoteOnline;
+      }
       if (settings['nearby_only'] is bool) {
         _nearbyOnly = settings['nearby_only'] as bool;
       }
@@ -223,6 +233,19 @@ class GuideConsoleProvider extends ChangeNotifier {
       );
     }
     notifyListeners();
+  }
+
+  bool? _readBool(dynamic value) {
+    if (value is bool) return value;
+    if (value is num) return value != 0;
+    final text = value?.toString().trim().toLowerCase();
+    if (text == 'true' || text == '1' || text == 'online' || text == 'yes') {
+      return true;
+    }
+    if (text == 'false' || text == '0' || text == 'offline' || text == 'no') {
+      return false;
+    }
+    return null;
   }
 
   void _syncEnabledTypesFromUser(User user) {
@@ -273,6 +296,7 @@ class GuideConsoleProvider extends ChangeNotifier {
 
   Future<void> setOnline(bool value) async {
     _isOnline = value;
+    _onlineChangedLocally = true;
     notifyListeners();
     final prefs = await SharedPreferences.getInstance();
     await prefs.setBool(_onlineKey, value);
@@ -297,6 +321,18 @@ class GuideConsoleProvider extends ChangeNotifier {
   }
 
   Future<void> saveServiceTypesToProfile(UserProvider userProvider) async {
+    const primaryTypes = {
+      GuideServiceType.localCompanion,
+      GuideServiceType.customTrip,
+      GuideServiceType.errandHelp,
+    };
+    final selectedPrimaryTypes = _enabledTypes
+        .where(primaryTypes.contains)
+        .toSet();
+    if (selectedPrimaryTypes.isEmpty) {
+      selectedPrimaryTypes.add(GuideServiceType.localCompanion);
+    }
+    _enabledTypes = selectedPrimaryTypes;
     final selectedLabels = _enabledTypes
         .map((item) => item.label)
         .where((item) => item.trim().isNotEmpty)
@@ -426,25 +462,26 @@ class GuideConsoleProvider extends ChangeNotifier {
       return const [];
     }
     final guideSideOrders = orders
-        .where(
-          (item) => item.guideId.isNotEmpty && item.guideId == currentGuideId,
-        )
+        .where((item) => item.guideId.isEmpty || item.guideId == currentGuideId)
+        .where((item) => item.status != OrderStatus.cancelled)
         .toList();
     if (guideSideOrders.isEmpty) {
       return const [];
     }
     return guideSideOrders.map((order) {
       final stage = switch (order.status) {
+        OrderStatus.pendingPayment when order.guideId.isEmpty =>
+          GuideOrderStage.newOrder,
         OrderStatus.pendingPayment => GuideOrderStage.pendingPayment,
         OrderStatus.inProgress => GuideOrderStage.inProgress,
         OrderStatus.pendingReview => GuideOrderStage.inProgress,
         OrderStatus.completed => GuideOrderStage.completed,
-        OrderStatus.cancelled => GuideOrderStage.newOrder,
+        OrderStatus.cancelled => GuideOrderStage.completed,
       };
       final primaryAction = order.status == OrderStatus.pendingReview
           ? GuideOrderAction.waitingReview
           : switch (stage) {
-              GuideOrderStage.newOrder => GuideOrderAction.goToService,
+              GuideOrderStage.newOrder => GuideOrderAction.accept,
               GuideOrderStage.pendingPayment =>
                 order.paymentStatus == 'accepted'
                     ? GuideOrderAction.waitingPayment
@@ -463,11 +500,11 @@ class GuideConsoleProvider extends ChangeNotifier {
         content: _contentForOrder(order),
         address: order.serviceAddress.isNotEmpty
             ? order.serviceAddress
-            : _currentLocation.summary,
+            : '待客户补充服务地址',
         serviceCity: order.serviceCity,
         serviceLat: order.serviceLat,
         serviceLng: order.serviceLng,
-        imageUrls: _mockOrderImages,
+        imageUrls: const [],
         primaryAction: primaryAction,
         serviceTime:
             order.serviceDate ?? order.createdAt.add(const Duration(hours: 6)),
@@ -477,47 +514,6 @@ class GuideConsoleProvider extends ChangeNotifier {
       );
     }).toList();
   }
-
-  List<GuideOrderCardData> get _mockGuideOrders => [
-    GuideOrderCardData(
-      id: 'guide_order_1',
-      stage: GuideOrderStage.inProgress,
-      serviceLabel: '地陪',
-      etaText: '剩余：5小时23分钟',
-      distanceText: '距服务地 2.3km',
-      amount: 480,
-      content: '苏州平江路半日陪同，客户希望安排轻松路线，含拍照打卡与晚餐建议。',
-      address: '苏州市姑苏区平江路历史街区游客中心',
-      serviceCity: '苏州',
-      serviceLat: 31.3202,
-      serviceLng: 120.6336,
-      imageUrls: _mockOrderImages,
-      primaryAction: GuideOrderAction.complete,
-      serviceTime: DateTime.now().add(const Duration(hours: 5)),
-    ),
-    GuideOrderCardData(
-      id: 'guide_order_2',
-      stage: GuideOrderStage.newOrder,
-      serviceLabel: '定制',
-      etaText: '剩余：5小时23分钟',
-      distanceText: '距服务地 8.6km',
-      amount: 480,
-      content: '金鸡湖夜游定制单，客户两人出行，希望包含拍照点和夜景路线建议。',
-      address: '苏州市工业园区金鸡湖音乐喷泉广场',
-      serviceCity: '苏州',
-      serviceLat: 31.3148,
-      serviceLng: 120.7072,
-      imageUrls: _mockOrderImages,
-      primaryAction: GuideOrderAction.goToService,
-      serviceTime: DateTime.now().add(const Duration(hours: 7)),
-    ),
-  ];
-
-  static const List<String> _mockOrderImages = [
-    'https://images.unsplash.com/photo-1506744038136-46273834b3fb?auto=format&fit=crop&w=360&q=80',
-    'https://images.unsplash.com/photo-1500530855697-b586d89ba3ee?auto=format&fit=crop&w=360&q=80',
-    'https://images.unsplash.com/photo-1493246507139-91e8fad9978e?auto=format&fit=crop&w=360&q=80',
-  ];
 
   String _serviceLabelForOrder(Order order) {
     final text = order.serviceName;
@@ -539,9 +535,7 @@ class GuideConsoleProvider extends ChangeNotifier {
     if ((order.routeDistanceMeters ?? order.distanceMeters) != null) {
       return '距服务地 ${order.distanceText}';
     }
-    final seed = order.id.codeUnits.fold<int>(0, (sum, item) => sum + item);
-    final kilometers = ((seed % 120) + 8) / 10;
-    return '距服务地 ${kilometers.toStringAsFixed(1)}km';
+    return '距离待计算';
   }
 
   String _contentForOrder(Order order) {

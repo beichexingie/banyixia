@@ -12,89 +12,98 @@ class GuideDutyModePage extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final console = context.watch<GuideConsoleProvider>();
+    final modes = console.modeList;
+
     return GuideAppScaffold(
       backgroundColor: Colors.white,
       appBar: AppBar(
-        title: const Text('接单模式'),
+        title: const Text(
+          '接单模式',
+          style: TextStyle(fontSize: 17, fontWeight: FontWeight.w900),
+        ),
         backgroundColor: Colors.white,
       ),
       body: Column(
         children: [
           Expanded(
             child: ListView.separated(
-              padding: const EdgeInsets.fromLTRB(16, 22, 16, 24),
-              itemCount: console.modeList.length,
-              separatorBuilder: (_, __) => const SizedBox(height: 20),
+              padding: const EdgeInsets.fromLTRB(16, 12, 16, 16),
+              itemCount: modes.length,
+              separatorBuilder: (_, __) => const SizedBox(height: 10),
               itemBuilder: (context, index) {
-                final mode = console.modeList[index];
-                final selected = mode == console.mode;
+                final mode = modes[index];
+                final selected = console.mode == mode;
                 return InkWell(
                   onTap: () => console.setMode(mode),
-                  borderRadius: BorderRadius.circular(24),
+                  borderRadius: BorderRadius.circular(13),
                   child: Container(
-                    padding: const EdgeInsets.all(20),
+                    padding: const EdgeInsets.all(12),
                     decoration: BoxDecoration(
-                      color: selected ? const Color(0xFFF6FFE7) : Colors.white,
-                      borderRadius: BorderRadius.circular(24),
-                      border: Border.all(color: const Color(0xFFE3E5E8)),
+                      color: selected ? const Color(0xFFF5FBDD) : Colors.white,
+                      borderRadius: BorderRadius.circular(13),
+                      border: Border.all(
+                        color: selected
+                            ? const Color(0xFFE3F6A2)
+                            : const Color(0xFFE8E9EC),
+                      ),
                     ),
                     child: Row(
-                      crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
+                        Container(
+                          width: 54,
+                          height: 54,
+                          decoration: BoxDecoration(
+                            color: selected
+                                ? AppColors.primary
+                                : const Color(0xFFF1F2F4),
+                            shape: BoxShape.circle,
+                          ),
+                          alignment: Alignment.center,
+                          child: Icon(
+                            switch (mode.index) {
+                              0 => Icons.near_me_outlined,
+                              1 => Icons.location_city_outlined,
+                              _ => Icons.public_outlined,
+                            },
+                            size: 28,
+                            color: AppColors.textPrimary,
+                          ),
+                        ),
+                        const SizedBox(width: 12),
                         Expanded(
                           child: Column(
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
-                              Row(
-                                children: [
-                                  Text(
-                                    mode.label,
-                                    style: const TextStyle(
-                                      fontSize: 18,
-                                      fontWeight: FontWeight.w900,
-                                    ),
-                                  ),
-                                  if (selected) ...[
-                                    const SizedBox(width: 10),
-                                    Container(
-                                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-                                      decoration: BoxDecoration(
-                                        color: AppColors.primary,
-                                        borderRadius: BorderRadius.circular(10),
-                                      ),
-                                      child: const Text(
-                                        '当前',
-                                        style: TextStyle(fontWeight: FontWeight.w900),
-                                      ),
-                                    ),
-                                  ],
-                                ],
-                              ),
-                              const SizedBox(height: 12),
                               Text(
-                                '推单范围：${mode.rangeLabel}',
+                                mode.label,
                                 style: const TextStyle(
                                   fontSize: 16,
-                                  color: AppColors.textSecondary,
+                                  fontWeight: FontWeight.w900,
                                 ),
                               ),
-                              const SizedBox(height: 8),
+                              const SizedBox(height: 4),
                               Text(
-                                '规则说明：${mode.description}',
+                                mode.description,
+                                maxLines: 2,
+                                overflow: TextOverflow.ellipsis,
                                 style: const TextStyle(
-                                  fontSize: 16,
-                                  color: AppColors.textSecondary,
-                                  height: 1.5,
+                                  fontSize: 12,
+                                  height: 1.35,
+                                  color: AppColors.textHint,
                                 ),
                               ),
                             ],
                           ),
                         ),
-                        const SizedBox(width: 12),
+                        const SizedBox(width: 8),
                         Icon(
-                          selected ? Icons.check_circle : Icons.radio_button_unchecked,
-                          size: 38,
-                          color: selected ? AppColors.textPrimary : AppColors.textHint,
+                          selected
+                              ? Icons.check_circle
+                              : Icons.radio_button_unchecked,
+                          size: 23,
+                          color: selected
+                              ? AppColors.textPrimary
+                              : AppColors.textHint,
                         ),
                       ],
                     ),
@@ -104,21 +113,23 @@ class GuideDutyModePage extends StatelessWidget {
             ),
           ),
           Padding(
-            padding: const EdgeInsets.fromLTRB(16, 0, 16, 24),
+            padding: const EdgeInsets.fromLTRB(16, 0, 16, 18),
             child: SizedBox(
               width: double.infinity,
+              height: 48,
               child: ElevatedButton(
                 onPressed: () => Navigator.of(context).maybePop(),
                 style: ElevatedButton.styleFrom(
                   backgroundColor: AppColors.primary,
                   foregroundColor: AppColors.textPrimary,
-                  padding: const EdgeInsets.symmetric(vertical: 18),
-                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(999)),
                   elevation: 0,
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(99),
+                  ),
                 ),
                 child: const Text(
                   '确定',
-                  style: TextStyle(fontSize: 18, fontWeight: FontWeight.w900),
+                  style: TextStyle(fontSize: 16, fontWeight: FontWeight.w900),
                 ),
               ),
             ),

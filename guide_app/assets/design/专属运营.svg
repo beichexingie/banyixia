@@ -1,0 +1,32 @@
+<svg viewBox="0 0 32 32" xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" width="32.000000" height="32.000000" fill="none" clip-path="url(#clipPath_2)" customFrame="url(#clipPath_2)">
+	<defs>
+		<clipPath id="clipPath_2">
+			<rect width="32.000000" height="32.000000" x="0.000000" y="0.000000" rx="16.000000" fill="rgb(255,255,255)" />
+		</clipPath>
+		<linearGradient id="paint_linear_1" x1="15.571435" x2="15.571435" y1="7.8182373" y2="14.8312244" gradientUnits="userSpaceOnUse">
+			<stop stop-color="rgb(188,254,42)" offset="0" stop-opacity="1" />
+			<stop stop-color="rgb(255,255,255)" offset="1" stop-opacity="1" />
+		</linearGradient>
+		<linearGradient id="paint_linear_2" x1="15.5714207" x2="15.5714207" y1="16.3896484" y2="23.4026356" gradientUnits="userSpaceOnUse">
+			<stop stop-color="rgb(188,254,42)" offset="0" stop-opacity="1" />
+			<stop stop-color="rgb(255,255,255)" offset="1" stop-opacity="1" />
+		</linearGradient>
+		<linearGradient id="paint_linear_3" x1="23.2857265" x2="23.2857265" y1="18.7270508" y2="22.8828945" gradientUnits="userSpaceOnUse">
+			<stop stop-color="rgb(188,254,42)" offset="0" stop-opacity="1" />
+			<stop stop-color="rgb(255,255,255)" offset="1" stop-opacity="1" />
+		</linearGradient>
+	</defs>
+	<rect id="Frame 1739336855" width="32.000000" height="32.000000" x="0.000000" y="0.000000" rx="16.000000" fill="rgb(248,248,248)" />
+	<g id="Group 1312315320">
+		<path id="Vector" d="M15.5714 14.8312C17.508 14.8312 19.0779 13.2613 19.0779 11.3247C19.0779 9.38815 17.508 7.81824 15.5714 7.81824C13.6349 7.81824 12.0649 9.38815 12.0649 11.3247C12.0649 13.2613 13.6349 14.8312 15.5714 14.8312Z" fill="url(#paint_linear_1)" fill-rule="evenodd" />
+		<path id="Vector" d="M15.5714 14.8312C13.6349 14.8312 12.0649 13.2613 12.0649 11.3247C12.0649 9.38815 13.6349 7.81824 15.5714 7.81824C17.508 7.81824 19.0779 9.38815 19.0779 11.3247C19.0779 13.2613 17.508 14.8312 15.5714 14.8312Z" fill-rule="evenodd" stroke="rgb(51,51,51)" stroke-linejoin="round" stroke-width="1.500000" />
+		<path id="Vector" d="M12.6104 16.3896C10.5747 17.0471 8.16882 20.1153 8.16882 23.4026L22.974 23.4026C22.974 20.1153 20.198 16.6088 18.5325 16.3896L15.5714 19.677C14.461 18.3621 12.6104 16.3896 12.6104 16.3896Z" fill="url(#paint_linear_2)" fill-rule="evenodd" />
+		<path id="Vector" d="M8.16882 23.4026C8.16882 20.1153 10.5747 17.0471 12.6104 16.3896C12.6104 16.3896 14.461 18.3621 15.5714 19.677L18.5325 16.3896C20.198 16.6088 22.974 20.1153 22.974 23.4026" stroke="rgb(51,51,51)" stroke-linejoin="round" stroke-width="1.500000" />
+		<path id="Vector" d="M7 23.4026L24.1429 23.4026" stroke="rgb(51,51,51)" stroke-linecap="round" stroke-linejoin="round" stroke-width="1.500000" />
+		<circle id="Ellipse 943" cx="23.8051872" cy="20.8051567" r="5.19480515" fill="rgb(248,248,248)" />
+		<g id="Group 1312315319">
+			<path id="Vector" d="M21.7273 18.7271L24.8442 18.7271L25.8831 19.9494L23.2857 22.8829L20.6883 19.9494L21.7273 18.7271Z" fill="url(#paint_linear_3)" fill-rule="nonzero" />
+			<path id="Vector" d="M24.8442 18.7271L25.8831 19.9494L23.2857 22.8829L20.6883 19.9494L21.7273 18.7271L24.8442 18.7271Z" fill-rule="nonzero" stroke="rgb(51,51,51)" stroke-linecap="round" stroke-linejoin="round" stroke-width="1.400000" />
+		</g>
+	</g>
+</svg>

@@ -15,6 +15,7 @@ import '../widgets/guide_console_header.dart';
 class GuideOrderCenterPage extends StatefulWidget {
   final VoidCallback onOpenSettings;
   final VoidCallback onOpenServiceOps;
+  final VoidCallback onOpenEmergencyContacts;
   final ValueChanged<GuideOrderCardData?> onOpenRoute;
   final VoidCallback onOpenChat;
 
@@ -22,6 +23,7 @@ class GuideOrderCenterPage extends StatefulWidget {
     super.key,
     required this.onOpenSettings,
     required this.onOpenServiceOps,
+    required this.onOpenEmergencyContacts,
     required this.onOpenRoute,
     required this.onOpenChat,
   });
@@ -31,8 +33,13 @@ class GuideOrderCenterPage extends StatefulWidget {
 }
 
 class _GuideOrderCenterPageState extends State<GuideOrderCenterPage> {
-  GuideOrderStage _selectedStage = GuideOrderStage.inProgress;
+  GuideOrderStage _selectedStage = GuideOrderStage.newOrder;
   static const bool _showRouteButton = false;
+  static const _visibleStages = [
+    GuideOrderStage.newOrder,
+    GuideOrderStage.pendingPayment,
+    GuideOrderStage.inProgress,
+  ];
 
   void _showSupportNotice() {
     widget.onOpenChat();
@@ -62,6 +69,8 @@ class _GuideOrderCenterPageState extends State<GuideOrderCenterPage> {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   GuideConsoleHeader(
+                    compact: true,
+                    onEmergencyTap: widget.onOpenEmergencyContacts,
                     onSettingsTap: widget.onOpenSettings,
                     onServiceOperationTap: widget.onOpenServiceOps,
                     onToggleOnlineTap: () =>
@@ -73,7 +82,7 @@ class _GuideOrderCenterPageState extends State<GuideOrderCenterPage> {
                     runSpacing: 12,
                     crossAxisAlignment: WrapCrossAlignment.center,
                     children: [
-                      for (final stage in GuideOrderStage.values)
+                      for (final stage in _visibleStages)
                         _OrderStageTab(
                           label: stage.label,
                           active: stage == _selectedStage,
@@ -348,7 +357,7 @@ class _GuideOrderCard extends StatelessWidget {
         ? Colors.white
         : AppColors.textPrimary;
     return GuideSectionCard(
-      padding: const EdgeInsets.fromLTRB(18, 18, 18, 16),
+      padding: const EdgeInsets.fromLTRB(12, 12, 12, 11),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
@@ -359,11 +368,11 @@ class _GuideOrderCard extends StatelessWidget {
                   builder: (_) => UserProfilePage(userId: data.customerId),
                 ),
               ),
-              borderRadius: BorderRadius.circular(14),
+              borderRadius: BorderRadius.circular(12),
               child: Row(
                 children: [
                   CircleAvatar(
-                    radius: 20,
+                    radius: 17,
                     backgroundImage: data.customerAvatar.isNotEmpty
                         ? NetworkImage(data.customerAvatar)
                         : null,
@@ -371,33 +380,34 @@ class _GuideOrderCard extends StatelessWidget {
                         ? const Icon(Icons.person_outline)
                         : null,
                   ),
-                  const SizedBox(width: 10),
+                  const SizedBox(width: 8),
                   Expanded(
                     child: Text(
                       data.customerName.isEmpty ? '客户' : data.customerName,
                       style: const TextStyle(
-                        fontSize: 16,
+                        fontSize: 14,
                         fontWeight: FontWeight.w800,
                         color: AppColors.textPrimary,
                       ),
                     ),
                   ),
-                  const Icon(Icons.chevron_right, color: AppColors.textHint),
+                  const Icon(
+                    Icons.chevron_right,
+                    size: 19,
+                    color: AppColors.textHint,
+                  ),
                 ],
               ),
             ),
-            const SizedBox(height: 14),
+            const SizedBox(height: 10),
           ],
           Wrap(
-            spacing: 12,
-            runSpacing: 10,
+            spacing: 8,
+            runSpacing: 6,
             crossAxisAlignment: WrapCrossAlignment.center,
             children: [
               Container(
-                padding: const EdgeInsets.symmetric(
-                  horizontal: 10,
-                  vertical: 8,
-                ),
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 5),
                 decoration: BoxDecoration(
                   color: labelColor,
                   borderRadius: BorderRadius.circular(10),
@@ -405,7 +415,7 @@ class _GuideOrderCard extends StatelessWidget {
                 child: Text(
                   data.serviceLabel,
                   style: TextStyle(
-                    fontSize: 14,
+                    fontSize: 12,
                     fontWeight: FontWeight.w900,
                     color: labelTextColor,
                   ),
@@ -414,7 +424,7 @@ class _GuideOrderCard extends StatelessWidget {
               Text(
                 data.etaText,
                 style: const TextStyle(
-                  fontSize: 16,
+                  fontSize: 13,
                   fontWeight: FontWeight.w800,
                   color: Color(0xFFFF9B33),
                 ),
@@ -424,13 +434,13 @@ class _GuideOrderCard extends StatelessWidget {
                 children: [
                   const Text(
                     '预计佣金',
-                    style: TextStyle(fontSize: 15, color: AppColors.textHint),
+                    style: TextStyle(fontSize: 12, color: AppColors.textHint),
                   ),
-                  const SizedBox(width: 6),
+                  const SizedBox(width: 4),
                   Text(
                     '¥${_formatAmount(data.expectedCommission ?? data.amount)}',
                     style: const TextStyle(
-                      fontSize: 18,
+                      fontSize: 16,
                       fontWeight: FontWeight.w900,
                       color: Color(0xFFFF5A3C),
                     ),
@@ -439,13 +449,13 @@ class _GuideOrderCard extends StatelessWidget {
               ),
             ],
           ),
-          const SizedBox(height: 16),
+          const SizedBox(height: 10),
           Container(
             width: double.infinity,
-            padding: const EdgeInsets.all(16),
+            padding: const EdgeInsets.all(10),
             decoration: BoxDecoration(
               color: const Color(0xFFF7F8FA),
-              borderRadius: BorderRadius.circular(18),
+              borderRadius: BorderRadius.circular(12),
             ),
             child: Wrap(
               spacing: 8,
@@ -467,10 +477,10 @@ class _GuideOrderCard extends StatelessWidget {
             ),
           ),
           if (data.stage == GuideOrderStage.inProgress) ...[
-            const SizedBox(height: 12),
+            const SizedBox(height: 9),
             Container(
               width: double.infinity,
-              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 9),
               decoration: BoxDecoration(
                 color: const Color(0xFFEFFFF1),
                 borderRadius: BorderRadius.circular(16),
@@ -480,15 +490,15 @@ class _GuideOrderCard extends StatelessWidget {
                 children: [
                   const Icon(
                     Icons.account_balance_wallet_outlined,
-                    size: 20,
+                    size: 18,
                     color: Color(0xFF2F8F43),
                   ),
-                  const SizedBox(width: 8),
+                  const SizedBox(width: 6),
                   Expanded(
                     child: Text(
                       '已入账 ¥${_formatAmount(data.expectedCommission ?? data.amount)}，当前为平台托管中，订单完成后可提现',
                       style: const TextStyle(
-                        fontSize: 13,
+                        fontSize: 11,
                         fontWeight: FontWeight.w800,
                         color: Color(0xFF2F8F43),
                       ),
@@ -498,24 +508,24 @@ class _GuideOrderCard extends StatelessWidget {
               ),
             ),
           ],
-          const SizedBox(height: 16),
+          const SizedBox(height: 10),
           Container(
             width: double.infinity,
-            padding: const EdgeInsets.all(18),
+            padding: const EdgeInsets.all(11),
             decoration: BoxDecoration(
               border: Border.all(color: const Color(0xFFE6E7EB)),
-              borderRadius: BorderRadius.circular(18),
+              borderRadius: BorderRadius.circular(12),
             ),
             child: Text(
               data.content,
               style: const TextStyle(
-                fontSize: 15,
+                fontSize: 13,
                 color: AppColors.textSecondary,
                 height: 1.5,
               ),
             ),
           ),
-          const SizedBox(height: 16),
+          const SizedBox(height: 10),
           LayoutBuilder(
             builder: (context, constraints) {
               final narrow = constraints.maxWidth < 390;
@@ -525,16 +535,16 @@ class _GuideOrderCard extends StatelessWidget {
                   const Icon(
                     Icons.location_on_rounded,
                     color: AppColors.primaryDark,
-                    size: 24,
+                    size: 20,
                   ),
-                  const SizedBox(width: 8),
+                  const SizedBox(width: 6),
                   Expanded(
                     child: Text(
                       data.address,
                       maxLines: narrow ? 3 : 2,
                       overflow: TextOverflow.fade,
                       style: const TextStyle(
-                        fontSize: 16,
+                        fontSize: 13,
                         color: AppColors.textSecondary,
                       ),
                     ),
@@ -542,10 +552,7 @@ class _GuideOrderCard extends StatelessWidget {
                 ],
               );
               final distance = Container(
-                padding: const EdgeInsets.symmetric(
-                  horizontal: 10,
-                  vertical: 6,
-                ),
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 5),
                 decoration: BoxDecoration(
                   color: const Color(0xFFF7F7F2),
                   borderRadius: BorderRadius.circular(999),
@@ -553,7 +560,7 @@ class _GuideOrderCard extends StatelessWidget {
                 child: Text(
                   data.distanceText,
                   style: const TextStyle(
-                    fontSize: 12,
+                    fontSize: 11,
                     fontWeight: FontWeight.w700,
                     color: AppColors.textPrimary,
                   ),
@@ -575,7 +582,7 @@ class _GuideOrderCard extends StatelessWidget {
               );
             },
           ),
-          const SizedBox(height: 18),
+          const SizedBox(height: 10),
           LayoutBuilder(
             builder: (context, constraints) {
               if (constraints.maxWidth < 360) {
@@ -590,7 +597,7 @@ class _GuideOrderCard extends StatelessWidget {
                             onTap: onSupportTap,
                           ),
                         ),
-                        const SizedBox(width: 10),
+                        const SizedBox(width: 8),
                         Expanded(
                           child: _OutlineActionButton(
                             icon: Icons.call_outlined,
@@ -600,7 +607,7 @@ class _GuideOrderCard extends StatelessWidget {
                         ),
                       ],
                     ),
-                    const SizedBox(height: 10),
+                    const SizedBox(height: 8),
                     SizedBox(
                       width: double.infinity,
                       child: _PrimaryActionButton(

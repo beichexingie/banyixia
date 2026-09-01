@@ -1,13 +1,14 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_application_1/config/app_theme.dart';
+import 'package:flutter_application_1/providers/user_provider.dart';
+import 'package:flutter_application_1/services/ecs_api_client.dart';
 import 'package:provider/provider.dart';
 
-import '../../config/app_theme.dart';
-import '../../providers/user_provider.dart';
 import '../providers/guide_console_provider.dart';
-import '../providers/guide_backend_provider.dart';
 import '../widgets/guide_app_shell.dart';
+import '../widgets/guide_design_icon.dart';
 
-class GuideProfilePage extends StatelessWidget {
+class GuideProfilePage extends StatefulWidget {
   final VoidCallback onOpenDutySettings;
   final VoidCallback onOpenAddressManager;
   final VoidCallback onOpenCityPicker;
@@ -30,163 +31,248 @@ class GuideProfilePage extends StatelessWidget {
   });
 
   @override
+  State<GuideProfilePage> createState() => _GuideProfilePageState();
+}
+
+class _GuideProfilePageState extends State<GuideProfilePage> {
+  final EcsApiClient _api = EcsApiClient();
+  Map<String, dynamic> _wallet = const {};
+  Map<String, dynamic> _payoutAccount = const {};
+  bool _walletLoading = true;
+
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addPostFrameCallback((_) => _loadWallet());
+  }
+
+  Future<void> _loadWallet() async {
+    final token = context.read<UserProvider>().accessToken;
+    if (token == null || token.isEmpty) {
+      if (mounted) setState(() => _walletLoading = false);
+      return;
+    }
+    if (mounted) setState(() => _walletLoading = true);
+    try {
+      final response = await _api.get('/wallet', authToken: token);
+      final data = response['data'];
+      if (!mounted || data is! Map) return;
+      setState(() {
+        _wallet = (data['wallet'] as Map?)?.cast<String, dynamic>() ?? {};
+        _payoutAccount =
+            (data['payout_account'] as Map?)?.cast<String, dynamic>() ?? {};
+      });
+    } catch (error) {
+      debugPrint('Guide profile wallet load error: $error');
+    } finally {
+      if (mounted) setState(() => _walletLoading = false);
+    }
+  }
+
+  double _money(dynamic value) => double.tryParse(value?.toString() ?? '') ?? 0;
+
+  String _payoutStatus() {
+    switch (_payoutAccount['status']?.toString()) {
+      case 'approved':
+        return '已审核';
+      case 'pending':
+        return '审核中';
+      case 'rejected':
+        return '已驳回';
+      default:
+        return '未绑定';
+    }
+  }
+
+  @override
   Widget build(BuildContext context) {
     final user = context.watch<UserProvider>().user;
     final console = context.watch<GuideConsoleProvider>();
-    final backend = context.watch<GuideBackendProvider>();
-    final stats = console.stats;
-    final positiveReviews = backend.reviews.where((item) {
-      final value = item['rating'];
-      final rating = value is num
-          ? value.toDouble()
-          : double.tryParse(value?.toString() ?? '') ?? 0;
-      return rating >= 4;
-    }).length;
+    final balance = _money(_wallet['balance'] ?? user.balance);
+    final pendingBalance = _money(_wallet['pending_balance']);
+    final totalEarned = _money(_wallet['total_earned']);
 
     return GuideAppScaffold(
-      backgroundColor: const Color(0xFFF0F1F3),
+      backgroundColor: const Color(0xFFF1F3F7),
       body: ListView(
-        padding: const EdgeInsets.fromLTRB(16, 18, 16, 28),
+        padding: const EdgeInsets.fromLTRB(16, 12, 16, 18),
         children: [
           Row(
             children: [
               ClipOval(
-                child: Image.network(
-                  user.avatar.isNotEmpty
-                      ? user.avatar
-                      : 'https://picsum.photos/seed/guide-profile/120/120',
-                  width: 72,
-                  height: 72,
-                  fit: BoxFit.cover,
-                  errorBuilder: (context, error, stackTrace) => Container(
-                    width: 72,
-                    height: 72,
-                    color: const Color(0xFFECEEF2),
-                    child: const Icon(Icons.person),
-                  ),
-                ),
+                child: user.avatar.isNotEmpty
+                    ? Image.network(
+                        user.avatar,
+                        width: 58,
+                        height: 58,
+                        fit: BoxFit.cover,
+                        errorBuilder: (_, __, ___) => _AvatarFallback(),
+                      )
+                    : _AvatarFallback(),
               ),
-              const SizedBox(width: 14),
+              const SizedBox(width: 10),
               Expanded(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text(
-                      user.nickname.isNotEmpty ? user.nickname : '地陪运营账号',
-                      style: const TextStyle(
-                        fontSize: 24,
-                        fontWeight: FontWeight.w900,
-                      ),
-                    ),
-                    const SizedBox(height: 6),
-                    Text(
-                      user.identityLabel,
-                      style: const TextStyle(
-                        fontSize: 15,
-                        color: AppColors.textSecondary,
-                      ),
-                    ),
-                    const SizedBox(height: 10),
-                    Wrap(
-                      spacing: 10,
-                      runSpacing: 8,
+                    Row(
                       children: [
-                        GuidePillButton(
-                          label: console.isOnline ? '在线中' : '下线中',
-                          active: console.isOnline,
-                          onTap: () => console.setOnline(!console.isOnline),
+                        Flexible(
+                          child: Text(
+                            user.nickname.isNotEmpty ? user.nickname : '地陪用户',
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: const TextStyle(
+                              fontSize: 17,
+                              fontWeight: FontWeight.w900,
+                            ),
+                          ),
                         ),
-                        GuidePillButton(
-                          label: console.selectedCity,
-                          onTap: onOpenCityPicker,
-                          color: Colors.white,
-                        ),
+                        if (user.vipLabel.isNotEmpty) ...[
+                          const SizedBox(width: 5),
+                          Container(
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 5,
+                              vertical: 2,
+                            ),
+                            decoration: BoxDecoration(
+                              color: const Color(0xFFFFC45A),
+                              borderRadius: BorderRadius.circular(99),
+                            ),
+                            child: Text(
+                              user.vipLabel,
+                              style: const TextStyle(
+                                fontSize: 9,
+                                fontWeight: FontWeight.w900,
+                                color: Color(0xFF704300),
+                              ),
+                            ),
+                          ),
+                        ],
                       ],
+                    ),
+                    const SizedBox(height: 3),
+                    Text(
+                      user.city.isNotEmpty ? 'IP：${user.city}' : 'IP：未设置',
+                      style: const TextStyle(
+                        fontSize: 11,
+                        color: AppColors.textHint,
+                      ),
                     ),
                   ],
                 ),
               ),
+              GuidePillButton(
+                label: console.isOnline ? '上线' : '下线',
+                icon: console.isOnline
+                    ? Icons.check_circle
+                    : Icons.remove_circle,
+                active: console.isOnline,
+                onTap: () => console.setOnline(!console.isOnline),
+              ),
             ],
           ),
-          const SizedBox(height: 20),
-          GuideSectionCard(
-            child: Wrap(
-              alignment: WrapAlignment.spaceAround,
-              runSpacing: 18,
-              children: [
-                _ProfileStat(label: '接单量', value: '${stats.totalOrders}'),
-                _ProfileStat(label: '完单量', value: '${stats.completedOrders}'),
-                _ProfileStat(label: '好评数', value: '$positiveReviews'),
-                _ProfileStat(label: '退单量', value: '${stats.cancelOrders}'),
-              ],
-            ),
+          const SizedBox(height: 12),
+          _WalletSummary(
+            balance: balance,
+            pendingBalance: pendingBalance,
+            totalEarned: totalEarned,
+            payoutStatus: _walletLoading ? '读取中' : _payoutStatus(),
+            onRefresh: _loadWallet,
+            onWithdraw: widget.onOpenWallet,
+            onPayoutAccount: widget.onOpenWallet,
           ),
-          const SizedBox(height: 18),
+          const SizedBox(height: 12),
+          Row(
+            children: [
+              Expanded(
+                child: _RewardCard(
+                  title: '邀请用户奖励',
+                  value: '${user.followCount}',
+                  subtitle: '累计人数',
+                  amount: '${user.couponCount}',
+                  amountLabel: '入账（元）',
+                  tint: const Color(0xFFFFF0D9),
+                ),
+              ),
+              const SizedBox(width: 10),
+              Expanded(
+                child: _RewardCard(
+                  title: '邀请新人奖励',
+                  value: '${user.fansCount}',
+                  subtitle: '累计人数',
+                  amount: '0',
+                  amountLabel: '入账（元）',
+                  tint: const Color(0xFFF2FFD9),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 12),
           GuideSectionCard(
-            padding: const EdgeInsets.fromLTRB(0, 0, 0, 0),
+            padding: EdgeInsets.zero,
             child: Column(
               children: [
                 _ProfileRow(
                   icon: Icons.edit_note_outlined,
                   title: '编辑地陪资料',
-                  onTap: onOpenProfileEdit,
-                ),
-                const Divider(height: 1),
-                _ProfileRow(
-                  icon: Icons.lock_outline,
-                  title: '修改密码',
-                  onTap: onOpenPasswordChange,
+                  onTap: widget.onOpenProfileEdit,
                 ),
                 const Divider(height: 1),
                 _ProfileRow(
                   icon: Icons.settings_outlined,
                   title: '接单设置',
-                  onTap: onOpenDutySettings,
-                ),
-                const Divider(height: 1),
-                _ProfileRow(
-                  icon: Icons.badge_outlined,
-                  title: '认证资料',
-                  onTap: onOpenCertification,
+                  onTap: widget.onOpenDutySettings,
                 ),
                 const Divider(height: 1),
                 _ProfileRow(
                   icon: Icons.location_on_outlined,
                   title: '服务地址管理',
-                  onTap: onOpenAddressManager,
+                  onTap: widget.onOpenAddressManager,
+                ),
+                const Divider(height: 1),
+                _ProfileRow(
+                  icon: Icons.verified_user_outlined,
+                  title: '认证资料',
+                  onTap: widget.onOpenCertification,
                 ),
                 const Divider(height: 1),
                 _ProfileRow(
                   icon: Icons.policy_outlined,
                   title: '平台规则',
-                  onTap: onOpenPlatformRules,
+                  onTap: widget.onOpenPlatformRules,
                 ),
                 const Divider(height: 1),
                 _ProfileRow(
-                  icon: Icons.account_balance_wallet_outlined,
-                  title: '钱包与提现',
-                  onTap: onOpenWallet,
+                  icon: Icons.location_city_outlined,
+                  title: '城市与服务信息',
+                  onTap: widget.onOpenCityPicker,
+                ),
+                const Divider(height: 1),
+                _ProfileRow(
+                  icon: Icons.lock_outline,
+                  title: '修改密码',
+                  onTap: widget.onOpenPasswordChange,
                 ),
               ],
             ),
           ),
-          const SizedBox(height: 18),
+          const SizedBox(height: 12),
           SizedBox(
-            width: double.infinity,
-            child: ElevatedButton(
+            height: 44,
+            child: OutlinedButton(
               onPressed: () => context.read<UserProvider>().logout(),
-              style: ElevatedButton.styleFrom(
+              style: OutlinedButton.styleFrom(
                 backgroundColor: Colors.white,
                 foregroundColor: const Color(0xFFE85B47),
-                elevation: 0,
-                padding: const EdgeInsets.symmetric(vertical: 18),
+                side: BorderSide.none,
                 shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(24),
+                  borderRadius: BorderRadius.circular(13),
                 ),
               ),
               child: const Text(
                 '退出当前账号',
-                style: TextStyle(fontSize: 17, fontWeight: FontWeight.w800),
+                style: TextStyle(fontSize: 14, fontWeight: FontWeight.w800),
               ),
             ),
           ),
@@ -196,24 +282,247 @@ class GuideProfilePage extends StatelessWidget {
   }
 }
 
-class _ProfileStat extends StatelessWidget {
-  final String label;
-  final String value;
+class _WalletSummary extends StatelessWidget {
+  final double balance;
+  final double pendingBalance;
+  final double totalEarned;
+  final String payoutStatus;
+  final VoidCallback onRefresh;
+  final VoidCallback onWithdraw;
+  final VoidCallback onPayoutAccount;
 
-  const _ProfileStat({required this.label, required this.value});
+  const _WalletSummary({
+    required this.balance,
+    required this.pendingBalance,
+    required this.totalEarned,
+    required this.payoutStatus,
+    required this.onRefresh,
+    required this.onWithdraw,
+    required this.onPayoutAccount,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.fromLTRB(13, 12, 13, 12),
+      decoration: BoxDecoration(
+        color: AppColors.primary,
+        borderRadius: BorderRadius.circular(15),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              const Expanded(
+                child: Text(
+                  '总资产',
+                  style: TextStyle(fontSize: 15, fontWeight: FontWeight.w700),
+                ),
+              ),
+              TextButton.icon(
+                onPressed: onRefresh,
+                icon: const Icon(Icons.refresh, size: 16),
+                label: const Text('刷新'),
+                style: TextButton.styleFrom(
+                  backgroundColor: Colors.white,
+                  foregroundColor: AppColors.textPrimary,
+                  padding: const EdgeInsets.symmetric(horizontal: 10),
+                  visualDensity: VisualDensity.compact,
+                ),
+              ),
+            ],
+          ),
+          Text(
+            '¥${balance.toStringAsFixed(2)}',
+            style: const TextStyle(fontSize: 28, fontWeight: FontWeight.w900),
+          ),
+          const SizedBox(height: 10),
+          Row(
+            children: [
+              Expanded(
+                child: _WalletMetric(
+                  title: '托管中（元）',
+                  value: pendingBalance.toStringAsFixed(2),
+                  action: '钱包',
+                  onTap: onRefresh,
+                ),
+              ),
+              const SizedBox(width: 8),
+              Expanded(
+                child: _WalletMetric(
+                  title: '累计收益（元）',
+                  value: totalEarned.toStringAsFixed(2),
+                  action: '明细',
+                  onTap: onWithdraw,
+                ),
+              ),
+              const SizedBox(width: 8),
+              Expanded(
+                child: _WalletMetric(
+                  title: '收款账号',
+                  value: payoutStatus,
+                  action: '设置',
+                  onTap: onPayoutAccount,
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 8),
+          Align(
+            alignment: Alignment.centerRight,
+            child: InkWell(
+              onTap: onWithdraw,
+              borderRadius: BorderRadius.circular(99),
+              child: const Padding(
+                padding: EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                child: Text(
+                  '进入钱包提现',
+                  style: TextStyle(
+                    fontSize: 11,
+                    fontWeight: FontWeight.w900,
+                    decoration: TextDecoration.underline,
+                  ),
+                ),
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _WalletMetric extends StatelessWidget {
+  final String title;
+  final String value;
+  final String action;
+  final VoidCallback onTap;
+
+  const _WalletMetric({
+    required this.title,
+    required this.value,
+    required this.action,
+    required this.onTap,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.fromLTRB(10, 8, 8, 8),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(11),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Expanded(
+                child: Text(
+                  title,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: const TextStyle(
+                    fontSize: 11,
+                    color: AppColors.textSecondary,
+                  ),
+                ),
+              ),
+              InkWell(
+                onTap: onTap,
+                child: Text(
+                  action,
+                  style: const TextStyle(
+                    fontSize: 11,
+                    fontWeight: FontWeight.w900,
+                    color: AppColors.primaryDark,
+                  ),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 3),
+          Text(
+            value == '管理' ? value : '¥$value',
+            style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w900),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _RewardCard extends StatelessWidget {
+  final String title;
+  final String value;
+  final String subtitle;
+  final String amount;
+  final String amountLabel;
+  final Color tint;
+
+  const _RewardCard({
+    required this.title,
+    required this.value,
+    required this.subtitle,
+    required this.amount,
+    required this.amountLabel,
+    required this.tint,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.fromLTRB(11, 10, 9, 10),
+      decoration: BoxDecoration(
+        color: tint,
+        borderRadius: BorderRadius.circular(13),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            title,
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w900),
+          ),
+          const SizedBox(height: 10),
+          Row(
+            children: [
+              Expanded(
+                child: _RewardValue(value: value, label: subtitle),
+              ),
+              Expanded(
+                child: _RewardValue(value: amount, label: amountLabel),
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _RewardValue extends StatelessWidget {
+  final String value;
+  final String label;
+
+  const _RewardValue({required this.value, required this.label});
 
   @override
   Widget build(BuildContext context) {
     return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Text(
           value,
-          style: const TextStyle(fontSize: 28, fontWeight: FontWeight.w900),
+          style: const TextStyle(fontSize: 21, fontWeight: FontWeight.w900),
         ),
-        const SizedBox(height: 8),
         Text(
           label,
-          style: const TextStyle(fontSize: 15, color: AppColors.textSecondary),
+          style: const TextStyle(fontSize: 10, color: AppColors.textSecondary),
         ),
       ],
     );
@@ -221,12 +530,14 @@ class _ProfileStat extends StatelessWidget {
 }
 
 class _ProfileRow extends StatelessWidget {
-  final IconData icon;
+  final String? asset;
+  final IconData? icon;
   final String title;
   final VoidCallback onTap;
 
   const _ProfileRow({
-    required this.icon,
+    this.asset,
+    this.icon,
     required this.title,
     required this.onTap,
   });
@@ -236,24 +547,43 @@ class _ProfileRow extends StatelessWidget {
     return InkWell(
       onTap: onTap,
       child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 18),
+        padding: const EdgeInsets.symmetric(horizontal: 13, vertical: 11),
         child: Row(
           children: [
-            Icon(icon, size: 24),
-            const SizedBox(width: 12),
+            asset != null
+                ? GuideDesignIcon(asset!, size: 22)
+                : Icon(icon, size: 21, color: AppColors.textSecondary),
+            const SizedBox(width: 9),
             Expanded(
               child: Text(
                 title,
                 style: const TextStyle(
-                  fontSize: 17,
+                  fontSize: 14,
                   fontWeight: FontWeight.w700,
                 ),
               ),
             ),
-            const Icon(Icons.chevron_right_rounded),
+            const Icon(
+              Icons.chevron_right_rounded,
+              size: 20,
+              color: AppColors.textHint,
+            ),
           ],
         ),
       ),
+    );
+  }
+}
+
+class _AvatarFallback extends StatelessWidget {
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      width: 58,
+      height: 58,
+      color: const Color(0xFFE2E5EA),
+      alignment: Alignment.center,
+      child: const Icon(Icons.person, color: AppColors.textHint),
     );
   }
 }

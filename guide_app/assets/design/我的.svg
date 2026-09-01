@@ -1,0 +1,24 @@
+<svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" width="24.000000" height="24.000000" fill="none">
+	<defs>
+		<g id="pixso_custom_effect_2">
+			<effect x="-1.000000" y="1.000000" visibility="hidden" fill="rgb(73,92,131)" fill-opacity="0.560000002" effectType="dropShadow" stdDeviation="0" radius="0" />
+			<effect x="4.000000" y="-4.000000" visibility="hidden" fill="rgb(66,67,104)" fill-opacity="0.0500000007" effectType="innerShadow" stdDeviation="0" radius="0" />
+			<effect x="-1.000000" y="2.000000" visibility="visible" fill="rgb(188,254,42)" fill-opacity="1" effectType="dropShadow" stdDeviation="0" radius="0" />
+		</g>
+		<filter id="filter_2" width="21.307617" height="22.307678" x="0.846191" y="1.846130" filterUnits="userSpaceOnUse" customEffect="url(#pixso_custom_effect_2)" color-interpolation-filters="sRGB">
+			<feFlood flood-opacity="0" result="BackgroundImageFix" />
+			<feOffset dx="-1.000000" dy="2.000000" in="SourceAlpha" />
+			<feColorMatrix type="matrix" values="0 0 0 0 0.737255 0 0 0 0 0.996078 0 0 0 0 0.164706 0 0 0 1 0 " />
+			<feBlend result="effect_dropShadow_1" in2="BackgroundImageFix" mode="normal" />
+			<feBlend result="shape" in="SourceGraphic" in2="effect_dropShadow_1" mode="normal" />
+		</filter>
+	</defs>
+	<rect id="Frame 1739335880" width="24.000000" height="24.000000" x="0.000000" y="0.000000" fill="rgb(255,255,255)" />
+	<g id="Group 35060">
+		<g filter="url(#filter_2)">
+			<circle id="Ellipse 26" cx="12.0000372" cy="11.9999762" r="10.1538458" fill="rgb(255,255,255)" />
+			<circle id="Ellipse 26" cx="12.0000372" cy="11.9999762" r="9.40384579" stroke="rgb(26,26,26)" stroke-width="1.500000" />
+		</g>
+		<path id="Vector 26" d="M0 2.56435C1.75226 3.30656 5.39992 3.87908 7.58514 0L9.09256 1.18833" stroke="rgb(26,26,26)" stroke-width="1.500000" transform="matrix(0.987906,-0.155056,0.155056,0.987906,8.37158,13.6205)" />
+	</g>
+</svg>

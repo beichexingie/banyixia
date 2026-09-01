@@ -1,0 +1,22 @@
+<svg viewBox="0 0 46 46" xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" width="46.000000" height="46.000000" fill="none" clip-path="url(#clipPath_9)" customFrame="url(#clipPath_9)">
+	<defs>
+		<clipPath id="clipPath_9">
+			<rect width="46.000000" height="46.000000" x="0.000000" y="0.000000" rx="12.000000" fill="rgb(255,255,255)" />
+		</clipPath>
+		<clipPath id="clipPath_10">
+			<rect width="34.000000" height="34.000000" x="6.500000" y="6.000000" fill="rgb(255,255,255)" />
+		</clipPath>
+		<linearGradient id="paint_linear_7" x1="23.5000801" x2="23.5000801" y1="11.666748" y2="34.3334122" gradientUnits="userSpaceOnUse">
+			<stop stop-color="rgb(255,255,255)" offset="0" stop-opacity="1" />
+			<stop stop-color="rgb(188,254,42)" offset="1" stop-opacity="1" />
+		</linearGradient>
+	</defs>
+	<rect id="Frame 1739336886" width="46.000000" height="46.000000" x="0.000000" y="0.000000" rx="12.000000" fill="rgb(255,255,255)" />
+	<g id="Frame" clip-path="url(#clipPath_10)" customFrame="url(#clipPath_10)">
+		<rect id="Frame" width="34.000000" height="34.000000" x="6.500000" y="6.000000" fill="rgb(255,255,255)" fill-opacity="0" />
+		<path id="Vector" d="M23.5001 34.3334C29.7593 34.3334 34.8334 29.2593 34.8334 23.0001C34.8334 16.7408 29.7593 11.6667 23.5001 11.6667C17.2408 11.6667 12.1667 16.7408 12.1667 23.0001C12.1667 29.2593 17.2408 34.3334 23.5001 34.3334Z" fill="url(#paint_linear_7)" fill-rule="nonzero" />
+		<path id="Vector" d="M34.8334 23.0001C34.8334 16.7408 29.7593 11.6667 23.5001 11.6667C17.2408 11.6667 12.1667 16.7408 12.1667 23.0001C12.1667 29.2593 17.2408 34.3334 23.5001 34.3334C29.7593 34.3334 34.8334 29.2593 34.8334 23.0001Z" fill-rule="nonzero" stroke="rgb(51,51,51)" stroke-linejoin="round" stroke-width="1.600000" />
+		<path id="Vector" d="M33.1079 16.9861C36.0965 17.2469 38.1474 18.1638 38.5523 19.6751C39.3623 22.698 33.2798 26.9544 24.9666 29.1819C16.6534 31.4094 9.25761 30.7645 8.44761 27.7416C8.02323 26.1577 9.49086 24.2353 12.18 22.4436" stroke="rgb(51,51,51)" stroke-linecap="round" stroke-linejoin="round" stroke-width="1.600000" />
+	</g>
+	<rect id="Frame 1739336886" width="45.000000" height="45.000000" x="0.500000" y="0.500000" rx="11.500000" stroke="rgb(238,238,238)" stroke-width="1.000000" />
+</svg>

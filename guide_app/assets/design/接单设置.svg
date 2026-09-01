@@ -1,0 +1,26 @@
+<svg viewBox="0 0 32 32" xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" width="32.000000" height="32.000000" fill="none" clip-path="url(#clipPath_0)" customFrame="url(#clipPath_0)">
+	<defs>
+		<clipPath id="clipPath_0">
+			<rect width="32.000000" height="32.000000" x="0.000000" y="0.000000" rx="16.000000" fill="rgb(255,255,255)" />
+		</clipPath>
+		<clipPath id="clipPath_1">
+			<rect width="20.000000" height="20.000000" x="6.000000" y="6.000000" fill="rgb(255,255,255)" />
+		</clipPath>
+		<linearGradient id="paint_linear_0" x1="16" x2="16" y1="7.66662598" y2="24.333292" gradientUnits="userSpaceOnUse">
+			<stop stop-color="rgb(188,254,42)" offset="0" stop-opacity="1" />
+			<stop stop-color="rgb(255,255,255)" offset="1" stop-opacity="1" />
+		</linearGradient>
+	</defs>
+	<rect id="Frame 1739336854" width="32.000000" height="32.000000" x="0.000000" y="0.000000" rx="16.000000" fill="rgb(248,248,248)" />
+	<g id="Frame 1739336959" clip-path="url(#clipPath_1)" customFrame="url(#clipPath_1)">
+		<rect id="Frame 1739336959" width="20.000000" height="20.000000" x="6.000000" y="6.000000" fill="rgb(255,255,255)" fill-opacity="0" />
+		<rect id="Rectangle 4028" width="15.000000" height="16.666666" x="8.500000" y="7.666626" rx="2.500000" fill="url(#paint_linear_0)" />
+		<path id="Rectangle 4027" d="M15.1667 24.3333L11.8333 24.3333C9.99238 24.3333 8.5 22.8409 8.5 21L8.5 11C8.5 9.15901 9.99238 7.66663 11.8333 7.66663L20.1667 7.66663C22.0076 7.66663 23.5 9.15901 23.5 11L23.5 14.3333" stroke="rgb(26,26,26)" stroke-linecap="round" stroke-width="1.250000" />
+		<g id="Group 1312315318">
+			<path id="Vector" d="M24.3333 20.3748L22.2501 16.8331L18.0834 16.8331L16 20.3748L18.0834 23.9165L22.2501 23.9165L24.3333 20.3748Z" fill-rule="nonzero" stroke="rgb(51,51,51)" stroke-linejoin="round" stroke-width="1.250000" />
+			<path id="Vector" d="M21.2083 20.3748C21.2083 19.7995 20.742 19.3331 20.1667 19.3331C19.5914 19.3331 19.125 19.7995 19.125 20.3748C19.125 20.9501 19.5914 21.4165 20.1667 21.4165C20.742 21.4165 21.2083 20.9501 21.2083 20.3748Z" fill-rule="nonzero" stroke="rgb(51,51,51)" stroke-linejoin="round" stroke-width="1.250000" />
+		</g>
+		<line id="Line 29" x1="11" x2="16.833334" y1="11.208374" y2="11.208374" stroke="rgb(26,26,26)" stroke-linecap="round" stroke-width="1.250000" />
+		<line id="Line 30" x1="11" x2="16.833334" y1="14.541626" y2="14.541626" stroke="rgb(26,26,26)" stroke-linecap="round" stroke-width="1.250000" />
+	</g>
+</svg>
