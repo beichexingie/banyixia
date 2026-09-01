@@ -446,7 +446,23 @@ class _LocationPickerPageState extends State<LocationPickerPage> {
         // Keep the existing city/default map when location is unavailable.
       }
     }
-    if (!_hasWebServiceKey || seed == null || seed.isEmpty) return;
+    if (seed == null || seed.isEmpty) return;
+
+    // A city-only selection is not a concrete address. Do not send it to
+    // AMap geocoding: some AMap endpoints return 30001 for these requests.
+    if (_isCityOnlySelection(seed, widget.initialCity)) {
+      if (!mounted) return;
+      setState(() {
+        _selectedAddress = seed;
+        _selectedCity = _normalizeCityName(widget.initialCity ?? seed);
+        _locationSummary = seed;
+        _selectedPosition = null;
+        _isSpecificPlaceSelection = false;
+      });
+      return;
+    }
+
+    if (!_hasWebServiceKey) return;
     _isSpecificPlaceSelection =
         widget.initialCity?.trim().isNotEmpty == true &&
         _normalizeCityName(seed) !=
@@ -537,10 +553,18 @@ class _LocationPickerPageState extends State<LocationPickerPage> {
   }
 
   Future<void> _selectCity(_CityEntry city) async {
-    await _selectPlace(address: city.name, city: city.name);
-    if (mounted) {
-      setState(() => _isSpecificPlaceSelection = false);
-    }
+    if (!mounted) return;
+    final normalizedCity = _normalizeCityName(city.name);
+    setState(() {
+      _selectedAddress = city.name;
+      _selectedCity = normalizedCity;
+      _locationSummary = city.name;
+      _selectedPosition = null;
+      _isSpecificPlaceSelection = false;
+      _searchController.clear();
+      _apiSuggestions = const [];
+    });
+    _notifyMapPanelChanged();
   }
 
   Future<void> _selectPlace({
@@ -566,6 +590,19 @@ class _LocationPickerPageState extends State<LocationPickerPage> {
       _searchController.clear();
       _apiSuggestions = const [];
     });
+
+    // City selection should never depend on geocoding. Keep this guard for
+    // callers that provide a city string through an initial route/state.
+    if (_isCityOnlySelection(address, normalizedCity)) {
+      if (mounted) {
+        setState(() {
+          _selectedPosition = null;
+          _isSpecificPlaceSelection = false;
+        });
+        _notifyMapPanelChanged();
+      }
+      return;
+    }
 
     if (latitude != null && longitude != null) {
       final position = MapPosition(
@@ -604,6 +641,14 @@ class _LocationPickerPageState extends State<LocationPickerPage> {
       if (!mounted) return;
       _showMessage('地点解析失败');
     }
+  }
+
+  bool _isCityOnlySelection(String address, String? city) {
+    final normalizedAddress = _normalizeCityName(address);
+    final normalizedCity = _normalizeCityName(city);
+    return normalizedAddress.isNotEmpty &&
+        normalizedCity.isNotEmpty &&
+        normalizedAddress == normalizedCity;
   }
 
   void _applyResolvedPosition(MapPosition position) {

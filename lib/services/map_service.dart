@@ -377,9 +377,7 @@ class AmapMapService implements MapService {
 
   Future<Position> _requestCurrentPosition({required bool forceRefresh}) async {
     if (!kIsWeb && defaultTargetPlatform == TargetPlatform.android) {
-      final nativePosition = await _requestNativeSystemPosition(
-        forceRefresh: forceRefresh,
-      );
+      final nativePosition = await _requestAmapPosition();
       if (nativePosition != null) return nativePosition;
     }
 
@@ -415,27 +413,26 @@ class AmapMapService implements MapService {
     );
   }
 
-  Future<Position?> _requestNativeSystemPosition({
-    required bool forceRefresh,
-  }) async {
+  Future<Position?> _requestAmapPosition() async {
     try {
-      final data =
-          await const MethodChannel(
-            'flutter_application_1/system_location',
-          ).invokeMethod<dynamic>('getCurrentLocation', <String, dynamic>{
-            'forceRefresh': forceRefresh,
-          });
+      final data = await const MethodChannel(
+        'flutter_application_1/amap_location',
+      ).invokeMethod<dynamic>('getCurrentLocation');
       if (data is! Map) return null;
       final latitude = (data['latitude'] as num?)?.toDouble();
       final longitude = (data['longitude'] as num?)?.toDouble();
       if (latitude == null ||
           longitude == null ||
           (latitude == 0 && longitude == 0)) {
+        debugPrint('AMAP location returned an invalid payload: $data');
         return null;
       }
+      // AMap Android returns GCJ-02 coordinates; keep the app's internal
+      // location representation in WGS-84, just like the normal path.
+      final normalizedPoint = toWgs84LatLng(LatLng(latitude, longitude));
       return Position(
-        latitude: latitude,
-        longitude: longitude,
+        latitude: normalizedPoint.latitude,
+        longitude: normalizedPoint.longitude,
         timestamp: DateTime.now(),
         accuracy: (data['accuracy'] as num?)?.toDouble() ?? 0,
         altitude: (data['altitude'] as num?)?.toDouble() ?? 0,
@@ -447,13 +444,15 @@ class AmapMapService implements MapService {
       );
     } on PlatformException catch (error) {
       debugPrint(
-        'Native system location unavailable: ${error.code} ${error.message}',
+        'AMAP location failed: code=${error.code} message=${error.message} '
+        'details=${error.details}',
       );
       return null;
     } on MissingPluginException {
+      debugPrint('AMAP location failed: missing native plugin');
       return null;
     } catch (error) {
-      debugPrint('Native system location unavailable: $error');
+      debugPrint('AMAP location failed: $error');
       return null;
     }
   }

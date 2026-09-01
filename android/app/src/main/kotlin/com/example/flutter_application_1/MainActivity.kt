@@ -4,16 +4,14 @@ import android.app.NotificationChannel
 import android.app.NotificationManager
 import android.content.Context
 import android.content.Intent
-import android.location.Location
-import android.location.LocationListener
-import android.location.LocationManager
 import android.net.Uri
 import android.content.pm.PackageManager
 import android.os.Build
-import android.os.Handler
-import android.os.Looper
 import android.provider.Settings
 import android.util.Log
+import com.amap.api.location.AMapLocationClient
+import com.amap.api.location.AMapLocationClientOption
+import com.amap.api.location.AMapLocationListener
 import com.alibaba.sdk.android.push.CloudPushService
 import com.alibaba.sdk.android.push.CommonCallback
 import com.alibaba.sdk.android.push.noonesdk.PushServiceFactory
@@ -26,7 +24,7 @@ private const val ALIYUN_NOTIFICATION_CHANNEL = "yidianban_messages"
 private const val ALIYUN_ORDER_NOTIFICATION_CHANNEL = "yidianban_orders"
 private const val ALIYUN_PUSH_PREFS = "aliyun_push"
 private const val PENDING_ROUTE_KEY = "pending_route"
-private const val SYSTEM_LOCATION_CHANNEL = "flutter_application_1/system_location"
+private const val AMAP_LOCATION_CHANNEL = "flutter_application_1/amap_location"
 
 class MainActivity : FlutterActivity() {
   private var notificationPermissionRequested = false
@@ -76,13 +74,10 @@ class MainActivity : FlutterActivity() {
 
     MethodChannel(
       flutterEngine.dartExecutor.binaryMessenger,
-      SYSTEM_LOCATION_CHANNEL,
+      AMAP_LOCATION_CHANNEL,
     ).setMethodCallHandler { call, result ->
       when (call.method) {
-        "getCurrentLocation" -> requestSystemLocation(
-          result,
-          call.argument<Boolean>("forceRefresh") ?: false,
-        )
+        "getCurrentLocation" -> requestAmapLocation(result)
         else -> result.notImplemented()
       }
     }
@@ -132,18 +127,23 @@ class MainActivity : FlutterActivity() {
     }
   }
 
-  private fun requestSystemLocation(result: MethodChannel.Result, forceRefresh: Boolean) {
-    val locationManager = getSystemService(Context.LOCATION_SERVICE) as LocationManager
+  private fun requestAmapLocation(result: MethodChannel.Result) {
+    var locationClient: AMapLocationClient? = null
     var delivered = false
-    val timeoutHandler = Handler(Looper.getMainLooper())
-    lateinit var listener: LocationListener
-
+    val timeoutHandler = android.os.Handler(android.os.Looper.getMainLooper())
     fun cleanup() {
       timeoutHandler.removeCallbacksAndMessages(null)
-      runCatching { locationManager.removeUpdates(listener) }
+      locationClient?.stopLocation()
+      locationClient?.onDestroy()
+      locationClient = null
     }
-
-    fun finishSystemLocation(location: Location) {
+    fun finishError(code: String, message: String) {
+      if (delivered) return
+      delivered = true
+      cleanup()
+      runOnUiThread { result.error(code, message, null) }
+    }
+    fun finishSuccess(location: com.amap.api.location.AMapLocation) {
       if (delivered) return
       delivered = true
       cleanup()
@@ -156,65 +156,42 @@ class MainActivity : FlutterActivity() {
             "altitude" to location.altitude,
             "bearing" to location.bearing,
             "speed" to location.speed,
-            "coordinateSystem" to "wgs84",
+            "coordinateSystem" to "gcj02",
           ),
         )
       }
     }
-
-    fun finishError(code: String, message: String) {
-      if (delivered) return
-      delivered = true
-      cleanup()
-      runOnUiThread { result.error(code, message, null) }
-    }
-
-    listener = object : LocationListener {
-      override fun onLocationChanged(location: Location) {
-        if (location.latitude != 0.0 && location.longitude != 0.0) {
-          finishSystemLocation(location)
-        }
-      }
-    }
-
     try {
-      val hasPermission = checkSelfPermission(android.Manifest.permission.ACCESS_FINE_LOCATION) ==
-        PackageManager.PERMISSION_GRANTED ||
-        checkSelfPermission(android.Manifest.permission.ACCESS_COARSE_LOCATION) ==
-          PackageManager.PERMISSION_GRANTED
-      if (!hasPermission) {
-        finishError("LOCATION_PERMISSION_DENIED", "定位权限未授予")
-        return
+      AMapLocationClient.updatePrivacyShow(applicationContext, true, true)
+      AMapLocationClient.updatePrivacyAgree(applicationContext, true)
+      val option = AMapLocationClientOption().apply {
+        locationMode = AMapLocationClientOption.AMapLocationMode.Hight_Accuracy
+        isOnceLocation = true
+        isOnceLocationLatest = true
+        isNeedAddress = false
       }
-
-      val providers = listOf(LocationManager.GPS_PROVIDER, LocationManager.NETWORK_PROVIDER)
-        .filter { provider -> runCatching { locationManager.isProviderEnabled(provider) }.getOrDefault(false) }
-      if (providers.isEmpty()) {
-        finishError("LOCATION_SERVICE_DISABLED", "定位服务未开启")
-        return
-      }
-
-      val lastKnown = providers.mapNotNull { provider ->
-        runCatching { locationManager.getLastKnownLocation(provider) }.getOrNull()
-      }.maxByOrNull { it.time }
-      if (!forceRefresh &&
-        lastKnown != null &&
-        lastKnown.latitude != 0.0 &&
-        lastKnown.longitude != 0.0
-      ) {
-        finishSystemLocation(lastKnown)
-        return
-      }
-
-      providers.forEach { provider ->
-        locationManager.requestLocationUpdates(provider, 1000L, 0f, listener, Looper.getMainLooper())
+      locationClient = AMapLocationClient(applicationContext).apply {
+        setLocationOption(option)
+        setLocationListener(AMapLocationListener { location ->
+          if (location == null) {
+            finishError("AMAP_NULL_RESULT", "高德返回空定位结果")
+          } else if (location.errorCode == 0 && location.latitude != 0.0 && location.longitude != 0.0) {
+            finishSuccess(location)
+          } else {
+            finishError(
+              "AMAP_LOCATION_${location.errorCode}",
+              location.errorInfo?.toString() ?: "高德定位失败",
+            )
+          }
+        })
+        startLocation()
       }
       timeoutHandler.postDelayed(
-        { finishError("LOCATION_TIMEOUT", "定位超时，请稍后重试") },
-        12000,
+        { finishError("AMAP_LOCATION_TIMEOUT", "高德定位超时") },
+        16000,
       )
     } catch (error: Throwable) {
-      finishError("LOCATION_ERROR", error.message ?: "系统定位初始化失败")
+      finishError("AMAP_LOCATION_ERROR", error.message ?: "高德定位初始化失败")
     }
   }
 

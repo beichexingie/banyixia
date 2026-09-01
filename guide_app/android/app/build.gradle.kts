@@ -90,6 +90,7 @@ android {
 dependencies {
     coreLibraryDesugaring("com.android.tools:desugar_jdk_libs:2.1.4")
     implementation("com.aliyun.ams:alicloud-android-push:4.0.0")
+    implementation("com.amap.api:location:6.4.9")
 }
 
 flutter {
