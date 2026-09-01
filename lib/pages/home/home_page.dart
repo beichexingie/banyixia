@@ -2,12 +2,12 @@ import 'dart:ui';
 import 'dart:async';
 
 import 'package:flutter/material.dart';
+import 'package:flutter_svg/flutter_svg.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:go_router/go_router.dart';
 import 'package:provider/provider.dart';
 
 import '../../config/app_theme.dart';
-import '../../config/amap_config.dart';
 import '../../config/guide_sort.dart';
 import '../../models/guide.dart';
 import '../../models/activity.dart';
@@ -17,6 +17,7 @@ import '../main_scaffold.dart';
 import '../../widgets/service_guide_card.dart';
 import '../../widgets/guide_sort_menu_button.dart';
 import '../../services/map_service.dart';
+import '../../services/location_cache_service.dart';
 import '../../services/ecs_api_client.dart';
 import '../../config/app_config.dart';
 
@@ -45,10 +46,6 @@ class _HomePageState extends State<HomePage>
   GuideSortMode _guideSortMode = GuideSortMode.hot;
   double? _viewerLatitude;
   double? _viewerLongitude;
-  final MapService _mapService = const AmapMapService(
-    apiKey: AmapConfig.webServiceKey,
-  );
-
   Future<void> _openCustomerService() async {
     try {
       final roomId = await context
@@ -467,8 +464,8 @@ class _HomePageState extends State<HomePage>
       height: 70,
       child: Align(
         alignment: Alignment.bottomLeft,
-        child: Image.asset(
-          'assets/home/logo 1.png',
+        child: SvgPicture.asset(
+          'assets/home/logo 1.svg',
           width: 77,
           height: 46,
           fit: BoxFit.contain,
@@ -1002,7 +999,7 @@ class _HomePageState extends State<HomePage>
         var latitude = _selectedPlaceLatitude;
         var longitude = _selectedPlaceLongitude;
         if (latitude == null || longitude == null) {
-          final position = await _mapService.currentPosition();
+          final position = await LocationCacheService.instance.getPosition();
           if (!mounted) return;
           latitude = position?.latitude;
           longitude = position?.longitude;

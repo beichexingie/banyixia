@@ -4,7 +4,6 @@ import 'package:go_router/go_router.dart';
 import 'package:provider/provider.dart';
 
 import '../../config/app_theme.dart';
-import '../../config/amap_config.dart';
 import '../../config/guide_sort.dart';
 import '../../config/guide_service_catalog.dart';
 import '../../models/guide.dart';
@@ -13,6 +12,7 @@ import '../../widgets/service_guide_card.dart';
 import '../../widgets/guide_sort_menu_button.dart';
 import '../../widgets/design_icon.dart';
 import '../../services/map_service.dart';
+import '../../services/location_cache_service.dart';
 
 class CompanionPage extends StatefulWidget {
   const CompanionPage({super.key});
@@ -34,10 +34,6 @@ class _CompanionPageState extends State<CompanionPage> {
   String? _selectedCategory;
   double? _viewerLatitude;
   double? _viewerLongitude;
-  final MapService _mapService = const AmapMapService(
-    apiKey: AmapConfig.webServiceKey,
-  );
-
   @override
   void initState() {
     super.initState();
@@ -339,7 +335,7 @@ class _CompanionPageState extends State<CompanionPage> {
         var latitude = _selectedPlaceLatitude;
         var longitude = _selectedPlaceLongitude;
         if (latitude == null || longitude == null) {
-          final position = await _mapService.currentPosition();
+          final position = await LocationCacheService.instance.getPosition();
           if (!mounted) return;
           latitude = position?.latitude;
           longitude = position?.longitude;

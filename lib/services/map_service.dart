@@ -3,6 +3,7 @@ import 'dart:convert';
 import 'dart:math' as math;
 
 import 'package:flutter/foundation.dart';
+import 'package:flutter/services.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:http/http.dart' as http;
 import 'package:latlong2/latlong.dart';
@@ -84,7 +85,10 @@ abstract class MapService {
     required double longitude,
   });
 
-  Future<MapPosition?> currentPosition();
+  Future<MapPosition?> currentPosition({
+    bool forceRefresh = false,
+    bool allowActiveRequest = true,
+  });
 
   Future<MapRoute?> planDrivingRoute({
     required double originLatitude,
@@ -256,7 +260,10 @@ class AmapMapService implements MapService {
   }
 
   @override
-  Future<MapPosition?> currentPosition() async {
+  Future<MapPosition?> currentPosition({
+    bool forceRefresh = false,
+    bool allowActiveRequest = true,
+  }) async {
     final permission = await Geolocator.checkPermission();
     var resolvedPermission = permission;
     if (resolvedPermission == LocationPermission.denied) {
@@ -270,26 +277,59 @@ class AmapMapService implements MapService {
       );
     }
 
-    Position? position;
+    // Read the platform cache before starting a new GPS request. Background
+    // warming uses this path only and must never occupy the active request.
+    Position? lastKnown;
     try {
-      // Do not gate this call with isLocationServiceEnabled(). On some
-      // Android vendors that status can briefly report false even while the
-      // system location switch is on. The actual location request is the
-      // reliable source of truth here.
-      position = await Geolocator.getCurrentPosition(
-        locationSettings: const LocationSettings(
-          accuracy: LocationAccuracy.high,
-          timeLimit: Duration(seconds: 15),
-        ),
-      );
-    } on LocationServiceDisabledException {
-      throw const AmapApiException(
-        code: 'LOCATION_SERVICE_DISABLED',
-        info: '定位服务未开启',
-      );
-    } on TimeoutException {
-      position = await Geolocator.getLastKnownPosition();
-      if (position == null) {
+      lastKnown = await Geolocator.getLastKnownPosition();
+      if (!kIsWeb && defaultTargetPlatform == TargetPlatform.android) {
+        final managerPosition = await Geolocator.getLastKnownPosition(
+          forceAndroidLocationManager: true,
+        );
+        if (managerPosition != null &&
+            (lastKnown == null ||
+                managerPosition.timestamp.isAfter(lastKnown.timestamp))) {
+          lastKnown = managerPosition;
+        }
+      }
+    } catch (_) {
+      // A failed fused-provider read should not prevent the Android fallback.
+      if (!kIsWeb && defaultTargetPlatform == TargetPlatform.android) {
+        try {
+          lastKnown = await Geolocator.getLastKnownPosition(
+            forceAndroidLocationManager: true,
+          );
+        } catch (_) {
+          lastKnown = null;
+        }
+      } else {
+        lastKnown = null;
+      }
+    }
+
+    late final Position position;
+    if (!forceRefresh && lastKnown != null) {
+      // Distance sorting does not need turn-by-turn GPS precision. Reuse a
+      // recent fix immediately instead of blocking the list on GPS startup.
+      position = lastKnown;
+    } else if (!allowActiveRequest) {
+      return lastKnown == null ? null : _positionToMapPosition(lastKnown);
+    } else {
+      try {
+        // Do not gate this call with isLocationServiceEnabled(). On some
+        // Android vendors that status can briefly report false even while the
+        // system location switch is on. The actual location request is the
+        // reliable source of truth here.
+        position = await _requestCurrentPosition(forceRefresh: forceRefresh);
+      } on LocationServiceDisabledException {
+        throw const AmapApiException(
+          code: 'LOCATION_SERVICE_DISABLED',
+          info: '定位服务未开启',
+        );
+      } on TimeoutException {
+        if (lastKnown != null) {
+          return _positionToMapPosition(lastKnown);
+        }
         throw const AmapApiException(
           code: 'LOCATION_TIMEOUT',
           info: '定位超时，请稍后重试',
@@ -333,6 +373,136 @@ class AmapMapService implements MapService {
         longitude: normalizedPoint.longitude,
       );
     }
+  }
+
+  Future<Position> _requestCurrentPosition({required bool forceRefresh}) async {
+    if (!kIsWeb && defaultTargetPlatform == TargetPlatform.android) {
+      final nativePosition = await _requestNativeSystemPosition(
+        forceRefresh: forceRefresh,
+      );
+      if (nativePosition != null) return nativePosition;
+    }
+
+    if (!kIsWeb && defaultTargetPlatform == TargetPlatform.android) {
+      // Some phones return a network/fused fix while others only return a
+      // fix through LocationManager. Run both providers instead of waiting
+      // for one provider to time out before trying the other.
+      return _firstSuccessfulPosition([
+        Geolocator.getCurrentPosition(
+          locationSettings: AndroidSettings(
+            accuracy: LocationAccuracy.high,
+            distanceFilter: 0,
+            intervalDuration: const Duration(seconds: 5),
+            timeLimit: const Duration(seconds: 20),
+          ),
+        ),
+        Geolocator.getCurrentPosition(
+          locationSettings: AndroidSettings(
+            forceLocationManager: true,
+            accuracy: LocationAccuracy.high,
+            distanceFilter: 0,
+            timeLimit: const Duration(seconds: 20),
+          ),
+        ),
+      ]);
+    }
+
+    return Geolocator.getCurrentPosition(
+      locationSettings: const LocationSettings(
+        accuracy: LocationAccuracy.high,
+        timeLimit: Duration(seconds: 20),
+      ),
+    );
+  }
+
+  Future<Position?> _requestNativeSystemPosition({
+    required bool forceRefresh,
+  }) async {
+    try {
+      final data =
+          await const MethodChannel(
+            'flutter_application_1/system_location',
+          ).invokeMethod<dynamic>('getCurrentLocation', <String, dynamic>{
+            'forceRefresh': forceRefresh,
+          });
+      if (data is! Map) return null;
+      final latitude = (data['latitude'] as num?)?.toDouble();
+      final longitude = (data['longitude'] as num?)?.toDouble();
+      if (latitude == null ||
+          longitude == null ||
+          (latitude == 0 && longitude == 0)) {
+        return null;
+      }
+      return Position(
+        latitude: latitude,
+        longitude: longitude,
+        timestamp: DateTime.now(),
+        accuracy: (data['accuracy'] as num?)?.toDouble() ?? 0,
+        altitude: (data['altitude'] as num?)?.toDouble() ?? 0,
+        altitudeAccuracy: 0,
+        heading: (data['bearing'] as num?)?.toDouble() ?? 0,
+        headingAccuracy: 0,
+        speed: (data['speed'] as num?)?.toDouble() ?? 0,
+        speedAccuracy: 0,
+      );
+    } on PlatformException catch (error) {
+      debugPrint(
+        'Native system location unavailable: ${error.code} ${error.message}',
+      );
+      return null;
+    } on MissingPluginException {
+      return null;
+    } catch (error) {
+      debugPrint('Native system location unavailable: $error');
+      return null;
+    }
+  }
+
+  Future<Position> _firstSuccessfulPosition(List<Future<Position>> requests) {
+    final completer = Completer<Position>();
+    var pending = requests.length;
+    Object? lastError;
+    StackTrace? lastStackTrace;
+    var serviceDisabled = false;
+
+    for (final request in requests) {
+      request.then<void>(
+        (position) {
+          if (!completer.isCompleted) completer.complete(position);
+        },
+        onError: (Object error, StackTrace stackTrace) {
+          pending--;
+          lastError = error;
+          lastStackTrace = stackTrace;
+          serviceDisabled =
+              serviceDisabled || error is LocationServiceDisabledException;
+          if (pending != 0 || completer.isCompleted) return;
+          if (serviceDisabled) {
+            completer.completeError(
+              const LocationServiceDisabledException(),
+              lastStackTrace,
+            );
+          } else {
+            completer.completeError(lastError!, lastStackTrace);
+          }
+        },
+      );
+    }
+
+    return completer.future;
+  }
+
+  MapPosition _positionToMapPosition(Position position) {
+    final rawPoint = LatLng(position.latitude, position.longitude);
+    final normalizedPoint = _shouldTreatDeviceLocationAsGcj(rawPoint)
+        ? toWgs84LatLng(rawPoint)
+        : rawPoint;
+    return MapPosition(
+      formattedAddress: '当前位置',
+      city: '',
+      latitude: normalizedPoint.latitude,
+      longitude: normalizedPoint.longitude,
+    );
   }
 
   @override
@@ -634,7 +804,10 @@ class PlaceholderMapService extends AmapMapService {
   }
 
   @override
-  Future<MapPosition?> currentPosition() async {
+  Future<MapPosition?> currentPosition({
+    bool forceRefresh = false,
+    bool allowActiveRequest = true,
+  }) async {
     return null;
   }
 

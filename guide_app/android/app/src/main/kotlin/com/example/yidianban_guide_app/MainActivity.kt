@@ -3,9 +3,14 @@ package com.example.yidianban_guide_app
 import android.app.NotificationChannel
 import android.app.NotificationManager
 import android.content.Context
+import android.location.Location
+import android.location.LocationListener
+import android.location.LocationManager
 import android.net.Uri
 import android.content.pm.PackageManager
 import android.os.Build
+import android.os.Handler
+import android.os.Looper
 import android.util.Log
 import com.alibaba.sdk.android.push.CloudPushService
 import com.alibaba.sdk.android.push.CommonCallback
@@ -19,6 +24,7 @@ private const val ALIYUN_NOTIFICATION_CHANNEL = "yidianban_messages"
 private const val ALIYUN_ORDER_NOTIFICATION_CHANNEL = "yidianban_orders"
 private const val ALIYUN_PUSH_PREFS = "aliyun_push"
 private const val PENDING_ROUTE_KEY = "pending_route"
+private const val SYSTEM_LOCATION_CHANNEL = "flutter_application_1/system_location"
 
 class MainActivity : FlutterActivity() {
   private fun applyAlipayEnvironment(sandbox: Boolean) {
@@ -55,6 +61,19 @@ class MainActivity : FlutterActivity() {
 
     MethodChannel(
       flutterEngine.dartExecutor.binaryMessenger,
+      SYSTEM_LOCATION_CHANNEL,
+    ).setMethodCallHandler { call, result ->
+      when (call.method) {
+        "getCurrentLocation" -> requestSystemLocation(
+          result,
+          call.argument<Boolean>("forceRefresh") ?: false,
+        )
+        else -> result.notImplemented()
+      }
+    }
+
+    MethodChannel(
+      flutterEngine.dartExecutor.binaryMessenger,
       ALIYUN_PUSH_CHANNEL,
     ).setMethodCallHandler { call, result ->
       when (call.method) {
@@ -84,6 +103,90 @@ class MainActivity : FlutterActivity() {
         }
         else -> result.notImplemented()
       }
+    }
+  }
+
+  private fun requestSystemLocation(result: MethodChannel.Result, forceRefresh: Boolean) {
+    val locationManager = getSystemService(Context.LOCATION_SERVICE) as LocationManager
+    var delivered = false
+    val timeoutHandler = Handler(Looper.getMainLooper())
+    lateinit var listener: LocationListener
+
+    fun cleanup() {
+      timeoutHandler.removeCallbacksAndMessages(null)
+      runCatching { locationManager.removeUpdates(listener) }
+    }
+
+    fun finishSystemLocation(location: Location) {
+      if (delivered) return
+      delivered = true
+      cleanup()
+      runOnUiThread {
+        result.success(
+          mapOf(
+            "latitude" to location.latitude,
+            "longitude" to location.longitude,
+            "accuracy" to location.accuracy,
+            "altitude" to location.altitude,
+            "bearing" to location.bearing,
+            "speed" to location.speed,
+            "coordinateSystem" to "wgs84",
+          ),
+        )
+      }
+    }
+
+    fun finishError(code: String, message: String) {
+      if (delivered) return
+      delivered = true
+      cleanup()
+      runOnUiThread { result.error(code, message, null) }
+    }
+
+    listener = object : LocationListener {
+      override fun onLocationChanged(location: Location) {
+        if (location.latitude != 0.0 && location.longitude != 0.0) {
+          finishSystemLocation(location)
+        }
+      }
+    }
+
+    try {
+      val hasPermission = checkSelfPermission(android.Manifest.permission.ACCESS_FINE_LOCATION) ==
+        PackageManager.PERMISSION_GRANTED ||
+        checkSelfPermission(android.Manifest.permission.ACCESS_COARSE_LOCATION) ==
+          PackageManager.PERMISSION_GRANTED
+      if (!hasPermission) {
+        finishError("LOCATION_PERMISSION_DENIED", "定位权限未授予")
+        return
+      }
+
+      val providers = listOf(LocationManager.GPS_PROVIDER, LocationManager.NETWORK_PROVIDER)
+        .filter { provider -> runCatching { locationManager.isProviderEnabled(provider) }.getOrDefault(false) }
+      if (providers.isEmpty()) {
+        finishError("LOCATION_SERVICE_DISABLED", "定位服务未开启")
+        return
+      }
+      val lastKnown = providers.mapNotNull { provider ->
+        runCatching { locationManager.getLastKnownLocation(provider) }.getOrNull()
+      }.maxByOrNull { it.time }
+      if (!forceRefresh &&
+        lastKnown != null &&
+        lastKnown.latitude != 0.0 &&
+        lastKnown.longitude != 0.0
+      ) {
+        finishSystemLocation(lastKnown)
+        return
+      }
+      providers.forEach { provider ->
+        locationManager.requestLocationUpdates(provider, 1000L, 0f, listener, Looper.getMainLooper())
+      }
+      timeoutHandler.postDelayed(
+        { finishError("LOCATION_TIMEOUT", "定位超时，请稍后重试") },
+        12000,
+      )
+    } catch (error: Throwable) {
+      finishError("LOCATION_ERROR", error.message ?: "系统定位初始化失败")
     }
   }
 

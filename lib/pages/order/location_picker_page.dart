@@ -10,6 +10,7 @@ import 'package:latlong2/latlong.dart';
 import '../../config/amap_config.dart';
 import '../../config/app_theme.dart';
 import '../../services/map_service.dart';
+import '../../services/location_cache_service.dart';
 
 class LocationPickerPage extends StatefulWidget {
   final String? initialAddress;
@@ -430,11 +431,22 @@ class _LocationPickerPageState extends State<LocationPickerPage> {
   }
 
   Future<void> _bootstrapInitialPosition() async {
-    if (!_hasWebServiceKey) return;
     final seed = widget.initialAddress?.trim().isNotEmpty == true
         ? widget.initialAddress!.trim()
         : widget.initialCity?.trim();
-    if (seed == null || seed.isEmpty) return;
+    if (widget.initialAddress?.trim().isNotEmpty != true) {
+      try {
+        final current = await LocationCacheService.instance.getPosition();
+        if (!mounted || current == null) return;
+        _applyResolvedPosition(current);
+        _isSpecificPlaceSelection = true;
+        await _moveMapToResolvedPosition(current);
+        return;
+      } catch (_) {
+        // Keep the existing city/default map when location is unavailable.
+      }
+    }
+    if (!_hasWebServiceKey || seed == null || seed.isEmpty) return;
     _isSpecificPlaceSelection =
         widget.initialCity?.trim().isNotEmpty == true &&
         _normalizeCityName(seed) !=
@@ -498,7 +510,9 @@ class _LocationPickerPageState extends State<LocationPickerPage> {
 
   Future<void> _useCurrentLocation() async {
     try {
-      final result = await _mapService.currentPosition();
+      final result = await LocationCacheService.instance.getPosition(
+        forceRefresh: true,
+      );
       if (!mounted) return;
       if (result == null) {
         _showMessage('暂未获取到当前位置');
@@ -1562,6 +1576,13 @@ class _LocationPickerPageState extends State<LocationPickerPage> {
         // creating its platform view. Apply the latest target once it is
         // ready instead of losing that request.
         _moveNativeCamera(_mapTarget, zoom: _mapZoom);
+      },
+      onLocationChanged: (location) {
+        final point = location.latLng;
+        LocationCacheService.instance.updateFromNativeMap(
+          latitude: point.latitude,
+          longitude: point.longitude,
+        );
       },
       onCameraMove: (position) {
         if (!_nativeMapReady) return;

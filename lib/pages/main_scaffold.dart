@@ -436,24 +436,15 @@ class _MainScaffoldState extends State<MainScaffold>
   }
 
   Widget _centerButton() {
-    return GestureDetector(
-      onTap: () => _onTap(2),
-      child: Container(
-        width: 52,
-        height: 52,
-        decoration: BoxDecoration(
-          color: AppColors.primary,
-          shape: BoxShape.circle,
-          boxShadow: [
-            BoxShadow(
-              color: AppColors.primary.withValues(alpha: 0.32),
-              blurRadius: 18,
-              offset: const Offset(0, 6),
-            ),
-          ],
+    return Transform.translate(
+      offset: const Offset(0, -5),
+      child: GestureDetector(
+        onTap: () => _onTap(2),
+        child: const SizedBox(
+          width: 52,
+          height: 52,
+          child: DesignIcon('加号', size: 52),
         ),
-        alignment: Alignment.center,
-        child: const DesignIcon('加号', size: 52),
       ),
     );
   }

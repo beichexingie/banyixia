@@ -1,9 +1,12 @@
+import 'dart:async';
+
 import 'package:flutter/foundation.dart';
 import 'package:flutter/widgets.dart';
 
 import '../config/app_config.dart';
 import '../services/push_notification_service.dart';
 import '../services/session_service.dart';
+import '../services/location_cache_service.dart';
 
 class AppBootstrap {
   const AppBootstrap._();
@@ -28,6 +31,7 @@ class AppBootstrap {
       sessionService: sessionService,
       appVariant: appVariant,
     );
+    unawaited(LocationCacheService.instance.startIfAuthorized());
 
     debugPrint(
       'AppBootstrap: ECS session initialized, '

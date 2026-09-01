@@ -1,4 +1,5 @@
 import java.util.Properties
+import java.util.Base64
 
 plugins {
     id("com.android.application")
@@ -16,7 +17,29 @@ val localProperties = Properties().apply {
     }
 }
 
+fun dartDefine(name: String): String {
+    val encodedDefines = project.findProperty("dart-defines")?.toString().orEmpty()
+    return encodedDefines
+        .split(',')
+        .asSequence()
+        .mapNotNull { encoded ->
+            try {
+                String(Base64.getDecoder().decode(encoded), Charsets.UTF_8)
+            } catch (_: IllegalArgumentException) {
+                null
+            }
+        }
+        .firstOrNull { it.startsWith("$name=") }
+        ?.substringAfter('=')
+        ?.trim()
+        .orEmpty()
+}
+
+// Prefer local.properties for IDE builds, but also accept Flutter's
+// --dart-define so the native AMap SDK receives the same key as Dart.
 val amapAndroidKey = localProperties.getProperty("amap.android.key", "")
+    .trim()
+    .ifEmpty { dartDefine("AMAP_ANDROID_KEY") }
 val aliyunPushAppKey = localProperties.getProperty("aliyun.push.app.key", "")
 val aliyunPushAppSecret = localProperties.getProperty("aliyun.push.app.secret", "")
 

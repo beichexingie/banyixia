@@ -5,6 +5,7 @@ import 'package:provider/provider.dart';
 import 'package:flutter_application_1/config/amap_config.dart';
 import 'package:flutter_application_1/config/app_theme.dart';
 import 'package:flutter_application_1/services/map_service.dart';
+import 'package:flutter_application_1/services/location_cache_service.dart';
 
 import '../models/guide_app_models.dart';
 import '../providers/guide_console_provider.dart';
@@ -119,7 +120,7 @@ class _GuideRoutePageState extends State<GuideRoutePage> {
 
   Future<MapPosition?> _resolveOrigin(GuideAddress currentLocation) async {
     try {
-      final current = await _mapService.currentPosition();
+      final current = await LocationCacheService.instance.getPosition();
       if (current != null &&
           current.latitude != null &&
           current.longitude != null) {

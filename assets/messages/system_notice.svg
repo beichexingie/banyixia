@@ -1,0 +1,30 @@
+<svg viewBox="0 0 48 48" xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" width="48.000000" height="48.000000" fill="none" clip-path="url(#clipPath_2)" customFrame="url(#clipPath_2)">
+	<defs>
+		<clipPath id="clipPath_2">
+			<rect width="48.000000" height="48.000000" x="0.000000" y="0.000000" rx="24.000000" fill="rgb(255,255,255)" />
+		</clipPath>
+		<clipPath id="clipPath_3">
+			<rect width="27.000000" height="27.000000" x="10.000000" y="10.000000" fill="rgb(255,255,255)" />
+		</clipPath>
+		<linearGradient id="paint_linear_1" x1="19" x2="26.3125" y1="23.5" y2="24.625" gradientUnits="userSpaceOnUse">
+			<stop stop-color="rgb(188,254,42)" offset="0" stop-opacity="1" />
+			<stop stop-color="rgb(255,255,255)" offset="1" stop-opacity="1" />
+		</linearGradient>
+		<linearGradient id="paint_linear_2" x1="15.34375" x2="15.34375" y1="18.4375" y2="28.5625" gradientUnits="userSpaceOnUse">
+			<stop stop-color="rgb(188,254,42)" offset="0" stop-opacity="1" />
+			<stop stop-color="rgb(255,255,255)" offset="1" stop-opacity="1" />
+		</linearGradient>
+	</defs>
+	<rect id="Frame 1739336925" width="48.000000" height="48.000000" x="0.000000" y="0.000000" rx="24.000000" fill="rgb(245,246,250)" />
+	<rect id="Frame 1739336925" width="48.000000" height="48.000000" x="0.000000" y="0.000000" rx="24.000000" fill="rgb(240,255,206)" />
+	<g id="Frame" clip-path="url(#clipPath_3)" customFrame="url(#clipPath_3)">
+		<rect id="Frame" width="27.000000" height="27.000000" x="10.000000" y="10.000000" fill="rgb(255,255,255)" fill-opacity="0" />
+		<path id="Vector" d="M28.5625 14.5L18.4375 18.4375L18.4375 28.5625L28.5625 32.5L28.5625 14.5Z" fill="url(#paint_linear_1)" fill-rule="evenodd" />
+		<path id="Vector" d="M18.4375 18.4375L12.25 18.4375L12.25 28.5625L18.4375 28.5625L18.4375 18.4375Z" fill="url(#paint_linear_2)" fill-rule="evenodd" />
+		<path id="Vector" d="M18.4375 18.4375L18.4375 28.5625L12.25 28.5625L12.25 18.4375L18.4375 18.4375Z" fill-rule="evenodd" stroke="rgb(51,51,51)" stroke-linecap="round" stroke-linejoin="round" stroke-width="1.500000" />
+		<path id="Vector" d="M18.4375 18.4375L28.5625 14.5L28.5625 32.5L18.4375 28.5625" stroke="rgb(51,51,51)" stroke-linecap="round" stroke-linejoin="round" stroke-width="1.500000" />
+		<path id="Vector" d="M32.5 19.5625L33.625 19.5625" stroke="rgb(51,51,51)" stroke-linecap="round" stroke-linejoin="round" stroke-width="1.500000" />
+		<path id="Vector" d="M31.9375 24.0625L34.75 24.0625" stroke="rgb(51,51,51)" stroke-linecap="round" stroke-linejoin="round" stroke-width="1.500000" />
+		<path id="Vector" d="M32.5 28.5625L33.625 28.5625" stroke="rgb(51,51,51)" stroke-linecap="round" stroke-linejoin="round" stroke-width="1.500000" />
+	</g>
+</svg>

@@ -1,5 +1,6 @@
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter_svg/flutter_svg.dart';
 import 'package:go_router/go_router.dart';
 import 'package:provider/provider.dart';
 
@@ -125,28 +126,28 @@ class _MessagesPageState extends State<MessagesPage> {
         children: [
           Expanded(
             child: _quickAction(
-              icon: Icons.receipt_long_outlined,
+              asset: 'assets/messages/online_service.svg',
               label: '订单服务',
               onTap: () => context.push('/profile/orders'),
             ),
           ),
           Expanded(
             child: _quickAction(
-              icon: Icons.campaign_outlined,
+              asset: 'assets/messages/system_notice.svg',
               label: '活动通知',
               onTap: () => context.push('/messages/activities'),
             ),
           ),
           Expanded(
             child: _quickAction(
-              icon: Icons.notifications_none,
+              asset: 'assets/messages/activity_notice.svg',
               label: '系统通知',
               onTap: () => context.push('/messages/system'),
             ),
           ),
           Expanded(
             child: _quickAction(
-              icon: Icons.headset_mic_outlined,
+              asset: 'assets/messages/order_service.svg',
               label: '在线客服',
               onTap: _openCustomerService,
             ),
@@ -175,7 +176,7 @@ class _MessagesPageState extends State<MessagesPage> {
   }
 
   Widget _quickAction({
-    required IconData icon,
+    required String asset,
     required String label,
     required VoidCallback onTap,
   }) {
@@ -186,16 +187,7 @@ class _MessagesPageState extends State<MessagesPage> {
         padding: const EdgeInsets.symmetric(vertical: 4),
         child: Column(
           children: [
-            Container(
-              width: 60,
-              height: 60,
-              decoration: const BoxDecoration(
-                color: Color(0xFFEAF9B8),
-                shape: BoxShape.circle,
-              ),
-              alignment: Alignment.center,
-              child: Icon(icon, color: AppColors.textPrimary, size: 32),
-            ),
+            SvgPicture.asset(asset, width: 60, height: 60),
             const SizedBox(height: 8),
             Text(
               label,

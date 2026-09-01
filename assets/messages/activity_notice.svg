@@ -1,0 +1,22 @@
+<svg viewBox="0 0 48 48" xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" width="48.000000" height="48.000000" fill="none" clip-path="url(#clipPath_4)" customFrame="url(#clipPath_4)">
+	<defs>
+		<clipPath id="clipPath_4">
+			<rect width="48.000000" height="48.000000" x="0.000000" y="0.000000" rx="24.000000" fill="rgb(255,255,255)" />
+		</clipPath>
+		<clipPath id="clipPath_5">
+			<rect width="24.000000" height="24.000000" x="12.000000" y="12.000000" fill="rgb(255,255,255)" />
+		</clipPath>
+		<linearGradient id="paint_linear_3" x1="24" x2="24" y1="14" y2="31" gradientUnits="userSpaceOnUse">
+			<stop stop-color="rgb(188,254,42)" offset="0" stop-opacity="1" />
+			<stop stop-color="rgb(255,255,255)" offset="1" stop-opacity="1" />
+		</linearGradient>
+	</defs>
+	<rect id="Frame 1739336924" width="48.000000" height="48.000000" x="0.000000" y="0.000000" rx="24.000000" fill="rgb(245,246,250)" />
+	<rect id="Frame 1739336924" width="48.000000" height="48.000000" x="0.000000" y="0.000000" rx="24.000000" fill="rgb(240,255,206)" />
+	<g id="Frame" clip-path="url(#clipPath_5)" customFrame="url(#clipPath_5)">
+		<rect id="Frame" width="24.000000" height="24.000000" x="12.000000" y="12.000000" fill="rgb(255,255,255)" fill-opacity="0" />
+		<path id="Vector" d="M24 14C20.134 14 17 17.134 17 21L17 31L31 31L31 21C31 17.134 27.866 14 24 14Z" fill="url(#paint_linear_3)" fill-rule="nonzero" />
+		<path id="Vector" d="M17 31L17 21C17 17.134 20.134 14 24 14C27.866 14 31 17.134 31 21L31 31M14 31L34 31" fill-rule="evenodd" stroke="rgb(51,51,51)" stroke-linecap="round" stroke-linejoin="round" stroke-width="1.500000" />
+		<path id="Vector" d="M26.5 31.5L26.5 31L21.5 31L21.5 31.5C21.5 32.8807 22.6193 34 24 34C25.3807 34 26.5 32.8807 26.5 31.5Z" fill-rule="nonzero" stroke="rgb(51,51,51)" stroke-linecap="round" stroke-linejoin="round" stroke-width="1.500000" />
+	</g>
+</svg>
